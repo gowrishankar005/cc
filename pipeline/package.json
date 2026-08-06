@@ -8,11 +8,13 @@
   "bin": {
     "run-slice": "dist/orchestration/run-slice.js"
   },
+  "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json && mkdir -p dist/rules && cp src/rules/signal-catalogue.yml src/rules/node-type-mapping.yml src/rules/relationship-type-mapping.yml dist/rules/",
+    "build": "tsc -p tsconfig.json && mkdir -p dist/rules/control-requirements && cp src/rules/signal-catalogue.yml src/rules/node-type-mapping.yml src/rules/relationship-type-mapping.yml src/rules/control-requirement-catalogue.yml src/rules/persistence-detection-catalogue.yml src/rules/scope-limitations.yml src/rules/messaging-detection-catalogue.yml src/rules/http-client-detection-catalogue.yml src/rules/env-relationship-allowlist.yml dist/rules/ && cp src/rules/control-requirements/*.json dist/rules/control-requirements/ && cp src/scanner/engine-capability-matrix.yml dist/scanner/ && node scripts/generate-control-url-mapping.js",
     "run-slice": "node dist/orchestration/run-slice.js",
     "suggest-rules": "node dist/rules/suggest-rules.js",
-    "validate": "calm validate -a"
+    "validate": "calm validate -u dist/rules/control-url-mapping.json -a",
+    "test": "npm run build && node --test test/*.test.js"
   },
   "dependencies": {
     "@colbymchenry/codegraph": "^1.5.0",

@@ -16,3 +16,14 @@ mappings:
     calmNodeType: database
     interfaceCategories: []
     descriptiveCategories: [persistence]
+
+  # T-X7-1 — a message queue/topic (Kafka topic, JMS queue, SQS queue, SNS
+  # topic) maps to CALM's `network` node-type, not a new CALM-side
+  # construct — matches this project's own established convention of
+  # reusing an existing CALM enum value for a new architectural category
+  # rather than inventing one (the same reasoning `system` got for the
+  # composite/boundary case, per CALM_Construct_Reference_Deep_Dive_Spike.md).
+  - unitKind: topic
+    calmNodeType: network
+    interfaceCategories: []
+    descriptiveCategories: [messaging]

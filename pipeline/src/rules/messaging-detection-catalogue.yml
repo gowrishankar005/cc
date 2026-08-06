@@ -1,0 +1,57 @@
+# Catalogue for messaging-detector.ts (T-X7-2, G-L2-03). Mirrors
+# persistence-detection-catalogue.yml's own pattern deliberately — messaging
+# has the same "different code shapes need different strategies" problem
+# persistence did: a decorator-marked consumer (@KafkaListener/@JmsListener,
+# decisive evidence) is a completely different detection shape from an
+# import-only cloud client (SQS/SNS, weak evidence) or a typed-field producer
+# call (KafkaTemplate.send(), not built at all). Naming all three here, even
+# the unimplemented one, so the strategy inventory is honest and complete —
+# same discipline as persistence-detection-catalogue.yml's jooq/spring-data-repository rows.
+
+version: "0.1.0"
+
+strategies:
+  - id: import-only-cloud-client
+    description: >
+      A file imports a known cloud messaging-client library (SQS/SNS SDKs);
+      the class Graphify says that file `contains` becomes a topic-kind
+      unit. Deliberately LOW confidence (weight 20, same flat value
+      persistence-detector.ts's driver-import strategy uses for the same
+      reason) — importing a client library is real but WEAK evidence: it
+      proves the code CAN talk to a queue/topic, not that it does, and says
+      nothing about which queue/topic. Never promoted to high confidence
+      from import alone, per this task's own explicit instruction.
+    status: dispatched
+    libraries:
+      - { name: "@aws-sdk/client-sqs", language: typescript, evidenceLevel: unverified }
+      - { name: "@aws-sdk/client-sns", language: typescript, evidenceLevel: unverified }
+      - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — same false-positive caveat as its persistence-detection-catalogue.yml entry
+
+  - id: decorator-consumer
+    description: >
+      @KafkaListener/@JmsListener class/method annotations — decisive,
+      first-party evidence of a real messaging consumer. NOT dispatched by
+      messaging-detector.ts at all — implemented via the SAME decorator/
+      extractFromSource() mechanism as JAX-RS routes and JPA entities
+      (signal-catalogue.yml's kafka-listener/jms-listener rows, matched by
+      signal-mapper.ts). Named here for strategy-inventory completeness,
+      not because this dispatcher runs it — same convention as
+      persistence-detection-catalogue.yml's jpa-entity entry.
+    status: implemented-elsewhere
+    mechanism: decorator (signal-catalogue.yml kafka-listener/jms-listener rows)
+
+  - id: typed-field-producer
+    description: >
+      A typed field/variable of type KafkaTemplate (or similar) with a
+      .send()/.publish() call — the PRODUCER-side signal named in
+      requirements v0.11 ("messaging detection gets a real two-mechanism
+      design: decorator for consumers, typed-field for producers").
+      Genuinely NOT built this round: this needs call-based typed-field
+      usage detection, a mechanism this pipeline has never built (every
+      existing extraction mechanism is either native-route typing,
+      decorator/extractFromSource(), or Graphify import-edges — none of
+      those detect "a call to .send() on a field of a specific type").
+      Left honestly unimplemented rather than attempted under time pressure
+      with an unproven approach.
+    status: not-implemented
+    mechanism: would-need call-based typed-field-usage detection (new mechanism, not yet built anywhere in this pipeline)

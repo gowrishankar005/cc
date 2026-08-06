@@ -1,0 +1,3 @@
+# CoE Lab ground truth — do not load into implementation agents (bias risk)
+coe-lab/gold/packages/
+coe-lab/gold/calm/

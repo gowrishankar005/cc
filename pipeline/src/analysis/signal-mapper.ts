@@ -1,4 +1,4 @@
-import { NativeRouteFact, DecoratorFact } from '../scanner/codegraph-provider';
+import { NativeRouteFact, DecoratorFact } from '../scanner/structural-engine';
 import { SignalCatalogue, findRule } from '../rules/rule-schema';
 import { Evidence, TypedUnit, IgnoredItem } from '../types/typed-facts';
 import { ignoreUnknownSignal } from './ignored-items';
@@ -26,10 +26,10 @@ export function mapSignalsToUnits(
   // read the matched rule's calmNodeType field at all). 'service' wins ties
   // (an HTTP-entry-point signal is decisive over a co-located persistence
   // annotation, though that combination hasn't been seen in practice).
-  const nodeTypeVotesByFile = new Map<string, Set<'service' | 'database'>>();
+  const nodeTypeVotesByFile = new Map<string, Set<'service' | 'database' | 'topic'>>();
   const ignoredItems: IgnoredItem[] = [];
 
-  const record = (filePath: string, line: number, ev: Evidence, calmNodeType: 'service' | 'database') => {
+  const record = (filePath: string, line: number, ev: Evidence, calmNodeType: 'service' | 'database' | 'topic') => {
     if (!evidenceByFile.has(filePath)) evidenceByFile.set(filePath, []);
     evidenceByFile.get(filePath)!.push(ev);
     const span = linesByFile.get(filePath) ?? { start: line, end: line };
@@ -90,7 +90,12 @@ export function mapSignalsToUnits(
     const span = linesByFile.get(filePath)!;
     const confidence = scoreConfidence(evidence);
     const votes = nodeTypeVotesByFile.get(filePath) ?? new Set();
-    const kind = votes.has('service') ? 'service' : votes.has('database') ? 'database' : 'service';
+    // T-X7-1/2 — extended to a third vote value, additive not a rewrite (per
+    // Contract_Evolution_Policy.md §4's own dry run of this exact change).
+    // Precedence unchanged for the first two tiers: service (HTTP entry
+    // point is decisive) beats database beats topic beats the 'service'
+    // default when no signal voted at all.
+    const kind = votes.has('service') ? 'service' : votes.has('database') ? 'database' : votes.has('topic') ? 'topic' : 'service';
     units.push({
       id: filePath,
       kind,

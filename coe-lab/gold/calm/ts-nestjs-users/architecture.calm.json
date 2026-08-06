@@ -1,0 +1,61 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-ts-nestjs-users",
+  "name": "CoE Lab \u2014 NestJS Users API",
+  "description": "Hand-authored gold architecture for the NestJS-style UsersController fixture. OpenAPI YAML is an alternate contract view, not a second deployable service.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/ts-nestjs-users"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "users-api",
+      "node-type": "service",
+      "name": "Users API",
+      "description": "NestJS UsersController at base path /users (users.controller.ts).",
+      "interfaces": [
+        {
+          "unique-id": "users-api-list",
+          "type": "path-interface",
+          "path": "GET /users"
+        },
+        {
+          "unique-id": "users-api-get",
+          "type": "path-interface",
+          "path": "GET /users/:id"
+        },
+        {
+          "unique-id": "users-api-create",
+          "type": "path-interface",
+          "path": "POST /users"
+        }
+      ]
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "users-api"
+          ]
+        }
+      }
+    }
+  ]
+}

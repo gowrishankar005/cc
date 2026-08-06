@@ -1,0 +1,88 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-py-accounts-api",
+  "name": "CoE Lab \u2014 Accounts API",
+  "description": "Hand-authored gold architecture for the Flask accounts API fixture (accounts_api.py + AccountDb SQLAlchemy store). Independent of the generator \u2014 derived from fixture source and semantic gold.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/py-accounts-api"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "accounts-api",
+      "node-type": "service",
+      "name": "Accounts API",
+      "description": "Flask HTTP service exposing account CRUD and health endpoints (accounts_api.py).",
+      "interfaces": [
+        {
+          "unique-id": "accounts-api-health",
+          "type": "path-interface",
+          "path": "GET /health"
+        },
+        {
+          "unique-id": "accounts-api-list",
+          "type": "path-interface",
+          "path": "GET /accounts"
+        },
+        {
+          "unique-id": "accounts-api-get",
+          "type": "path-interface",
+          "path": "GET /accounts/<id>"
+        },
+        {
+          "unique-id": "accounts-api-create",
+          "type": "path-interface",
+          "path": "POST /accounts"
+        }
+      ]
+    },
+    {
+      "unique-id": "accounts-db",
+      "node-type": "database",
+      "name": "AccountDb",
+      "description": "SQLAlchemy-backed in-memory account store (account_db.py class AccountDb)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "accounts-api-connects-accounts-db",
+      "description": "Accounts API uses AccountDb for persistence (import + method calls).",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "accounts-api"
+          },
+          "destination": {
+            "node": "accounts-db"
+          }
+        }
+      },
+      "protocol": "JDBC"
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "accounts-api",
+            "accounts-db"
+          ]
+        }
+      }
+    }
+  ]
+}

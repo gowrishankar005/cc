@@ -1,0 +1,26 @@
+{
+  "packageId": "py-jwt-gateway",
+  "goldVersion": "0.1.0",
+  "tier": "stretch",
+  "description": "Flask gateway with jwt.decode call-based auth (BoA-shaped). Control attachment is stretch until call-based catalogue exists.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/py-jwt-gateway",
+  "changelog": "v0.1.0 initial",
+  "nodes": [
+    {
+      "id": "jwt-gateway",
+      "nodeType": "service",
+      "match": { "nameContains": "auth_gateway" },
+      "interfaces": ["GET /health", "GET /secure/ping"]
+    }
+  ],
+  "relationships": [],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [],
+  "expectedPlatformGaps": [
+    "jwt.decode is call-based control evidence — may not attach controls until catalogue supports call-based detection",
+    "Service + routes should still be found via Flask native typing"
+  ],
+  "expectControls": false
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-lib-fintech-common",
+  "name": "CoE Lab — Fintech Common Library (trap)",
+  "description": "Hand-authored gold for the shared utility library trap. Money and StringUtils are pure helpers — the intended architecture has zero deployable services, databases, or relationships. An empty nodes/relationships model is the correct answer.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/lib-fintech-common"
+    },
+    {
+      "key": "x-lab-trap",
+      "value": "must-not-emit-service-for-utility-classes"
+    }
+  ],
+  "nodes": [],
+  "relationships": []
+}

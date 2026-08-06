@@ -46,6 +46,20 @@ mappings:
     calmRelationshipType: connects
     protocol: null
 
+  # T-X5-0 — k8s shared-Secret/ConfigMap trust relationship. Still maps to
+  # `connects` (CALM has no dedicated "trust" relationship-type; `interacts`
+  # is actor-fan-out shape, doesn't fit a peer-to-peer trust edge) — the
+  # DISTINCTION this pipeline needed wasn't a new CALM shape, it was a named
+  # TypedRelationship.kind so the fact isn't silently indistinguishable from
+  # a code-level `calls`/`imports` edge upstream of CALM construction.
+  # protocol stays null deliberately — a shared Secret name is not itself a
+  # network protocol, and this pipeline never invents one (v0.9 §1 discipline).
+  - relationshipKind: shares-secret
+    sourceNodeType: service
+    targetNodeType: service
+    calmRelationshipType: connects
+    protocol: null
+
 # Fallback when no row matches a {kind, sourceType, targetType} triple: still
 # `connects`, never `interacts` — see rules/relationship-type-mapping-schema.ts
 # for the exact default-application order.

@@ -1,0 +1,48 @@
+name: pipeline test
+
+# Runs the real regression suite (pipeline/test/regression.test.js) on every
+# push/PR touching pipeline/. Note: spikes/boa and spikes/fineract are
+# disposable scratch clones (see CLAUDE.md) and are NOT cloned here — those
+# regression cases SKIP by design (test/regression.test.js's own skip
+# logic), so this gives a real but partial signal: the checked-in NestJS
+# fixture and the module-registry checks always run; the BoA/Fineract cases
+# only run locally where those clones already exist. Honest partial
+# coverage, not silently overclaiming full coverage in CI.
+on:
+  push:
+    paths:
+      - 'pipeline/**'
+      - '.github/workflows/pipeline-test.yml'
+  pull_request:
+    paths:
+      - 'pipeline/**'
+      - '.github/workflows/pipeline-test.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: pipeline/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Graphify (scanner/graphify-provider.ts) — installed so the
+      # cross-package pass actually exercises the real subprocess path in CI
+      # instead of silently degrading (run-slice.ts catches a missing
+      # binary and continues without relationships, so this isn't required
+      # for tests to pass, but it's cheap and gives a stronger real signal).
+      - run: pip install graphifyy
+
+      - run: npm ci
+      - run: npm test

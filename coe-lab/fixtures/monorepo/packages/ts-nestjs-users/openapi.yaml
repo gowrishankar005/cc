@@ -1,0 +1,36 @@
+openapi: 3.0.3
+info:
+  title: Lab Users API
+  version: 0.1.0
+paths:
+  /users:
+    get:
+      operationId: listUsers
+      responses:
+        "200":
+          description: OK
+    post:
+      operationId: createUser
+      responses:
+        "201":
+          description: Created
+  /users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+security:
+  - bearerAuth: []

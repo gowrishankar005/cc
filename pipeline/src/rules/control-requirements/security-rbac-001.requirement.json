@@ -1,0 +1,5 @@
+{
+  "control-id": "security-rbac-001",
+  "name": "Role-Based Access Control",
+  "description": "Method or endpoint access restricted by role/authority"
+}

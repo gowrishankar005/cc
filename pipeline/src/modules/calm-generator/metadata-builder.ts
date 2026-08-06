@@ -1,5 +1,7 @@
+import * as path from 'path';
 import { TypedFacts, TypedUnit } from '../../types/typed-facts';
 import { CalmNode, CalmMetadataEntry } from '../../types/calm';
+import { loadScopeLimitations } from '../../rules/scope-limitations-schema';
 
 /** Attaches per-node x-aac-* metadata (mutates in place) — unchanged fields from the original build-calm.ts. */
 export function attachNodeMetadata(units: TypedUnit[], nodes: CalmNode[], facts: TypedFacts): void {
@@ -15,20 +17,16 @@ export function attachNodeMetadata(units: TypedUnit[], nodes: CalmNode[], facts:
   }
 }
 
-/** Document-root x-aac-* metadata, including the scope-limitations disclosure. */
+/** Document-root x-aac-* metadata, including the scope-limitations disclosure (T-X0-3 — sourced from rules/scope-limitations.yml, not a hardcoded literal). */
 export function buildDocumentMetadata(facts: TypedFacts): CalmMetadataEntry[] {
+  const scopeLimitations = loadScopeLimitations(path.join(__dirname, '..', '..', 'rules'));
   return [
     { key: 'x-aac-run-version', value: facts.runVersion },
     { key: 'x-aac-generated-at', value: facts.generatedAt },
     { key: 'x-aac-package-roots', value: facts.packageRoots },
     {
       key: 'x-aac-scope-limitations',
-      value: [
-        'HTTP-entry-point and Graphify-visible-persistence signals only (Slice 1 scope, requirements v0.6 §1.5).',
-        'Config/env-var-mediated relationships (e.g. JWT signing-key trust between services) are not detected.',
-        'Intra-file business logic (validation, auth checks) is not modeled as separate units.',
-        'A high x-aac-confidence score reflects certainty about the SIGNALS FOUND, not completeness of the architecture picture.',
-      ],
+      value: scopeLimitations.limitations.map((l) => l.text),
     },
   ];
 }

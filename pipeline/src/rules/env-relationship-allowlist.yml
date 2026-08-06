@@ -1,0 +1,21 @@
+# T-X9-0 (G-L1-06) — key-name-PATTERN allowlist only. This file names
+# which env-var/ConfigMap KEY NAME suffixes are considered architecturally
+# meaningful enough to feed the (off-by-default) env soft-graph — it never
+# contains, references, or implies any VALUE-matching rule. Real evidence:
+# spikes/boa/repo/kubernetes-manifests/config.yaml's `service-api-config`
+# ConfigMap has keys USERSERVICE_API_ADDR/CONTACTS_API_ADDR/BALANCES_API_ADDR/
+# HISTORY_API_ADDR/TRANSACTIONS_API_ADDR — all real, all matching one
+# pattern below, none of their VALUES ever read by this pipeline.
+
+version: "0.1.0"
+
+# Case-insensitive suffixes. A key name is IN the allowlist iff it ends
+# with one of these (after stripping, the remainder is the candidate
+# "service basename" used for correlation, e.g. "USERSERVICE_API_ADDR"
+# strips to "USERSERVICE").
+suffixes:
+  - "_API_ADDR"
+  - "_ADDR"
+  - "_URI"
+  - "_URL"
+  - "_HOST"

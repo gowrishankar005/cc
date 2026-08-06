@@ -1,0 +1,66 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-deploy-k8s-trust",
+  "name": "CoE Lab \u2014 K8s JWT Trust",
+  "description": "Hand-authored gold for Bank of Anthos\u2013class shared jwt-key Secret: accounts_api (issuer, private key mount) and ledger_api (verifier, public key mount) trust via shared secret material.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/deploy/k8s"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "accounts-deploy",
+      "node-type": "service",
+      "name": "accounts_api",
+      "description": "Kubernetes Deployment accounts_api mounting jwt-key private key (issuer role)."
+    },
+    {
+      "unique-id": "ledger-deploy",
+      "node-type": "service",
+      "name": "ledger_api",
+      "description": "Kubernetes Deployment ledger_api mounting jwt-key public key (verifier role)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "jwt-key-trust-accounts-to-ledger",
+      "description": "Shared Secret jwt-key establishes trust: issuer accounts_api to verifier ledger_api.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "accounts-deploy"
+          },
+          "destination": {
+            "node": "ledger-deploy"
+          }
+        }
+      },
+      "protocol": "TLS"
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "accounts-deploy",
+            "ledger-deploy"
+          ]
+        }
+      }
+    }
+  ]
+}

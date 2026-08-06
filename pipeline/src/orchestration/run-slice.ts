@@ -1,128 +1,265 @@
 #!/usr/bin/env node
+import * as fs from 'fs';
 import * as path from 'path';
-import {
-  indexPackage,
-  extractDecoratorFacts,
-  listIndexedFiles,
-  NativeRouteFact,
-  DecoratorFact,
-} from '../scanner/codegraph-provider';
+import { codeGraphEngine } from '../scanner/codegraph-provider';
+import { discoverDeployableManifests } from '../scanner/deployable-manifest-provider';
 import { runDetectGateSmokeTest } from '../scanner/detect-gate-smoketest';
-import { runGraphifyPass } from '../scanner/graphify-provider';
+import { loadEngineCapabilityMatrix, logEngineCapabilitySummary } from '../scanner/engine-capability-matrix';
 import { loadSignalCatalogue } from '../rules/rule-schema';
-import { mapSignalsToUnits } from '../analysis/signal-mapper';
-import { composeJaxRsRoutes } from '../analysis/jaxrs-route-composer';
-import { reconcileCrossPackageEdges } from '../analysis/cross_package/graphify-reconciler';
-import { detectPersistenceUnits } from '../analysis/cross_package/persistence-detector';
-import { ignoreLowConfidence } from '../analysis/ignored-items';
-import { writeArtefacts } from '../modules/calm-generator/write-artefacts';
-import { TypedFacts, TypedUnit, IgnoredItem } from '../types/typed-facts';
+import { runModules } from '../modules/registry';
+import { resolveModules, DEFAULT_MODULE_NAMES } from '../modules/available-modules';
+import { AnalysisContext, RawRootFacts, runPasses } from '../analysis/pass-registry';
+import { DEFAULT_PASSES } from '../analysis/passes';
+import { writePlatformArtefacts } from './platform-artefacts';
+import { buildEvidencePacks } from '../analysis/ir/evidence-packs';
+import { renderIntelligenceIR } from '../analysis/ir/intelligence-ir';
+import { CoverageReport } from '../analysis/coverage-report';
+import { UnmappedSignalsReport } from '../analysis/unmapped-signals';
+import { TypedFacts, CONTRACT_VERSION } from '../types/typed-facts';
 
-const CONFIDENCE_FLOOR = 40;
+/**
+ * Shared by both a normal scan-and-build run and --from-facts reconstruct-only
+ * mode (T-X6-3) — runModules + --strict-overrides check + IR render is the
+ * same tail either way; the only difference between the two modes is
+ * whether facts/coverage/unmapped came from a fresh scan or a frozen file.
+ * Kept here as a small helper, not duplicated, per "no feature dumps in
+ * run-slice.ts" — this itself IS the wiring, not new analysis logic.
+ */
+function finishRun(
+  facts: TypedFacts,
+  coverage: CoverageReport,
+  unmapped: UnmappedSignalsReport,
+  outDir: string,
+  overridesDir: string | undefined,
+  moduleNames: string[],
+  includeSnippets: boolean,
+  strictOverrides: boolean,
+  includeSystemNode: boolean
+): void {
+  runModules(resolveModules(moduleNames), facts, { outDir, overridesDir, includeSystemNode });
 
-async function runSlice(packageRoots: string[], outDir: string, overridesDir?: string): Promise<void> {
+  // T-X6-2 — --strict-overrides reads back calm-generator's own
+  // overrides-applied-report.json (already written by runModules above) the
+  // same way the IR's module-projection appendix already reads real module
+  // output after the fact — not a new pattern, just this task's use of the
+  // existing one. Orphans (stale DR/override pairs pointing at a
+  // renamed/removed node) are a silent-decay risk if nobody's watching;
+  // this makes that failure loud on request, default stays warn-only via
+  // the report file alone.
+  if (strictOverrides) {
+    const reportPath = path.join(outDir, 'modules', 'calm-generator', 'overrides-applied-report.json');
+    if (fs.existsSync(reportPath)) {
+      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+      if (report.orphans?.length > 0) {
+        console.error(`[run-slice] FAILED (--strict-overrides): ${report.orphans.length} orphaned override(s) — see modules/calm-generator/overrides-applied-report.json`);
+        process.exit(1);
+      }
+    }
+  }
+
+  // T-X3-2 — rendered AFTER modules run so the optional "module projections"
+  // appendix can read their real output (CALM node/relationship counts,
+  // threat-signals findings) — still one-way (reads outDir, never writes
+  // back into facts/ctx) and still not calm-generator's own artefact.
+  const evidencePacks = buildEvidencePacks(facts.ignoredItems, facts.packageRoots, includeSnippets);
+  const ir = renderIntelligenceIR(facts, coverage, unmapped, evidencePacks, outDir);
+  fs.writeFileSync(path.join(outDir, 'intelligence-ir.md'), ir);
+
+  console.log(`[run-slice] wrote artefacts to ${outDir}`);
+}
+
+/**
+ * Wave M T-M7 — orchestration is now: scan -> runPasses -> build TypedFacts
+ * -> runModules, not one function body with every analysis step inlined.
+ * "Scan" (raw structural-engine indexing) stays here, not a pass, since it's
+ * the one step every pass depends on having already happened and it isn't
+ * itself an "analysis" step — it's Scanner, feeding Analysis.
+ */
+async function runSlice(
+  packageRoots: string[],
+  outDir: string,
+  overridesDir?: string,
+  moduleNames: string[] = DEFAULT_MODULE_NAMES,
+  strictDetect = false,
+  includeSnippets = true,
+  k8sManifestsDir?: string,
+  strictOverrides = false,
+  includeSystemNode = true,
+  enableEnvSoftGraph = false
+): Promise<void> {
   const catalogue = loadSignalCatalogue(path.join(__dirname, '..', 'rules'));
+  logEngineCapabilitySummary(loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner')));
 
-  const allUnits: TypedUnit[] = [];
-  const allIgnoredItems: IgnoredItem[] = [];
-  const unitsByRoot = new Map<string, TypedUnit[]>();
-
-  // Step 1-2 + 4-5: CodeGraph pass per package root (native routes + decorator facts -> typed units)
+  // Scan: structural-engine pass per package root (native routes + raw
+  // decorator facts). Depends on the StructuralEngine interface
+  // (structural-engine.ts), not on codegraph-provider.ts's specific
+  // exports — codeGraphEngine is the one real implementation today,
+  // swappable at this single call site.
+  const engine = codeGraphEngine;
+  const rawByRoot = new Map<string, RawRootFacts>();
+  let anySilentFailure = false;
   for (const root of packageRoots) {
-    const { cg, nativeRoutes } = await indexPackage(root);
+    const { handle, nativeRoutes } = await engine.indexPackage(root);
+    const detectGateResult = runDetectGateSmokeTest(root, nativeRoutes.length);
+    if (detectGateResult.suspectedSilentFailure) anySilentFailure = true;
 
-    runDetectGateSmokeTest(root, nativeRoutes.length);
-
-    const indexedFiles = listIndexedFiles(cg, ['.py', '.ts', '.java']);
-    const decoratorFacts: DecoratorFact[] = [];
+    const indexedFiles = engine.listIndexedFiles(handle, ['.py', '.ts', '.java']);
+    const decoratorFacts = indexedFiles.flatMap((file) => engine.extractDecoratorFacts(handle, root, file));
+    const filesByExt: Record<string, number> = {};
     for (const file of indexedFiles) {
-      const fileFacts = extractDecoratorFacts(cg, root, file);
-      // JAX-RS has no native route typing (CodeGraph is Spring/Play-only for
-      // Java) — compose class-level + method-level @Path into full routes,
-      // then drop the raw per-annotation facts that fed the composition so
-      // they don't ALSO produce a redundant low-quality entry (same
-      // precedence discipline as the native-route-vs-decorator-fallback fix).
-      const { composed, consumed } = composeJaxRsRoutes(fileFacts);
-      decoratorFacts.push(...fileFacts.filter((f) => !consumed.has(f)), ...composed);
+      const ext = path.extname(file);
+      filesByExt[ext] = (filesByExt[ext] ?? 0) + 1;
     }
-
-    const { units, ignoredItems } = mapSignalsToUnits(nativeRoutes, decoratorFacts, catalogue);
-    for (const u of units) {
-      if (u.confidence < CONFIDENCE_FLOOR) {
-        allIgnoredItems.push(ignoreLowConfidence(u.id, u.confidence));
-      } else {
-        allUnits.push(u);
-      }
-    }
-    allIgnoredItems.push(...ignoredItems);
-    unitsByRoot.set(root, units);
-
-    console.log(
-      `[run-slice] ${root}: ${nativeRoutes.length} native route(s), ${decoratorFacts.length} decorator fact(s), ${units.length} unit(s)`
-    );
+    const deployableManifests = discoverDeployableManifests(root); // T-X8-1
+    rawByRoot.set(root, { nativeRoutes, decoratorFacts, filesByExt, deployableManifests });
   }
 
-  // Step 3: one Graphify pass across all roots.
-  let relationships: TypedFacts['relationships'] = [];
-  if (packageRoots.length > 0) {
-    try {
-      const graphsByRoot = runGraphifyPass(packageRoots);
-
-      // Persistence units: CodeGraph gives zero persistence signal (confirmed
-      // repeatedly this project — Java JPA, now Python SQLAlchemy), but
-      // Graphify's raw imports_from/contains edges already carry it. Add
-      // these as database-kind units BEFORE reconciling, so the reconciler
-      // has something to map db.py's class nodes onto — without this, those
-      // Graphify nodes have no matching unit and every edge touching them
-      // is silently dropped (the exact gap the accuracy audit found).
-      for (const root of packageRoots) {
-        const graph = graphsByRoot.get(root);
-        if (!graph) continue;
-        const persistenceUnits = detectPersistenceUnits(root, graph);
-        if (persistenceUnits.length > 0) {
-          console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via graphify`);
-        }
-        allUnits.push(...persistenceUnits);
-        unitsByRoot.set(root, [...(unitsByRoot.get(root) ?? []), ...persistenceUnits]);
-      }
-
-      relationships = reconcileCrossPackageEdges(graphsByRoot, unitsByRoot);
-      const crossCount = relationships.filter((r) => r.crossPackage).length;
-      console.log(
-        `[run-slice] graphify: ${relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${relationships.length - crossCount} same-package)`
-      );
-    } catch (err) {
-      console.warn(`[run-slice] WARNING: graphify pass failed, continuing without cross-package relationships: ${err}`);
-    }
+  // T-X1-2 — detect-gate-smoketest.ts already computes suspectedSilentFailure
+  // (requirements v0.6 §4's known CodeGraph detect()-gate silent-failure
+  // pattern) but only warns; --strict-detect makes that failure loud instead
+  // of leaving a monorepo pilot to silently produce zero routes and no
+  // indication why. Default stays warn-only, unchanged from before this task.
+  if (strictDetect && anySilentFailure) {
+    console.error('[run-slice] FAILED (--strict-detect): at least one package root has grep-verified route usage but 0 native routes — see the [detect-gate-smoketest] warning(s) above.');
+    process.exit(1);
   }
+
+  const ctx: AnalysisContext = {
+    packageRoots,
+    catalogue,
+    rawByRoot,
+    allUnits: [],
+    allIgnoredItems: [],
+    unitsByRoot: new Map(),
+    relationships: [],
+    k8sManifestsDir,
+    enableEnvSoftGraph,
+  };
+  await runPasses(DEFAULT_PASSES, ctx);
+  const { coverage, unmapped } = writePlatformArtefacts(ctx, outDir);
 
   const facts: TypedFacts = {
+    contractVersion: CONTRACT_VERSION,
     runVersion: catalogue.version,
     generatedAt: new Date().toISOString(),
     packageRoots,
-    units: allUnits,
-    relationships,
-    ignoredItems: allIgnoredItems,
+    units: ctx.allUnits,
+    relationships: ctx.relationships,
+    ignoredItems: ctx.allIgnoredItems,
   };
 
-  writeArtefacts(facts, outDir, overridesDir);
-  console.log(`[run-slice] wrote artefacts to ${outDir}`);
+  // Goal A's actual plumbing: a real registry, module list externalized
+  // (Wave M T-M1) — resolveModules throws clearly on an unknown name rather
+  // than silently dropping it, and the default list preserves the exact
+  // behavior this pipeline has always had (calm-generator + threat-signals)
+  // when --modules isn't passed.
+  finishRun(facts, coverage, unmapped, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
+}
+
+/**
+ * T-X6-3 — reconstruct-only mode: rebuilds modules + IR + overrides from an
+ * EXISTING typed-facts.json, no rescan (no StructuralEngine/Graphify/k8s
+ * calls at all). Real use case: iterating on an Override/Decision Record
+ * pair against a large monorepo shouldn't require a multi-minute rescan
+ * every time — the facts a human is authoring overrides against haven't
+ * changed, only the overrides have.
+ *
+ * Refuses an incompatible contractVersion outright (major segment mismatch
+ * against the currently-running code's CONTRACT_VERSION) rather than
+ * attempting a reconstruction the module registry would just skip anyway —
+ * failing loudly here, before any module even runs, per the acceptance
+ * criterion ("refuse incompatible contractVersion").
+ *
+ * Honest limitation, not silently glossed over: coverage-report.json and
+ * unmapped-signals-report.json are NOT regenerated — they need raw scan
+ * internals (rawByRoot, the live GraphifyRun) that typed-facts.json never
+ * carried in the first place, so there is nothing to reconstruct them FROM.
+ * intelligence-ir.md is still rendered, with empty/placeholder coverage +
+ * unmapped sections clearly marked as "not recomputed in --from-facts mode"
+ * rather than showing misleading zeros as if a fresh scan found nothing.
+ */
+function runFromFacts(
+  factsPath: string,
+  outDir: string,
+  overridesDir?: string,
+  moduleNames: string[] = DEFAULT_MODULE_NAMES,
+  includeSnippets = true,
+  strictOverrides = false,
+  includeSystemNode = true
+): void {
+  const facts: TypedFacts = JSON.parse(fs.readFileSync(factsPath, 'utf8'));
+
+  const factsMajor = facts.contractVersion.split('.')[0];
+  const runningMajor = CONTRACT_VERSION.split('.')[0];
+  if (factsMajor !== runningMajor) {
+    console.error(
+      `[run-slice] FAILED (--from-facts): ${factsPath} has contractVersion "${facts.contractVersion}" (major ${factsMajor}), but this build's CONTRACT_VERSION is "${CONTRACT_VERSION}" (major ${runningMajor}) — refusing to reconstruct against an incompatible contract shape.`
+    );
+    process.exit(1);
+  }
+
+  const placeholderCoverage: CoverageReport = {
+    generatedAt: facts.generatedAt,
+    graphifyStatus: 'skipped',
+    roots: [],
+    ignoredByReason: {},
+    unmappedSignalCount: 0,
+    k8sManifestsStatus: 'not-provided',
+    relationshipsByKind: {},
+    relationshipsBySource: {},
+    unresolvedByMechanism: {},
+  };
+  const placeholderUnmapped: UnmappedSignalsReport = {
+    generatedAt: facts.generatedAt,
+    totalUnmappedOccurrences: 0,
+    clusterCount: 0,
+    truncated: false,
+    clusters: [],
+    footer: '--from-facts mode: coverage/unmapped were NOT recomputed (no rescan) — see the original run\'s coverage-report.json for real counts.',
+  };
+
+  finishRun(facts, placeholderCoverage, placeholderUnmapped, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
 }
 
 function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error('Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>]');
+    console.error(
+      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph]\n' +
+        '   or: run-slice --from-facts <typed-facts.json> [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--no-snippets] [--strict-overrides] [--no-system-node]'
+    );
     process.exit(1);
   }
   const outIdx = args.indexOf('--out');
   const outDir = outIdx >= 0 ? args[outIdx + 1] : path.join(process.cwd(), 'calm-output');
   const overridesIdx = args.indexOf('--overrides');
   const overridesDir = overridesIdx >= 0 ? path.resolve(args[overridesIdx + 1]) : undefined;
-  const positionalEnd = [outIdx, overridesIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const modulesIdx = args.indexOf('--modules');
+  const moduleNames = modulesIdx >= 0 ? args[modulesIdx + 1].split(',').map((s) => s.trim()) : DEFAULT_MODULE_NAMES;
+  const noSnippetsIdx = args.indexOf('--no-snippets');
+  const includeSnippets = noSnippetsIdx === -1;
+  const strictOverrides = args.includes('--strict-overrides');
+  const strictOverridesIdx = args.indexOf('--strict-overrides');
+  const noSystemNodeIdx = args.indexOf('--no-system-node');
+  const includeSystemNode = noSystemNodeIdx === -1;
+
+  const fromFactsIdx = args.indexOf('--from-facts');
+  if (fromFactsIdx >= 0) {
+    const factsPath = path.resolve(args[fromFactsIdx + 1]);
+    runFromFacts(factsPath, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
+    return;
+  }
+
+  const strictDetect = args.includes('--strict-detect');
+  const strictDetectIdx = args.indexOf('--strict-detect');
+  const k8sManifestsIdx = args.indexOf('--k8s-manifests');
+  const k8sManifestsDir = k8sManifestsIdx >= 0 ? path.resolve(args[k8sManifestsIdx + 1]) : undefined;
+  const enableEnvSoftGraph = args.includes('--enable-env-soft-graph');
+  const enableEnvSoftGraphIdx = args.indexOf('--enable-env-soft-graph');
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
-  runSlice(packageRoots, outDir, overridesDir).catch((err) => {
+  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph).catch((err) => {
     console.error('[run-slice] FAILED:', err);
     process.exit(1);
   });

@@ -1,4 +1,4 @@
-import { NativeRouteFact } from './codegraph-provider';
+import { NativeRouteFact } from './structural-engine';
 
 /**
  * Native routes are already typed by CodeGraph's framework resolvers

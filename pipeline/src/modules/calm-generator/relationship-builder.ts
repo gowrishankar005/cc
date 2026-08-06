@@ -1,4 +1,4 @@
-import { TypedRelationship } from '../../types/typed-facts';
+import { TypedRelationship, TypedUnit } from '../../types/typed-facts';
 import { CalmNode, CalmRelationship, CalmRelationshipTypeShape } from '../../types/calm';
 import { RelationshipTypeMapping, findRelationshipTypeMapping } from '../../rules/construct-mapping-schema';
 
@@ -11,14 +11,36 @@ import { RelationshipTypeMapping, findRelationshipTypeMapping } from '../../rule
  * constructed here because no row asks for it (no actor-node detection
  * exists yet) — adding actor detection later is a catalogue row, not a code
  * change to this file.
+ *
+ * T-X7-4 — protocol comes from the catalogue row first (rule.protocol,
+ * always null today — no row sets one); when that's absent, falls back to
+ * `protocolBySignal` (built from persistence-detection-catalogue.yml's
+ * per-library `protocol` field, e.g. org.postgresql -> JDBC) by checking
+ * whether EITHER endpoint unit's own evidence names a library with a known
+ * protocol. Still null, not invented, when neither source has one — the
+ * exact discipline this pipeline has held since the original interacts/
+ * connects fix (v0.9 §1: "leave null honestly").
  */
 export function buildRelationships(
   relationships: TypedRelationship[],
   nodes: CalmNode[],
-  mapping: RelationshipTypeMapping
+  mapping: RelationshipTypeMapping,
+  units: TypedUnit[] = [],
+  protocolBySignal: Map<string, string> = new Map()
 ): CalmRelationship[] {
   const nodeIds = new Set(nodes.map((n) => n['unique-id']));
   const nodeTypeById = new Map(nodes.map((n) => [n['unique-id'], n['node-type']]));
+  const unitById = new Map(units.map((u) => [u.id, u]));
+
+  const inferredProtocol = (unitId: string): string | undefined => {
+    const unit = unitById.get(unitId);
+    if (!unit) return undefined;
+    for (const evidence of unit.evidence) {
+      const protocol = protocolBySignal.get(evidence.signal);
+      if (protocol) return protocol;
+    }
+    return undefined;
+  };
 
   return relationships
     .filter((r) => nodeIds.has(r.from) && nodeIds.has(r.to))
@@ -53,10 +75,16 @@ export function buildRelationships(
         metadata: [
           { key: 'x-aac-provenance', value: rel.source },
           { key: 'x-aac-cross-package', value: rel.crossPackage },
+          // T-X9-1 — only present for relationships a producer explicitly
+          // scored (today: the env soft-graph detector's name-correlation
+          // edges); every other producer leaves rel.confidence unset, so no
+          // x-aac-confidence entry is added for them — absence, not a fake 0.
+          ...(rel.confidence !== undefined ? [{ key: 'x-aac-confidence', value: rel.confidence }] : []),
         ],
       };
-      if (rule.protocol) {
-        calmRel.protocol = rule.protocol;
+      const protocol = rule.protocol ?? inferredProtocol(rel.to) ?? inferredProtocol(rel.from);
+      if (protocol) {
+        calmRel.protocol = protocol;
       }
       return calmRel;
     });

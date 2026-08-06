@@ -1,0 +1,56 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-py-jwt-gateway",
+  "name": "CoE Lab \u2014 JWT Auth Gateway",
+  "description": "Hand-authored gold for Flask gateway with call-based jwt.decode auth (Bank of Anthos\u2013shaped). Routes are required; JWT control attachment is aspirational until call-based detection is complete.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/py-jwt-gateway"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "jwt-gateway",
+      "node-type": "service",
+      "name": "Auth Gateway",
+      "description": "Flask gateway (auth_gateway.py) with health and secure ping; JWT verified via jwt.decode call.",
+      "interfaces": [
+        {
+          "unique-id": "jwt-gateway-health",
+          "type": "path-interface",
+          "path": "GET /health"
+        },
+        {
+          "unique-id": "jwt-gateway-secure-ping",
+          "type": "path-interface",
+          "path": "GET /secure/ping"
+        }
+      ]
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "jwt-gateway"
+          ]
+        }
+      }
+    }
+  ]
+}

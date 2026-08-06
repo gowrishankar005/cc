@@ -36,12 +36,32 @@ export interface CalmMetadataEntry {
   value: unknown;
 }
 
+// Real shape confirmed this session against the authoritative schema
+// (control.json#/defs/{controls,control-detail}) and a real worked example
+// (calm/getting-started/conference-signup.pattern.json — a node-level
+// micro-segmentation control and a relationship-level permitted-connection
+// control, both with this exact structure). The control-id is the object
+// KEY, not a field inside the value — a precision the original schema read
+// (requirements v0.9 §3) got right but is easy to get wrong in code.
+export interface CalmControlDetail {
+  'requirement-url': string; // per v0.10 §0: project-owned, honestly labeled as provisional until this project hosts real dereferenceable schemas
+  'config-url'?: string;
+  config?: Record<string, unknown>; // oneOf config-url/config — this pipeline always uses inline `config` (no hosted config-url yet)
+}
+export interface CalmControls {
+  [controlId: string]: {
+    description: string;
+    requirements: CalmControlDetail[];
+  };
+}
+
 export interface CalmNode {
   'unique-id': string;
   'node-type': CalmNodeType;
   name: string;
   description: string;
   interfaces?: CalmInterface[];
+  controls?: CalmControls;
   metadata?: CalmMetadataEntry[];
 }
 

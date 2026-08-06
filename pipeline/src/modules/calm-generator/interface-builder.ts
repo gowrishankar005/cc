@@ -1,4 +1,4 @@
-import { TypedUnit } from '../../types/typed-facts';
+import { Evidence, TypedUnit } from '../../types/typed-facts';
 import { CalmNode, CalmInterface } from '../../types/calm';
 import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapping-schema';
 
@@ -8,12 +8,26 @@ import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapp
  * `category === 'http-entry-point'` literal check. Which evidence categories
  * become interfaces is a node-type-mapping.yml property now, not code.
  *
- * Native-route-beats-decorator-fallback precedence is preserved (found via the
- * NestJS fixture: when native route typing succeeds, the extractFromSource()
- * decorator fallback also fires for the same routes, producing a redundant,
- * lower-quality interface for the same endpoint) — generalized here to work
- * off Evidence.source rather than being re-derived per unit kind.
+ * T-X4-2 (AGENT_TASKS_Extraction_Enrichment.md, G-L3-08) — generalizes the
+ * original binary "native-route beats decorator" check (found via the
+ * NestJS fixture: native route typing AND the extractFromSource() decorator
+ * fallback both firing for the same routes, producing a redundant,
+ * lower-quality duplicate interface) into a real authority-tier table, now
+ * that a genuine third source exists (openapi, T-X4-1) — this IS the
+ * Contract_Evolution_Policy.md §3 reopen trigger firing, done as the policy
+ * itself specified: "at that point there will be a real second data point
+ * to design the tiers against, not a guess." Lower number wins; only the
+ * lowest tier PRESENT on a unit contributes interfaces, deduped by signal
+ * within that tier (two evidence entries for "GET /users" from the same
+ * source still produce one interface).
  */
+const SOURCE_PRECEDENCE: Record<Evidence['source'], number> = {
+  'native-route': 0,
+  openapi: 1,
+  decorator: 2,
+  'graphify-import': 3, // never actually contributes interfaces today (no node-type-mapping row lists persistence/graphify-import under interfaceCategories) — ordered last for completeness, not because it's been exercised
+};
+
 export function attachInterfaces(units: TypedUnit[], nodes: CalmNode[], mapping: NodeTypeMapping): void {
   const nodesById = new Map(nodes.map((n) => [n['unique-id'], n]));
 
@@ -23,16 +37,23 @@ export function attachInterfaces(units: TypedUnit[], nodes: CalmNode[], mapping:
     const rule = findNodeTypeMapping(mapping, unit.kind);
     if (!rule) continue;
 
-    const hasNativeRouteEvidence = unit.evidence.some((e) => e.source === 'native-route');
-    const interfaces: CalmInterface[] = unit.evidence
-      .filter(
-        (e) => rule.interfaceCategories.includes(e.category) && (e.source === 'native-route' || !hasNativeRouteEvidence)
-      )
-      .map((e, i) => ({
-        'unique-id': `${unit.id}::iface-${i}`,
+    const interfaceCandidates = unit.evidence.filter((e) => rule.interfaceCategories.includes(e.category));
+    if (interfaceCandidates.length === 0) continue;
+
+    const bestTier = Math.min(...interfaceCandidates.map((e) => SOURCE_PRECEDENCE[e.source]));
+    const winningEvidence = interfaceCandidates.filter((e) => SOURCE_PRECEDENCE[e.source] === bestTier);
+
+    const seenSignals = new Set<string>();
+    const interfaces: CalmInterface[] = [];
+    for (const e of winningEvidence) {
+      if (seenSignals.has(e.signal)) continue; // dedupe within the winning tier — same METHOD+path from two evidence entries is one interface
+      seenSignals.add(e.signal);
+      interfaces.push({
+        'unique-id': `${unit.id}::iface-${interfaces.length}`,
         type: 'path-interface' as const,
         path: e.signal,
-      }));
+      });
+    }
 
     if (interfaces.length > 0) {
       node.interfaces = interfaces;

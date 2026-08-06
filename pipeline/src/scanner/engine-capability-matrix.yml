@@ -1,0 +1,66 @@
+# The single, real engine-capability-matrix file (Wave M T-M10). Docs follow
+# this file, not the reverse (docs/solution/Architecture_as_Code_Solution_Design_v2.md
+# §0's conflict rule). Phase 1 rows are primaryEngine: codegraph-*; CodeQL/
+# scip-java/tree-sitter are augmentEngine (Phase 2), never primary, until a
+# real measured gap fires the named trigger — see docs/solution/language/java.md
+# §1.5-1.7 for what's actually been proven.
+#
+# This file is loaded and logged against by run-slice.ts (see
+# scanner/engine-capability-matrix.ts) — full dynamic engine-swapping is NOT
+# implemented (only codeGraphEngine exists as a real StructuralEngine today,
+# structural-engine.ts); this is a stub integration per T-M10's own allowance
+# ("load-and-validate + log planned engines" is acceptable when full routing
+# doesn't have a second engine to route to yet).
+
+version: "0.2.0"
+
+routes:
+  - language: python
+    framework: [flask, fastapi]
+    primaryEngine: codegraph-native-route
+    fallbackEngine: codegraph-extract-from-source
+    evidenceLevel: proven
+
+  - language: typescript
+    framework: [nestjs]
+    primaryEngine: codegraph-native-route
+    fallbackEngine: codegraph-extract-from-source
+    evidenceLevel: proven
+
+  - language: java
+    framework: [spring-mvc]
+    primaryEngine: codegraph-native-route
+    fallbackEngine: codegraph-extract-from-source
+    evidenceLevel: mechanism-proven-other-frameworks # never run against real Java Spring MVC source in this project
+
+  - language: java
+    framework: [jax-rs, quarkus]
+    primaryEngine: codegraph-extract-from-source
+    augmentEngine: codeql
+    augmentTrigger: "Phase 1's route-path assembly proves insufficient at scale (not yet fired — 19/19 real routes assembled correctly)"
+    evidenceLevel: proven
+
+  - language: java
+    framework: [jpa]
+    primaryEngine: codegraph-extract-from-source
+    augmentEngine: codeql
+    augmentTrigger: "Entity-relationship modeling gaps Phase 1 can't close (not yet fired — 36 real @Entity nodes correctly typed)"
+    evidenceLevel: proven-entity-only
+
+  - language: java
+    framework: [spring-data-repository, jooq]
+    primaryEngine: codegraph-extract-from-source
+    evidenceLevel: not-implemented # designed in persistence-detection-catalogue.yml, no dispatcher path yet
+
+  - language: java
+    framework: [spring-security-oauth2, resilience4j, spring-batch, spring-kafka]
+    primaryEngine: codegraph-extract-from-source
+    corroborateEngine: codeql
+    evidenceLevel: mechanism-proven-other-signal # proven via @PreAuthorize control detection, these specific signals unbuilt
+
+  - language: any
+    framework: unmatched-above
+    primaryEngine: tree-sitter-custom-query
+    evidenceLevel: researched-not-built
+
+crossPackageBackbone: graphify # one combined pass, all languages, no per-root gate — proven, 265 real cross-module edges

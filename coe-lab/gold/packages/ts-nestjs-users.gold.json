@@ -1,0 +1,25 @@
+{
+  "packageId": "ts-nestjs-users",
+  "goldVersion": "0.1.0",
+  "tier": "core",
+  "description": "NestJS users API — native route typing + Controller as bootstrap not interface.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/ts-nestjs-users",
+  "changelog": "v0.1.0 initial",
+  "nodes": [
+    {
+      "id": "users-api",
+      "nodeType": "service",
+      "match": { "nameContains": "users" },
+      "interfaces": ["GET /users", "GET /users/:id", "POST /users"]
+    }
+  ],
+  "relationships": [],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system", "openapi"],
+  "outOfScope": [],
+  "expectedPlatformGaps": [
+    "OpenAPI provider may emit a second service-shaped unit for openapi.yaml (same routes) — ignored as FP via ignoreCalmNameContains until merge policy collapses units"
+  ],
+  "changelog": "v0.1.1 ignore openapi.yaml dual unit after empirical baseline 2026-08-07"
+}

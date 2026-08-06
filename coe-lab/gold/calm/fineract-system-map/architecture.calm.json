@@ -1,0 +1,132 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-fineract-system-map",
+  "name": "Apache Fineract — Module system map",
+  "description": "Hand-authored module-level CALM for Apache Fineract monorepo. Each Gradle module is a service (or database for fineract-db). Grain is module boundaries, not individual JAX-RS resources. Use fineract-charge / fineract-core gold for deep route/entity detail. Independent of the platform generator.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "apache/fineract" },
+    { "key": "x-lab-grain", "value": "gradle-module" },
+    { "key": "x-lab-excluded-modules", "value": "test runners, clients, docs, war packaging, avro schemas, e2e" }
+  ],
+  "nodes": [
+    {
+      "unique-id": "fineract-system",
+      "node-type": "system",
+      "name": "Apache Fineract",
+      "description": "Core banking platform monorepo — composed of domain and infrastructure modules."
+    },
+    { "unique-id": "mod-provider", "node-type": "service", "name": "fineract-provider", "description": "Main application assembly / deployable provider module." },
+    { "unique-id": "mod-core", "node-type": "service", "name": "fineract-core", "description": "Shared infrastructure, security context, batch, business date, datatables, monetary APIs." },
+    { "unique-id": "mod-security", "node-type": "service", "name": "fineract-security", "description": "Security-related module." },
+    { "unique-id": "mod-charge", "node-type": "service", "name": "fineract-charge", "description": "Charge (fee/penalty) domain module." },
+    { "unique-id": "mod-loan", "node-type": "service", "name": "fineract-loan", "description": "Loan portfolio domain." },
+    { "unique-id": "mod-loan-origination", "node-type": "service", "name": "fineract-loan-origination", "description": "Loan origination." },
+    { "unique-id": "mod-progressive-loan", "node-type": "service", "name": "fineract-progressive-loan", "description": "Progressive loan products." },
+    { "unique-id": "mod-working-capital-loan", "node-type": "service", "name": "fineract-working-capital-loan", "description": "Working capital loan." },
+    { "unique-id": "mod-savings", "node-type": "service", "name": "fineract-savings", "description": "Savings domain." },
+    { "unique-id": "mod-accounting", "node-type": "service", "name": "fineract-accounting", "description": "Accounting / GL." },
+    { "unique-id": "mod-tax", "node-type": "service", "name": "fineract-tax", "description": "Tax domain." },
+    { "unique-id": "mod-rates", "node-type": "service", "name": "fineract-rates", "description": "Rates domain." },
+    { "unique-id": "mod-branch", "node-type": "service", "name": "fineract-branch", "description": "Branch organisation." },
+    { "unique-id": "mod-investor", "node-type": "service", "name": "fineract-investor", "description": "Investor domain." },
+    { "unique-id": "mod-report", "node-type": "service", "name": "fineract-report", "description": "Reporting." },
+    { "unique-id": "mod-mix", "node-type": "service", "name": "fineract-mix", "description": "MIX reporting integration." },
+    { "unique-id": "mod-cob", "node-type": "service", "name": "fineract-cob", "description": "Close-of-business batch processing." },
+    { "unique-id": "mod-command", "node-type": "service", "name": "fineract-command", "description": "Command processing core." },
+    { "unique-id": "mod-command-async", "node-type": "service", "name": "fineract-command-async", "description": "Async command processing." },
+    { "unique-id": "mod-command-audit", "node-type": "service", "name": "fineract-command-audit", "description": "Command audit." },
+    { "unique-id": "mod-command-disruptor", "node-type": "service", "name": "fineract-command-disruptor", "description": "Disruptor-based command path." },
+    { "unique-id": "mod-command-jdbc", "node-type": "service", "name": "fineract-command-jdbc", "description": "JDBC command persistence." },
+    { "unique-id": "mod-validation", "node-type": "service", "name": "fineract-validation", "description": "Validation support." },
+    { "unique-id": "mod-db", "node-type": "database", "name": "fineract-db", "description": "Database migrations / schema assets module." }
+  ],
+  "relationships": [
+    {
+      "unique-id": "fineract-composed-of-modules",
+      "description": "Fineract system is composed of domain and infrastructure Gradle modules.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "fineract-system",
+          "nodes": [
+            "mod-provider",
+            "mod-core",
+            "mod-security",
+            "mod-charge",
+            "mod-loan",
+            "mod-loan-origination",
+            "mod-progressive-loan",
+            "mod-working-capital-loan",
+            "mod-savings",
+            "mod-accounting",
+            "mod-tax",
+            "mod-rates",
+            "mod-branch",
+            "mod-investor",
+            "mod-report",
+            "mod-mix",
+            "mod-cob",
+            "mod-command",
+            "mod-command-async",
+            "mod-command-audit",
+            "mod-command-disruptor",
+            "mod-command-jdbc",
+            "mod-validation",
+            "mod-db"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "provider-connects-core",
+      "description": "Provider assembly depends on fineract-core.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-provider" },
+          "destination": { "node": "mod-core" }
+        }
+      }
+    },
+    {
+      "unique-id": "charge-connects-core",
+      "description": "Charge module uses core infrastructure (e.g. PlatformSecurityContext, command source).",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-charge" },
+          "destination": { "node": "mod-core" }
+        }
+      }
+    },
+    {
+      "unique-id": "loan-connects-core",
+      "description": "Loan module depends on core infrastructure.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-loan" },
+          "destination": { "node": "mod-core" }
+        }
+      }
+    },
+    {
+      "unique-id": "savings-connects-core",
+      "description": "Savings module depends on core infrastructure.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-savings" },
+          "destination": { "node": "mod-core" }
+        }
+      }
+    },
+    {
+      "unique-id": "provider-connects-db",
+      "description": "Runtime platform uses fineract-db schema/migrations.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-provider" },
+          "destination": { "node": "mod-db" }
+        }
+      },
+      "protocol": "JDBC"
+    }
+  ]
+}

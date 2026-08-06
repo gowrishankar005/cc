@@ -1,0 +1,132 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { parseAllDocuments } from 'yaml';
+
+/**
+ * T-X5-1 — flat/pre-rendered Kubernetes manifest discovery + parse.
+ * Deliberately scoped to already-rendered YAML on disk (confirmed real
+ * shape against spikes/boa/repo/kubernetes-manifests/*.yaml — the
+ * repo-root, pre-rendered artifact, not the per-package `k8s/base/`
+ * Kustomize sources, which differ and are NOT resolved here). Kustomize/Helm
+ * template resolution is explicit backlog (T-X10-1), not silently assumed
+ * to work against a templated source.
+ *
+ * Only `Deployment` objects are read for trust detection (T-X5-0's scope).
+ * Names only for Secret/ConfigMap references — this file never reads a
+ * real `Secret`/`ConfigMap` object's `data`/`stringData`, only which OTHER
+ * object's `metadata.name` a Deployment references by name. No secret
+ * VALUE is ever on a code path this provider touches.
+ */
+const SKIP_DIRS = new Set(['node_modules', '.git']);
+
+export interface SecretMount {
+  secretName: string;
+  itemKeys: string[]; // the `items[].key` names actually mounted — the only signal T-X5-0 allows for issuer/verifier inference
+}
+
+export interface DeploymentManifest {
+  name: string;
+  namespace: string;
+  image?: string;
+  configMapNames: string[];
+  secretMounts: SecretMount[];
+  sourceFile: string;
+}
+
+/**
+ * T-X9-0/1 — a ConfigMap's `data` KEY NAMES only, never `data`'s values.
+ * Extending the existing "names only" boundary this file already holds for
+ * Deployments (never reads Secret data) to ConfigMap objects too — reading
+ * `Object.keys(data)` and discarding the values immediately, not "reading
+ * then redacting."
+ */
+export interface ConfigMapKeys {
+  name: string;
+  keyNames: string[];
+  sourceFile: string;
+}
+
+function findManifestFiles(manifestsDir: string): string[] {
+  const results: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+        walk(full);
+      } else if (entry.name.endsWith('.yaml') || entry.name.endsWith('.yml')) {
+        results.push(full);
+      }
+    }
+  };
+  if (fs.existsSync(manifestsDir)) walk(manifestsDir);
+  return results;
+}
+
+function extractDeployment(doc: any, sourceFile: string): DeploymentManifest | undefined {
+  if (doc?.kind !== 'Deployment') return undefined;
+
+  const name: string | undefined = doc?.metadata?.name;
+  if (!name) return undefined;
+  const namespace: string = doc?.metadata?.namespace ?? 'default';
+
+  const containers: any[] = doc?.spec?.template?.spec?.containers ?? [];
+  const image: string | undefined = containers[0]?.image;
+
+  const configMapNames = new Set<string>();
+  for (const c of containers) {
+    for (const envFromEntry of c.envFrom ?? []) {
+      if (envFromEntry?.configMapRef?.name) configMapNames.add(envFromEntry.configMapRef.name);
+    }
+    for (const envEntry of c.env ?? []) {
+      if (envEntry?.valueFrom?.configMapKeyRef?.name) configMapNames.add(envEntry.valueFrom.configMapKeyRef.name);
+    }
+  }
+
+  const secretMounts: SecretMount[] = [];
+  const volumes: any[] = doc?.spec?.template?.spec?.volumes ?? [];
+  for (const v of volumes) {
+    if (v?.secret?.secretName) {
+      const itemKeys: string[] = (v.secret.items ?? []).map((item: any) => item.key).filter(Boolean);
+      secretMounts.push({ secretName: v.secret.secretName, itemKeys });
+    }
+  }
+
+  return { name, namespace, image, configMapNames: [...configMapNames], secretMounts, sourceFile };
+}
+
+function extractConfigMapKeys(doc: any, sourceFile: string): ConfigMapKeys | undefined {
+  if (doc?.kind !== 'ConfigMap') return undefined;
+  const name: string | undefined = doc?.metadata?.name;
+  if (!name) return undefined;
+  const keyNames = Object.keys(doc?.data ?? {}); // NEVER doc.data's values
+  return { name, keyNames, sourceFile };
+}
+
+/** Empty array (not an error) when the directory doesn't exist or has no manifests — "run without it ok", same convention as discoverOpenApiDocuments. */
+export function discoverDeployments(manifestsDir: string): DeploymentManifest[] {
+  const deployments: DeploymentManifest[] = [];
+  for (const filePath of findManifestFiles(manifestsDir)) {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    for (const doc of parseAllDocuments(raw)) {
+      const parsed = doc.toJS();
+      const deployment = extractDeployment(parsed, path.relative(manifestsDir, filePath));
+      if (deployment) deployments.push(deployment);
+    }
+  }
+  return deployments;
+}
+
+/** T-X9-0/1 — same discovery walk as discoverDeployments, filtered to `kind: ConfigMap` and key names only. */
+export function discoverConfigMapKeys(manifestsDir: string): ConfigMapKeys[] {
+  const configMaps: ConfigMapKeys[] = [];
+  for (const filePath of findManifestFiles(manifestsDir)) {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    for (const doc of parseAllDocuments(raw)) {
+      const parsed = doc.toJS();
+      const configMap = extractConfigMapKeys(parsed, path.relative(manifestsDir, filePath));
+      if (configMap) configMaps.push(configMap);
+    }
+  }
+  return configMaps;
+}

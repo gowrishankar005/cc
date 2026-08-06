@@ -1,0 +1,32 @@
+# Lab fixture — ledger deployment mounts the same jwt-key secret.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Name must match unit file basename (ledger_api.py) for T-X5-1 exact-match correlation
+  name: ledger_api
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger_api
+  template:
+    metadata:
+      labels:
+        app: ledger_api
+    spec:
+      containers:
+        - name: ledger
+          image: lab/ledger-api:0.1.0
+          volumeMounts:
+            - name: jwt
+              mountPath: /secrets/jwt
+              readOnly: true
+      volumes:
+        - name: jwt
+          secret:
+            secretName: jwt-key
+            # Public key half (.pub) → verifier role for T-X5-1 heuristic
+            items:
+              - key: jwtRS256.key.pub
+                path: jwtRS256.key.pub

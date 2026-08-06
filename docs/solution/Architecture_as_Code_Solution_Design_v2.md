@@ -1,10 +1,48 @@
 # Architecture-as-Code Solution Design v2
 
-**Status:** First persistent solution-design document in this repo (`docs/solution/` created this round). Supersedes no prior file — the only earlier solution-design material is the external `Architecture_as_Code_Solution_Design_v1.docx`/`Architecture_as_Code_V1_Playbook.md` (not in this repo; known only via `docs/spikes/AaC_Solution_Design_Critical_Review.md`) and the paused, narrower `scalable-dreaming-hearth` plan (CALM-construction two-catalogue design only — folded into §5 here, not superseded, since its content is still correct, just incomplete relative to the dual-goal scope below).
+**Status: LOCKED — construction architecture and phased-build discipline.** The core pattern this document specifies (three-plus construct-mapping catalogues, catalogue-driven builders, the deterministic-core/override-escape-hatch split, phased engine adoption) has been built and verified against real, varied conditions — not just designed — and further building should extend it with catalogue rows and new builders, not revisit its structure, unless a future finding proves a genuine mismatch (none has, so far; every gap found has been a narrow, fixable bug or a real-but-bounded architectural correction, see the two entries below).
+
+**Living status matrix:** `docs/solution/STATUS.md` (Platform + Extraction sections) is the short inventory of built / partial / backlog — prefer it over any stale sentence in this banner when they disagree.
+
+**What locking does *not* cover** — still open or only partial (do **not** re-read this as “Goal A never shipped”):
+
+| Area | Current truth (see also `STATUS.md`) |
+|---|---|
+| **Goal A — modular platform** | **Partially delivered:** `contractVersion`, `modules/registry.ts`, `available-modules.ts` + `--modules`, second module `threat-signals`, namespaced module outputs. **Still open:** seamless third-party plugin discovery, library embed API (Wave G), full analysis-pass/engine routing maturity. |
+| **Persistence genericity** | Bare `@Entity` + **driver-import** strategy catalogue **dispatched**; Spring Data / jOOQ / multi-shape strategies **designed, not fully dispatched**. |
+| **Platform IR (§13) / LLM advisory (§7.1)** | Optional UX; override mechanism works without them. IR may be in progress under extraction MVP — track in `STATUS.md` Extraction section, not assumed zero forever. |
+| **k8s trust, OpenAPI (if not yet in STATUS)** | Backlog or in-progress per `STATUS.md` — not part of the locked construction *pattern*. |
+| **Full-scale (7,000+ file) E2E** | Graphify-scale timing evidence exists; full pipeline construction at that scale not the lock criterion. |
+
+**Two real, load-bearing corrections made after this document was first written, both closed, both worth knowing before treating anything here as untested prose:**
+1. **Cross-package relationship detection — claimed since `v0.6 §4`, never once verified, root cause was structural** (Graphify was invoked once per root, which cannot produce a cross-root edge by construction — not a bug in the reconciler, a bug in how it was fed). Fixed: one combined Graphify pass per run, covering the common ancestor of all given roots. Verified with 265 real cross-module edges in real Fineract source, including the exact evidenced case. Full detail in `CLAUDE.md`'s pipeline-architecture section — including a real, disclosed trade-off (Graphify itself occasionally under-resolves a same-package edge at wider scan scope) that was not papered over.
+2. **A design-doc assumption about control `requirement-url`s ("still schema-valid CALM, the field just needs to be a string," `v0.10 §0`) was falsified by actually running `calm validate`** — it does a live remote-host-allowlist check. Fixed using `calm-cli`'s own `-u/--url-to-local-file-mapping` mechanism; see §5.5's inline correction.
+
+**First persistent solution-design document in this repo** (`docs/solution/` created this round). Supersedes no prior file — the only earlier solution-design material is the external `Architecture_as_Code_Solution_Design_v1.docx`/`Architecture_as_Code_V1_Playbook.md` (not in this repo; known only via `docs/spikes/AaC_Solution_Design_Critical_Review.md`) and the paused, narrower `scalable-dreaming-hearth` plan (CALM-construction two-catalogue design only — folded into §5 here, not superseded, since its content is still correct, just incomplete relative to the dual-goal scope below).
 
 **Produced against:** `docs/requirements/CALM_Generator_Requirements_v0_14.md` (current), the full v0.1–v0.14 requirements chain, `docs/spikes/*`, and the real `pipeline/src/` codebase — read directly this session, not recalled.
 
 ---
+
+## 0. Document structure & authority
+
+**Structural decision** (`docs/solution/AGENT_TASKS_Solution_Cleanup_and_Prioritized_Actions.md` T-A0, confirmed rather than left implicit): this repository keeps **one platform root + language annexes**, not one monolithic solution document. A full merge would recreate the exact failure mode `docs/spikes/Solution_Design_v2_Critical_Review.md` §3 found between this document and the Java companion — contradictory "locked" claims sitting in one file — and would make every Java/Node/Python-specific churn rewrite the platform story unnecessarily.
+
+```
+docs/solution/
+  Architecture_as_Code_Solution_Design_v2.md   # platform + CALM construction (this file, root)
+  language/
+    java.md                                    # Slice 2 Java — moved from Architecture_as_Code_Java_Solution_Design.md
+  STATUS.md                                    # living built/partial/backlog (Platform + Extraction)
+  Platform_Architecture_Analysis.md            # this system as software (style, runtime, deployment, quality attributes)
+  Modularity_and_Integration_Assessment.md     # modularity grade + P0-P2 recommendations (implemented as Wave M)
+  AGENT_TASKS_Solution_Cleanup_and_Prioritized_Actions.md
+  AGENT_TASKS_Extraction_Enrichment.md         # extraction MVP + integrity (Wave XI / X0–X10)
+```
+
+**Conflict rule** (authoritative — both this document and the language annexes must agree with it, and where they don't, this rule decides, not intuition): *Platform contracts and the CALM construction pattern → this root is authoritative. Slice 2 Java sequencing and Phase 1/2 engine choice → `language/java.md` is authoritative. `engine-capability-matrix.yml` (§6.1, once coded in `pipeline/src/scanner/`) is the runtime source of truth for engine routing — both docs' prose follows the matrix, not the reverse. Where prose conflicts, the more recent verified pipeline evidence wins, and the losing section gets corrected in the same edit, not left to drift.*
+
+**Goal A status, stated precisely rather than left to a reader's inference** (`docs/spikes/Solution_Design_v2_Critical_Review.md` §2.3 High finding): Goal A (modular platform) is **partially delivered, not fully proven**. What's real: `contractVersion`, a working module registry (`modules/registry.ts`), and a genuine second module (`threat-signals`) consuming only `TypedFacts` — verified this session, not aspirational (§9, §Wave-C-verification below). What's still target architecture, not delivered foundation: module registration is a code edit, not config (Wave M T-M1 closes this); Scanner/orchestration remain a closed recipe, not a plugin bus (Wave M T-M7); no library/API embed surface exists (Wave G, explicitly deferred). Read Goal A as "real boundary, not yet a seamless platform" — both halves of that sentence matter.
 
 ## Part A — Readiness Assessment
 
@@ -86,7 +124,7 @@ flowchart TB
             DB["decorator-builder.ts"]
             MB["metadata-builder.ts"]
         end
-        THREAT["Threat modeller<br/>(sketched, §9 — not built)"]
+        THREAT["threat-signals module<br/>(§9 — BUILT & proven this session)"]
         GREEN["Green analyser<br/>(sketched, §9 — not built)"]
     end
 
@@ -115,7 +153,7 @@ flowchart TB
     TF -.->|same versioned contract| GREEN
 ```
 
-Dashed edges/boxes are specified-not-built (this document specifies them; `docs/solution/` implementation is the next round). Solid boxes are real, running code, confirmed by reading `pipeline/src/` directly this session.
+Dashed **boxes** (K8S, K8T, GREEN) are specified-not-built. Dashed **arrows** into THREAT/GREEN denote the contract relationship (module ↔ `typed-facts.json`, version-checked), not build status — THREAT is now a solid, built, verified box despite the dashed arrow into it, since that arrow describes the versioned-contract coupling, not implementation state (corrected label conflation this round — `docs/spikes/Solution_Design_v2_Critical_Review.md` §2.4 flagged doc/code drift generally, this diagram was one real instance). Solid boxes are real, running code, confirmed against `pipeline/src/` directly.
 
 ## 3. Pillars (contract-level)
 
@@ -142,10 +180,14 @@ A module is: a name, a supported `contractVersion` range, and a function `(facts
 Detailed in §5. The centerpiece of this revision.
 
 ### 3.7 Architect review aids
-Confidence scoring (`Gap_Closure §7`'s weighted-signal bands, already implemented in `analysis/confidence-scorer.ts`), the Ignored Items taxonomy (implemented, `analysis/ignored-items.ts`, 8 codes including the federated-ownership-driven `CROSS_DOMAIN_UNRESOLVED`), and Decision Records/Overrides (specified, `Gap_Closure §6`, **not built** — see §5.4) exist to help an architect trust or correct *generation accuracy*. This is explicitly not CALM governance — an architect confirming "yes, this is really a service" is a different activity from "does this architecture satisfy our security pattern," and this design does not conflate them, per the v0.14 prompt's explicit instruction.
+Confidence scoring (`Gap_Closure §7`'s weighted-signal bands, already implemented in `analysis/confidence-scorer.ts`), the Ignored Items taxonomy (implemented, `analysis/ignored-items.ts`, 8 codes including the federated-ownership-driven `CROSS_DOMAIN_UNRESOLVED`), and Decision Records/Overrides (`Gap_Closure §6`'s schema, **built and tested this session** — `modules/calm-generator/override-applier.ts`, see §5.4) exist to help an architect trust or correct *generation accuracy*. This is explicitly not CALM governance — an architect confirming "yes, this is really a service" is a different activity from "does this architecture satisfy our security pattern," and this design does not conflate them, per the v0.14 prompt's explicit instruction.
 
 ### 3.8 Artefact handoff
 `architecture.calm.json` + `ignored-items-report.json` + `provenance.json` (+ `decorators.json`, new — §5.8) is the full output set. All custom fields namespaced `x-aac-*` (`Gap_Closure §3`'s CALM Studio contract — a real downstream consumer, the drawio↔CALM converter, chokes on unrecognized fields otherwise). This set is designed to be **consumed**, not to validate itself: an external `calm validate -p pattern.json` run, or a governance platform, is the next hop, and this design stops at producing a schema-valid, semantically-correct artefact for that hop. `architecture-ir.md` (§13, new this round) is a separate, internal-only review artifact alongside this set — never handed to an external validator, purely the human/LLM review and override-authoring surface.
+
+**Control requirement-url portability — a real handoff constraint, documented not assumed** (`docs/solution/AGENT_TASKS_Solution_Cleanup_and_Prioritized_Actions.md` T-B4, and §5.5's `calm-cli` host-allowlist finding). Generated `architecture.calm.json` references control `requirement-url`s as placeholder `https://` identifiers that are *not* independently resolvable — validating with plain `calm validate -a architecture.calm.json` on a machine other than the one that generated the output **will fail** with a host-allowlist error, this is expected, not a bug. **The portable path**: `npm run build` regenerates `dist/rules/control-url-mapping.json` fresh with absolute local paths every time (`scripts/generate-control-url-mapping.js`), and `npm run validate` always passes `-u` pointing at it — so `npm run build && npm run validate -- <output>` on *any* checkout of this repo works without hand-edited paths, confirmed this session (`npm ci` + fresh clone + `npm test`, which exercises this exact path, ran clean). **External consumers who only receive the JSON artefact, not this repo, cannot resolve it the same way** — this is a real, disclosed limitation of the current handoff contract, not yet solved: an external governance system running `calm validate` against a received `architecture.calm.json` needs its own `-u` mapping (or its own copy of `pipeline/src/rules/control-requirements/`) to avoid the same allowlist failure. Named honestly as an open handoff gap, not implied solved by the in-repo fix.
+
+**Output layout — namespaced per module (Wave M T-M2), documented here per that task's own acceptance criterion:** `outDir/typed-facts.json`, `ignored-items-report.json`, and `provenance.json` stay top-level — they describe the *run*, not any one module's output, since every registered module reads the same `typed-facts.json`. `outDir/architecture.calm.json` is written **twice**: once at top level (back-compat — this is the flagship deliverable, and existing tooling/tests/`npm run validate` usage all expect it there) and once namespaced at `outDir/modules/calm-generator/architecture.calm.json`. `overrides-applied-report.json` (calm-generator-private) and `threat-signals-report.json` (threat-signals-private) are namespaced only, under `outDir/modules/<module-name>/` — no top-level copy, since nothing has ever depended on either being there, and namespacing is exactly what prevents a future module's output from colliding with another's by filename.
 
 ### 3.9 NFRs
 See §8.
@@ -252,7 +294,7 @@ mappings:
 ### 5.4 Builders
 One small builder per CALM construct kind, each consuming the two catalogues + `typed-facts.json`, none containing a hardcoded signal or framework name — the concrete test of "systematic": `node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `decorator-builder.ts` (new, for k8s deployment decorators), `metadata-builder.ts`. Adding Slice 2 (Java/JPA) means new `signal-catalogue.yml` rows (already true) plus, if JPA introduces a genuinely new `TypedUnit.kind` (it likely doesn't — JPA entities are still `database`-kind), zero builder changes; if it does introduce a new kind, one `node-type-mapping.yml` row.
 
-**Decision Record / Override pass** (Gap_Closure §6 schema, v0.10 §1.4's precise design, **specified here for the next implementation round, not built**): after the five builders produce deterministic output, an `overrides/` directory (if present alongside the run) is read; each `status: "active"` Override is applied as a final pass, and the builder **refuses** to apply any Override whose `decision_record_ref` doesn't resolve to a real Decision Record file in the same directory — the mechanical enforcement v0.10 §1.4 calls for, not a documented convention. This closes the enterprise-readiness review's "core integrity rule with no code" finding, scoped precisely enough to build next, per this document's own quality bar of not re-opening settled specification as an open question.
+**Decision Record / Override pass** (Gap_Closure §6 schema, v0.10 §1.4's precise design, **built and tested this session, not just specified**: `modules/calm-generator/override-applier.ts`): after the builders produce deterministic output, an `overrides/` directory (if present alongside the run) is read; each `status: "active"` Override is applied as a final pass, and the builder **refuses** to apply any Override whose `decision_record_ref` doesn't resolve to a real, *active* Decision Record file in the same directory — the mechanical enforcement v0.10 §1.4 calls for, verified against real BoA output (node_add/type_change/node_rename/node_remove all tested, both rejection paths — dangling ref, superseded decision — confirmed firing). This closes the enterprise-readiness review's "core integrity rule with no code" finding for real, not just on paper.
 
 ### 5.5 Catalogue 2c — `control-type-mapping.yml`, and the sixth builder: `control-builder.ts`
 
@@ -275,6 +317,8 @@ controls:
     detectionMechanism: call-based        # jwt.decode(), same shape as persistence's calls-edge detection
     requirementUrl: "https://<project-owned>/controls/jwt-verification.requirement.json"
 ```
+
+**Correction to a claim earlier in this document (and in `requirements v0.10 §0`), found by actually running `calm validate`, not assumed from the schema**: a placeholder `requirement-url` is *not* simply "still schema-valid CALM because the field just needs to be a string." `calm-cli` does a **live remote-host-allowlist check** against every control's `requirement-url`, even under plain `-a` schema validation — confirmed empirically this session (real Fineract `DatatableWriteService.java` controls output, `calm validate -a`, 4 real errors: `"Host 'project-owned-placeholder.invalid' is not allowlisted"`). Neither an unallowlisted `https://` host nor a `file://` URL is accepted. The actual, working fix — implemented and verified, not just designed — uses `calm-cli`'s own documented `-u/--url-to-local-file-mapping` flag: a real, checked-in, schema-conformant local requirement file per catalogue row (`pipeline/src/rules/control-requirements/<controlId>.requirement.json`), mapped via a build-time-generated (`scripts/generate-control-url-mapping.js`, absolute paths resolved fresh per build for portability) `control-url-mapping.json`, with `npm run validate` now always passing `-u`. This is the kind of gap that only surfaces by running the real tool against real generated output — worth remembering the next time a "still schema-valid" claim is made about anything this pipeline hasn't actually validated.
 
 `control-builder.ts` (the sixth builder) attaches `controls` to the node or relationship the evidence was found on, and — per §3 of the deep-dive spike's `evidence.json` finding — emits control-specific provenance using CALM's own `evidence.json` shape (`{unique-id, evidence-paths: [file:line, ...], control-config-url}`) rather than folding it into the generic `x-aac-provenance` metadata array used for non-control evidence. This is a materially better fit than another metadata field for the one evidence category CALM actually built a first-class construct for.
 
@@ -317,7 +361,7 @@ The current selection (CodeGraph primary, Graphify as documented fallback, `Code
 **New artifact: `scanner/engine-capability-matrix.yml`** — the third catalogue this design introduces (alongside `node-type-mapping.yml`/`relationship-type-mapping.yml`), same philosophy: a data table, not a conditional.
 
 ```yaml
-version: "0.1.0"
+version: "0.2.0"
 routes:
   - language: python
     framework: [flask, fastapi]
@@ -333,14 +377,14 @@ routes:
     fallbackEngine: codegraph-extract-from-source
   - language: java
     framework: [jax-rs]
-    primaryEngine: codeql                     # NEW — CodeGraph gives 0% high-confidence here (§6 table)
-    fallbackEngine: codegraph-extract-from-source   # degrade gracefully if CodeQL DB can't be built (license/build constraints, §6 table)
-    evidenceLevel: researched-pending-spike
+    primaryEngine: codegraph-extract-from-source   # PHASE 1 — proven: 19/19 real Fineract routes, zero build dependency (Java companion §1.6-1.7)
+    augmentEngine: codeql                           # PHASE 2 — trigger: only if Phase 1 route-path assembly proves insufficient at scale; not a default
+    evidenceLevel: proven-phase1
   - language: java
     framework: [jpa, spring-data-repository]
-    primaryEngine: codeql
-    fallbackEngine: codegraph-extract-from-source
-    evidenceLevel: researched-pending-spike
+    primaryEngine: codegraph-extract-from-source   # PHASE 1 — proven for bare @Entity (Fineract fineract-core, 36 real nodes)
+    augmentEngine: codeql                           # PHASE 2 — trigger: entity-relationship modeling gaps Phase 1 can't close
+    evidenceLevel: proven-phase1-entity-only
   - language: any
     framework: unmatched-above                # gap-filler, not a default
     primaryEngine: tree-sitter-custom-query
@@ -348,9 +392,11 @@ routes:
 crossPackageBackbone: graphify                 # unchanged — one whole-run pass, all languages, no gate
 ```
 
+**Conflict rule (this is the authoritative statement, both docs must agree with it):** the Java companion (`docs/solution/language/java.md`) is authoritative for Slice 2 Java engine sequencing — this table is kept in sync with it, not the reverse. `codeql`/`scip-java` are `augmentEngine` (Phase 2, trigger-gated) for every Java row, never `primaryEngine`, until a real measured gap justifies promoting one. An earlier revision of this table listed `codeql` as `primaryEngine` for `jax-rs`/`jpa` before the Java companion's Phase 1 evidence (§1.6-1.7 there) existed — that was a real, since-corrected contradiction between the two documents, not a hypothetical risk (`docs/spikes/Solution_Design_v2_Critical_Review.md` §3 flagged it directly).
+
 **Why this is a small change, not a rewrite:** the Scanner layer already refuses a forced common interface across engines (§3.2) — CodeGraph, Graphify, and a future k8s provider are already separate adapters feeding one shared `TypedFacts` contract. Adding CodeQL and tree-sitter as two more adapters behind the same boundary is the same pattern, not a new one. The one real code change needed: `Evidence.source` (`types/typed-facts.ts`) is currently a closed union (`'native-route' | 'decorator' | 'graphify-import'`) — it becomes an open string keyed against an **authority-tier table** (`{engineSource: tier}`, e.g. native-typed=1, framework-aware-query=1, decorator/annotation-extracted=2, fuzzy/heuristic=3), and `interface-builder.ts`'s current hardcoded `hasNativeRouteEvidence` precedence check (§5.1) generalizes to "pick the evidence with the lowest tier number per unit" — which already has to be built for §5's catalogue-driven construction anyway, so this doesn't add a second mechanism, it makes the one §5 already needs also cover engine choice.
 
-**Java specifics are designed in full in a companion doc.** `docs/solution/Architecture_as_Code_Java_Solution_Design.md` takes Fidelity's stack as the yardstick and locks the Java engine strategy as **augment, not replace**: CodeGraph+Graphify stay primary, scip-java is added for cross-package reference *precision* (replacing the line-range reconciler heuristic for Java, since a full build makes a precise index available), and CodeQL is added for JAX-RS/JPA framework-aware queries. It also generalizes persistence detection from one code-shape to a strategy table (the single biggest per-repo-patch risk) and makes static-OpenAPI ingestion the primary Java route/control source. Read it for the concrete Java plan; the sequencing below is the higher-level version.
+**Java specifics are designed in full in a companion doc.** `docs/solution/language/java.md` (the Java annex — authoritative for Slice 2 Java engine sequencing per §0's conflict rule) takes Fidelity's stack as the yardstick and locks the Java engine strategy as **augment, not replace**: CodeGraph+Graphify stay primary, scip-java is added for cross-package reference *precision* (replacing the line-range reconciler heuristic for Java, since a full build makes a precise index available), and CodeQL is added for JAX-RS/JPA framework-aware queries. It also generalizes persistence detection from one code-shape to a strategy table (the single biggest per-repo-patch risk) and makes static-OpenAPI ingestion the primary Java route/control source. Read it for the concrete Java plan; the sequencing below is the higher-level version.
 
 **Sequencing, not simultaneous adoption:**
 1. **CodeQL spike, scoped exactly to JAX-RS + JPA against a real Slice 2 candidate package** — confirm query-pack coverage, confirm CodeQL-database buildability against the actual target repo's Java build (Maven/Gradle), confirm license terms fit (§6's flagged open point). This is Slice 2's real blocker-to-check, not a nice-to-have.
@@ -361,10 +407,12 @@ crossPackageBackbone: graphify                 # unchanged — one whole-run pas
 
 - **Confidence scoring**: weighted-signal bands, already real (`analysis/confidence-scorer.ts`), starting weights per `Gap_Closure §7`, explicitly provisional pending pilot recalibration.
 - **Ignored Items report**: 8-code taxonomy, already real (`analysis/ignored-items.ts`).
-- **Decision Records / Overrides**: specified precisely (§5.4), not built — next round's implementation target.
+- **Decision Records / Overrides**: built and tested (§5.4) — `override-applier.ts`, verified against real BoA output this session, not just specified.
 - **What these are not**: none of the above validate an architecture against an org pattern or control catalogue. That's `calm validate -p`, run by an external system against this pipeline's output. This design's job stops at producing an artefact honest enough (confidence scores, `x-aac-scope-limitations`, ignored-items) that an architect knows what to trust and what to check by hand — not at deciding whether the architecture is compliant with anything.
 
 ### 7.1 Optional LLM advisory layer — where it goes, and why it doesn't touch the no-LLM-core-path guarantee
+
+> **Appendix-style: optional review UX, unbuilt, not Slice 2a.** Zero code exists for this section (`docs/spikes/Solution_Design_v2_Critical_Review.md` §6, §2.5). It is off the deterministic core path by design and is the easiest place for this document to bloat if treated as near-term — do not schedule it against Slice 2a/2b/2c capacity. Kept in the main body rather than physically relocated (which would renumber every following section) — this banner is the actual T-A7 fix.
 
 **The question this answers:** the deterministic pipeline has a real, honest failure mode — some units land below the confidence floor (`CONFIDENCE_FLOOR = 40`, `run-slice.ts`) or get ignored as `INSUFFICIENT_EVIDENCE`/`AMBIGUOUS_BOUNDARY` (`analysis/ignored-items.ts`'s taxonomy), because the catalogue genuinely has no rule that fits. Today that's a dead end — the item sits in `ignored-items-report.json` and an architect either resolves it by hand from scratch or leaves it unresolved. An LLM is a plausible way to give that architect a starting hypothesis instead of a blank page, **without weakening the determinism guarantee this project has held since v0.1** — the reason to be careful about *where*, not whether to reject the idea outright.
 
@@ -427,12 +475,45 @@ Neither sketch requires a new Scanner engine, a new Rules catalogue entry, or a 
 
 ## 10. Slice Delivery — platform + CALM construction together
 
-| Slice | Platform (Goal A) | CALM construction (Goal B) |
+**Rewritten this round** (`docs/spikes/Solution_Design_v2_Critical_Review.md` §2.2, §5 action 4): the original "Slice 2" row packed platform generalization, six builders, a CodeQL spike, controls, k8s trust, and DR/override into one undifferentiated "near-term" label — several quarters of work compressed into one slice. Split into 2a/2b/2c with real exit criteria, and updated against what's now actually built, not what was planned when this table was first written.
+
+**Slice 2a exit criteria — executable, not prose** (`docs/solution/AGENT_TASKS_Solution_Cleanup_and_Prioritized_Actions.md` T-B1). All five are enforced by `pipeline/test/regression.test.js` (`npm test`), not just asserted here:
+
+1. `fineract-charge` produces schema-valid CALM via `npm run validate` — **passes** (0 errors, confirmed by test).
+2. JAX-RS routes match grep baseline exactly (not just count) — **passes**: `ChargesApiResource`'s exact 6-route set asserted, not a tolerance range.
+3. JPA `@Entity` → `database` kind, never `service` — **passes**: `Charge.java` asserted `node-type: database`, zero interfaces.
+4. No `interacts` with `{source, destination}` shape — **enforced structurally** (§5.3: no catalogue row ever requests `interacts`), not just tested; every relationship in every regression case is `connects`.
+5. Automated regression for BoA + NestJS + `fineract-charge` + `fineract-core` counts — **passes**, `npm test`, 6 real tests, all green.
+
+**Slice 2a is exit-criteria-complete as of this session.** Slice 2b/2c remain genuinely open (§10 table above).
+
+| Slice | Platform (Goal A) | CALM construction (Goal B) | Status |
+|---|---|---|---|
+| **1** | Scanner/Rules/Analysis/Orchestration real | Python/Node, routes + persistence + same-package relationships, `calm validate` 0/0 | **Built** |
+| **2a — Java source-only + construction hardening** | Module registry (`modules/registry.ts`), `contractVersion`, three catalogues + node/interface/relationship/metadata/control builders, `interacts`/`connects` fix, real cross-package Graphify fix (one combined pass), automated regression suite (`npm test`) | JAX-RS routes (proven, 19/19), JPA `@Entity` (proven, 36 real nodes), `@PreAuthorize` controls (proven, real evidence lines) | **Built and verified this session** — exit criteria in Wave B below all pass |
+| **2b — controls evidence breadth + DR/override UX** | — | Broaden controls beyond `@PreAuthorize` (resiliency, OAuth2-via-OpenAPI); Decision Record/Override mechanism itself is **built** (`override-applier.ts`), the *UX* around it (IR layer §13) is not | **Mechanism built; breadth + UX open** |
+| **2c — k8s + OpenAPI** | — | k8s trust relationships (`shares-secret`), deployment decorators, static-OpenAPI provider | **Not started** |
+| **3 — second module / platform proof** | `threat-signals` module (§9) | Quarkus/Spring Data repository-interface/Spring Batch/JMS (evidenced `v0.12`), messaging two-mechanism detection (`v0.11`) | **Platform half built this session** (`threat-signals` real, proven); construction half not started |
+| **Backlog, unchanged** | Wave M P0-P2 (module seamlessness, upstream plugins — see `docs/solution/Modularity_and_Integration_Assessment.md`) | WebFlux, gRPC (checked absent across 4+ evidence repos), Django/Express, Scala/Spark web-service framing, TypeORM/Prisma/Mongoose (unverified), CALM Studio round-trip | — |
+
+**protocol/system-node/evidence.json, precisely** (a nuance the original row's phrasing glossed over): `evidence.json`-shaped provenance for controls is built (`control-builder.ts`). `protocol` population and `system`-node emission are **designed (§5.6/§5.7) but not coded** — `relationship-type-mapping.yml`'s rows currently all carry `protocol: null`; no rule sets a real value yet, and `node-builder.ts` does not emit a composite `system` node. Named honestly rather than left implied by the surrounding "built" language.
+
+### 10.1 Pilot scorecard (provisional numbers, `docs/spikes/Solution_Design_v2_Critical_Review.md` §2.5/§2.8)
+
+The original v1 review's failure mode was qualitative-only success metrics with no numeric target to score a pilot against; this document had drifted back toward the same gap (no scorecard section existed until this revision). Provisional, not yet stakeholder-ratified — same status as `v0.10 §1.1`'s numbers, which these extend with real measurements from this session where available:
+
+| Metric | Target (provisional) | Real measurement so far |
 |---|---|---|
-| **1 (built)** | Scanner/Rules/Analysis/Orchestration real; module framework not yet generalized (hardcodes CALM Generator as the only consumer) | Python/Node, routes + persistence + same-package relationships, `calm validate` 0/0 |
-| **2 (this document's near-term build target)** | Generalize orchestration's terminus into a real module registry (§4.4); add `contractVersion` (§3.4); build the three-catalogue construct-mapping layer + six builders including `control-builder.ts` (§5.2-5.8), fixing the `interacts`/`connects` bug structurally and populating `protocol`/`system`-node/`evidence.json`; add `engine-capability-matrix.yml` routing (§6.1) and the authority-tier generalization it needs | Java (Spring MVC + JAX-RS + JPA, already evidenced v0.6 §3), CodeQL spike for JAX-RS/JPA (§6.1 step 1, real blocker-to-check not nice-to-have), control evidence-capture (`control-requirement-catalogue.yml`, decorator + call-based per v0.10/v0.11, real schema now confirmed §5.5), k8s trust-relationship layer (§4.1/§5.3's `shares-secret` row), Decision Record/Override apply-pass (§5.4) |
-| **3 (not started, named not designed)** | First real second module — threat modeller or green analyser (§9), proving the module boundary against real code, not just a sketch | Quarkus/Spring Data repository-interface/Spring Batch/JMS (evidenced v0.12), messaging two-mechanism detection (v0.11) |
-| **Backlog, unchanged** | — | WebFlux, gRPC (checked absent across 4+ evidence repos, named not assumed), Django/Express, Scala/Spark web-service framing (data/batch only is evidenced, not web services — v0.14 §4), TypeORM/Prisma/Mongoose (Node persistence catalogue rows exist but unverified against a real repo), OpenAPI ingestion (validated as customer need per v0.14 §2.5, not built), CALM Studio round-trip/companion review interface (explicitly backlog-tier per v0.10 §1.3, not silently absent this time) |
+| Route recall vs. grep-verified ground truth | 100% on proxy repos | **19/19** (Fineract JAX-RS), **4/4** ×2 (BoA Flask) |
+| `calm validate` errors | 0 | **0** across every regression case (BoA, NestJS, `fineract-charge`, `fineract-core`) |
+| Time per package (CodeGraph + decorator pass) | Under 2 min (`v0.10 §1.1`) | **~10s** for 823 files (`fineract-core`) |
+| Full combined-scan time at Fineract's real scale (6,781 files) | Not yet targeted | **~96s** (Graphify portion only — not a full end-to-end pipeline timing, named as a gap in §11) |
+| Override rate (how often generated output needs correction) | Not yet measured | No pilot has run against a non-proxy repo yet — genuinely unmeasurable until then |
+| Architect review time per package | Under 15 min (`v0.10 §1.1`) | Not measured — no human-review pilot has happened |
+
+### 10.2 CALM schema version-drift stance
+
+Pinned to CALM 1.2 throughout, unchanged since `v0.9`. **One-liner policy, stated explicitly rather than left implicit** (`docs/spikes/Solution_Design_v2_Critical_Review.md` §2.8): if CALM's upstream schema changes, this pipeline re-validates its generated output against the new schema version and bumps the artefact's `x-aac-*` metadata to record which CALM version it was checked against — it does not silently continue emitting 1.2-shaped output under a newer schema without that check. No automated re-validation trigger exists yet; this is a stated manual-process stance, not a built mechanism.
 
 ## 11. Risks and Open Points
 
@@ -443,7 +524,7 @@ Neither sketch requires a new Scanner engine, a new Rules catalogue entry, or a 
 | Regression suite is a floor, not a program | Accepted for Slice 2 scope; a real golden-dataset program is a stated backlog item, not designed here. |
 | CodeQL license/build-compatibility unresolved | Real open point from §6 — needs an actual spike against the real target repo's build system before any adoption decision, not assumed compatible from research alone. |
 | Numeric success metric, data-classification owner, companion-interface auth — still provisional | Unchanged from v0.10 §1 — this document does not claim to resolve organizational-authority questions it has none over; it restates their provisional status rather than letting them re-drift silently. |
-| Second module (§9) is sketched, not built | The actual test of Goal A is still pending a real Slice 3 attempt — named as a real risk to the "platform, not CALM-only script" claim until that happens. |
+| Second module (§9) is sketched, not built | **RESOLVED this session** — `modules/threat-signals/` is real, built, and proven against real Fineract `fineract-core` output (flags `http-entry-point` units with no `security-control` evidence), consuming only `TypedFacts` + the registry types, no Scanner/CALM-builder imports. The actual test of Goal A now passes. Residual risk narrows to *seamlessness* (module registration is still a code edit, not config — Wave M T-M1), not existence. |
 | LLM advisory layer (§7.1) drifts from "bounded escape hatch" to "default second opinion on everything" | Named as a real risk to watch, not assumed away — the trigger-set discipline (§7.1 point 1) and the per-run item cap are the concrete guardrails; if a future version proposes widening the trigger set (e.g. to the whole 40-69 confidence band instead of below-floor/ambiguous only), that should be treated as a real scope decision requiring the same review this document gives every other scope change, not a quiet default-widening. |
 | IR layer (§13) drifts into a second source of truth, or its override block becomes a way around Decision Record enforcement | Mitigated by construction per §13.4 — one-way generation, narrow fenced-block parsing, no direct path to `typed-facts.json`. Named again here because "a file both humans and an LLM can edit" is exactly the shape of thing that tends to accumulate scope over time if the regenerate-and-discard convention isn't actually enforced in the implementation, not just specified in this document. |
 | OpenAPI/AsyncAPI ingestion assumes a static file that may not exist (§4.1) | Named honestly, carried forward from `v0.6 §11` item 10 — annotation-based extraction (`extractFromSource()`) is the specified fallback, not yet built either. Don't scope Slice 2/3 work around "read `openapi.yaml`" without confirming the target repo actually checks one in. |
@@ -468,6 +549,8 @@ Neither sketch requires a new Scanner engine, a new Rules catalogue entry, or a 
 | How an ambiguous/ignored item becomes a real CALM node after human/LLM resolution | (a) Leave it implicit that the existing Override mechanism "somehow" covers this; (b) Extend the IR to render one section per `IgnoredItem` (not only per `TypedUnit`) using the existing `node_add` override type (already in `Gap_Closure §6`'s schema, unused until now), applied by the existing Override-apply pass every run | (b) | Caught by directly asking the question: §13.2 as first written only showed a unit that already existed, leaving no attachment point for an item that was never a node. (b) closes this with the schema that already exists (`node_add`) rather than inventing a new mechanism — and makes explicit that determinism is preserved because the override is applied *after* generation, not by changing what Analysis concludes. |
 
 ## 13. Intermediate Representation (IR) Layer — a human/LLM-facing markdown surface
+
+> **Appendix-style: optional review UX, unbuilt, not Slice 2a.** ~~Zero code exists for this section either.~~ **Correction (T-X3-2, `docs/solution/AGENT_TASKS_Extraction_Enrichment.md`, `docs/solution/STATUS.md` §B.3):** a real subset now exists — `intelligence-ir.md`, generated by `pipeline/src/analysis/ir/intelligence-ir.ts` + `evidence-packs.ts`, wired into `run-slice.ts` after modules run. It covers the read-only rendering half of this section (run header, coverage appendix, units, relationships, ignored/ambiguous with redacted evidence-pack snippets, unmapped-signal clusters, and a module-projections appendix reading real CALM/threat-signals output) — **not** the editable override-authoring fenced block described in §13.3 below, which remains unbuilt. Per `docs/solution/Extraction_Gaps_Mitigation_and_IR_Platform_Review.md` §3's correction, the built renderer is deliberately **platform-scoped, not CALM-centric** — named `intelligence-ir.md`, not `architecture-ir.md`, and it reads TypedFacts + coverage + unmapped as its primary source, treating CALM/threat-signals output as an optional read-after-the-fact appendix, matching §3.4's naming table below. The Decision Record/Override mechanism this IR would provide a friendlier front-end for is already real and usable today (a human editing raw Override JSON works now, `modules/calm-generator/override-applier.ts`) — the override-authoring half of the IR layer is still UX polish on a working mechanism, not a blocker to using it. Do not schedule the remaining half against Slice 2a/2b/2c capacity.
 
 **The question this answers:** `typed-facts.json` is the right *machine* contract — strict, versioned, the thing Modules must trust (§3.4). It is a poor *review* surface — no architect or LLM should be expected to review architecture facts by reading raw JSON, and the LLM advisory layer's `advisory-suggestions.json` (§7.1) has the same problem in the other direction: a reasonable proposal, badly presented. The ask is real: introduce a markdown-based IR that a human or an LLM can both read and — carefully — write back to.
 
@@ -595,7 +678,7 @@ confidence-scorer couldn't resolve which unit kind this is.
 
 **`deployed-in` relationships from Kubernetes namespace/cluster data.** Previously the k8s layer parsed `namespace`/`cluster` only to populate a *decorator* — a string tag. CALM has a relationship type built for exactly this (`deployed-in: {container, nodes[]}`, confirmed in real use in `calm-3.json`). Decision: **emit both** — the namespace/cluster becomes a real node (`node-type: system` for a cluster, per §5.7's confirmed usage), with `deployed-in` relationships from each service to it, *and* the deployment decorator stays for image/build metadata that isn't naturally a node. A traversable relationship is strictly more useful to a governance consumer than a string tag; adding it is a `relationship-type-mapping.yml` row (§5.3), not new extraction — the k8s provider already parses this data.
 
-**Logging/observability and resiliency as cross-language concerns, not Java-only.** Both were specified in the Java design (`Architecture_as_Code_Java_Solution_Design.md` §5) but never generalized here, which would have left them looking Java-specific when neither is. Both use mechanisms this pipeline already has for every language:
+**Logging/observability and resiliency as cross-language concerns, not Java-only.** Both were specified in the Java design (`language/java.md` §5) but never generalized here, which would have left them looking Java-specific when neither is. Both use mechanisms this pipeline already has for every language:
 - **Logging** → import-presence detection (the same Graphify import-edge mechanism as persistence): SLF4J/Logback/Log4j2 (Java), `logging`/structlog (Python), winston/pino (Node) → `x-aac-observability` metadata. Deliberately *not* a node — logging is cross-cutting, not an architectural component.
 - **Resiliency** → decorator/annotation detection (the same `decorates`-ref mechanism as controls): resilience4j `@CircuitBreaker`/`@Retry`/`@Bulkhead` (Java), tenacity `@retry` (Python), and equivalent Node libraries → `controls` (resiliency domain), with the annotation's own parameters rendered as `units.json` time/rate values inside the control's `config`.
 Both become `signal-catalogue.yml` rows plus `control-requirement-catalogue.yml` entries — no new mechanism, which is precisely why they generalize.

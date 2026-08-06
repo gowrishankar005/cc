@@ -1,0 +1,36 @@
+{
+  "packageId": "py-accounts-api",
+  "goldVersion": "0.1.0",
+  "tier": "core",
+  "description": "Flask accounts API with SQLAlchemy-backed AccountDb — Slice 1 happy path.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/py-accounts-api",
+  "changelog": "v0.1.0 initial lab gold",
+  "nodes": [
+    {
+      "id": "accounts-api",
+      "nodeType": "service",
+      "match": { "nameContains": "accounts" },
+      "interfaces": [
+        "GET /health",
+        "GET /accounts",
+        "GET /accounts/<id>",
+        "POST /accounts"
+      ]
+    },
+    {
+      "id": "accounts-db",
+      "nodeType": "database",
+      "match": { "nameContains": "AccountDb" }
+    }
+  ],
+  "relationships": [
+    { "from": "accounts-api", "to": "accounts-db", "kind": "connects" }
+  ],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [
+    { "description": "Angular account UI", "reason": "frontend out of Slice 1/2" }
+  ],
+  "expectedPlatformGaps": []
+}

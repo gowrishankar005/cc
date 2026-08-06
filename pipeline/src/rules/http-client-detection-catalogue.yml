@@ -1,0 +1,61 @@
+# Catalogue for outbound-http-detector.ts (T-X8-3a/T-X8-3, G-L2-13 — "the
+# biggest missing code-level relationship class after DB" per the review's
+# own §2.1 Tier-1 ranking). Same strategy-catalogue pattern as
+# persistence-detection-catalogue.yml / messaging-detection-catalogue.yml.
+#
+# Real evidence checked BEFORE building this (not assumed): grepped both
+# real fixture repos for actual outbound-HTTP call sites.
+#   - Bank of Anthos `frontend.py`: real `requests.get/post(...)` calls to
+#     userservice/contacts/transactions — but every target URL is built
+#     from `os.environ.get(...)` at runtime (`app.config["USERSERVICE_URI"]
+#     = 'http://{}/users'.format(os.environ.get('USERSERVICE_API_ADDR'))`),
+#     never a literal string. Genuinely NOT resolvable via any static
+#     mechanism this pipeline has (that's G-L1-06's env-soft-graph
+#     territory, Phase 4 — a DIFFERENT gap).
+#   - Fineract `SendMessageToSmsGatewayTasklet.java`: real
+#     `org.springframework.web.client.RestTemplate` import + `.exchange(uri,
+#     ...)` call, but `uri` is a runtime-constructed variable, not a literal
+#     annotation argument.
+# Both real cases land in the import-only / unresolved-target bucket, not
+# a resolvable one — this catalogue is scoped to match that reality, not an
+# imagined one.
+
+version: "0.1.0"
+
+strategies:
+  - id: import-only-client
+    description: >
+      A file imports a known HTTP-client library; Graphify's imports_from
+      edge is the ONLY signal — there is no literal target URL/service-name
+      available from a bare import, so this strategy NEVER resolves a
+      target. Every detection becomes an `unresolved-http-target`
+      CROSS_DOMAIN_UNRESOLVED ignored-item (real evidence for HITL to
+      complete via the already-real relationship_add override, T-X6-1) —
+      never a fabricated connects relationship. This is the strategy
+      actually dispatched by outbound-http-detector.ts.
+    status: dispatched
+    libraries:
+      - { name: requests, language: python, evidenceLevel: verified } # real: spikes/boa/repo/src/frontend/frontend.py
+      - { name: httpx, language: python, evidenceLevel: unverified }
+      - { name: org.springframework.web.client.RestTemplate, language: java, evidenceLevel: verified } # real: spikes/fineract/repo/.../SendMessageToSmsGatewayTasklet.java
+      - { name: org.springframework.web.reactive.function.client.WebClient, language: java, evidenceLevel: unverified }
+      - { name: axios, language: typescript, evidenceLevel: unverified }
+      - { name: node-fetch, language: typescript, evidenceLevel: unverified }
+
+  - id: resolvable-target-decorator
+    description: >
+      A declarative HTTP-client annotation whose OWN literal argument names
+      the target service (e.g. Java's @FeignClient(name = "other-service")),
+      extractable via the SAME extractLiteralArgument()/DecoratorFact
+      mechanism JAX-RS route composition already proves works — matched
+      against other units' basenames in the same run (same exact-match
+      discipline as k8s-trust-detector.ts's deployment correlation), which
+      WOULD produce a real, resolvable `connects` relationship at low/medium
+      confidence. NOT implemented: no real @FeignClient (or equivalent)
+      usage was found in either evidence repo when this catalogue was built
+      — building and "verifying" it would mean testing against a fixture
+      invented for the occasion, not real evidence. Left honestly
+      unimplemented, same discipline as messaging-detection-catalogue.yml's
+      typed-field-producer entry.
+    status: not-implemented
+    mechanism: decorator + literal-argument extraction (proven mechanism) + same-run basename correlation (proven mechanism, k8s-trust-detector.ts) — combination not yet wired, no real evidence to verify it against

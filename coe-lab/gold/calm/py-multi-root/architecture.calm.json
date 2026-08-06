@@ -1,0 +1,132 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-py-multi-root",
+  "name": "CoE Lab \u2014 Multi-root Accounts + Ledger",
+  "description": "Hand-authored gold when scanning py-accounts-api and py-ledger-worker together. Same-package service\u2192db connects expected; cross-service JWT trust is out of scope here (see deploy-k8s-trust).",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/py-accounts-api + py-ledger-worker"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "accounts-api",
+      "node-type": "service",
+      "name": "Accounts API",
+      "description": "Flask accounts service.",
+      "interfaces": [
+        {
+          "unique-id": "accounts-api-health",
+          "type": "path-interface",
+          "path": "GET /health"
+        },
+        {
+          "unique-id": "accounts-api-list",
+          "type": "path-interface",
+          "path": "GET /accounts"
+        },
+        {
+          "unique-id": "accounts-api-get",
+          "type": "path-interface",
+          "path": "GET /accounts/<id>"
+        },
+        {
+          "unique-id": "accounts-api-create",
+          "type": "path-interface",
+          "path": "POST /accounts"
+        }
+      ]
+    },
+    {
+      "unique-id": "accounts-db",
+      "node-type": "database",
+      "name": "AccountDb",
+      "description": "SQLAlchemy AccountDb."
+    },
+    {
+      "unique-id": "ledger-api",
+      "node-type": "service",
+      "name": "Ledger API",
+      "description": "Flask ledger service.",
+      "interfaces": [
+        {
+          "unique-id": "ledger-api-health",
+          "type": "path-interface",
+          "path": "GET /health"
+        },
+        {
+          "unique-id": "ledger-api-post-entries",
+          "type": "path-interface",
+          "path": "POST /entries"
+        },
+        {
+          "unique-id": "ledger-api-list-entries",
+          "type": "path-interface",
+          "path": "GET /entries"
+        }
+      ]
+    },
+    {
+      "unique-id": "ledger-db",
+      "node-type": "database",
+      "name": "LedgerDb",
+      "description": "SQLAlchemy LedgerDb."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "accounts-api-connects-accounts-db",
+      "description": "Accounts API \u2192 AccountDb.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "accounts-api"
+          },
+          "destination": {
+            "node": "accounts-db"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "ledger-api-connects-ledger-db",
+      "description": "Ledger API \u2192 LedgerDb.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "ledger-api"
+          },
+          "destination": {
+            "node": "ledger-db"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "accounts-api",
+            "accounts-db",
+            "ledger-api",
+            "ledger-db"
+          ]
+        }
+      }
+    }
+  ]
+}

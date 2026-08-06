@@ -1,5 +1,8 @@
-import { GraphifyGraph } from '../../scanner/graphify-provider';
+import * as path from 'path';
+import { GraphifyRun } from '../../scanner/graphify-provider';
 import { TypedUnit } from '../../types/typed-facts';
+import { loadPersistenceDetectionCatalogue, driverImportLibraries } from '../../rules/persistence-detection-schema';
+import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector';
 
 /**
  * Real gap found by auditing pipeline output against Bank of Anthos source
@@ -9,90 +12,34 @@ import { TypedUnit } from '../../types/typed-facts';
  * for free — no new extraction engine needed, just reading what's already
  * there instead of discarding it in the cross-package-only reconciler.
  *
- * Detects: a file that imports a known persistence library, then the
- * class Graphify says that file `contains` (e.g. db.py -contains-> UserDb).
- * That class + its methods become a `database`-kind TypedUnit, spanning
- * from the class's own line to its last known member's line.
+ * Wave M T-M9: this is now a dispatcher over `persistence-detection-catalogue.yml`'s
+ * `driver-import` strategy — the ONLY one of the four named persistence
+ * strategies this function actually implements (`jpa-entity` is a real,
+ * working, but SEPARATE mechanism — signal-catalogue.yml's decorator path;
+ * `spring-data-repository`/`jooq` are not implemented anywhere yet). Adding
+ * a new driver library is now a catalogue row, not a code change — the
+ * genericity fix named since `docs/solution/language/java.md` §3.1, done
+ * for real here, not just designed.
+ *
+ * The actual file->contains->class walk is shared with messaging-detector.ts
+ * and outbound-http-detector.ts via graphify-import-strategy-detector.ts
+ * (post-MVP consolidation — all three were independently-written copies of
+ * the identical two-step algorithm before this).
  */
-// Python entries verified against real Bank of Anthos code (both db.py files
-// import sqlalchemy). Node/TS entries added for Slice 1 completeness — a
-// language explicitly in scope per requirements v0.6 §1.5 — but UNVERIFIED:
-// no real Node/TS package with a persistence layer has been run through
-// this pipeline yet. Don't treat these as confirmed the way the Python
-// entries are; re-check Graphify's actual import-target naming for
-// TypeORM/Prisma/Mongoose before relying on them.
-const PERSISTENCE_LIBRARIES = new Set([
-  // Python — verified
-  'sqlalchemy',
-  'psycopg2',
-  'pymongo',
-  'redis',
-  'sqlite3',
-  'mysql',
-  'mysqlclient',
-  'pymysql',
-  // Node/TS — unverified, added for scope completeness only
-  'typeorm',
-  'prisma',
-  '@prisma/client',
-  'mongoose',
-  'sequelize',
-  'pg',
-  'mysql2',
-  'ioredis',
-]);
+export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): Map<string, TypedUnit[]> {
+  const catalogue = loadPersistenceDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
+  const libraries = driverImportLibraries(catalogue);
 
-export function detectPersistenceUnits(root: string, graph: GraphifyGraph): TypedUnit[] {
-  const units: TypedUnit[] = [];
-
-  const persistenceFiles = new Set(
-    graph.edges
-      .filter((e) => (e.relation === 'imports_from' || e.relation === 'imports') && PERSISTENCE_LIBRARIES.has(e.target))
-      .map((e) => e.source_file)
+  return detectUnitsByImportStrategy(
+    run,
+    libraries,
+    {
+      kind: 'database',
+      category: 'persistence',
+      weight: 20, // persistence signal weight, Gap_Closure_Build_Ready_Specs_v0.1.md §7
+      confidence: 20,
+      unknownLibraryFallback: 'unknown-persistence-lib',
+    },
+    existingServiceFilePaths
   );
-
-  for (const file of persistenceFiles) {
-    // Find the class this file `contains` (db.py -contains-> db_userdb).
-    const fileNodeId = graph.nodes.find((n) => n.source_file === file && n.source_location === 'L1')?.id;
-    if (!fileNodeId) continue;
-
-    const containsEdges = graph.edges.filter((e) => e.source === fileNodeId && e.relation === 'contains');
-    for (const containsEdge of containsEdges) {
-      const classNode = graph.nodes.find((n) => n.id === containsEdge.target);
-      if (!classNode) continue;
-
-      // Span: class's own line through its furthest member's line (method edges).
-      const memberEdges = graph.edges.filter((e) => e.source === classNode.id && e.relation === 'method');
-      const memberLines = memberEdges
-        .map((e) => graph.nodes.find((n) => n.id === e.target))
-        .map((n) => (n ? parseInt(/^L(\d+)/.exec(n.source_location)?.[1] ?? '0', 10) : 0));
-      const classLine = parseInt(/^L(\d+)/.exec(classNode.source_location)?.[1] ?? '0', 10);
-      const endLine = memberLines.length > 0 ? Math.max(classLine, ...memberLines) : classLine;
-
-      const persistenceLib = [...persistenceFiles]
-        .map(() => graph.edges.find((e) => e.source === fileNodeId && PERSISTENCE_LIBRARIES.has(e.target)))
-        .find((e) => e)?.target;
-
-      units.push({
-        id: `${file}::${classNode.label}`,
-        kind: 'database',
-        name: classNode.label,
-        filePath: file,
-        startLine: classLine,
-        endLine,
-        evidence: [
-          {
-            signal: persistenceLib ?? 'unknown-persistence-lib',
-            source: 'graphify-import',
-            category: 'persistence',
-            weight: 20, // persistence signal weight, Gap_Closure_Build_Ready_Specs_v0.1.md §7
-            ref: `${file}:${classLine}`,
-          },
-        ],
-        confidence: 20,
-      });
-    }
-  }
-
-  return units;
 }

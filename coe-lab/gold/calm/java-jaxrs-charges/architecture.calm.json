@@ -1,0 +1,68 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-java-jaxrs-charges",
+  "name": "CoE Lab \u2014 JAX-RS Charges",
+  "description": "Hand-authored gold architecture for Fineract-shaped JAX-RS ChargesApiResource + JPA Charge entity.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/java-jaxrs-charges"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "charges-api",
+      "node-type": "service",
+      "name": "Charges API",
+      "description": "JAX-RS resource at /v1/charges (ChargesApiResource.java).",
+      "interfaces": [
+        {
+          "unique-id": "charges-api-list",
+          "type": "path-interface",
+          "path": "GET /v1/charges"
+        },
+        {
+          "unique-id": "charges-api-get",
+          "type": "path-interface",
+          "path": "GET /v1/charges/{chargeId}"
+        },
+        {
+          "unique-id": "charges-api-create",
+          "type": "path-interface",
+          "path": "POST /v1/charges"
+        }
+      ]
+    },
+    {
+      "unique-id": "charge-entity",
+      "node-type": "database",
+      "name": "Charge",
+      "description": "JPA @Entity mapped to table m_charge (Charge.java)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "charges-api",
+            "charge-entity"
+          ]
+        }
+      }
+    }
+  ]
+}

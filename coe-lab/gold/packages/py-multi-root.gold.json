@@ -1,0 +1,28 @@
+{
+  "packageId": "py-multi-root",
+  "goldVersion": "0.1.0",
+  "tier": "core",
+  "description": "When accounts-api and ledger-worker are scanned together, expect both services/dbs. Cross-service edge is aspirational unless code calls across packages.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages (py-accounts-api + py-ledger-worker)",
+  "changelog": "v0.1.0 initial",
+  "nodes": [
+    { "id": "accounts-api", "nodeType": "service", "match": { "nameContains": "accounts" } },
+    { "id": "accounts-db", "nodeType": "database", "match": { "nameContains": "AccountDb" } },
+    { "id": "ledger-api", "nodeType": "service", "match": { "nameContains": "ledger" } },
+    { "id": "ledger-db", "nodeType": "database", "match": { "nameContains": "LedgerDb" } }
+  ],
+  "relationships": [
+    { "from": "accounts-api", "to": "accounts-db", "kind": "connects" },
+    { "from": "ledger-api", "to": "ledger-db", "kind": "connects" }
+  ],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [
+    {
+      "description": "JWT trust edge accounts→ledger",
+      "reason": "Requires k8s shared secret or env soft-graph — see deploy-k8s-trust stretch gold"
+    }
+  ],
+  "expectedPlatformGaps": []
+}

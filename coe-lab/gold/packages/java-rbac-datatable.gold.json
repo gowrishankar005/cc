@@ -1,0 +1,29 @@
+{
+  "packageId": "java-rbac-datatable",
+  "goldVersion": "0.1.0",
+  "tier": "core",
+  "description": "Spring @PreAuthorize RBAC — service-layer-only + HTTP controller with controls.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/java-rbac-datatable",
+  "changelog": "v0.1.0 initial control package",
+  "nodes": [
+    {
+      "id": "datatable-write",
+      "nodeType": "service",
+      "match": { "nameContains": "DatatableWriteService" }
+    },
+    {
+      "id": "account-read-api",
+      "nodeType": "service",
+      "match": { "nameContains": "AccountReadController" },
+      "interfaces": ["GET /accounts", "GET /accounts/{id}"]
+    }
+  ],
+  "relationships": [],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [],
+  "expectedPlatformGaps": [],
+  "expectControls": true,
+  "controlNotes": "At least one service node should carry CALM controls (security-rbac-001 / PreAuthorize evidence)."
+}

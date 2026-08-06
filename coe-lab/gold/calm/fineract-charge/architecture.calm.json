@@ -1,0 +1,63 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-fineract-charge",
+  "name": "Apache Fineract — Charge module",
+  "description": "Hand-authored CALM gold for fineract-charge, derived from source (ChargesApiResource JAX-RS + Charge JPA entity). Independent of the platform generator. Wild-type Java evidence package for CoE lab eval.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "apache/fineract" },
+    { "key": "x-lab-module", "value": "fineract-charge" },
+    { "key": "x-lab-source-evidence", "value": "portfolio/charge/api/ChargesApiResource.java; portfolio/charge/domain/Charge.java" }
+  ],
+  "nodes": [
+    {
+      "unique-id": "charges-api",
+      "node-type": "service",
+      "name": "Charges API",
+      "description": "JAX-RS ChargesApiResource at /v1/charges — define and manage fee/penalty charges for clients, loans, and savings.",
+      "interfaces": [
+        { "unique-id": "charges-list", "type": "path-interface", "path": "GET /v1/charges" },
+        { "unique-id": "charges-get", "type": "path-interface", "path": "GET /v1/charges/{chargeId}" },
+        { "unique-id": "charges-template", "type": "path-interface", "path": "GET /v1/charges/template" },
+        { "unique-id": "charges-create", "type": "path-interface", "path": "POST /v1/charges" },
+        { "unique-id": "charges-update", "type": "path-interface", "path": "PUT /v1/charges/{chargeId}" },
+        { "unique-id": "charges-delete", "type": "path-interface", "path": "DELETE /v1/charges/{chargeId}" }
+      ]
+    },
+    {
+      "unique-id": "charge-entity",
+      "node-type": "database",
+      "name": "Charge",
+      "description": "JPA @Entity Charge mapped to table m_charge (unique name constraint)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "fineract-charge system",
+      "description": "Composite boundary for the fineract-charge module architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "charges-api-connects-charge-entity",
+      "description": "Charges API persists and reads charge definitions via the Charge entity / m_charge table (through read/write platform services).",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "charges-api" },
+          "destination": { "node": "charge-entity" }
+        }
+      },
+      "protocol": "JDBC"
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "Module system composed of charges API and Charge entity.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": ["charges-api", "charge-entity"]
+        }
+      }
+    }
+  ]
+}

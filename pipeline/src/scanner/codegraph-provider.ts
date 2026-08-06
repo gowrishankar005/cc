@@ -2,23 +2,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { CodeGraph } = require('@colbymchenry/codegraph');
+import { NativeRouteFact, DecoratorFact, StructuralEngine } from './structural-engine';
 
-export interface NativeRouteFact {
-  filePath: string;
-  startLine: number;
-  name: string; // e.g. "GET /balances/{accountId}"
-  qualifiedName: string;
-}
-
-export interface DecoratorFact {
-  referenceName: string; // raw decorator/annotation name, e.g. "route", "Controller"
-  fromNodeId: string;
-  filePath: string;
-  line: number;
-  argument?: string; // decorator's own quoted string literal, e.g. "{chargeId}" for @Path("{chargeId}")
-  fromNodeKind?: 'class' | 'method' | 'other'; // whether the annotation sits on the class or a method — needed to compose JAX-RS class-Path + method-Path into one route (analysis/jaxrs-route-composer.ts)
-  language?: string; // derived from the file extension, not CodeGraph's own UnresolvedReference.language (empirically unpopulated for decorates refs) — lets findRule disambiguate same-shaped signals across frameworks (e.g. composed JAX-RS "GET /path" vs. NestJS's bare "Get")
-}
+// Re-exported for backward compatibility — the neutral definitions now live
+// in structural-engine.ts (the vendor-agnostic contract), not here.
+export type { NativeRouteFact, DecoratorFact };
 
 const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   '.py': 'python',
@@ -111,3 +99,24 @@ export function listIndexedFiles(cg: any, extensions: string[]): string[] {
     .map((f) => f.path)
     .filter((p: string) => extensions.some((ext) => p.endsWith(ext)));
 }
+
+/**
+ * CodeGraph's implementation of the neutral StructuralEngine contract
+ * (structural-engine.ts) — the vendor-risk-isolation fix: run-slice.ts
+ * depends on this object's shape, not on codegraph-provider.ts's specific
+ * named exports, so a future fallback engine (tree-sitter, scip-java, or
+ * Graphify-as-fallback per the original tool-comparison spike's own
+ * recommendation) is a second implementation of the same interface, swapped
+ * in at one call site — not a change to every consumer. `handle` here is
+ * just `cg` under the interface's opaque naming; internal-only, never
+ * exposed to callers as a CodeGraph-specific type.
+ */
+export const codeGraphEngine: StructuralEngine = {
+  indexPackage: async (packageRoot: string) => {
+    const { cg, nativeRoutes } = await indexPackage(packageRoot);
+    return { handle: cg, nativeRoutes };
+  },
+  extractDecoratorFacts: (handle: unknown, packageRoot: string, relativeFilePath: string) =>
+    extractDecoratorFacts(handle, packageRoot, relativeFilePath),
+  listIndexedFiles: (handle: unknown, extensions: string[]) => listIndexedFiles(handle, extensions),
+};

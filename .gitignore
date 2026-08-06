@@ -45,3 +45,12 @@ temp/
 npm-debug.log*
 yarn-error.log*
 .pnpm-store/
+
+# CoE Lab evaluation outputs (regenerate via scripts)
+coe-lab/eval-results/
+coe-lab/generated/**
+!coe-lab/generated/README.md
+
+# Graphify scratch (tool writes into scanned trees)
+**/.graphify-cache/
+**/graphify-out/

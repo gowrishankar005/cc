@@ -1,0 +1,110 @@
+# Catalogue for persistence-detector.ts (Wave M T-M9,
+# Modularity_and_Integration_Assessment.md friction F5). Java persistence has
+# at least four genuinely different code shapes — JPA @Entity classes,
+# Spring Data repository interfaces, jOOQ typed queries, plain driver
+# imports — and the old persistence-detector.ts hardcoded only one of them
+# (a Python-shaped `PERSISTENCE_LIBRARIES` set). This catalogue is the fix
+# for THAT ONE strategy: adding a new driver library is now a row here, not
+# a code change. The other three strategies named in
+# docs/solution/language/java.md §3.1 are NOT dispatched by this file —
+# stated honestly per strategy below, not silently implied working.
+
+version: "0.1.0"
+
+strategies:
+  - id: driver-import
+    description: >
+      A file imports a known persistence-library module; the class Graphify
+      says that file `contains` becomes a database-kind unit. This is the
+      ONLY strategy persistence-detector.ts actually dispatches — generalizes
+      the prior hardcoded PERSISTENCE_LIBRARIES set into data.
+    status: dispatched
+    libraries:
+      # Python — verified against real Bank of Anthos code (both db.py files import sqlalchemy)
+      - { name: sqlalchemy, language: python, evidenceLevel: verified }
+      - { name: psycopg2, language: python, evidenceLevel: verified }
+      - { name: pymongo, language: python, evidenceLevel: verified }
+      - { name: redis, language: python, evidenceLevel: verified }
+      - { name: sqlite3, language: python, evidenceLevel: verified }
+      - { name: mysql, language: python, evidenceLevel: verified }
+      - { name: mysqlclient, language: python, evidenceLevel: verified }
+      - { name: pymysql, language: python, evidenceLevel: verified }
+      # Node/TS — @prisma/client is now VERIFIED: run against a real
+      # NestJS+Prisma fintech repo (ghostfolio/ghostfolio, apps/api) and
+      # confirmed real detection (87 real persistence units) — this also
+      # found and fixed a real bug affecting every Node/TS entry in this
+      # list: Graphify normalizes external package import targets to
+      # `ref_<sanitized-name>` (`@prisma/client` -> `ref_prisma_client`),
+      # never the literal package name — see graphify-import-target.ts.
+      # Every OTHER Node/TS entry below is still unverified for its OWN
+      # detection (the ref_ transform is now correctly applied to all of
+      # them, but no real fixture has exercised typeorm/mongoose/etc yet).
+      - { name: typeorm, language: typescript, evidenceLevel: unverified }
+      - { name: prisma, language: typescript, evidenceLevel: unverified }
+      - { name: "@prisma/client", language: typescript, evidenceLevel: verified }
+      - { name: mongoose, language: typescript, evidenceLevel: unverified }
+      - { name: sequelize, language: typescript, evidenceLevel: unverified }
+      - { name: pg, language: typescript, evidenceLevel: unverified }
+      - { name: mysql2, language: typescript, evidenceLevel: unverified }
+      - { name: ioredis, language: typescript, evidenceLevel: unverified }
+      # T-X2-2 (AGENT_TASKS_Extraction_Enrichment.md, G-L2-02) — Node/AWS
+      # cloud-native persistence, Fidelity-evidenced (requirements v0.14).
+      # DynamoDB genuinely IS a database, so it's correct to type via this
+      # strategy (unlike SQS/SNS below, which are messaging, not persistence
+      # — see the cloud-messaging strategy entry for why those are NOT here).
+      - { name: "@aws-sdk/client-dynamodb", language: typescript, evidenceLevel: unverified }
+      - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — covers DynamoDB use but also other AWS services, so a real false-positive risk this catalogue row doesn't hide
+      # Java — Fidelity-evidenced (v0.14), not yet added to real Graphify
+      # import-edge matching — named here as the concrete next catalogue
+      # addition, not yet dispatched (Graphify's actual edge-target naming
+      # for these hasn't been verified against real Java source).
+      - { name: com.mongodb, language: java, evidenceLevel: unverified }
+      - { name: com.amazonaws.services.dynamodbv2, language: java, evidenceLevel: unverified }
+      - { name: software.amazon.awssdk.services.dynamodb, language: java, evidenceLevel: unverified } # AWS SDK v2 for Java, distinct package from the v1 entry above
+      # T-X7-4 — org.postgresql IS the PostgreSQL JDBC driver package,
+      # unambiguously (not a guess: this is what the package name means).
+      # protocol: JDBC is a real value in core.json#/defs/protocol
+      # (verified against the installed calm-cli schema before adding this,
+      # not assumed). Still evidenceLevel: unverified — no real fixture has
+      # exercised THIS library's own Graphify import-edge detection yet
+      # (same caveat every other Java entry in this list already carries);
+      # the protocol mechanism itself is proven with a synthetic test
+      # (test/regression.test.js), honestly not a real-fixture one.
+      - { name: org.postgresql, language: java, evidenceLevel: unverified, protocol: JDBC }
+
+  - id: jpa-entity
+    description: >
+      @Entity/@Table decorator on a class. NOT dispatched by persistence-detector.ts
+      at all — this strategy is already implemented via a completely
+      different, separate mechanism: the decorator/extractFromSource() path
+      (signal-catalogue.yml's jpa-entity row, matched by signal-mapper.ts).
+      Named here for completeness of the strategy inventory, not because this
+      dispatcher runs it.
+    status: implemented-elsewhere
+    mechanism: decorator (signal-catalogue.yml jpa-entity/jpa-table rows)
+
+  - id: spring-data-repository
+    description: An interface extending CrudRepository/JpaRepository.
+    status: not-implemented
+    mechanism: would-need extractFromSource() interface-extends detection
+
+  - id: jooq
+    description: org.jooq.* import + typed-field usage (evidenced at Waltz, GenericSelector.java:23-24).
+    status: not-implemented
+    mechanism: would-need Graphify import-edge + typed-field detection, similar to driver-import but with an added type check
+
+  - id: cloud-messaging-sqs-sns
+    description: >
+      Node/AWS SQS/SNS client imports (@aws-sdk/client-sqs, @aws-sdk/client-sns,
+      aws-sdk). Deliberately NOT added as driver-import libraries: SQS/SNS are
+      messaging, not persistence — the driver-import strategy always emits
+      `kind: 'database'`, so adding a queue/topic client here would mistype a
+      message queue as a database (the exact "force everything into the wrong
+      kind" anti-pattern named in Extraction_Gaps_Mitigation_and_IR_Platform_Review.md
+      §2.2). Correct home is Wave X7 (messaging/`network`|`topic` kind),
+      explicitly out of scope for this MVP pass (AGENT_TASKS_Extraction_Enrichment.md
+      §0.1) — named here for strategy-inventory completeness only, per T-X2-2's
+      own instruction ("SQS/SNS → defer to X7... never silent high-confidence service").
+    status: not-implemented
+    deferredTo: X7
+    mechanism: would-need a new TypedUnit.kind ('topic'/'network') + contract bump, per Contract_Evolution_Policy.md §2(c)

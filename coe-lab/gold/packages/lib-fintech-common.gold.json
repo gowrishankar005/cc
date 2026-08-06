@@ -1,0 +1,24 @@
+{
+  "packageId": "lib-fintech-common",
+  "goldVersion": "0.1.0",
+  "tier": "trap",
+  "description": "Shared utility library — must NOT be emitted as a service.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/lib-fintech-common",
+  "changelog": "v0.1.0 initial",
+  "nodes": [],
+  "relationships": [],
+  "mustNotDetect": [
+    {
+      "nameContains": "Money",
+      "reason": "Utility class only — not a deployable service"
+    },
+    {
+      "nameContains": "StringUtils",
+      "reason": "Pure helper"
+    }
+  ],
+  "ignoreCalmNameContains": [],
+  "outOfScope": [],
+  "expectedPlatformGaps": []
+}

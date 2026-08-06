@@ -148,3 +148,59 @@ rules:
     category: persistence
     weight: 10
     calmNodeType: database
+
+  # --- Java: Spring Security control evidence (requirements v0.10 §0 / v0.11) ---
+  # Real evidence: spikes/fineract/repo/fineract-core/.../DatatableWriteService.java
+  # — a pure Java `interface` with @PreAuthorize on every method, NO @Path/
+  # @RestController at all. Weighted 40 (sufficient alone, same tier as
+  # jpa-entity) deliberately: this is a genuine, previously-completely-invisible
+  # architectural unit (an authorization-enforcing service layer with no HTTP
+  # surface of its own) — the same class of gap persistence-detector.ts closed
+  # for db.py, now closed for RBAC-only service interfaces. The actual control
+  # attachment (which control-id, what evidence) is a SEPARATE lookup against
+  # control-requirement-catalogue.yml (rules/construct-mapping-schema.ts),
+  # done by control-builder.ts — this row only tells signal-mapper.ts "this
+  # signal is control-category evidence for a service unit," the same
+  # division of labor signal-catalogue.yml already has for every other
+  # category.
+  - id: spring-preauthorize
+    language: java
+    framework: spring-security
+    matchSignal: "PreAuthorize"
+    matchSource: decorator
+    category: security-control
+    weight: 40
+    calmNodeType: service
+
+  # --- Java: messaging consumers (T-X7-2, G-L2-03) ---
+  # @KafkaListener/@JmsListener are consumer-side markers, decorator-detected
+  # via the SAME proven extractFromSource()/decorates-ref mechanism as every
+  # other Java signal above — no new extraction mechanism needed, matching
+  # this project's own "new signal = catalogue row" discipline. Weighted 40
+  # (sufficient alone, same tier as jpa-entity/spring-preauthorize): a
+  # @KafkaListener/@JmsListener annotation is decisive, first-party evidence
+  # of a real messaging consumer, not a fuzzy import-only guess (contrast
+  # with the SQS/SNS import-only strategy in messaging-detection-catalogue.yml,
+  # deliberately kept at LOW confidence because it lacks this decisiveness).
+  # Producer-side detection (KafkaTemplate.send()) is A DIFFERENT, NOT YET
+  # BUILT mechanism (typed-field/call-based, not decorator-based) — honestly
+  # left as a named gap, not attempted here under time pressure with an
+  # unproven approach (see messaging-detection-catalogue.yml's own strategy
+  # entry for this).
+  - id: kafka-listener
+    language: java
+    framework: spring-kafka
+    matchSignal: "KafkaListener"
+    matchSource: decorator
+    category: messaging
+    weight: 40
+    calmNodeType: topic
+
+  - id: jms-listener
+    language: java
+    framework: jms
+    matchSignal: "JmsListener"
+    matchSource: decorator
+    category: messaging
+    weight: 40
+    calmNodeType: topic

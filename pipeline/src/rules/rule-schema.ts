@@ -8,9 +8,9 @@ export interface CatalogueRule {
   framework: string;
   matchSignal: string; // literal or | -separated alternatives, matched case-sensitively against raw signal name
   matchSource: 'native-route' | 'decorator';
-  category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention';
+  category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control';
   weight: number;
-  calmNodeType: 'service' | 'database';
+  calmNodeType: 'service' | 'database' | 'topic'; // 'topic' added T-X7-2, for messaging-consumer decorator rules (@KafkaListener/@JmsListener) — same CONTRACT_VERSION 4.0.0 bump as TypedUnit.kind's own 'topic' addition
 }
 
 export interface SignalCatalogue {

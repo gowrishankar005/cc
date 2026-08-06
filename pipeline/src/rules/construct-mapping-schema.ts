@@ -70,3 +70,44 @@ export function findRelationshipTypeMapping(
   );
   return match ?? mapping.default;
 }
+
+/** Catalogue 2c — docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.5. */
+export interface ControlRequirementRule {
+  controlId: string;
+  name: string;
+  description: string;
+  detectionMechanism: string;
+  language: string;
+  matchSignal: string;
+  requirementUrl: string;
+}
+
+export interface ControlRequirementCatalogue {
+  version: string;
+  controls: ControlRequirementRule[];
+}
+
+export function loadControlRequirementCatalogue(catalogueDir: string = __dirname): ControlRequirementCatalogue {
+  const filePath = path.join(catalogueDir, 'control-requirement-catalogue.yml');
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const doc = parseYaml(raw) as ControlRequirementCatalogue;
+  if (!doc.version || !Array.isArray(doc.controls)) {
+    throw new Error(`control-requirement-catalogue.yml at ${filePath} is malformed: missing version or controls array`);
+  }
+  return doc;
+}
+
+/** Word-boundary matched, same discipline as findRule() (rule-schema.ts) — the @Getter/GET collision this project already found and fixed. */
+export function findControlRequirement(
+  catalogue: ControlRequirementCatalogue,
+  rawSignal: string,
+  language?: string
+): ControlRequirementRule | undefined {
+  const candidates = catalogue.controls.filter((c) => new RegExp(`\\b${c.matchSignal}\\b`, 'i').test(rawSignal));
+  if (candidates.length === 0) return undefined;
+  if (language) {
+    const languageMatch = candidates.find((c) => c.language.toLowerCase() === language.toLowerCase());
+    if (languageMatch) return languageMatch;
+  }
+  return candidates[0];
+}

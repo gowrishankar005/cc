@@ -1,0 +1,26 @@
+# T-X0-3 (AGENT_TASKS_Extraction_Enrichment.md) — single source for the
+# x-aac-scope-limitations metadata block. Previously hardcoded as a literal
+# array in metadata-builder.ts and stale (it still said "HTTP-entry-point
+# and Graphify-visible-persistence signals only" after JAX-RS routes, JPA
+# @Entity typing, and @PreAuthorize control detection all shipped in Wave M).
+# Bump `version` and edit `limitations` when a capability change makes a
+# bullet wrong — this file is the fix point, not metadata-builder.ts.
+
+version: "0.1.0"
+
+limitations:
+  - id: no-k8s-manifests
+    text: "Kubernetes manifests are not read — shared-Secret/ConfigMap trust relationships and deployment metadata are not detected (docs/requirements/CALM_Generator_Requirements_v0_7.md §3, backlog)."
+  - id: no-env-config-relationships
+    text: "Config/env-var-mediated relationships (e.g. a shared JWT signing key between two services) are not detected."
+  - id: no-openapi
+    text: "OpenAPI/Swagger contract files are not read — interfaces and controls come only from code-level signals (backlog, T-X4-1)."
+  - id: no-messaging
+    text: "Messaging producers/consumers (Kafka, JMS, SQS/SNS) are not detected — only HTTP entry points and persistence (backlog, Wave X7)."
+  - id: no-intra-file-logic
+    text: "Intra-file business logic (validation, auth checks not expressed as a decorator/annotation) is not modeled as separate units."
+  - id: persistence-driver-import-only
+    text: "Persistence detection covers direct driver-import (SQLAlchemy, TypeORM, etc.) and JPA @Entity — Spring Data repository interfaces and jOOQ are not-implemented rows in persistence-detection-catalogue.yml."
+  - id: confidence-not-completeness
+    permanent: true
+    text: "A high x-aac-confidence score reflects certainty about the SIGNALS FOUND, not completeness of the architecture picture."

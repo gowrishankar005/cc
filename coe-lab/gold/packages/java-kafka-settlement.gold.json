@@ -1,0 +1,24 @@
+{
+  "packageId": "java-kafka-settlement",
+  "goldVersion": "0.2.0",
+  "tier": "stretch",
+  "description": "Settlement service with @KafkaListener. Platform maps listener class to topic→network (consumer path). Separate service + topic edge not required once network unit is present.",
+  "platformMinContract": "4.0.0",
+  "fixturePath": "fixtures/monorepo/packages/java-kafka-settlement",
+  "changelog": "v0.2.0 baseline 2026-08-07 post-X7: expect network unit on SettlementListener; producer KafkaTemplate still open",
+  "nodes": [
+    {
+      "id": "settlement-listener",
+      "nodeType": "network",
+      "match": { "nameContains": "SettlementListener" }
+    }
+  ],
+  "relationships": [],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [],
+  "expectedPlatformGaps": [
+    "KafkaTemplate.send producer path not implemented — no producer→topic edge",
+    "Listener typed as network/topic unit rather than separate service+topic pair (platform mapping choice)"
+  ]
+}

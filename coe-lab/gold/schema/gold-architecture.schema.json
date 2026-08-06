@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codescanner.local/coe-lab/gold-architecture.schema.json",
+  "title": "CoE Lab Gold Architecture",
+  "type": "object",
+  "required": ["packageId", "goldVersion", "tier", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "packageId": { "type": "string" },
+    "goldVersion": { "type": "string" },
+    "tier": { "type": "string", "enum": ["core", "stretch", "trap"] },
+    "description": { "type": "string" },
+    "platformMinContract": { "type": "string" },
+    "fixturePath": { "type": "string" },
+    "changelog": { "type": "string" },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "nodeType", "match"],
+        "properties": {
+          "id": { "type": "string" },
+          "nodeType": {
+            "type": "string",
+            "enum": ["service", "database", "network", "system", "actor"]
+          },
+          "match": {
+            "type": "object",
+            "properties": {
+              "nameContains": { "type": "string" },
+              "uniqueId": { "type": "string" }
+            }
+          },
+          "interfaces": {
+            "type": "array",
+            "items": { "type": "string", "description": "METHOD /path" }
+          }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string", "description": "gold node id" },
+          "to": { "type": "string" },
+          "kind": { "type": "string" }
+        }
+      }
+    },
+    "mustNotDetect": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "nameContains": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "ignoreCalmNameContains": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Calm nodes matching these substrings are not counted as FP"
+    },
+    "outOfScope": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "expectedPlatformGaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known generator gaps for stretch packages (not automatic FN waivers)"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "ts-nestjs-users",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lab fixture — NestJS users API"
+}

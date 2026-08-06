@@ -1,4 +1,4 @@
-import { DecoratorFact } from '../scanner/codegraph-provider';
+import { DecoratorFact } from '../scanner/structural-engine';
 
 /**
  * CodeGraph natively types routes only for Spring MVC/Play — confirmed

@@ -1,0 +1,29 @@
+{
+  "packageId": "py-ledger-worker",
+  "goldVersion": "0.1.0",
+  "tier": "core",
+  "description": "Flask ledger worker with SQLAlchemy LedgerDb — second root for multi-package runs.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/py-ledger-worker",
+  "changelog": "v0.1.0 initial",
+  "nodes": [
+    {
+      "id": "ledger-api",
+      "nodeType": "service",
+      "match": { "nameContains": "ledger" },
+      "interfaces": ["GET /health", "POST /entries", "GET /entries"]
+    },
+    {
+      "id": "ledger-db",
+      "nodeType": "database",
+      "match": { "nameContains": "LedgerDb" }
+    }
+  ],
+  "relationships": [
+    { "from": "ledger-api", "to": "ledger-db", "kind": "connects" }
+  ],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [],
+  "expectedPlatformGaps": []
+}

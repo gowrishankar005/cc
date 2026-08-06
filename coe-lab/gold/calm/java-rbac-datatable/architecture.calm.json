@@ -1,0 +1,99 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-java-rbac-datatable",
+  "name": "CoE Lab \u2014 RBAC Datatable",
+  "description": "Hand-authored gold architecture for Spring @PreAuthorize RBAC: service-layer DatatableWriteService (no HTTP) and AccountReadController (HTTP + RBAC).",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/java-rbac-datatable"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "datatable-write-service",
+      "node-type": "service",
+      "name": "DatatableWriteService",
+      "description": "Authorization-enforcing service interface with @PreAuthorize on every method and no HTTP surface (Fineract-shaped).",
+      "controls": {
+        "security-rbac-001": {
+          "description": "Role-Based Access Control via Spring @PreAuthorize on create/update/delete datatable operations.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/rbac.requirement.json",
+              "config": {
+                "mechanism": "decorator",
+                "signal": "PreAuthorize",
+                "evidence": [
+                  "hasPermission CREATE",
+                  "hasPermission UPDATE",
+                  "hasPermission DELETE"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "account-read-api",
+      "node-type": "service",
+      "name": "Account Read API",
+      "description": "Spring REST controller at /accounts with method-level @PreAuthorize ACCOUNT_READ.",
+      "interfaces": [
+        {
+          "unique-id": "account-read-list",
+          "type": "path-interface",
+          "path": "GET /accounts"
+        },
+        {
+          "unique-id": "account-read-get",
+          "type": "path-interface",
+          "path": "GET /accounts/{id}"
+        }
+      ],
+      "controls": {
+        "security-rbac-001": {
+          "description": "Role-Based Access Control via Spring @PreAuthorize hasAuthority ACCOUNT_READ on list and get.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/rbac.requirement.json",
+              "config": {
+                "mechanism": "decorator",
+                "signal": "PreAuthorize",
+                "evidence": [
+                  "hasAuthority ACCOUNT_READ"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "datatable-write-service",
+            "account-read-api"
+          ]
+        }
+      }
+    }
+  ]
+}

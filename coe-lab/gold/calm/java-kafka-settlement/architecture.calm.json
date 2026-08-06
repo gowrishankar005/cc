@@ -1,0 +1,79 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-java-kafka-settlement",
+  "name": "CoE Lab \u2014 Kafka Settlement",
+  "description": "Hand-authored gold for settlement event consumer/producer. Intended model: a settlement service plus the settlement.completed topic (network), with connects for consume and produce. Independent of current platform mapping choices.",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/java-kafka-settlement"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "settlement-service",
+      "node-type": "service",
+      "name": "Settlement Listener",
+      "description": "Spring component that consumes and publishes settlement.completed Kafka messages (SettlementListener.java)."
+    },
+    {
+      "unique-id": "settlement-completed-topic",
+      "node-type": "network",
+      "name": "settlement.completed",
+      "description": "Kafka topic settlement.completed referenced by @KafkaListener and KafkaTemplate.send."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "settlement-consumes-topic",
+      "description": "SettlementListener consumes from settlement.completed via @KafkaListener.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "settlement-service"
+          },
+          "destination": {
+            "node": "settlement-completed-topic"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "settlement-produces-topic",
+      "description": "SettlementListener publishes to settlement.completed via KafkaTemplate.send.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "settlement-service"
+          },
+          "destination": {
+            "node": "settlement-completed-topic"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "settlement-service",
+            "settlement-completed-topic"
+          ]
+        }
+      }
+    }
+  ]
+}

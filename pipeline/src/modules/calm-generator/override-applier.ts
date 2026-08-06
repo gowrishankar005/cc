@@ -1,7 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CalmDocument, CalmNode, CalmNodeType } from '../../types/calm';
+import { CalmDocument, CalmNode, CalmNodeType, CalmRelationship } from '../../types/calm';
 import { DecisionRecord, Override, OverrideApplicationResult } from '../../types/overrides';
+
+/** T-X6-2 — records a "target not found" rejection as BOTH a rejection (existing behavior, unchanged) and an orphan (new, dedicated classification) — see OverrideApplicationResult.orphans' own doc comment for why these are reported separately from other rejection causes. */
+function reportOrphan(result: OverrideApplicationResult, override: Override, reason: string): void {
+  result.rejected.push({ override_id: override.override_id, reason });
+  result.orphans.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref, reason });
+}
 
 /**
  * Reads an overrides/ directory: any .json file is inspected and dispatched
@@ -43,6 +49,29 @@ function isValidCalmNode(value: unknown): value is CalmNode {
 }
 
 /**
+ * T-X6-1 — "connects shape validated" per the task's own acceptance
+ * criterion: relationship_add only accepts the `connects` relationship-type
+ * shape, the only one this pipeline emits from the deterministic core today
+ * (v0.9 §1's interacts/connects fix). A future override supporting
+ * interacts/deployed-in/composed-of would need this extended deliberately,
+ * not silently — same "don't build ahead of a real need" discipline as
+ * node_remove's already-existing four-shape cleanup logic below.
+ */
+function isValidConnectsRelationship(value: unknown): value is CalmRelationship {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v['unique-id'] !== 'string' || typeof v['description'] !== 'string') return false;
+  const rt = v['relationship-type'];
+  if (typeof rt !== 'object' || rt === null) return false;
+  const connects = (rt as Record<string, unknown>)['connects'];
+  if (typeof connects !== 'object' || connects === null) return false;
+  const c = connects as Record<string, unknown>;
+  const source = c['source'] as Record<string, unknown> | undefined;
+  const destination = c['destination'] as Record<string, unknown> | undefined;
+  return typeof source?.['node'] === 'string' && typeof destination?.['node'] === 'string';
+}
+
+/**
  * Applies ACTIVE overrides to an already-deterministically-built CalmDocument
  * — the final pass, per Solution Design v2 §5.4. Mechanically enforces the
  * "no override without a traceable decision" integrity rule from
@@ -52,15 +81,15 @@ function isValidCalmNode(value: unknown): value is CalmNode {
  * every rejection is reported so a run doesn't silently ignore a
  * misconfigured correction.
  *
- * Deliberately supports only node_add / type_change / node_remove /
- * node_rename this round — relationship_add/relationship_remove/
- * boundary_change are recognized (won't crash) but reported as skipped, not
- * pretended-complete, since this pipeline's relationship-side needs are less
- * urgent than node-side corrections (the ambiguous/unknown-node use case
- * this was built for) and haven't been evidenced yet.
+ * Supports node_add / type_change / node_remove / node_rename /
+ * relationship_add / relationship_remove (T-X6-1, AGENT_TASKS_Extraction_Enrichment.md
+ * — the hard predecessor for X5/X8/X9's HITL-completed edges; those
+ * mitigations were false claims until this shipped). `boundary_change` is
+ * still recognized (won't crash) but reported as skipped, not
+ * pretended-complete — no evidenced use case yet.
  */
 export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm: CalmDocument; result: OverrideApplicationResult } {
-  const result: OverrideApplicationResult = { applied: [], rejected: [], skipped: [] };
+  const result: OverrideApplicationResult = { applied: [], rejected: [], skipped: [], orphans: [] };
 
   if (!fs.existsSync(overridesDir)) {
     return { calm, result };
@@ -115,7 +144,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
       case 'type_change': {
         const idx = nodes.findIndex((n) => n['unique-id'] === override.target_ref);
         if (idx === -1) {
-          result.rejected.push({ override_id: override.override_id, reason: `type_change target_ref "${override.target_ref}" not found among nodes` });
+          reportOrphan(result, override, `type_change target_ref "${override.target_ref}" not found among nodes`);
           break;
         }
         if (typeof override.new_value !== 'string') {
@@ -135,7 +164,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
       case 'node_rename': {
         const idx = nodes.findIndex((n) => n['unique-id'] === override.target_ref);
         if (idx === -1) {
-          result.rejected.push({ override_id: override.override_id, reason: `node_rename target_ref "${override.target_ref}" not found among nodes` });
+          reportOrphan(result, override, `node_rename target_ref "${override.target_ref}" not found among nodes`);
           break;
         }
         if (typeof override.new_value !== 'string') {
@@ -155,7 +184,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
       case 'node_remove': {
         const idx = nodes.findIndex((n) => n['unique-id'] === override.target_ref);
         if (idx === -1) {
-          result.rejected.push({ override_id: override.override_id, reason: `node_remove target_ref "${override.target_ref}" not found among nodes` });
+          reportOrphan(result, override, `node_remove target_ref "${override.target_ref}" not found among nodes`);
           break;
         }
         nodes.splice(idx, 1);
@@ -189,8 +218,45 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
         break;
       }
 
-      case 'relationship_add':
-      case 'relationship_remove':
+      case 'relationship_add': {
+        if (!isValidConnectsRelationship(override.new_value)) {
+          result.rejected.push({ override_id: override.override_id, reason: 'relationship_add new_value is not a valid connects-shaped CalmRelationship (needs unique-id, description, relationship-type.connects.source.node, relationship-type.connects.destination.node)' });
+          break;
+        }
+        const newRel = override.new_value as CalmRelationship;
+        if (newRel['unique-id'] !== override.target_ref) {
+          result.rejected.push({ override_id: override.override_id, reason: `relationship_add target_ref "${override.target_ref}" does not match new_value's unique-id "${newRel['unique-id']}"` });
+          break;
+        }
+        if (relationships.some((r) => r['unique-id'] === newRel['unique-id'])) {
+          result.rejected.push({ override_id: override.override_id, reason: `relationship_add target_ref "${override.target_ref}" already exists — use relationship_remove first if replacing it` });
+          break;
+        }
+        const connects = (newRel['relationship-type'] as unknown as { connects: { source: { node: string }; destination: { node: string } } }).connects;
+        const missingEndpoint = [connects.source.node, connects.destination.node].find((id) => !nodes.some((n) => n['unique-id'] === id));
+        if (missingEndpoint) {
+          reportOrphan(result, override, `relationship_add references node "${missingEndpoint}" which does not exist — would create a dangling relationship endpoint`);
+          break;
+        }
+        relationships.push({
+          ...newRel,
+          metadata: [...(newRel.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }],
+        });
+        result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
+        break;
+      }
+
+      case 'relationship_remove': {
+        const idx = relationships.findIndex((r) => r['unique-id'] === override.target_ref);
+        if (idx === -1) {
+          reportOrphan(result, override, `relationship_remove target_ref "${override.target_ref}" not found among relationships`);
+          break;
+        }
+        relationships.splice(idx, 1);
+        result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
+        break;
+      }
+
       case 'boundary_change':
         result.skipped.push({ override_id: override.override_id, override_type: override.override_type, reason: `override_type "${override.override_type}" is recognized but not yet implemented` });
         break;

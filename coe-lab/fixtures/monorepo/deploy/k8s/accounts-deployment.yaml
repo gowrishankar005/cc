@@ -1,0 +1,32 @@
+# Lab fixture — accounts deployment mounts shared jwt-key (BoA-class trust).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # Name must match unit file basename (accounts_api.py) for T-X5-1 exact-match correlation
+  name: accounts_api
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: accounts_api
+  template:
+    metadata:
+      labels:
+        app: accounts_api
+    spec:
+      containers:
+        - name: accounts
+          image: lab/accounts-api:0.1.0
+          volumeMounts:
+            - name: jwt
+              mountPath: /secrets/jwt
+              readOnly: true
+      volumes:
+        - name: jwt
+          secret:
+            secretName: jwt-key
+            # Private key half (no .pub) → issuer role for T-X5-1 heuristic
+            items:
+              - key: jwtRS256.key
+                path: jwtRS256.key

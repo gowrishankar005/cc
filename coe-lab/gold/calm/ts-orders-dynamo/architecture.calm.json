@@ -1,0 +1,98 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-ts-orders-dynamo",
+  "name": "CoE Lab \u2014 Orders Dynamo/SQS",
+  "description": "Hand-authored gold for cloud-native orders store: HTTP surface, DynamoDB client, and SQS queue (Fidelity-aligned AWS patterns).",
+  "metadata": [
+    {
+      "key": "x-lab-gold-source",
+      "value": "hand-authored"
+    },
+    {
+      "key": "x-lab-fixture",
+      "value": "fixtures/monorepo/packages/ts-orders-dynamo"
+    }
+  ],
+  "nodes": [
+    {
+      "unique-id": "orders-api",
+      "node-type": "service",
+      "name": "Orders API",
+      "description": "Minimal HTTP orders surface (startOrdersApi) plus OrdersDynamoStore orchestration.",
+      "interfaces": [
+        {
+          "unique-id": "orders-api-list",
+          "type": "path-interface",
+          "path": "GET /orders"
+        },
+        {
+          "unique-id": "orders-api-create",
+          "type": "path-interface",
+          "path": "POST /orders"
+        }
+      ]
+    },
+    {
+      "unique-id": "orders-dynamodb",
+      "node-type": "database",
+      "name": "Orders DynamoDB",
+      "description": "AWS DynamoDB via @aws-sdk/client-dynamodb DynamoDBClient."
+    },
+    {
+      "unique-id": "orders-sqs",
+      "node-type": "network",
+      "name": "Orders SQS Queue",
+      "description": "AWS SQS queue used by SendMessageCommand (QueueUrl https://sqs.example/orders)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "Lab package system",
+      "description": "Composite boundary for this fixture package \u2014 composed-of all architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "orders-api-connects-dynamodb",
+      "description": "Orders service persists via DynamoDB client.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "orders-api"
+          },
+          "destination": {
+            "node": "orders-dynamodb"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "orders-api-connects-sqs",
+      "description": "Orders service enqueues via SQS SendMessageCommand.",
+      "relationship-type": {
+        "connects": {
+          "source": {
+            "node": "orders-api"
+          },
+          "destination": {
+            "node": "orders-sqs"
+          }
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System is composed of all architectural units in this package.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "orders-api",
+            "orders-dynamodb",
+            "orders-sqs"
+          ]
+        }
+      }
+    }
+  ]
+}

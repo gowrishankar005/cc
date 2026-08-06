@@ -62,4 +62,15 @@ export interface OverrideApplicationResult {
   applied: Array<{ override_id: string; override_type: OverrideType; target_ref: string }>;
   rejected: Array<{ override_id: string; reason: string }>;
   skipped: Array<{ override_id: string; override_type: OverrideType; reason: string }>;
+  /**
+   * T-X6-2 (G-L4-08) — a SUBSET of `rejected`, specifically overrides whose
+   * target_ref doesn't resolve against the current deterministic
+   * CalmDocument (the thing it pointed at was renamed/removed since the
+   * override was written — "DR points at a ghost node"). Not every
+   * rejection is an orphan (a malformed new_value shape or an inactive
+   * Decision Record are different failure classes, not staleness), so this
+   * is reported separately rather than treating all rejections as the same
+   * kind of problem.
+   */
+  orphans: Array<{ override_id: string; override_type: OverrideType; target_ref: string; reason: string }>;
 }

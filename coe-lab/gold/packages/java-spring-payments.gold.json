@@ -1,0 +1,32 @@
+{
+  "packageId": "java-spring-payments",
+  "goldVersion": "0.1.0",
+  "tier": "core",
+  "description": "Spring MVC-style payments API with JPA Payment entity.",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/packages/java-spring-payments",
+  "changelog": "v0.1.0 initial",
+  "nodes": [
+    {
+      "id": "payments-api",
+      "nodeType": "service",
+      "match": { "nameContains": "PaymentController" },
+      "interfaces": ["GET /payments", "GET /payments/{id}", "POST /payments"]
+    },
+    {
+      "id": "payment-entity",
+      "nodeType": "database",
+      "match": { "nameContains": "Payment.java" }
+    }
+  ],
+  "relationships": [],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system"],
+  "outOfScope": [],
+  "expectedPlatformGaps": [
+    "Spring MVC native typing depends on CodeGraph resolver; may need extractFromSource fallback",
+    "Minimal pom.xml present for detect() — not a full Spring Boot runnable app",
+    "Service match uses PaymentController; entity match uses class Payment + nodeType database"
+  ]
+}
+

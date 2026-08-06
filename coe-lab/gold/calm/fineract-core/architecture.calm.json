@@ -1,0 +1,187 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-fineract-core",
+  "name": "Apache Fineract — Core module (deep slice)",
+  "description": "Hand-authored CALM gold for fineract-core: all *ApiResource HTTP surfaces in this module, DatatableWriteService RBAC controls, and representative JPA entities. Not every core @Entity (dozens exist) — remaining entities are out-of-scope for this gold revision, documented in metadata. Independent of the platform generator.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "apache/fineract" },
+    { "key": "x-lab-module", "value": "fineract-core" },
+    { "key": "x-lab-coverage", "value": "all-ApiResource-in-module + DatatableWriteService + representative entities (BusinessDate, PaymentType, AccountNumberFormat, Client)" },
+    { "key": "x-lab-out-of-scope", "value": "Remaining core @Entity classes; call-based auth via PlatformSecurityContext.validateHasReadPermission (not @PreAuthorize)" }
+  ],
+  "nodes": [
+    {
+      "unique-id": "batch-api",
+      "node-type": "service",
+      "name": "Batch API",
+      "description": "BatchApiResource — batch request handling.",
+      "interfaces": [
+        { "unique-id": "batch-post", "type": "path-interface", "path": "POST /v1/batches" }
+      ]
+    },
+    {
+      "unique-id": "business-date-api",
+      "node-type": "service",
+      "name": "Business Date API",
+      "description": "BusinessDateApiResource.",
+      "interfaces": [
+        { "unique-id": "bd-list", "type": "path-interface", "path": "GET /v1/businessdate" },
+        { "unique-id": "bd-get", "type": "path-interface", "path": "GET /v1/businessdate/{type}" },
+        { "unique-id": "bd-post", "type": "path-interface", "path": "POST /v1/businessdate" }
+      ]
+    },
+    {
+      "unique-id": "cache-api",
+      "node-type": "service",
+      "name": "Cache API",
+      "description": "CacheApiResource.",
+      "interfaces": [
+        { "unique-id": "cache-list", "type": "path-interface", "path": "GET /v1/caches" },
+        { "unique-id": "cache-put", "type": "path-interface", "path": "PUT /v1/caches" }
+      ]
+    },
+    {
+      "unique-id": "external-event-config-api",
+      "node-type": "service",
+      "name": "External Event Configuration API",
+      "description": "ExternalEventConfigurationApiResource.",
+      "interfaces": [
+        { "unique-id": "eec-get", "type": "path-interface", "path": "GET /v1/externalevents/configuration" },
+        { "unique-id": "eec-put", "type": "path-interface", "path": "PUT /v1/externalevents/configuration" }
+      ]
+    },
+    {
+      "unique-id": "internal-external-events-api",
+      "node-type": "service",
+      "name": "Internal External Events API",
+      "description": "InternalExternalEventsApiResource (internal ops).",
+      "interfaces": [
+        { "unique-id": "iee-get", "type": "path-interface", "path": "GET /v1/internal/externalevents" },
+        { "unique-id": "iee-delete", "type": "path-interface", "path": "DELETE /v1/internal/externalevents" }
+      ]
+    },
+    {
+      "unique-id": "currencies-api",
+      "node-type": "service",
+      "name": "Currencies API",
+      "description": "CurrenciesApiResource.",
+      "interfaces": [
+        { "unique-id": "cur-get", "type": "path-interface", "path": "GET /v1/currencies" },
+        { "unique-id": "cur-put", "type": "path-interface", "path": "PUT /v1/currencies" }
+      ]
+    },
+    {
+      "unique-id": "payment-type-api",
+      "node-type": "service",
+      "name": "Payment Type API",
+      "description": "PaymentTypeApiResource.",
+      "interfaces": [
+        { "unique-id": "pt-list", "type": "path-interface", "path": "GET /v1/paymenttypes" },
+        { "unique-id": "pt-get", "type": "path-interface", "path": "GET /v1/paymenttypes/{paymentTypeId}" },
+        { "unique-id": "pt-post", "type": "path-interface", "path": "POST /v1/paymenttypes" },
+        { "unique-id": "pt-put", "type": "path-interface", "path": "PUT /v1/paymenttypes/{paymentTypeId}" },
+        { "unique-id": "pt-delete", "type": "path-interface", "path": "DELETE /v1/paymenttypes/{paymentTypeId}" }
+      ]
+    },
+    {
+      "unique-id": "datatable-write-service",
+      "node-type": "service",
+      "name": "DatatableWriteService",
+      "description": "Authorization-enforcing service interface with @PreAuthorize on register/deregister; no HTTP surface of its own.",
+      "controls": {
+        "security-rbac-001": {
+          "description": "Spring @PreAuthorize on DatatableWriteService register/deregister methods (REGISTER_DATATABLE / DEREGISTER_DATATABLE / ALL_FUNCTIONS).",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/rbac.requirement.json",
+              "config": {
+                "mechanism": "decorator",
+                "signal": "PreAuthorize",
+                "evidence": [
+                  "hasAnyAuthority ALL_FUNCTIONS|REGISTER_DATATABLE",
+                  "hasAnyAuthority ALL_FUNCTIONS|DEREGISTER_DATATABLE"
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "business-date-entity",
+      "node-type": "database",
+      "name": "BusinessDate",
+      "description": "Representative JPA entity BusinessDate (core infrastructure)."
+    },
+    {
+      "unique-id": "payment-type-entity",
+      "node-type": "database",
+      "name": "PaymentType",
+      "description": "Representative JPA entity PaymentType."
+    },
+    {
+      "unique-id": "account-number-format-entity",
+      "node-type": "database",
+      "name": "AccountNumberFormat",
+      "description": "Representative JPA entity AccountNumberFormat."
+    },
+    {
+      "unique-id": "client-entity",
+      "node-type": "database",
+      "name": "Client",
+      "description": "Representative JPA entity Client (portfolio)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "fineract-core system",
+      "description": "Composite boundary for this core-module gold slice."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "business-date-api-connects-entity",
+      "description": "Business Date API uses BusinessDate persistence.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "business-date-api" },
+          "destination": { "node": "business-date-entity" }
+        }
+      }
+    },
+    {
+      "unique-id": "payment-type-api-connects-entity",
+      "description": "Payment Type API uses PaymentType persistence.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "payment-type-api" },
+          "destination": { "node": "payment-type-entity" }
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "Core gold slice units under one system boundary.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": [
+            "batch-api",
+            "business-date-api",
+            "cache-api",
+            "external-event-config-api",
+            "internal-external-events-api",
+            "currencies-api",
+            "payment-type-api",
+            "datatable-write-service",
+            "business-date-entity",
+            "payment-type-entity",
+            "account-number-format-entity",
+            "client-entity"
+          ]
+        }
+      }
+    }
+  ]
+}

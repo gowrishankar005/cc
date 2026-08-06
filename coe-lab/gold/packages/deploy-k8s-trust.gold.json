@@ -1,0 +1,33 @@
+{
+  "packageId": "deploy-k8s-trust",
+  "goldVersion": "0.1.0",
+  "tier": "stretch",
+  "description": "Two deployments share jwt-key secret — trust relationship (Bank of Anthos class).",
+  "platformMinContract": "1.0.0",
+  "fixturePath": "fixtures/monorepo/deploy/k8s",
+  "changelog": "v0.1.0 initial",
+  "nodes": [
+    {
+      "id": "accounts-deploy",
+      "nodeType": "service",
+      "match": { "nameContains": "accounts" }
+    },
+    {
+      "id": "ledger-deploy",
+      "nodeType": "service",
+      "match": { "nameContains": "ledger" }
+    }
+  ],
+  "relationships": [
+    {
+      "from": "ledger-deploy",
+      "to": "accounts-deploy",
+      "kind": "shares-secret"
+    }
+  ],
+  "mustNotDetect": [],
+  "ignoreCalmNameContains": ["system", "AccountDb", "LedgerDb", "db"],
+  "outOfScope": [],
+  "expectedPlatformGaps": [],
+  "changelog": "v0.1.1 align deploy names with unit basenames; issuer=accounts (private key), verifier=ledger (.pub); ignore DB FPs when scoring trust-only gold"
+}
