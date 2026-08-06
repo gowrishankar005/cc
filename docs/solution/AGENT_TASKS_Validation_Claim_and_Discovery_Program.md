@@ -2,7 +2,8 @@
 
 **Status:** planned (process / investigation only — **not** detector or product fixes)  
 **Origin:** Fineract hand-gold vs platform RCA (2026-08-07); user-approved phase plan  
-**Authority:** Complements `STATUS.md` and CoE lab eval; does **not** authorize catalogue/detector implementation unless a later program is opened after Phase 0–2 decisions.
+**Master sequence:** See `AGENT_TASKS_Master_Sequence_Claim_Honesty_and_AREC.md` (Wave 1 = this program; Wave 2–3 = AREC pillar). **Blocked on user** until they clear G0.  
+**Authority:** Complements `STATUS.md` and CoE lab eval; does **not** authorize catalogue/detector implementation unless Wave 3 is opened after Wave 2 lock.
 
 ---
 

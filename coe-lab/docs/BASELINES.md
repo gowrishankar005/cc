@@ -1,11 +1,13 @@
 # CoE Lab baselines (locked measurement)
 
 **Baselined:** 2026-08-07 (post-MVP platform, `CONTRACT_VERSION` **4.0.0**)  
-**Updated:** 2026-08-07 — full CALM gold switched from generator-bootstrap to **hand-authored**  
+**Updated:** 2026-08-07 — full CALM gold switched from generator-bootstrap to **hand-authored**; Wave 1 claim honesty + Fineract finding recorded  
 **Pipeline:** rebuild + full re-run of `run-slice` per package  
 **Semantic scorer:** `score-calm.mjs` v0.1.2  
-**Full CALM gold:** hand-authored `gold/calm/<pkg>/architecture.calm.json` (calm validate 0 errors / 0 warnings on all 12)  
-**Validate:** `validate-calm-pair.mjs --all-core` → **7/7 semantic PASS + schemaOk** (independent gold, not unique-id equality)
+**Full CALM gold:** hand-authored `gold/calm/<pkg>/architecture.calm.json` (calm validate 0 errors / 0 warnings)  
+**Validate layers:** see `validation-approach-vnext.md` — lab core **L0+L1** semantic PASS is **not** Fineract **L2** story pass  
+**Fineract wild gold:** L0 pass; L1 strong; **L2 story FAIL** on current platform — `fineract-gold-vs-platform-finding.md`  
+**Validate:** `validate-calm-pair.mjs --all-core` → lab core L1-style semantic PASS + schemaOk (independent gold)
 
 ---
 

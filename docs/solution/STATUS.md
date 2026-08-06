@@ -10,8 +10,17 @@ Agents update the relevant section when behaviour changes (cleanup T-A3 + extrac
 
 Design rationale lives in `Architecture_as_Code_Solution_Design_v2.md`, `language/java.md`, modularity/extraction review docs — not duplicated here.
 
-**Validation / claim honesty (process, not detectors):**  
-`AGENT_TASKS_Validation_Claim_and_Discovery_Program.md` — claim register, validation layers, Fineract gold-vs-platform finding packaging, pattern discovery without full-repo scans. Completing that program does **not** fix extraction gaps; it prevents silent overclaim. Do not mark relationship/control **completeness** as built without the claim register.
+**Validation / claim honesty + AREC (sequenced):**  
+Master list: `AGENT_TASKS_Master_Sequence_Claim_Honesty_and_AREC.md`  
+
+| Wave | Status | Authority |
+|---|---|---|
+| **Wave 1** claim honesty / discovery | **done** (2026-08-07) | `Claim_Register.md`, `coe-lab/docs/validation-approach-vnext.md`, Fineract finding, probes |
+| **Wave 2** AREC design lock | **done** (2026-08-07) | `Architecture_Relation_Evidence_Completeness.md` |
+| **Wave 3** AREC strategy implementation | **backlog** | `AREC_Wave3_Implementation_Backlog.md` — no strategy code until prioritized |
+
+**Do not mark relationship/control completeness as built** without Claim Register + AREC claim binding.  
+**Fineract L2 story** is **not** built (R2/C-call unbuilt).
 
 ---
 

@@ -38,3 +38,10 @@ for d in fineract-charge fineract-core fineract-system-map; do
     -a ../coe-lab/gold/calm/$d/architecture.calm.json -f pretty
 done
 ```
+
+## Policy & findings
+
+- Wild-type policy: `coe-lab/docs/wild-type-gold-policy.md`  
+- Platform compare finding (L2 story fail): `coe-lab/docs/fineract-gold-vs-platform-finding.md`  
+- Validation layers: `coe-lab/docs/validation-approach-vnext.md`  
+- **Lab core green does not supersede these gold packages.**
