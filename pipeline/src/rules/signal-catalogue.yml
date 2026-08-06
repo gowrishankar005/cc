@@ -1,0 +1,150 @@
+# Signal Catalogue — the deterministic rule table the pipeline's core
+# generation path reads. Hand-owned, checked in, versioned. This IS
+# docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md §4's signal-catalogue.yml,
+# concretely implemented. Never written to by suggest-rules.ts directly —
+# that tool only ever writes proposed-updates.json for human review.
+#
+# Seeded from requirements v0.6 §3's Slice-1 table (Python/Node only;
+# Java stays Slice 2 backlog).
+
+version: "0.1.0"
+
+rules:
+  # --- Native CodeGraph route typing (source: native-route) ---
+  - id: flask-route
+    language: python
+    framework: flask
+    matchSignal: "app.route"
+    matchSource: native-route
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  - id: fastapi-route
+    language: python
+    framework: fastapi
+    matchSignal: "router"
+    matchSource: native-route
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  - id: nestjs-route
+    language: typescript
+    framework: nestjs
+    matchSignal: "get|post|put|patch|delete"
+    matchSource: native-route
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  # --- extractFromSource() decorates refs (source: decorator) ---
+  # Requirements v0.6 §5: the resolved mechanism. These are raw decorator
+  # names as returned by CodeGraph.extractFromSource()'s unresolvedReferences
+  # filtered to referenceKind === 'decorates'.
+  - id: flask-route-decorator
+    language: python
+    framework: flask
+    matchSignal: "route"
+    matchSource: decorator
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  - id: fastapi-verb-decorator
+    language: python
+    framework: fastapi
+    matchSignal: "get|post|put|patch|delete"
+    matchSource: decorator
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  # @Controller() is a CLASS-level marker (analogous to Flask(__name__)/FastAPI()) —
+  # it identifies "this file is a service," it is NOT itself a route the way
+  # @Get()/@Post() are. Miscategorizing it as http-entry-point (as an earlier
+  # version of this catalogue did) double-counts evidence against the real
+  # routes AND makes build-calm.ts emit a nonsense path-interface with
+  # path:"Controller". framework-bootstrap is the correct category, same
+  # tier as Flask()/FastAPI() below.
+  - id: nestjs-controller-decorator
+    language: typescript
+    framework: nestjs
+    matchSignal: "Controller"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 25
+    calmNodeType: service
+
+  - id: nestjs-verb-decorator
+    language: typescript
+    framework: nestjs
+    matchSignal: "Get|Post|Put|Patch|Delete"
+    matchSource: decorator
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  # --- Framework bootstrap markers ---
+  - id: flask-bootstrap
+    language: python
+    framework: flask
+    matchSignal: "Flask"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 25
+    calmNodeType: service
+
+  - id: fastapi-bootstrap
+    language: python
+    framework: fastapi
+    matchSignal: "FastAPI"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 25
+    calmNodeType: service
+
+  # --- Java: JAX-RS (route composition, see analysis/jaxrs-route-composer.ts) ---
+  # CodeGraph has no native `route` typing for JAX-RS (Spring/Play only,
+  # resolution/frameworks/index.js) — the composer joins class-level +
+  # method-level @Path into one full route string ("GET /v1/charges/{id}"),
+  # emitted as a synthetic decorator fact matched here. Verified 19/19 real
+  # routes across 3 real Fineract resource files (docs/spikes/fineract-route-assembly-spike/).
+  # `language: java` matters here specifically because this matchSignal shape
+  # ("GET|POST|...") would otherwise ambiguously match nestjs-verb-decorator's
+  # alternation too — findRule() now disambiguates by language (rule-schema.ts).
+  - id: jax-rs-composed-route
+    language: java
+    framework: jax-rs
+    matchSignal: "GET|POST|PUT|DELETE|PATCH"
+    matchSource: decorator
+    category: http-entry-point
+    weight: 40
+    calmNodeType: service
+
+  # --- Java: JPA persistence (decorator-based, requirements v0.6 §5) ---
+  # CodeGraph gives zero native persistence signal for JPA (confirmed
+  # repeatedly) — @Entity is decorator-detected the same mechanism as routes.
+  # Weighted at 40 (sufficient alone, same tier as a primary route signal),
+  # not the Graphify-persistence-detector's flat 20 — that detector's units
+  # bypass the confidence floor entirely (pushed directly in run-slice.ts),
+  # while units built via signal-mapper.ts's per-file evidence path (this
+  # one) ARE floor-checked at 40, so a lower weight here would silently drop
+  # every bare @Entity class into ignored-items as INSUFFICIENT_EVIDENCE.
+  - id: jpa-entity
+    language: java
+    framework: jpa
+    matchSignal: "Entity"
+    matchSource: decorator
+    category: persistence
+    weight: 40
+    calmNodeType: database
+
+  - id: jpa-table
+    language: java
+    framework: jpa
+    matchSignal: "Table"
+    matchSource: decorator
+    category: persistence
+    weight: 10
+    calmNodeType: database

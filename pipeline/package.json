@@ -1,0 +1,26 @@
+{
+  "name": "calm-generator-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Slice 1 Analyser/Orchestrator: CodeGraph + Graphify hybrid scanner -> typed-facts.json -> CALM 1.2 generator",
+  "type": "commonjs",
+  "main": "dist/orchestration/run-slice.js",
+  "bin": {
+    "run-slice": "dist/orchestration/run-slice.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && mkdir -p dist/rules && cp src/rules/signal-catalogue.yml src/rules/node-type-mapping.yml src/rules/relationship-type-mapping.yml dist/rules/",
+    "run-slice": "node dist/orchestration/run-slice.js",
+    "suggest-rules": "node dist/rules/suggest-rules.js",
+    "validate": "calm validate -a"
+  },
+  "dependencies": {
+    "@colbymchenry/codegraph": "^1.5.0",
+    "yaml": "^2.4.5"
+  },
+  "devDependencies": {
+    "@finos/calm-cli": "^1.52.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

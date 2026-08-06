@@ -1,0 +1,54 @@
+# Catalogue 2b (docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.3).
+# {relationshipKind, sourceNodeType, targetNodeType} -> CALM relationship-type
+# + protocol (when known, honestly null when not — core.json#/defs/protocol
+# enum, requirements v0.9 §1 / CALM_Construct_Reference_Deep_Dive_Spike.md §5).
+#
+# THIS IS THE interacts/connects BUG FIX: every row this pipeline can
+# currently produce resolves to `connects` — confirmed against the
+# authoritative schema (calm-hub-detail.architecture.json uses `connects`
+# even for in-process, non-network delegation, so it's the real default for
+# node-to-node relationships generally, not strictly "network connections").
+# `interacts` is actor-centric fan-out (actor -> nodes[]) and is never emitted
+# by any row here, because this pipeline has no actor-node detection yet
+# (requirements v0.9 §1's explicit recommendation). Adding actor detection
+# later means adding a row, not touching relationship-builder.ts.
+
+version: "0.1.0"
+
+mappings:
+  - relationshipKind: calls
+    sourceNodeType: service
+    targetNodeType: database
+    calmRelationshipType: connects
+    protocol: null
+
+  - relationshipKind: imports
+    sourceNodeType: service
+    targetNodeType: database
+    calmRelationshipType: connects
+    protocol: null
+
+  - relationshipKind: connects
+    sourceNodeType: service
+    targetNodeType: database
+    calmRelationshipType: connects
+    protocol: null
+
+  - relationshipKind: calls
+    sourceNodeType: service
+    targetNodeType: service
+    calmRelationshipType: connects
+    protocol: null
+
+  - relationshipKind: imports
+    sourceNodeType: service
+    targetNodeType: service
+    calmRelationshipType: connects
+    protocol: null
+
+# Fallback when no row matches a {kind, sourceType, targetType} triple: still
+# `connects`, never `interacts` — see rules/relationship-type-mapping-schema.ts
+# for the exact default-application order.
+default:
+  calmRelationshipType: connects
+  protocol: null

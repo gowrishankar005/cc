@@ -1,0 +1,18 @@
+# Catalogue 2a (docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.2).
+# TypedUnit.kind -> CALM node-type + which evidence categories become
+# CalmInterfaces vs. stay descriptive-only (confidence corroboration, no
+# interface built). Adding a new unit kind is a row here, not a code change
+# in node-builder.ts/interface-builder.ts.
+
+version: "0.1.0"
+
+mappings:
+  - unitKind: service
+    calmNodeType: service
+    interfaceCategories: [http-entry-point]
+    descriptiveCategories: [framework-bootstrap, persistence, messaging, folder-convention]
+
+  - unitKind: database
+    calmNodeType: database
+    interfaceCategories: []
+    descriptiveCategories: [persistence]

@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+pipeline/dist/
+dist/
+*.tsbuildinfo
+
+# Code intelligence / scan scratch
+.codegraph/
+**/.codegraph/
+graphify-out/
+**/graphify-out/
+*.codegraph.db
+
+# Evidence clones (disposable; re-clone from upstream if needed)
+spikes/**/repo/
+spikes/**/node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets / local tooling
+.env
+.env.*
+!.env.example
+.claude/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs and temp
+*.log
+tmp/
+temp/
+.cache/
+
+# Package manager noise
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
