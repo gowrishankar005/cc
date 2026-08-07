@@ -2,6 +2,8 @@
 
 Deterministic pipeline that **extracts software architecture signals from source** (Java, Python, Node/TypeScript) and generates **FINOS CALM 1.2** JSON — for review, governance input, and evaluation against hand-authored gold.
 
+**Product target:** polyglot **enterprise / fintech-shaped monorepos** in general — not any single open-source app. Public repos and lab fixtures are **evidence samples** used to prove or disprove mechanism claims.
+
 **No LLM in the core generation path.** Optional offline tooling may propose catalogue or review hints; they never write `typed-facts.json`.
 
 | | |
@@ -22,15 +24,16 @@ Working name used in design docs: **Loom** (weaving signals into one architectur
 
 - A **catalogue-driven analyser/orchestrator**: scan → typed facts → modules (CALM generator, threat-signals, …).
 - A generator of **schema-valid CALM** (`calm validate`) with provenance and confidence metadata.
-- A research-and-build track for **fintech-shaped** polyglot monorepos (Bank of Anthos, Apache Fineract, Ghostfolio, lab fixtures).
+- A platform for **repeating architecture extraction** across languages/frameworks common in enterprise stacks (Spring/JAX-RS, Flask/Nest, JPA/SQLAlchemy/Prisma, k8s, messaging, …).
 - An evaluation harness (**CoE lab**) with **hand-authored** gold — not generator-bootstrapped SOT.
+- **Evidence-driven:** real public monorepos and controlled fixtures *test* the platform; they are not the product roadmap.
 
 ### Is not
 
+- A product “for Apache Fineract,” Bank of Anthos, Ghostfolio, or any one codebase — those are **proxies** for fintech engineering patterns.
 - A CALM **governance** product (pattern authoring, org policy engines) — it *produces* artefacts for external `calm validate -p` / governance tools.
 - An LLM architecture fantasy generator.
 - A complete enterprise architecture model for every layered codebase (see [Known issues](#known-issues--honest-gaps)).
-
 ---
 
 ## Dual goals
@@ -97,7 +100,7 @@ Legend: **Supported** = proven on real or lab evidence and safe to claim · **Pa
 | **Flask** | **Supported** | Bank of Anthos; lab py-accounts / ledger |
 | **FastAPI** | **Partial / catalogue-ready** | Signal rows exist; less regression weight than Flask in this repo |
 | **NestJS** | **Supported** | Lab fixture + Ghostfolio-class Nest; `@Controller` = bootstrap not interface |
-| **JAX-RS** (`@Path` / `@GET`…) | **Supported** | Fineract charge/core; route composition |
+| **JAX-RS** (`@Path` / `@GET`…) | **Supported** | Route composition; evidenced on multi-module Java services |
 | **Spring MVC** (`@RestController`, `@GetMapping`…) | **Partial** | Lab spring-payments; matrix notes real Spring MVC monorepo less exercised than JAX-RS |
 | **Quarkus** | **Partial** | Same JAX-RS extraction path; CDI-specific bootstrap not a full product claim |
 | **Play Framework** | **Not a product focus** | CodeGraph has Play leanings historically; not a claimed CoE target |
@@ -109,7 +112,7 @@ Legend: **Supported** = proven on real or lab evidence and safe to claim · **Pa
 
 | Stack | Status | Notes |
 |---|---|---|
-| **JPA** (`@Entity` / `@Table`) | **Supported** | Fineract; lab Java |
+| **JPA** (`@Entity` / `@Table`) | **Supported** | Lab Java + multi-module Java services |
 | **SQLAlchemy** (import / wrapper class) | **Supported** | BoA; lab Python |
 | **Prisma** (`@prisma/client`, Graphify `ref_prisma_client`) | **Supported** (detection) | Ghostfolio; ontology “Service = database unit” still debatable |
 | **TypeORM / Mongoose / Sequelize / pg / …** | **Partial** | Catalogue entries; not all verified on large real apps |
@@ -124,7 +127,7 @@ Legend: **Supported** = proven on real or lab evidence and safe to claim · **Pa
 | Stack | Status | Notes |
 |---|---|---|
 | **Spring `@PreAuthorize`** | **Supported** | Decorator → CALM controls |
-| **Call-site auth** (`validateHasReadPermission`, `jwt.decode`) | **Todo** (AREC C-call) | Common on Fineract HTTP + BoA-shaped gateways; not controls today |
+| **Call-site auth** (`validateHasReadPermission`, `jwt.decode`, …) | **Todo** (AREC C-call) | Common enterprise pattern (method-call security, not only annotations); not controls today |
 | **OpenAPI `securitySchemes`** | **Partial** | When static OpenAPI present |
 | **Quarkus `@Authenticated` / other vocabularies** | **Todo / catalogue expansion** | Breadth spike showed third vocabularies |
 | **OAuth2 full flow modeling** | **Not supported** as end-to-end product | Partial signals only |
@@ -170,7 +173,7 @@ Authoritative claim cells: [`docs/solution/Claim_Register.md`](./docs/solution/C
 |---|---|
 | Hybrid engines | CodeGraph (per-package typing) + Graphify (combined structural graph) |
 | Multi-root runs | One Graphify pass over common ancestor; cross-package edges when units match |
-| JAX-RS route composition | Class + method `@Path` assembly (Fineract-proven) |
+| JAX-RS route composition | Class + method `@Path` assembly (proven on real multi-module Java) |
 | NestJS / Flask / Spring MVC routes | Native typing and/or decorator paths |
 | JPA `@Entity` → database units | Decorator extraction |
 | Import-based persistence | SQLAlchemy, Prisma (`ref_*` Graphify targets), etc. |
@@ -198,7 +201,7 @@ Authoritative claim cells: [`docs/solution/Claim_Register.md`](./docs/solution/C
 |---|---|
 | Fixtures monorepo | Python / Nest / JAX-RS / Spring / RBAC / Kafka / Dynamo / k8s / trap lib |
 | Semantic gold | `coe-lab/gold/packages/*.gold.json` (P/R style) |
-| Full CALM gold | Hand-authored `coe-lab/gold/calm/**` (includes Fineract wild gold) |
+| Full CALM gold | Hand-authored `coe-lab/gold/calm/**` (lab packages + optional wild-type samples) |
 | Score / validate scripts | generate-calm, score-calm, validate-calm-pair, scoreboard |
 | Isolation | Implementers must not mine gold to invent detectors (`ISOLATION.md`) |
 
@@ -216,36 +219,47 @@ Authoritative claim cells: [`docs/solution/Claim_Register.md`](./docs/solution/C
 
 Use these claims freely (see Claim Register for precision):
 
-1. **HTTP surface discovery** — Flask, NestJS, Spring MVC, JAX-RS composed routes on real and lab code.  
+1. **HTTP surface discovery** — Flask, NestJS, Spring MVC, JAX-RS composed routes.  
 2. **Persistence units** — JPA entities; Graphify import strategies (including Prisma after Graphify `ref_` normalization).  
 3. **Schema-valid CALM** — builders + control URL mapping; regression and lab runs routinely 0 errors.  
-4. **One-hop architecture links (R1)** — e.g. BoA-style service → DB class when Graphify connects two TypedUnits.  
-5. **Decorator controls (C-dec)** — e.g. Fineract `DatatableWriteService` `@PreAuthorize`.  
-6. **k8s shared-secret trust** — BoA-class; deployment correlation improved for Java Controller naming (service-kind only).  
+4. **One-hop architecture links (R1)** — service → DB when code/Graphify connects two TypedUnits in one hop.  
+5. **Decorator controls (C-dec)** — e.g. Spring `@PreAuthorize` on service layers without HTTP.  
+6. **k8s shared-secret trust** — deployment correlation for role-named Deployments ↔ Controller-style units (service-kind only).  
 7. **Cross-package structural edges** — when multi-root Graphify + dual-unit match.  
 8. **Eval discipline** — hand gold, L0–L5 validation language, lab core L1-style gates.  
 9. **Platform modularity basics** — TypedFacts contract, second module, namespaced outputs.  
-10. **Evidence-driven fixes** — Ghostfolio, full BoA k8s, Fineract charge/core used as disconfirming samples.
+10. **Evidence-driven engineering** — public monorepos + lab fixtures used as **disconfirming samples**, not as the product.
+
+### Evidence samples (not the product)
+
+| Sample | Why it exists in this repo |
+|---|---|
+| CoE lab fixtures | Controlled, isolated regression shapes |
+| Bank of Anthos–class trees | Python/Flask + k8s trust patterns |
+| Multi-module Java (e.g. JAX-RS + JPA services) | Layered enterprise Java / dual-unit stress |
+| NestJS + Prisma wealth apps | Real Node import-graph / `ref_*` behaviour |
+
+Clones under `spikes/` are **scratch evidence**, not deliverables.
 
 ---
 
 ## Known issues & honest gaps
 
-| Issue | Impact | Tracking |
+| Issue (pattern class) | Impact | Tracking |
 |---|---|---|
-| **Layered multi-hop (R2)** — e.g. Fineract API → platform service → entity | Strong L1 units; **L2 architecture story often empty** on single-module charge | AREC Session C; may need **labeled multi-root** (e.g. +provider) |
-| **Call-site auth (C-call)** — `validateHasReadPermission`, `jwt.decode` | HTTP “no security-control” in pipeline categories despite real auth in source | AREC Session D |
+| **Layered multi-hop (R2)** — API → application service → store across packages | Strong L1 units; **L2 architecture story often incomplete** when implementers live outside a single root or lack catalogue persistence signals | AREC R2 (mechanism partial; enterprise residual remains) |
+| **Call-site auth (C-call)** — permission/JWT checks as method calls, not annotations | HTTP units lack security-control evidence despite real auth in source | AREC Session D |
 | **R0 entity–entity mesh** | Many `connects` edges that are structural, not service architecture | Graded R0; do not overclaim |
 | **High confidence ≠ complete** | Easy to misread unit scores as full architecture | Completeness / silence metrics; scope-limitations |
-| **Lab L1 green ≠ Fineract L2** | Soft “all pass” on lab does not prove enterprise story | `validation-approach-vnext.md` |
+| **Lab L1 green ≠ wild-type L2** | Soft “all pass” on fixtures does not prove multi-module enterprise stories | `validation-approach-vnext.md` |
 | **Messaging producers** | Consumers partial; producers largely open | Claim U-msg-producer; Session E |
 | **Spring Data / jOOQ / Dynamo-SQS depth** | Catalogue partial / stretch | Claim Register; Session E |
 | **Control payload richness** | Expression/authority often thin vs gold | C-rich (D or E) |
-| **Prisma `*Service` as `database` kind** | Detection works; ontology debatable | Q13 / Session E |
+| **ORM import ontology** (e.g. app service importing client types typed as `database`) | Detection works; architecture kind debatable | Session E |
 | **IR / LLM advisory UX** | IR partial; full advisory path not productized | Design v2 §7.1 / §13 |
-| **scope-limitations drift** | Must stay aligned with Claim Register | Session A T-A4 hygiene |
+| **scope-limitations drift** | Must stay aligned with Claim Register | Hygiene with capability changes |
 
-**Forbidden overclaims (examples):** “Java relationships work end-to-end”; “Graphify recovers full architecture”; “Fineract APIs have CALM controls” (decorator-only is true for some service layers, not call-site HTTP).
+**Forbidden overclaims (examples):** “Java relationships work end-to-end”; “Graphify recovers full architecture”; “all HTTP APIs have CALM security controls” (decorator path only today).
 
 ---
 
@@ -258,9 +272,9 @@ Use these claims freely (see Claim Register for precision):
 | Extraction enrichment (X0–X9 class work) | Largely built; see STATUS §B |
 | Claim honesty Wave 1 | **Done** |
 | AREC design Wave 2 | **Done** |
-| AREC implementation Wave 3 | **In progress** — Sessions A–B done (silence, R0 grade, eval labels, R1 lock, R2 design); **Session C (R2 implement)** next |
+| AREC implementation Wave 3 | **In progress** — Sessions A–C landed (silence, R0 grade, R1 lock, R2 **mechanism**); **Session D (C-call)** next. R2 does **not** yet close all layered multi-module stories |
 | CoE lab core eval | L0+L1 strong; stretch packages mixed |
-| Fineract wild gold | L0 pass; L1 strong; **L2 story fail** until R2 (+ appropriate multi-root claim) |
+| Wild-type / multi-module L2 stories | Still the hard bar — incomplete by design honesty, not “one repo left to finish” |
 
 Authoritative detail: **[`docs/solution/STATUS.md`](./docs/solution/STATUS.md)** and **[`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md)**.
 
@@ -271,11 +285,11 @@ Authoritative detail: **[`docs/solution/STATUS.md`](./docs/solution/STATUS.md)**
 Ordered implementation: **[`AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md)** (Sessions A→E).  
 Framework/language “Todo” rows above map here — especially **R2 multi-hop**, **C-call auth**, **Kafka/SQS producers**, **Spring Data / jOOQ**, **Dynamo**.
 
-| Priority | Theme | Examples (from language/framework matrix) |
+| Priority | Theme | Examples (pattern classes) |
 |---|---|---|
 | **P0** | Silence, R0 honesty, eval layers, scope hygiene, shields | *(Session A — largely landed)* |
-| **P1** | Architecture stories + call-site security | **R2** layered Java; **C-call** (`validateHasReadPermission`, `jwt.decode`); Fineract L2 remeasure (often multi-root) |
-| **P2** | Breadth | C-rich controls; messaging **producers**; Prisma ontology; Dynamo/SQS; Spring Data/jOOQ; OpenAPI dual-unit |
+| **P1** | Architecture stories + call-site security | **R2** layered multi-module services; **C-call** method-level auth; wild-type L2 remeasure under labeled multi-root |
+| **P2** | Breadth | C-rich controls; messaging **producers**; ORM ontology; Dynamo/SQS; Spring Data/jOOQ; OpenAPI dual-unit |
 | **P3** | Residual UX / polish | HITL empty-neighborhood triggers; k8s substring FPs; claim-mode labeling |
 
 **Other platform backlog** (not only AREC): CodeQL/scip Phase 2, two-tier mapping-config, plugin discovery, ADR ingestion, Helm/Kustomize, Django/Express if ever prioritized — see design v2 and STATUS.
@@ -361,7 +375,7 @@ See [`coe-lab/README.md`](./coe-lab/README.md).
 | **L4** | Scope-limitations match reality |
 | **L5** | HITL residual only |
 
-Lab core green is typically **L0+L1**. Fineract wild gold is **L2-fail** until multi-hop (and claim mode) catch up. Details: [`coe-lab/docs/validation-approach-vnext.md`](./coe-lab/docs/validation-approach-vnext.md).
+Lab core green is typically **L0+L1**. **Wild-type multi-module L2** (layered service→store across packages) is a harder bar and still incomplete. Details: [`coe-lab/docs/validation-approach-vnext.md`](./coe-lab/docs/validation-approach-vnext.md).
 
 ---
 
@@ -378,7 +392,7 @@ Lab core green is typically **L0+L1**. Fineract wild gold is **L2-fail** until m
 | [`docs/solution/Module_Authoring_Guide.md`](./docs/solution/Module_Authoring_Guide.md) | Adding a module |
 | [`docs/solution/Contract_Evolution_Policy.md`](./docs/solution/Contract_Evolution_Policy.md) | TypedFacts versioning |
 | [`CLAUDE.md`](./CLAUDE.md) | Deep working memory for agents |
-| [`coe-lab/docs/fineract-gold-vs-platform-finding.md`](./coe-lab/docs/fineract-gold-vs-platform-finding.md) | Why Fineract L2 fails today |
+| [`coe-lab/docs/fineract-gold-vs-platform-finding.md`](./coe-lab/docs/fineract-gold-vs-platform-finding.md) | Example wild-type L2 finding (one multi-module Java sample — not the product target) |
 | [`docs/spikes/`](./docs/spikes/) | Historical spikes and evidence |
 
 ---
