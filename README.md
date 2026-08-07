@@ -73,6 +73,95 @@ Working name used in design docs: **Loom** (weaving signals into one architectur
 
 ---
 
+## Languages & frameworks
+
+Scope is intentionally **Java + Python + TypeScript/Node** for fintech-shaped services. Support is **catalogue- and evidence-based** — not “every framework in the language.”
+
+Legend: **Supported** = proven on real or lab evidence and safe to claim · **Partial** = works for some signals/shapes only · **Not supported** = no reliable path today · **Todo** = specified or backlog, not done
+
+### By language
+
+| Language | Status | What works well | Limits |
+|---|---|---|---|
+| **Python** | **Supported** | Flask routes (BoA), SQLAlchemy-style persistence via Graphify imports, multi-package runs | Call-site JWT auth not attached as controls; Django/SQLAlchemy-as-primary unproven as first-class stacks |
+| **TypeScript / Node** | **Supported** | NestJS routes (native + decorator), Prisma/import persistence after Graphify `ref_*` fix (Ghostfolio), OpenAPI file ingestion | Cloud Dynamo/SQS architecture units weak; bare `http` servers not a focus; Angular/frontend out of scope |
+| **Java** | **Supported (units)** · **Partial (stories)** | JAX-RS composed routes, JPA `@Entity`, Spring `@PreAuthorize`, `@KafkaListener` consumers, Spring MVC-style lab routes | Layered service→DB (R2) incomplete; call-site security incomplete; Spring Data / jOOQ / Batch not dispatched |
+| **Other** (Go, .NET, Scala, Kotlin-first, Ruby, …) | **Not supported** | — | No scanner catalogue path; not in current dual-engine scope |
+
+### Frameworks & concerns (detail)
+
+#### HTTP / application frameworks
+
+| Stack | Status | Evidence / notes |
+|---|---|---|
+| **Flask** | **Supported** | Bank of Anthos; lab py-accounts / ledger |
+| **FastAPI** | **Partial / catalogue-ready** | Signal rows exist; less regression weight than Flask in this repo |
+| **NestJS** | **Supported** | Lab fixture + Ghostfolio-class Nest; `@Controller` = bootstrap not interface |
+| **JAX-RS** (`@Path` / `@GET`…) | **Supported** | Fineract charge/core; route composition |
+| **Spring MVC** (`@RestController`, `@GetMapping`…) | **Partial** | Lab spring-payments; matrix notes real Spring MVC monorepo less exercised than JAX-RS |
+| **Quarkus** | **Partial** | Same JAX-RS extraction path; CDI-specific bootstrap not a full product claim |
+| **Play Framework** | **Not a product focus** | CodeGraph has Play leanings historically; not a claimed CoE target |
+| **Express / Fastify / Koa** | **Not supported** | No dedicated catalogue/route composer |
+| **Django / FastAPI-as-only-stack** | **Not supported** as primary proven path | Django not evidenced; FastAPI rows exist but Flask is the Python yardstick |
+| **Angular / React / browser apps** | **Out of scope** | Explicit lab/out-of-scope for Slice 1/2 frontend |
+
+#### Persistence
+
+| Stack | Status | Notes |
+|---|---|---|
+| **JPA** (`@Entity` / `@Table`) | **Supported** | Fineract; lab Java |
+| **SQLAlchemy** (import / wrapper class) | **Supported** | BoA; lab Python |
+| **Prisma** (`@prisma/client`, Graphify `ref_prisma_client`) | **Supported** (detection) | Ghostfolio; ontology “Service = database unit” still debatable |
+| **TypeORM / Mongoose / Sequelize / pg / …** | **Partial** | Catalogue entries; not all verified on large real apps |
+| **Spring Data repositories** | **Todo** | Designed in persistence catalogue; not fully dispatched |
+| **jOOQ** | **Todo** | Same |
+| **MyBatis** | **Not supported** | Unevidenced (earlier false lead was MapStruct) |
+| **DynamoDB (AWS SDK)** | **Todo / stretch** | Lab fixture; architecture units still weak |
+| **Raw JDBC-only / custom DAOs** | **Not supported** as a generic pattern | May appear only if other signals fire |
+
+#### Security / controls
+
+| Stack | Status | Notes |
+|---|---|---|
+| **Spring `@PreAuthorize`** | **Supported** | Decorator → CALM controls |
+| **Call-site auth** (`validateHasReadPermission`, `jwt.decode`) | **Todo** (AREC C-call) | Common on Fineract HTTP + BoA-shaped gateways; not controls today |
+| **OpenAPI `securitySchemes`** | **Partial** | When static OpenAPI present |
+| **Quarkus `@Authenticated` / other vocabularies** | **Todo / catalogue expansion** | Breadth spike showed third vocabularies |
+| **OAuth2 full flow modeling** | **Not supported** as end-to-end product | Partial signals only |
+
+#### Messaging
+
+| Stack | Status | Notes |
+|---|---|---|
+| **Spring `@KafkaListener`** | **Partial** | Consumer → network/topic-style unit |
+| **JMS `@JmsListener`** | **Partial** | Catalogue row; less evidence weight |
+| **Kafka producers** (`KafkaTemplate.send`) | **Todo** | Not decorator-shaped |
+| **AWS SQS/SNS** | **Todo** | Import strategy catalogued; units weak |
+| **RabbitMQ / Pulsar / gRPC streaming** | **Not supported** | gRPC checked unevidenced in early sampling |
+
+#### Platform / ops signals
+
+| Stack | Status | Notes |
+|---|---|---|
+| **Kubernetes** Deployments + shared Secret/ConfigMap | **Partial** | Trust edges; flat/pre-rendered YAML; opt-in `--k8s-manifests` |
+| **Env / ConfigMap name correlation** | **Partial** | Opt-in soft-graph; no secret **values** |
+| **OpenAPI 3 / Swagger 2 files** | **Partial** | Static files; not springdoc build-time-only |
+| **Docker Compose as architecture source** | **Not primary** | Cited historically; not a first-class provider |
+| **Terraform / Helm deep resolution** | **Not supported** | Kustomize/Helm resolution backlog |
+
+#### Explicitly not supported (near term)
+
+- Languages outside **Java / Python / TS-Node**
+- Full **frontend** architecture (SPA, mobile)
+- **Build-dependent** engines as Phase 1 default (CodeQL, scip-java, jQAssistant) — researched / Phase 2 only
+- **LLM** as a required step for generation
+- **CALM pattern governance** product (authoring org patterns, live policy packs)
+- Guaranteeing **complete** architecture graphs for **multi-module layered** systems until R2 + multi-root claims mature
+
+Authoritative claim cells: [`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md) · engine rows: [`pipeline/src/scanner/engine-capability-matrix.yml`](./pipeline/src/scanner/engine-capability-matrix.yml).
+
+---
+
 ## Features
 
 ### Scanning & analysis
@@ -179,16 +268,17 @@ Authoritative detail: **[`docs/solution/STATUS.md`](./docs/solution/STATUS.md)**
 
 ## Backlog (high level)
 
-Ordered implementation: **[`AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md)** (Sessions A→E).
+Ordered implementation: **[`AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md)** (Sessions A→E).  
+Framework/language “Todo” rows above map here — especially **R2 multi-hop**, **C-call auth**, **Kafka/SQS producers**, **Spring Data / jOOQ**, **Dynamo**.
 
-| Priority | Theme |
-|---|---|
-| **P0** | Silence metrics, R0 honesty, eval L0/L1/L2 labels, scope hygiene, regression shields *(Session A — largely landed)* |
-| **P1** | R1 lock, **R2 multi-hop**, **C-call auth**, Fineract L2 remeasure *(B done; C–D next)* |
-| **P2** | C-rich controls, messaging producers, persist ontology, Dynamo/jOOQ, OpenAPI dual-unit |
-| **P3** | HITL empty-neighborhood triggers, residual k8s FPs, claim-mode polish |
+| Priority | Theme | Examples (from language/framework matrix) |
+|---|---|---|
+| **P0** | Silence, R0 honesty, eval layers, scope hygiene, shields | *(Session A — largely landed)* |
+| **P1** | Architecture stories + call-site security | **R2** layered Java; **C-call** (`validateHasReadPermission`, `jwt.decode`); Fineract L2 remeasure (often multi-root) |
+| **P2** | Breadth | C-rich controls; messaging **producers**; Prisma ontology; Dynamo/SQS; Spring Data/jOOQ; OpenAPI dual-unit |
+| **P3** | Residual UX / polish | HITL empty-neighborhood triggers; k8s substring FPs; claim-mode labeling |
 
-Other backlog (platform, not only AREC): full CodeQL/scip Phase 2, two-tier mapping-config, plugin discovery, ADR ingestion, deeper OpenAPI productization — see design v2 and STATUS.
+**Other platform backlog** (not only AREC): CodeQL/scip Phase 2, two-tier mapping-config, plugin discovery, ADR ingestion, Helm/Kustomize, Django/Express if ever prioritized — see design v2 and STATUS.
 
 ---
 
