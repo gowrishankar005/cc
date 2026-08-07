@@ -1,9 +1,10 @@
 # AREC Wave 3 — ordered implementation backlog (W3-0)
 
-**Status:** superseded for **execution detail** by `AGENT_TASKS_AREC_Wave3_Implementation.md` (keep this file as priority summary).  
+**Status:** Wave 3 A–D largely **done**; remaining open items also listed in product index **`BACKLOG.md`**.  
+**Execution detail:** `AGENT_TASKS_AREC_Wave3_Implementation.md` (Session **E** next).  
 **Depends on:** Wave 2 lock (`Architecture_Relation_Evidence_Completeness.md`)  
-**Forbidden:** one-off `ChargesApi → Charge` patches  
-**Start:** Session A in the agent task file.
+**Forbidden:** sample-repo class-name hardcodes  
+**Start (historical):** Session A; **now:** Session E.
 
 ---
 

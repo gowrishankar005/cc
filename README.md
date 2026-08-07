@@ -11,6 +11,8 @@
 | **Product name** | **Weaver** |
 | **Primary code** | [`pipeline/`](./pipeline/) |
 | **Living status** | [`docs/solution/STATUS.md`](./docs/solution/STATUS.md) |
+| **Product backlog (thin index)** | [`docs/solution/BACKLOG.md`](./docs/solution/BACKLOG.md) |
+| **Next iteration plan** | [`docs/solution/NEXT_ITERATION.md`](./docs/solution/NEXT_ITERATION.md) |
 | **What you may claim is “built”** | [`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md) |
 | **Eval benchmark (CoE lab)** | [`coe-lab/`](./coe-lab/) |
 | **Solution design** | [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](./docs/solution/Architecture_as_Code_Solution_Design_v2.md) |
@@ -282,17 +284,18 @@ Authoritative detail: **[`docs/solution/STATUS.md`](./docs/solution/STATUS.md)**
 
 ## Backlog (high level)
 
-Ordered implementation: **[`AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md)** (Sessions A→E).  
-Framework/language “Todo” rows above map here — especially **R2 multi-hop**, **C-call auth**, **Kafka/SQS producers**, **Spring Data / jOOQ**, **Dynamo**.
+**Canonical thin index:** [`docs/solution/BACKLOG.md`](./docs/solution/BACKLOG.md)  
+**Next iteration (critical todos):** [`docs/solution/NEXT_ITERATION.md`](./docs/solution/NEXT_ITERATION.md)  
+**Active agent tasks (Session E next):** [`docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md)
 
-| Priority | Theme | Examples (pattern classes) |
+| Priority | Theme | Examples |
 |---|---|---|
-| **P0** | Silence, R0 honesty, eval layers, scope hygiene, shields | *(Session A — largely landed)* |
-| **P1** | Architecture stories + call-site security | **R2** layered multi-module services; **C-call** method-level auth; wild-type L2 remeasure under labeled multi-root |
-| **P2** | Breadth | C-rich controls; messaging **producers**; ORM ontology; Dynamo/SQS; Spring Data/jOOQ; OpenAPI dual-unit |
-| **P3** | Residual UX / polish | HITL empty-neighborhood triggers; k8s substring FPs; claim-mode labeling |
+| **Now** | Session E + R2 residual (R2b) | Producers, ontology, cloud; multi-hop when impl ≠ entity |
+| **P1** | Architecture stories + security depth | Labeled multi-root L2; C-call vocabulary expand |
+| **P2** | Breadth | Spring Data/jOOQ; Dynamo/SQS; OpenAPI dual-unit |
+| **P3** | Discovery + polish | Stratified sampling; trap automation; HITL S1 trigger |
 
-**Other platform backlog** (not only AREC): CodeQL/scip Phase 2, two-tier mapping-config, plugin discovery, ADR ingestion, Helm/Kustomize, Django/Express if ever prioritized — see design v2 and STATUS.
+**Other platform backlog:** CodeQL/scip Phase 2, plugin discovery, two-tier mapping-config, ADR ingestion — see STATUS and BACKLOG “Later”.
 
 ---
 
