@@ -55,9 +55,13 @@ export function renderIntelligenceIR(
 
   h(`## Completeness (AREC S1/S2 — distinct from confidence; see S4)`);
   lines.push(
-    `- service units: ${coverage.completeness.serviceUnitCount}, database units: ${coverage.completeness.databaseUnitCount}`,
+    `- service units: ${coverage.completeness.serviceUnitCount}, database units: ${coverage.completeness.databaseUnitCount}, topic units: ${coverage.completeness.topicUnitCount}`,
     `- relationships touching a service unit: ${coverage.completeness.serviceTouchingRelationshipCount}`,
     `- HTTP-entry-point units without security-control evidence: ${coverage.completeness.httpUnitsWithoutSecurityControlCount}`,
+    // Robustness T-R0-2 — a RATE alongside S1's binary flag. "N/A" (not 0%)
+    // when there are no store units to potentially connect to — same
+    // honesty discipline as every other precondition-gated metric here.
+    `- architecture coverage: ${coverage.completeness.servicesWithArchitectureOutbound}/${coverage.completeness.serviceUnitCount} service unit(s) have ≥1 architecture-grade outbound relationship${coverage.completeness.architectureOutboundCoverage !== undefined ? ` (${(coverage.completeness.architectureOutboundCoverage * 100).toFixed(0)}%)` : ' (N/A — no store units in this run)'}`,
     ''
   );
   if (coverage.completeness.silenceFlags.length > 0) {

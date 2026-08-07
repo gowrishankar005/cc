@@ -24,6 +24,9 @@
 | **What’s built vs partial** | [`STATUS.md`](./STATUS.md) |
 | **What we may claim** | [`Claim_Register.md`](./Claim_Register.md) |
 | **Eval traps** | [`../../coe-lab/docs/trap-gold-backlog.md`](../../coe-lab/docs/trap-gold-backlog.md) |
+| **Pilot-ready scorecard** | [`Pilot_Ready_Scorecard.md`](./Pilot_Ready_Scorecard.md) |
+| **Standing OOS registry** | [`OOS_Registry.md`](./OOS_Registry.md) |
+| **Multi-root L2 protocol** | [`../../coe-lab/docs/multi-root-l2-protocol.md`](../../coe-lab/docs/multi-root-l2-protocol.md) |
 
 ---
 
@@ -32,7 +35,7 @@
 | ID | Item | Status | Detail |
 |---|---|---|---|
 | **E** | AREC Session E (breadth) | `done` (2026-08-08) | [T-E1…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) all shipped (T-E0 correctly skipped — C-rich already landed in D) |
-| **RB** | Weaver robustness program (phased) | `todo` | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) — after or interleaved with E per that file |
+| **RB** | Weaver robustness program (phased) | `doing` — Phase R0 in progress | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) |
 | **W3-close** | Close Wave 3 checklist / OOS decisions | `done` | AREC Wave 3 DoD — all checkboxes closed, Sessions A–E complete |
 
 ### Recently landed (Wave 3 A–D) — do not re-queue
@@ -69,9 +72,9 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 |---|---|---|---|---|
 | **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `todo` | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | Robustness Phase R1; AREC_R2 strategy |
 | **B-arch-cov** | Architecture coverage metric + gate (% services with architecture-grade outbound when store units exist) | `todo` | S1 is binary; need ongoing quality signal, not only empty/non-empty | Robustness Phase R0 |
-| **B-pilot-scorecard** | Pilot-ready scorecard (which claim cells must be proven/partial) | `todo` | Enterprise readiness: no single success metric | Robustness Phase R0 |
-| **B-R2-eval** | Labeled multi-root L2 remeasure protocol | `todo` | Q11; single-root ≠ multi-root claims | Robustness Phase R0 |
-| **B-oos-registry** | Standing OOS registry (command-bus, Helm, …) | `todo` | Permanent non-goals must not vanish | Robustness Phase R0 |
+| **B-pilot-scorecard** | Pilot-ready scorecard (which claim cells must be proven/partial) | `done` (T-R0-1) | Enterprise readiness: no single success metric | `Pilot_Ready_Scorecard.md` |
+| **B-R2-eval** | Labeled multi-root L2 remeasure protocol | `done` (T-R0-3) | Q11; single-root ≠ multi-root claims | `coe-lab/docs/multi-root-l2-protocol.md` |
+| **B-oos-registry** | Standing OOS registry (command-bus, Helm, …) | `done` (T-R0-4) | Permanent non-goals must not vanish | `OOS_Registry.md` |
 | **B-catalogue-intake** | Catalogue intake rule (evidence + test + claim cell) for new rows | `todo` | Vocab growth without one-offs | Robustness Phase R2 |
 | **B-discovery-cadence** | Scheduled stratified sampling (not one-shot) | `todo` | Avoid overfitting last pain | Robustness Phase R3 |
 | **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `todo` | Completeness UX under tool failure | Robustness Phase R0 / R4 |
@@ -152,3 +155,4 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 | 2026-08-08 | Initial thin index after Wave 3 A–D |
 | 2026-08-08 | Robustness track folded in; link to AGENT_TASKS_Weaver_Robustness.md |
 | 2026-08-08 | Session E (T-E1–T-E6) marked done — was stale `todo` from before this session's work landed |
+| 2026-08-08 | Robustness Phase R0 (T-R0-1…T-R0-5) done: B-pilot-scorecard, B-R2-eval, B-oos-registry flipped; new Pilot_Ready_Scorecard.md / multi-root-l2-protocol.md / OOS_Registry.md linked above |

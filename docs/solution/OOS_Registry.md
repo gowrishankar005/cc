@@ -1,0 +1,30 @@
+# Out-of-scope (OOS) registry
+
+**Purpose:** a living list of things Weaver deliberately does NOT do — permanently or on a long horizon — with the reason recorded, so a non-goal doesn't silently re-enter scope (someone "discovers" it's missing and starts building it) or get forgotten as a real, disclosed limitation and quietly become an implicit false claim.
+
+**Authority:** entries here are cross-referenced from `scope-limitations.yml` (generated-artifact-facing disclosure) and `Claim_Register.md` (claim-facing disclosure) where relevant — this file is the canonical reason+trigger record; those files carry the user/claim-facing wording.
+
+**Rule:** every row needs a real reason (not "not done yet") and a revisit trigger (what would justify reopening it) — a row with neither is not OOS, it's just undone work that hasn't been scheduled.
+
+---
+
+| ID | What's OOS | Reason | Revisit trigger |
+|---|---|---|---|
+| **OOS-command-bus** | Resolving runtime string-keyed command-bus/dynamic-dispatch handlers (e.g. a `Map<String, Handler>` resolved by a command-name string at runtime) into a static relationship. Real evidenced instance: Fineract's `ChargesApiResource` write path via `PortfolioCommandSourceWritePlatformService` — the concrete case that first surfaced this class of gap (T-B2/T-C1) | No static-analysis mechanism this pipeline has (or has evaluated) can resolve this without either false-positive guessing or full bytecode/runtime tracing, named explicitly in `AREC_R2_MultiHop_Strategy.md` §2.4.5 as a permanent non-goal, not a deferral | A future engine (real Spring bean-graph resolution, e.g.) is evaluated AND verified against a real command-bus case before being adopted — never assumed to work |
+| **OOS-helm-kustomize** | Deep resolution of Helm chart templating or Kustomize overlay/patch composition — only flat, pre-rendered k8s manifest YAML is read | `k8s-manifest-provider.ts` is a static YAML parser; template/overlay resolution is a materially different, much larger problem (would need a real Helm/Kustomize engine dependency) | A pilot repo whose only manifests are templated (no pre-rendered form ever produced) makes k8s-trust/env-soft-graph entirely blind for that repo — if that becomes common across pilots, re-evaluate |
+| **OOS-llm-core-path** | Any LLM call inside `run-slice.ts`'s call graph (core generation path) | Foundational project discipline since the earliest requirements docs — "no LLM in the core generation path" — determinism guarantee for the primary deliverable (`typed-facts.json`/`architecture.calm.json`) | Never — this is the platform's core determinism claim, not a capability gap |
+| **OOS-sample-repo-detectors** | Any catalogue row, matcher, or code path keyed to a specific sample/evidence-repo class, module, or package name (e.g. `if (path.includes('ChargesApi'))`) | Explicit integrity rule across every AREC/robustness task file — evidence repos prove or falsify a GENERIC mechanism, they are never the product target | Never — a name-keyed detector is always rejected on review, not a backlog item |
+| **OOS-unbounded-multihop** | R2/R2b bridge resolution beyond a fixed, small hop bound (2 hops: service → bridge → implementer) | Unbounded traversal risks connecting a service to an unrelated persistence unit through an accidental long chain; named explicitly in `AREC_R2_MultiHop_Strategy.md` §2.4.2 | A real, evidenced case where the correct architecture edge needs 3+ hops AND a safe ambiguity rule for that depth is designed and verified — not assumed safe by just raising the bound |
+| **OOS-secret-values** | Ever reading, storing, or emitting a Kubernetes Secret's `data`/`stringData` VALUES (names only) | Security discipline enforced since the k8s-manifest-provider's first version, red-team-tested every time this area changes | Never — this is a hard security boundary, not a capability gap |
+| **OOS-full-frontend-analysis** | Deep static analysis of frontend framework code (React/Angular/Vue component trees, client-side routing) beyond basic file/import detection | Not evidenced as a near-term enterprise-pilot need; backend/service architecture is the primary target | A pilot repo where the frontend IS the primary architectural surface to document |
+| **OOS-lang-expansion** | Languages beyond Java/Python/Node-TypeScript (Go, .NET/C#, Ruby, etc.) | No real evidence repo or pilot need yet exercised; each language needs its own decorator/call/extends extraction verification, not assumed to transfer | A pilot repo whose dominant language is outside the current three |
+
+**Deliberately NOT listed here:** the Java Graphify import-target gap (jOOQ, `org.postgresql`, and every driver-import row) is real and confirmed twice over, but it is **active tracked backlog** (`B-java-driver-ref`, Robustness Phase R1 — see `BACKLOG.md`), not a non-goal — it fails this registry's own bar (§ "Rule," above): it already has an owner and a phase, so filing it here would misrepresent scheduled work as abandoned/permanent.
+
+---
+
+## Changelog
+
+| Date | Note |
+|---|---|
+| 2026-08-08 | T-R0-4 — initial registry, seeded from real, already-named non-goals across AREC/robustness docs |

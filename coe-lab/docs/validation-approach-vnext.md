@@ -51,6 +51,7 @@ Implement later (Wave 3-S); **policy now**:
 
 | ID | Invariant | Fail means |
 |---|---|---|
+| **S0** | If `graphifyStatus !== 'ok'`, flag it — a degraded/failed structural backbone silently starves every downstream mechanism (cross-package edges, import-based persistence/messaging, R2 bridge resolution), including S1's own precondition | Empty-looking architecture story that's actually a tool-failure artifact, not a maturity gap — shipped T-R0-5, `coverage-report.ts`'s `completeness.silenceFlags` |
 | **S1** | If ≥1 service and ≥1 database architectural unit in a package run, and gold/claim requires R1/R2, then service-touching relationship count must be >0 | Silent incomplete architecture graph |
 | **S2** | If unit has `http-entry-point` and claim requires C-call or C-dec, then either security-control evidence or explicit OOS/scope id | Silent “secure by omission” |
 | **S3** | Threat-signals “no security-control” on HTTP must not be marketed as “no auth in source” without C-call status | Narrative honesty |

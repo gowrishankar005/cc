@@ -386,7 +386,11 @@ Compare is layered: L0 schema, L1 unit/node recall, L2 architecture-story
 also gate on L2 (off by default since R2 multi-hop is specified-unbuilt —
 see Claim_Register.md). A package whose gold has no connects-shaped
 relationships, or is module-grain (x-lab-grain metadata), reports L2 as N/A,
-never a false PASS or FAIL.`);
+never a false PASS or FAIL.
+
+This script runs single-package-root scans only (module-root claim mode).
+For multi-root scan claims and how to label them, see
+coe-lab/docs/multi-root-l2-protocol.md.`);
     process.exit(args.help ? 0 : 2);
   }
 

@@ -33,6 +33,7 @@ Implementation sessions: `AGENT_TASKS_AREC_Wave3_Implementation.md`
 | **Wave 1** claim honesty / discovery | **done** | Claim Register, L0–L5 validation language, wild-type finding docs, probes |
 | **Wave 2** AREC design lock | **done** | R / C / S pillar documented |
 | **Wave 3** AREC implementation | **done (2026-08-08)** — all Definition-of-Done checkboxes closed (see `AGENT_TASKS_AREC_Wave3_Implementation.md`'s own list): S1/S2 real, R0 graded, L0/L1/L2 eval labels, scope-limitations aligned, Q11 decided, R1 regression-locked, R2 shipped with an honest Fineract residual, C-call + C-rich shipped for real, messaging producers + Spring Data + DynamoDB dispatched, a real persistence-ontology decision recorded (not silently deferred), OpenAPI dual-unit trap closed, HITL trigger shipped, k8s residual re-watched clean. Zero Fineract-only hardcodes. **Sessions A–E all complete** — Wave 3 program done per its own DoD. |
+| **Robustness R0** | Foundations (scorecard, arch-cov metric, multi-root protocol, OOS registry, Graphify visibility) | **done (2026-08-08)** — see §E. Pilot scorecard, architecture-coverage rate metric, multi-root L2 protocol, OOS registry, S0 Graphify-backbone flag all shipped. 46/46 tests green. **R1 next** (architecture residual: R2b + Java driver-ref). |
 
 **Do not mark relationship/control completeness as built** without Claim Register + AREC binding.  
 **Layered multi-module architecture stories (R2) and call-site auth (C-call)** are **not** fully product-proven yet — even where R2 code exists and refuses to fabricate edges.
@@ -198,10 +199,27 @@ Session order: A (honesty substrate) → B (protect R1 + design R2) → C (R2 sh
 
 ---
 
+## E. Weaver robustness program (`AGENT_TASKS_Weaver_Robustness.md`)
+
+Phase order: R0 (foundations) → R1 (architecture residual) → R2 (security depth) → R3 (discovery system) → R4 (residual UX). Full detail in `AGENT_TASKS_Weaver_Robustness.md` / `Claim_Register.md` / `BACKLOG.md`.
+
+| Phase | Task | Status |
+|---|---|---|
+| R0 | T-R0-1 — Pilot-ready scorecard | **done** — `docs/solution/Pilot_Ready_Scorecard.md` (new). States the load-bearing rule plainly: a green `npm test` / lab-core "ALL PASS" is L1 evidence, not an L2/pilot-readiness claim on its own — the exact confusion the Fineract finding named. Tables map each Claim Register cell (U-*/R*/C-*/S-silence) to its minimum required status for pilot readiness, cites the two mandatory disconfirming sample SHAPES (shallow one-hop; layered multi-module — generic descriptions, evidence repos named only as "currently fills this role," never as the product target, per Q5), and a 4-step actual procedure (run → read `completeness.silenceFlags` → run `hitl-review-trigger.js` → only then report). Linked from README.md, BACKLOG.md. No code. |
+| R0 | T-R0-2 — Architecture coverage metric | **done** — `coverage-report.ts`'s `completeness` block gained `topicUnitCount`, `servicesWithArchitectureOutbound`, `architectureOutboundCoverage` (a RATE beyond S1's binary flag: of the run's service units, what fraction have ≥1 real, `grade === 'architecture'` OUTBOUND relationship). Same precondition discipline as S1: `undefined` (never a fake 0%) when the run has 0 store units — verified with a dedicated test (NestJS fixture, 0 database/topic units → `architectureOutboundCoverage === undefined`, not `0`). Surfaced in `intelligence-ir.md`. **Real verified result, shapes differ sensibly (the acceptance bar's own wording)**: real BoA (userservice+contacts) — 2/2 services, 100% architecture coverage; real Fineract `fineract-charge` — 0/1 services, 0% (the same honest R2 residual T-C1 already named, now visible as a rate rather than only a binary S1 flag). 2 new regression tests. Integrity home: `platform-artefact` (`coverage-report.ts`) — no calm-generator change, no new relationships invented. |
+| R0 | T-R0-3 — Labeled multi-root L2 remeasure protocol | **done** — `coe-lab/docs/multi-root-l2-protocol.md` (new), implementing Claim Register Q11's decision as a written HOW: primary claim mode (module-root) vs. secondary/scan-specific multi-root claims, a fill-in template (root set, scan mode, expected claim cells, L0/L1/L2, residual) with a real worked example (T-C1's own Fineract multi-root remeasure, explicitly marked "evidence, not a repeatable product claim about Fineract specifically"), and generic root-set SHAPES ("API module + provider module," etc.) so evidence-repo paths stay in an appendix, never the headline. `validate-calm-pair.mjs`'s `--help` text now points to it. Claim Register Q11 row updated with the link. |
+| R0 | T-R0-4 — Standing OOS registry | **done** — `docs/solution/OOS_Registry.md` (new). 10 seeded rows (command-bus dynamic dispatch, Helm/Kustomize deep resolve, LLM-in-core-path, sample-repo-name hardcodes, unbounded multi-hop, secret values, the jOOQ/Java-driver-ref gap, the Fineract command-bus write-path evidenced instance, full frontend analysis, language expansion) — each with a real reason (not "not done yet") and a genuine revisit trigger, per the file's own stated rule that a row without both isn't OOS, it's just unscheduled work. Cross-referenced from BACKLOG.md. |
+| R0 | T-R0-5 — Graphify partial/fail-soft visibility | **done** — `graphifyStatus`/`graphifyError` were already surfaced prominently in `intelligence-ir.md`'s coverage-appendix header (pre-existing), but living in a separate field from `completeness.silenceFlags` meant a reviewer scanning that array (or T-E5's `hitl-review-trigger.js`, which reads exactly this array) could miss that a degraded/failed Graphify pass — not R2/C-call maturity — is the real reason a run looks architecturally empty. New: a generic `S0-graphify-backbone-incomplete` flag, folded into the SAME `silenceFlags` array whenever `graphifyStatus !== 'ok'`. Documented alongside S1–S4 in `coe-lab/docs/validation-approach-vnext.md`'s silence-invariants table (new S0 row). 1 new regression test (direct `buildCoverageReport()` unit test with a synthetic failed-Graphify context — the real CLI has no `--graphify-bin` override flag to fixture this end-to-end, named honestly as the reason for a unit-level test instead of a full-CLI one). Full suite: 46/46 green. **Phase R0 complete: T-R0-1 through T-R0-5 all done.** |
+
+*Robustness agent should overwrite only §E rows when finishing phases; keep §A/§B/§D unless platform code changes.*
+
+---
+
 ## C. How to update this file
 
 1. Platform/modularity/Slice change → edit **§A**.  
 2. Extraction MVP/post-MVP task done → edit **§B.3** (and §B.1 if new extension points).  
 3. AREC Wave 3 session/task done → edit **§D**.  
-4. Do not delete the other sections to “own” the file.  
-5. Prefer linking task IDs (T-A*, T-M*, T-X*) in the Status column notes.
+4. Weaver robustness phase/task done → edit **§E**.  
+5. Do not delete the other sections to “own” the file.  
+6. Prefer linking task IDs (T-A*, T-M*, T-X*, T-R*) in the Status column notes.

@@ -88,6 +88,18 @@ export interface CoverageReport {
      * scope-limitations.yml / metadata-builder.ts for where it's asserted.
      */
     silenceFlags: string[];
+    /**
+     * Robustness Wave T-R0-2 — beyond S1's binary "zero vs non-zero", a
+     * RATE: of the run's service units, how many have at least one real
+     * OUTBOUND architecture-grade relationship (T-A2's `grade === 'architecture'`
+     * — R1 one-hop or R2 bridge-resolved, never `structural`/`trust`).
+     * Same precondition spirit as S1 (only meaningful when the run also has
+     * store units to potentially connect to) — `undefined` when there are 0
+     * store units or 0 service units, never a fake 0/0 ratio.
+     */
+    topicUnitCount: number;
+    servicesWithArchitectureOutbound: number;
+    architectureOutboundCoverage?: number;
   };
 }
 
@@ -100,6 +112,7 @@ export interface CoverageReport {
 export function computeCompleteness(units: TypedUnit[], relationships: TypedRelationship[]): CoverageReport['completeness'] {
   const serviceUnitIds = new Set(units.filter((u) => u.kind === 'service').map((u) => u.id));
   const databaseUnitCount = units.filter((u) => u.kind === 'database').length;
+  const topicUnitCount = units.filter((u) => u.kind === 'topic').length;
   const serviceTouchingRelationshipCount = relationships.filter(
     (rel) => serviceUnitIds.has(rel.from) || serviceUnitIds.has(rel.to)
   ).length;
@@ -119,12 +132,28 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     );
   }
 
+  // Robustness T-R0-2 — architecture coverage RATE, same precondition
+  // spirit as S1 (only meaningful when a store unit exists to potentially
+  // connect to). Outbound only (rel.from), architecture-grade only (never
+  // structural/trust) — a service "has architecture coverage" when it has
+  // at least one real, graded outbound edge, not merely any relationship.
+  const storeUnitCount = databaseUnitCount + topicUnitCount;
+  const servicesWithArchitectureOutbound =
+    storeUnitCount >= 1
+      ? [...serviceUnitIds].filter((id) => relationships.some((rel) => rel.from === id && rel.grade === 'architecture')).length
+      : 0;
+  const architectureOutboundCoverage =
+    storeUnitCount >= 1 && serviceUnitIds.size > 0 ? servicesWithArchitectureOutbound / serviceUnitIds.size : undefined;
+
   return {
     serviceUnitCount: serviceUnitIds.size,
     databaseUnitCount,
     serviceTouchingRelationshipCount,
     httpUnitsWithoutSecurityControlCount,
     silenceFlags,
+    topicUnitCount,
+    servicesWithArchitectureOutbound,
+    architectureOutboundCoverage,
   };
 }
 
@@ -181,6 +210,20 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   }
 
   const completeness = computeCompleteness(ctx.allUnits, ctx.relationships);
+  // Robustness T-R0-5 — graphifyStatus was already surfaced prominently in
+  // intelligence-ir.md's own header, but living in a DIFFERENT field than
+  // silenceFlags meant a reviewer (or the T-E5 hitl-review-trigger.js CLI,
+  // which reads exactly this array) could miss that a degraded/failed
+  // Graphify pass is the REAL reason a run looks architecturally empty —
+  // every cross-package edge, persistence-detector unit, and R2 bridge
+  // resolution depends on Graphify; a failure here silently starves S1's
+  // own precondition (fewer database units even exist to trigger it).
+  // Folding this into the SAME reviewer-facing list closes that gap.
+  if (graphifyStatus !== 'ok') {
+    completeness.silenceFlags.push(
+      `S0-graphify-backbone-incomplete: graphifyStatus is "${graphifyStatus}"${ctx.graphifyError ? ` (${String(ctx.graphifyError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on Graphify; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
+    );
+  }
 
   return {
     generatedAt: new Date().toISOString(),

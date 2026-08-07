@@ -444,6 +444,74 @@ test(
   }
 );
 
+test(
+  'Robustness T-R0-2 — architecture coverage metric: real BoA shows 100% (2/2 services), real Fineract-charge shows 0% (0/1) — shapes differ sensibly',
+  { skip: (!fs.existsSync(BOA_ROOT) || !fs.existsSync(FINERACT_ROOT)) && 'spikes/boa or spikes/fineract not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const boa = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    try {
+      const coverage = JSON.parse(fs.readFileSync(path.join(boa.outDir, 'coverage-report.json'), 'utf8'));
+      assert.equal(coverage.completeness.serviceUnitCount, 2);
+      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 2, 'both BoA services have a real R1 architecture-grade outbound edge');
+      assert.equal(coverage.completeness.architectureOutboundCoverage, 1, 'expected 100% architecture coverage for BoA');
+    } finally {
+      fs.rmSync(boa.outDir, { recursive: true, force: true });
+    }
+
+    const charge = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    try {
+      const coverage = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'coverage-report.json'), 'utf8'));
+      assert.equal(coverage.completeness.serviceUnitCount, 1);
+      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 0, 'the R2 residual means ChargesApiResource has no architecture-grade outbound edge');
+      assert.equal(coverage.completeness.architectureOutboundCoverage, 0, 'expected 0% architecture coverage for the fineract-charge residual');
+    } finally {
+      fs.rmSync(charge.outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test('Robustness T-R0-5 — Graphify partial/failed visibility: S0 fires in completeness.silenceFlags when graphifyStatus is not ok, absent when ok', () => {
+  const { buildCoverageReport } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
+  const baseCtx = {
+    packageRoots: ['fake-root'],
+    rawByRoot: new Map(),
+    allUnits: [],
+    allIgnoredItems: [],
+    unitsByRoot: new Map(),
+    relationships: [],
+    openApiDocumentsByRoot: new Map(),
+  };
+
+  const failedReport = buildCoverageReport({ ...baseCtx, graphifyError: new Error('graphify binary not found') });
+  assert.equal(failedReport.graphifyStatus, 'failed');
+  assert.ok(
+    failedReport.completeness.silenceFlags.some((f) => f.startsWith('S0-graphify-backbone-incomplete')),
+    'expected S0 to fire when graphifyStatus is failed'
+  );
+
+  const okReport = buildCoverageReport({ ...baseCtx, graphifyRun: { graph: { nodes: [], edges: [] }, resolveRoot: () => undefined } });
+  assert.equal(okReport.graphifyStatus, 'ok');
+  assert.ok(
+    !okReport.completeness.silenceFlags.some((f) => f.startsWith('S0-graphify-backbone-incomplete')),
+    'S0 must not fire when graphifyStatus is ok'
+  );
+});
+
+test('Robustness T-R0-2 — architecture coverage: N/A (undefined), not a fake 0%, when a run has no store units', () => {
+  const { outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
+  try {
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    // The NestJS fixture has 1 service unit and 0 database/topic units —
+    // architecture coverage must not be computed (no store to connect to),
+    // same precondition discipline as S1.
+    assert.equal(coverage.completeness.databaseUnitCount, 0);
+    assert.equal(coverage.completeness.topicUnitCount, 0);
+    assert.equal(coverage.completeness.architectureOutboundCoverage, undefined, 'must be N/A, not a fake 0, when there are no store units');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
 test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging double-detector collision fix: lab ts-orders-dynamo fixture, no duplicate unique-ids, calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-orders-dynamo');
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
