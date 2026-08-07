@@ -1,7 +1,7 @@
 # Weaver — product backlog (thin index)
 
 **Purpose:** One place to see **what is left to build**, without duplicating full task specs.  
-**Product:** Weaver (Architecture-as-Code → CALM). Evidence repos are samples, not the product.
+**Product:** **Weaver** (Architecture-as-Code → CALM). Evidence repos are samples, not the product.
 
 | This file is | This file is not |
 |---|---|
@@ -9,7 +9,7 @@
 | Status snapshot of open items | Capability matrix (that’s STATUS) |
 | Links to the doc that owns detail | Claim authority (that’s Claim Register) |
 
-**Update rule:** When an item ships, set status → `done` (or remove) and update **STATUS** + **Claim Register**. When you add work, add one row here + a task/spec link if needed.
+**Update rule:** When an item ships → `done` (or remove) + update **STATUS** + **Claim Register**. Add one row here when work is accepted onto the queue.
 
 ---
 
@@ -18,20 +18,22 @@
 | Need | File |
 |---|---|
 | **What’s left (this index)** | **This file** |
-| **How an agent implements (current wave)** | [`AGENT_TASKS_AREC_Wave3_Implementation.md`](./AGENT_TASKS_AREC_Wave3_Implementation.md) |
+| **Next iteration focus** | [`NEXT_ITERATION.md`](./NEXT_ITERATION.md) |
+| **Robustness program (phased agent tasks)** | [`AGENT_TASKS_Weaver_Robustness.md`](./AGENT_TASKS_Weaver_Robustness.md) |
+| **Wave 3 Session E (breadth)** | [`AGENT_TASKS_AREC_Wave3_Implementation.md`](./AGENT_TASKS_AREC_Wave3_Implementation.md) |
 | **What’s built vs partial** | [`STATUS.md`](./STATUS.md) |
 | **What we may claim** | [`Claim_Register.md`](./Claim_Register.md) |
 | **Eval traps** | [`../../coe-lab/docs/trap-gold-backlog.md`](../../coe-lab/docs/trap-gold-backlog.md) |
-| **Next iteration plan** | [`NEXT_ITERATION.md`](./NEXT_ITERATION.md) |
 
 ---
 
 ## Now / next (active)
 
-| ID | Item | Status | Owner detail |
+| ID | Item | Status | Detail |
 |---|---|---|---|
-| **E** | AREC Session E (breadth) | `todo` | [Wave 3 tasks T-E0…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) — skip T-E0 if C-rich already done in D |
-| **W3-close** | Close Wave 3 checklist (done cells + OOS decisions) | `todo` | Same agent file § “Definition of Wave 3 program done” |
+| **E** | AREC Session E (breadth) | `todo` | [T-E1…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) (T-E0 only if C-rich skipped in D) |
+| **RB** | Weaver robustness program (phased) | `todo` | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) — after or interleaved with E per that file |
+| **W3-close** | Close Wave 3 checklist / OOS decisions | `todo` | AREC Wave 3 § done criteria |
 
 ### Recently landed (Wave 3 A–D) — do not re-queue
 
@@ -41,70 +43,92 @@
 | R0 relationship grading | `done` |
 | Eval L0/L1/L2 labels | `done` |
 | R1 one-hop regression lock | `done` |
-| R2 multi-hop **mechanism** (non-fabricating) | `done` (partial product — residual open below) |
-| C-call (bounded vocabularies) + C-rich (expression text) | `done` (partial — vocab/expansion open) |
+| R2 multi-hop **mechanism** (non-fabricating) | `done` — **product residual** → **B-R2b** |
+| C-call (bounded vocab) + C-rich (expression text) | `done` — expand → **B-C-call-expand** / **B-C-rich-authority** |
+
+---
+
+## Robustness track (must stay first-class)
+
+These exist so Weaver stays honest under enterprise monorepos — not optional polish.
+
+| ID | Item | Status | Why | Spec |
+|---|---|---|---|---|
+| **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `todo` | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | Robustness Phase R1; AREC_R2 strategy |
+| **B-arch-cov** | Architecture coverage metric + gate (% services with architecture-grade outbound when store units exist) | `todo` | S1 is binary; need ongoing quality signal, not only empty/non-empty | Robustness Phase R0 |
+| **B-pilot-scorecard** | Pilot-ready scorecard (which claim cells must be proven/partial) | `todo` | Enterprise readiness: no single success metric | Robustness Phase R0 |
+| **B-R2-eval** | Labeled multi-root L2 remeasure protocol | `todo` | Q11; single-root ≠ multi-root claims | Robustness Phase R0 |
+| **B-oos-registry** | Standing OOS registry (command-bus, Helm, …) | `todo` | Permanent non-goals must not vanish | Robustness Phase R0 |
+| **B-catalogue-intake** | Catalogue intake rule (evidence + test + claim cell) for new rows | `todo` | Vocab growth without one-offs | Robustness Phase R2 |
+| **B-discovery-cadence** | Scheduled stratified sampling (not one-shot) | `todo` | Avoid overfitting last pain | Robustness Phase R3 |
+| **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `todo` | Completeness UX under tool failure | Robustness Phase R0 / R4 |
+| **B-java-driver-ref** | Graphify Java import target normalize (symbol vs qualified package) | `todo` | Silent catalogue miss class | Robustness Phase R1 |
+| **B-trap-promote** | Trap-gold → automated eval/CI gates | `todo` | Docs-only traps don’t enforce honesty | Robustness Phase R3 |
+| **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `todo` | Residual human path | Robustness Phase R4 / T-E5 |
 
 ---
 
 ## Open product backlog (by priority)
 
-Statuses: `todo` · `partial` · `doing` · `oos`
+Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 
-### P1 — Architecture stories & security depth (critical)
-
-| ID | Item | Status | Why it matters | Spec / claim |
-|---|---|---|---|---|
-| **B-R2b** | R2 extension: terminal hop via implementer → imported DB/topic unit (not only “impl is @Entity”) | `todo` | Mechanism works on synthetic shape; real multi-module layered services often have service impls without being the entity | Claim **R2** residual; [AREC_R2 strategy](./AREC_R2_MultiHop_Strategy.md) |
-| **B-R2-eval** | Wild-type L2 remeasure protocol (labeled multi-root sets, not one-repo fetish) | `todo` | Q11 claim mode; honest multi-module evaluation | Claim Q11; validation-approach-vnext |
-| **B-C-call-expand** | Expand call-site control vocabularies (beyond validateHas*/jwt.decode) | `todo` | C-call is partial; enterprise stacks use many call shapes | Claim **C-call** |
-| **B-C-rich-authority** | Richer control config (resolved authority / structured fields) | `todo` | C-rich is raw line text only | Claim **C-rich** |
-| **B-S3** | Threat-signals narrative vs category-only detection (if not fully closed in D) | `partial` | Avoid “no auth in source” misread | T-D3 / Claim S |
-
-### P2 — Breadth (Session E + known catalogue debt)
+### P1 — Architecture stories & security depth
 
 | ID | Item | Status | Spec / claim |
 |---|---|---|---|
-| **B-msg-prod** | Messaging **producers** (KafkaTemplate.send, SQS send, …) | `todo` | Claim **U-msg-producer**; T-E1 |
-| **B-ontology** | Persist ontology: app service + ORM type import ≠ always `database` unit | `todo` | Claim **U-persist-import**; T-E2 |
-| **B-spring-data** | Spring Data repository strategy dispatch | `todo` | Claim **U-spring-data**; T-E3 |
-| **B-jooq** | jOOQ strategy dispatch | `todo` | Claim **U-spring-data/jOOQ**; T-E3 |
-| **B-dynamo-sqs** | Dynamo / SQS architecture units (lab + real samples) | `todo` | T-E3; lab stretch gold |
-| **B-openapi-dual** | OpenAPI dual-unit merge/ignore policy | `todo` | T-E4; trap T8 |
-| **B-c-contract** | OpenAPI securitySchemes as controls (expand) | `partial` | Claim **C-contract** |
-| **B-java-driver-ref** | Graphify Java import target normalization for driver packages (qualified vs symbol) | `todo` | Surfaced during R2 work; Claim R2 notes |
+| **B-R2b** | (see robustness) | `todo` | Claim **R2** |
+| **B-R2-eval** | (see robustness) | `todo` | Q11 |
+| **B-C-call-expand** | Expand call-site control vocabularies | `todo` | Claim **C-call** |
+| **B-C-rich-authority** | Richer control config (structured authority) | `todo` | Claim **C-rich** |
+| **B-S3** | Threat narrative honesty | `partial` | T-D3 |
+
+### P2 — Breadth (Session E + catalogue debt)
+
+| ID | Item | Status | Spec / claim |
+|---|---|---|---|
+| **B-msg-prod** | Messaging **producers** | `todo` | **U-msg-producer**; T-E1 |
+| **B-ontology** | Persist ontology (ORM import ≠ always database) | `todo` | **U-persist-import**; T-E2 |
+| **B-spring-data** | Spring Data repository dispatch | `todo` | T-E3 |
+| **B-jooq** | jOOQ strategy dispatch | `todo` | T-E3 |
+| **B-dynamo-sqs** | Dynamo / SQS architecture units | `todo` | T-E3 |
+| **B-openapi-dual** | OpenAPI dual-unit policy | `todo` | T-E4 |
+| **B-c-contract** | OpenAPI securitySchemes expand | `partial` | **C-contract** |
+| **B-java-driver-ref** | (see robustness) | `todo` | R2 notes |
 
 ### P3 — Eval, discovery, residual UX
 
-| ID | Item | Status | Spec / claim |
+| ID | Item | Status | Spec |
 |---|---|---|---|
-| **B-hitl-s1** | Empty-neighborhood / S1 advisory or IR trigger (offline, no TypedFacts write) | `todo` | T-E5 |
-| **B-k8s-fp** | Deployment correlation residual FPs (substring) | `todo` | T-E6 if observed |
-| **B-discovery** | Next stratified sample pass (FINOS landscape / new proxies) | `todo` | [NEXT_ITERATION.md](./NEXT_ITERATION.md); pattern matrix |
-| **B-trap-promote** | Promote trap-gold cards to automated gates as cells ship | `todo` | trap-gold-backlog.md |
-| **B-scope-hygiene** | Keep scope-limitations.yml ↔ Claim Register after each wave | `ongoing` | STATUS hygiene |
+| **B-discovery-cadence** | (see robustness) | `todo` | Phase R3 |
+| **B-trap-promote** | (see robustness) | `todo` | Phase R3 |
+| **B-hitl-s1** | (see robustness) | `todo` | Phase R4 |
+| **B-k8s-fp** | Deployment correlation residual FPs | `todo` | T-E6 if observed |
+| **B-scope-hygiene** | scope-limitations ↔ Claim Register | `ongoing` | every wave |
 
-### Later / platform (not only AREC)
+### Later / platform
 
 | ID | Item | Status | Notes |
 |---|---|---|---|
-| **B-phase2-engines** | CodeQL / scip-java as Phase 2 when Phase 1 gaps measured | `todo` | engine-capability-matrix |
-| **B-plugin** | Third-party module discovery / embed API | `todo` | Goal A incomplete |
-| **B-two-tier-map** | Two-tier mapping-config (global + domain) | `todo` | Gap_Closure / design |
-| **B-adr** | ADR file discovery → CALM `adrs[]` | `todo` | design v2 |
-| **B-helm** | Helm/Kustomize resolution | `oos` near-term | Not Phase 1 |
-| **B-lang-expand** | Go / .NET / frontend stacks | `oos` near-term | Explicit non-support in README |
+| **B-phase2-engines** | CodeQL / scip-java on measured gap only | `todo` | engine-capability-matrix |
+| **B-plugin** | Module discovery / embed API | `todo` | Goal A |
+| **B-two-tier-map** | Global + domain mapping-config | `todo` | Gap_Closure |
+| **B-adr** | ADR → CALM `adrs[]` | `todo` | design v2 |
+| **B-helm** | Helm/Kustomize | `oos` near-term | — |
+| **B-lang-expand** | Go / .NET / frontend | `oos` near-term | README |
 
 ---
 
-## Pointers (do not duplicate full lists)
+## Health note (robustness)
 
-| Topic | Canonical detail |
+| Dimension | Assessment |
 |---|---|
-| Wave 3 session tasks | `AGENT_TASKS_AREC_Wave3_Implementation.md` |
-| Older extraction waves | `AGENT_TASKS_Extraction_Enrichment.md` (mostly historical/done) |
-| Trap shapes | `coe-lab/docs/trap-gold-backlog.md` |
-| Ranked pattern risks | `coe-lab/docs/pattern-coverage-matrix.md` |
-| Next iteration focus | `NEXT_ITERATION.md` |
+| Honesty / anti-overclaim | Strong (S1, grades, non-fabricating R2, Claim Register) |
+| Hardest story (layered multi-module) | Fair — mechanism yes, product close needs **B-R2b** + **B-R2-eval** |
+| Discovery as a system | Weak → **B-discovery-cadence** |
+| Eval enforcement | Fair → **B-trap-promote** + **B-arch-cov** |
+| Pilot readiness | Needs **B-pilot-scorecard** |
+
+See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 
 ---
 
@@ -112,4 +136,5 @@ Statuses: `todo` · `partial` · `doing` · `oos`
 
 | Date | Note |
 |---|---|
-| 2026-08-08 | Initial thin index after Wave 3 A–D; next = Session E + R2 residual / discovery |
+| 2026-08-08 | Initial thin index after Wave 3 A–D |
+| 2026-08-08 | Robustness track folded in; link to AGENT_TASKS_Weaver_Robustness.md |

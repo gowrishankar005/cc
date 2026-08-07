@@ -13,6 +13,7 @@
 | **Living status** | [`docs/solution/STATUS.md`](./docs/solution/STATUS.md) |
 | **Product backlog (thin index)** | [`docs/solution/BACKLOG.md`](./docs/solution/BACKLOG.md) |
 | **Next iteration plan** | [`docs/solution/NEXT_ITERATION.md`](./docs/solution/NEXT_ITERATION.md) |
+| **Robustness program (phased)** | [`docs/solution/AGENT_TASKS_Weaver_Robustness.md`](./docs/solution/AGENT_TASKS_Weaver_Robustness.md) |
 | **What you may claim is “built”** | [`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md) |
 | **Eval benchmark (CoE lab)** | [`coe-lab/`](./coe-lab/) |
 | **Solution design** | [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](./docs/solution/Architecture_as_Code_Solution_Design_v2.md) |
