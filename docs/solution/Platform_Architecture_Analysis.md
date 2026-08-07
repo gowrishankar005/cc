@@ -6,9 +6,9 @@
 
 ## 0. Naming Proposal
 
-**Recommendation: `Loom`.**
+**Recommendation (locked): `Weaver`.**
 
-The dominant real mechanism in this system — proven, not aspirational — is taking many independent, low-level threads of evidence (a route annotation here, a persistence import there, an RBAC decorator somewhere else) and weaving them, via a fixed set of catalogues, into one coherent fabric (`architecture.calm.json`). That's a precise metaphor, not a decorative one: `signal-catalogue.yml` + three construct-mapping catalogues are literally the loom's warp threads (the fixed structure), and each new framework/language is a weft thread pulled through without rebuilding the loom itself. "Weaving disparate signals into one architecture" is also literally what the tagline would say, so the name and the one-sentence description reinforce each other — that's the actual bar for a good platform name, not just "sounds nice."
+The dominant real mechanism in this system — proven, not aspirational — is taking many independent, low-level threads of evidence (a route annotation here, a persistence import there, an RBAC decorator somewhere else) and **weaving** them, via a fixed set of catalogues, into one coherent fabric (`architecture.calm.json`). That's a precise metaphor, not a decorative one: `signal-catalogue.yml` + construct-mapping catalogues are the fixed structure; each new framework/language is a thread pulled through without rebuilding the machine. Earlier working name “Loom” described the same idea; **product name is Weaver** (see root `README.md` and `STATUS.md`).
 
 **Runners-up, with honest tradeoffs:**
 
@@ -18,7 +18,7 @@ The dominant real mechanism in this system — proven, not aspirational — is t
 | **Strata** | The system is genuinely layered (Scanner → Rules → Analysis → Orchestration → Modules) and CALM architectures are conventionally drawn in layers. | Doesn't capture the catalogue-driven extensibility, which is this system's actual differentiator over "yet another code-to-diagram tool." |
 | **Codex** | Evokes a governed rulebook (the catalogues) that architecture is checked against. | Overloaded in the industry (OpenAI Codex) — real naming-collision risk. |
 
-`Loom` is short, unclaimed in this exact space, and — practically — reads well as a CLI binary name (`loom scan <root> --out <dir>`) and a module-framework noun ("a Loom module," matching Goal A's plugin story). Recommend locking this; happy to run a second pass if you want more options.
+`Weaver` is short and — practically — reads well as a CLI binary name (`weaver scan <root> --out <dir>`, when the bin is renamed) and a module-framework noun ("a Weaver module," matching Goal A's plugin story). **Locked as the product name** (2026-08).
 
 ---
 

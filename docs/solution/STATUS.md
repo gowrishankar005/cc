@@ -1,32 +1,46 @@
-# STATUS — Living capability matrix
+# STATUS — **Weaver** living capability matrix
 
-**Single tracker** for what is **built** vs **partial** vs **backlog** in this repo.  
-Agents update the relevant section when behaviour changes (cleanup T-A3 + extraction T-XI-4).
+**Product:** **Weaver** — Architecture-as-Code platform that weaves code signals into FINOS CALM.  
+**Repo folder:** `codescanner` (path only; product name is Weaver).  
+**Single tracker** for what is **built** vs **partial** vs **backlog**. Agents update when behaviour changes.
 
 | Section | Owns |
 |---|---|
 | **A. Platform** | Goal A modules, construction pattern, Wave M modularity, Slice 2a gates |
 | **B. Extraction enrichment** | Wave XI + X0–X10 from `AGENT_TASKS_Extraction_Enrichment.md` |
+| **C. Claims & AREC** | Completeness honesty + relation/control strategies |
 
-Design rationale lives in `Architecture_as_Code_Solution_Design_v2.md`, `language/java.md`, modularity/extraction review docs — not duplicated here.
+Design rationale: `Architecture_as_Code_Solution_Design_v2.md`, `language/java.md`, `Claim_Register.md`, `Architecture_Relation_Evidence_Completeness.md`.  
+Project overview: repo root [`README.md`](../../README.md).
 
-**Validation / claim honesty + AREC (sequenced):**  
-Master list: `AGENT_TASKS_Master_Sequence_Claim_Honesty_and_AREC.md`  
+### Product framing (read first)
 
-| Wave | Status | Authority |
+| | |
+|---|---|
+| **Weaver is for** | Polyglot **enterprise monorepos** (Java / Python / Node) that need deterministic architecture extraction → CALM |
+| **Weaver is not for** | A single OSS app, one bank’s stack, or LLM-generated architecture |
+| **Evidence samples** | Lab fixtures + public monorepos used to **prove or falsify** mechanisms — not the product roadmap |
+| **Completeness claims** | Only per [`Claim_Register.md`](./Claim_Register.md) — high unit confidence ≠ full architecture story |
+
+### Claims & AREC program
+
+Master sequence: `AGENT_TASKS_Master_Sequence_Claim_Honesty_and_AREC.md`  
+Implementation sessions: `AGENT_TASKS_AREC_Wave3_Implementation.md`
+
+| Wave | Status | Notes |
 |---|---|---|
-| **Wave 1** claim honesty / discovery | **done** (2026-08-07) | `Claim_Register.md`, `coe-lab/docs/validation-approach-vnext.md`, Fineract finding, probes |
-| **Wave 2** AREC design lock | **done** (2026-08-07) | `Architecture_Relation_Evidence_Completeness.md` |
-| **Wave 3** AREC strategy implementation | **in progress** | Spec: `AGENT_TASKS_AREC_Wave3_Implementation.md`. **A–B done** (silence, R0 grade, eval labels, R1 lock, R2 design). **C next** (R2 implement — multi-root may be required for Fineract story). Summary: `AREC_Wave3_Implementation_Backlog.md`. |
+| **Wave 1** claim honesty / discovery | **done** | Claim Register, L0–L5 validation language, wild-type finding docs, probes |
+| **Wave 2** AREC design lock | **done** | R / C / S pillar documented |
+| **Wave 3** AREC implementation | **in progress** | **A–C done** (silence, R0 grade, eval labels, R1 lock, R2 **mechanism** + honest residual on multi-module layered stories). **D next** (call-site auth + C-rich). Then E (breadth). |
 
-**Do not mark relationship/control completeness as built** without Claim Register + AREC claim binding.  
-**Fineract L2 story** is **not** built (R2/C-call unbuilt).
+**Do not mark relationship/control completeness as built** without Claim Register + AREC binding.  
+**Layered multi-module architecture stories (R2) and call-site auth (C-call)** are **not** fully product-proven yet — even where R2 code exists and refuses to fabricate edges.
 
 ---
 
 ## A. Platform (cleanup / modularity / Slice 2a)
 
-**Last reviewed:** 2026-08-07 (doc hygiene pass after Wave A–M agent work).
+**Last reviewed:** 2026-08-08 (Weaver naming + status reframe; AREC Wave 3 A–C).
 
 ### A.1 Inventory (design section → code)
 
@@ -158,6 +172,10 @@ Session order: A (honesty substrate) → B (protect R1 + design R2) → C (R2 sh
 | B | T-B1 — R1 lock: one-hop service→db | **done** — no new mechanism; strengthened the existing real BoA regression (`test/regression.test.js`) to be the hard R1 lock T-B1 asks for. It already asserted a `service->database` `connects` relationship by ENDPOINT KIND (not just `relationships.length >= 1`, which a purely structural entity mesh could also satisfy) and `x-aac-relationship-grade: architecture` (T-A2) — added explicitly as the T-B1 regression with a comment naming it, so Session C/D's R2 work has a real tripwire if it accidentally regresses the one-hop shape that already works. Claim Register: **R1** → "partial, regression-locked". Full suite 33/33 green. |
 
 | B | T-B2 — R2 strategy design note (spike, generic) | **done** — `docs/solution/AREC_R2_MultiHop_Strategy.md` (new). Grounded in a fresh, real re-investigation of `spikes/fineract/repo/fineract-charge` (source grep + a real `graphify extract` run, not recalled from the earlier finding doc): confirmed Graphify DOES capture a real same-module `imports` edge from `ChargesApiResource` to the `ChargeReadPlatformService` bridge interface (the dual-unit gate's actual failure mode is that the interface itself has zero catalogue evidence, not that Graphify misses the edge) — but the interface's real implementation lives in a THIRD Gradle module (`fineract-provider`), never in-scope for any single/dual-module scan run so far. Also confirmed the write path is genuinely unrecoverable via static analysis (a generic runtime command-bus, not a Charge-specific static reference) and named that a permanent non-goal, not a deferral. Design: a generic, catalogue-free "zero-evidence interface referenced by a service, resolved via Graphify's own `implements` edge to exactly one same-scanned-root implementer" strategy — explicitly rejects a name-suffix allowlist (`*PlatformService`/`*Repository`) as the exact per-repo patching this task forbids, since Fineract alone already uses 3+ different suffixes. Confidence caps (below R1), false-positive controls (ambiguous bridge → honest `unresolved-multi-hop` ignored-item, never a guess), hop bound (2), Phase 1 (source-only, Graphify-only) vs Phase 2 (optional scip-java/CodeQL for real Spring-bean-wiring resolution) all specified. **Honest, load-bearing finding for Session C**: Phase 1 alone may NOT close `fineract-charge`'s S1 gap (its bridge's implementer is out of a single-root scan's reach) — a multi-root scan including `fineract-provider` is named as the more likely real closer, tied directly to T-A6's Q11 decision (a separate, labeled claim, not silently substituted). Claim Register: **R2** updated with this finding. No production code changed (design-only, per T-B2's own scope). |
+
+| C | T-C1 — Implement R2 multi-hop strategy (generic) | **done** — `analysis/cross_package/multi-hop-bridge-detector.ts` (new) implements `AREC_R2_MultiHop_Strategy.md` exactly: a `service` unit's `imports`/`references` edge to a node with ZERO TypedUnits of its own (a "bridge" — structural test, no name-suffix list) is resolved via Graphify's own `implements` edges to find its sole in-scope implementer; if that implementer is a real `database`/`topic` unit, emits a `kind: 'calls'`, `grade: 'architecture'` relationship at a fixed LOW confidence (15 same-root / 10 cross-root, both below any R1 value) — otherwise (0 or 2+ implementers, or implementer has no persistence/messaging evidence) emits an honest `CROSS_DOMAIN_UNRESOLVED` (`unresolved-multi-hop: ...`) item, never a guess. Wired as `multiHopBridgePass` (new `analysis/multi-hop-bridge-pass.ts`), positioned right after `reconcilePass` (append-only, needs the final `ctx.unitsByRoot`) and before `gradeRelationshipsPass` in `DEFAULT_PASSES`. **Real bug caught and fixed while building this, not assumed safe**: the first version only looked at `imports` edges and flooded `ignoredItems` with 34 bogus "bridge" candidates on real `fineract-charge` alone — Swagger annotation types (`Operation`, `Schema`, `Parameter`) get a Graphify node too, with `source_file: ""`. Fixed generically: a bridge candidate must resolve to a REAL scanned-root file via `run.resolveRoot()`, which also correctly excludes genuinely-external symbols (`PlatformSecurityContext`) without a name check. **Second real finding while building the synthetic proof fixture**: Java does not require (and Graphify does not emit) an `imports` edge for SAME-PACKAGE type usage — only `references` — so a same-package controller+interface shape (arguably more common than Fineract's cross-package one) would have been silently missed by an `imports`-only check; both relations are now accepted as bridge-discovery signals. **New checked-in fixture** `test/fixtures/r2-bridge-sample/` (`WidgetApiResource` → zero-evidence `WidgetReadService` interface → sole implementer `WidgetReadServiceImpl`, real `@Entity`) proves the mechanism produces a correct, low-confidence, correctly-graded relationship end-to-end, `calm validate` 0 errors/0 warnings — deliberately isolated from a SEPARATE, pre-existing, honestly-disclosed gap this fixture surfaced: Graphify normalizes a Java `import org.postgresql.Driver;` to the bare symbol `driver`, not the qualified package `org.postgresql`, so that catalogue row (`persistence-detection-catalogue.yml`) has never actually been exercised via Graphify for Java end-to-end — still `evidenceLevel: unverified`, unchanged, named here rather than silently worked around. **Real Fineract remeasure (§0.6), both single-root and multi-root**: `fineract-charge` alone — exactly 2 honest `unresolved-multi-hop` items (down from 34 pre-fix noise), 0 fabricated relationships, **S1 still fires** — confirming the design note's own prediction exactly: the real `ChargeReadPlatformService` bridge has 0 implementers in a single-root scan (the implementer lives in `fineract-provider`). `fineract-charge`+`fineract-provider` combined multi-root scan (2772 files, ~26s) — the bridge's implementer IS found this time (`ChargeReadPlatformServiceImpl`), but it has NO TypedUnit of its own (real, raw-JDBC/RowMapper class with no catalogue-recognized persistence import) — hop bound correctly reached, 0 relationships, 0 fabricated edges. **This is a genuine, honestly-reported residual, not a mechanism failure**: R2 Phase 1 does not close `fineract-charge`'s S1 gap either way, for real, evidenced reasons named in both runs — matches the design note's own explicit prediction that Phase 1 alone might not succeed here. 2 new regression tests (synthetic fixture positive case; real Fineract negative/honest-residual case). Claim Register: **R2** → `partial` (mechanism built, verified correct and non-fabricating on two real scans, but the flagship Fineract case remains an honest residual — not `proven`, not still `specified-unbuilt`). Full suite: 35/35 green. Integrity home: `analysis-pass` + new detector module — zero Fineract-specific code, zero name-suffix lists. |
+
+| C | T-C2 — Fineract L2 eval gate update | **done** — verified `validate-calm-pair.mjs`'s explicit L0/L1/L2 reporting (T-A3) still correctly reports `fineract-charge` L2: FAIL after R2 (T-C1) shipped, by actually regenerating real `fineract-charge` CALM (with R2 wired into the pipeline) and re-running the comparator, not assuming the T-A3 tooling still holds. Real result: `L2 story: FAIL — missing connects topology service->database (gold needs 1, generated has 0)` — unchanged from pre-R2, correctly, since R2's own real-Fineract remeasure (T-C1) found 0 relationships for this exact package (an honest residual, not a bug in either R2 or the eval tooling). No comparator code change needed — T-A3's L2 logic already handles a partial-but-not-closing R2 correctly. Per the task's explicit instruction, gold was NOT weakened to match a still-failing R2. Updated `coe-lab/docs/validation-approach-vnext.md`'s expected-fail table: `fineract-charge`'s FAIL is now annotated as R2-attempted-and-evidenced-residual (cites the exact real cause — `ChargeReadPlatformServiceImpl` has no catalogue-recognized persistence evidence) rather than "R2 unbuilt" — a meaningfully different, more precise claim for a future session to act on. `fineract-core` not yet remeasured against R2 (T-C1 only remeasured `fineract-charge` per its own acceptance criteria) — noted as open, not silently assumed identical. **Session C (R2 ship + eval gate) is now complete: T-C1, T-C2 both done.** |
 
 *AREC agent should overwrite only §D rows when finishing sessions; keep §A/§B unless platform code changes.*
 

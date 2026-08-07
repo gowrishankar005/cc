@@ -1,21 +1,21 @@
-# Architecture-as-Code platform (codescanner / Loom)
+# Weaver
 
-Deterministic pipeline that **extracts software architecture signals from source** (Java, Python, Node/TypeScript) and generates **FINOS CALM 1.2** JSON — for review, governance input, and evaluation against hand-authored gold.
+**Weaver** is a deterministic Architecture-as-Code platform: it **extracts software architecture signals from source** (Java, Python, Node/TypeScript) and **weaves** them into **FINOS CALM 1.2** JSON — for review, governance input, and evaluation against hand-authored gold.
 
-**Product target:** polyglot **enterprise / fintech-shaped monorepos** in general — not any single open-source app. Public repos and lab fixtures are **evidence samples** used to prove or disprove mechanism claims.
+**Product target:** polyglot **enterprise / fintech-shaped monorepos** — not any single open-source app. Public repos and lab fixtures are **evidence samples** used to prove or disprove mechanism claims.
 
 **No LLM in the core generation path.** Optional offline tooling may propose catalogue or review hints; they never write `typed-facts.json`.
 
 | | |
 |---|---|
+| **Product name** | **Weaver** |
 | **Primary code** | [`pipeline/`](./pipeline/) |
 | **Living status** | [`docs/solution/STATUS.md`](./docs/solution/STATUS.md) |
 | **What you may claim is “built”** | [`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md) |
 | **Eval benchmark (CoE lab)** | [`coe-lab/`](./coe-lab/) |
 | **Solution design** | [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](./docs/solution/Architecture_as_Code_Solution_Design_v2.md) |
 
-Working name used in design docs: **Loom** (weaving signals into one architecture fabric). Repo folder remains `codescanner`.
-
+Repo directory may still be named `codescanner` on disk; the platform name is **Weaver** (weaving disparate signals into one architecture fabric via catalogues).
 ---
 
 ## What this project is (and is not)
@@ -299,10 +299,10 @@ Framework/language “Todo” rows above map here — especially **R2 multi-hop*
 ## Repository layout
 
 ```text
-codescanner/
+<repo>/                     # e.g. codescanner/ — product name: Weaver
   README.md                 ← you are here
   CLAUDE.md                 ← agent/project working memory (long)
-  pipeline/                 ← Node/TS product code
+  pipeline/                 ← Node/TS product code (Weaver runtime)
     src/scanner/            ← engines & providers
     src/rules/              ← YAML catalogues + schemas
     src/analysis/           ← passes, detectors, IR, coverage
@@ -314,7 +314,7 @@ codescanner/
     solution/               ← design, STATUS, Claim Register, AREC, agent tasks
     requirements/           ← CALM generator requirements series
     spikes/                 ← research write-ups
-  spikes/                   ← disposable real-repo clones (boa, fineract, ghostfolio, …)
+  spikes/                   ← disposable evidence clones (not product targets)
   tmp/                      ← gitignored local outputs
 ```
 
