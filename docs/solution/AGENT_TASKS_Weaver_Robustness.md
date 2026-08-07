@@ -179,6 +179,8 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 **Phase R1 done when:** R2b ships with tests; Java driver-ref fixed or bounded; Claim R2 updated honestly.
 
+**Phase R1 complete** (2026-08-08): T-R1-1, T-R1-2, T-R1-3 all done. Real, substantial result beyond the phase's own bar — T-R1-3's follow-up evidence check closed the flagship Fineract residual (`ChargesApiResource → Charge`-family) this whole phase was scoped around, via a Phase 1 mechanism once the Java import-resolution root cause was fixed, not R2b alone.
+
 ---
 
 ### T-R1-1 — R2b design addendum
@@ -216,11 +218,12 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | Catalogue driver packages match Graphify’s real edge targets for Java (symbol vs qualified), generically. |
 | **Why** | R2 work found `org.postgresql`-style rows may never match Graphify targets — silent miss. |
 | **Backlog ID** | B-java-driver-ref |
-| **Integrity home** | rules (`graphify-import-target.ts` or sibling) + persistence schema expand |
-| **Implementation details** | Evidence-first: sample real Graphify edges for Java driver imports; implement expand/normalize (mirror Node `ref_*` discipline); regression with fixture or gated real sample. |
+| **Integrity home** | rules (new `java-import-resolver.ts`, sibling to `graphify-import-target.ts`) + `graphify-import-strategy-detector.ts` + persistence catalogue expand |
+| **Implementation details** | Real evidence FIRST, not assumed: re-confirmed against real Fineract (`fineract-security/.../SqlInjectionPreventerServiceImpl.java:26`) that Graphify's Java `imports` edges target the bare lowercased LAST SYMBOL (`utils`), never the qualified package — and that this target is often not even a real graph node (`nodeById.get('utils')` → `null`). Unlike Node's deterministic `ref_<name>` transform, there is NO string transform that recovers the package from that target — a Set-membership fix would be a false-positive generator (`Utils`/`Driver` are common class names across unrelated packages). **Actual fix**: read the real import line back from source at the edge's own `source_location` (same technique already proven for decorator/call arguments), match the qualified import against catalogue package names as prefix-or-exact. New `java-import-resolver.ts` (`resolveJavaImportPackage`, `javaImportMatchesPackage`), wired into `graphify-import-strategy-detector.ts`'s `findLibraryImportEdges` (shared by persistence/messaging/outbound-http detectors) with a per-run file-line cache. `org.postgresql` and `org.jooq` added as real, now-reachable `driver-import` catalogue rows (`evidenceLevel: verified`). **Real verification, not synthetic**: `fineract-security` (71 files) — `SqlInjectionPreventerServiceImpl.java` now a real `database` unit, evidence names the real resolved import `org.postgresql.core.Utils`. Real Waltz `waltz-data` (241 files) — 229 real `database` units via `org.jooq.*`, including the exact `GenericSelector.java` case the catalogue row was originally evidenced against; jOOQ strategy flipped `not-implemented` → `dispatched`. **Follow-up evidence check (B-charge-jdbc-driver), real and substantial**: added `org.springframework.jdbc.core` as a driver-import row and re-ran the real `fineract-charge`+`fineract-provider` multi-root scan — this **closes the flagship Fineract residual named since requirements v0.9**: `ChargeReadPlatformServiceImpl` (the real bridge implementer for `ChargesApiResource`'s read path) now becomes its own real `database` unit, and `ChargesApiResource → ChargeReadPlatformServiceImpl` is a real, `calm validate`-clean (0 errors), confidence-10 cross-root relationship — the exact case R2/R2b were scoped around, closed via a Phase 1 mechanism once the import-resolution root cause was fixed (R2b's extra hop wasn't even needed for this one). `architectureOutboundCoverage` for the combined run: 98.3% (up from 97.5%). 3 new regression tests (2 fast/gated on `fineract-security`+`waltz-data`, 1 slow/gated multi-root closure test with a real assertion on the exact flagship relationship). One pre-existing regression test's hardcoded R0 relationship count (85) had to move to 96 — a real, explained side effect (11 more real database units in `fineract-core` alone from the newly-reachable driver rows), not a rebaseline-to-force-green. |
 | **Acceptance** | At least one previously unreachable Java driver row becomes matchable in test; Claim/STATUS note. |
 | **Hard predecessors** | None (can parallel R2b). |
 

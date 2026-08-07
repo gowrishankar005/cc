@@ -25,11 +25,14 @@ const FINERACT_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/fineract/repo');
 const FINERACT_KAFKA_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/springbatch/messagehandler/kafka');
 const FINERACT_KAFKA_PRODUCER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/event/external/producer/kafka');
 const GHOSTFOLIO_ACCESS_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/app/access');
+const FINERACT_SECURITY_ROOT = path.resolve(FINERACT_ROOT, 'fineract-security');
+const FINERACT_PROVIDER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider');
+const WALTZ_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
 const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
 
-function runPipeline(roots, extraArgs = []) {
+function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
-  execFileSync('node', [RUN_SLICE, ...roots, '--out', outDir, ...extraArgs], { stdio: 'pipe' });
+  execFileSync('node', [...nodeArgs, RUN_SLICE, ...roots, '--out', outDir, ...extraArgs], { stdio: 'pipe' });
   const calm = JSON.parse(fs.readFileSync(path.join(outDir, 'architecture.calm.json'), 'utf8'));
   return { outDir, calm };
 }
@@ -236,6 +239,60 @@ test(
 
       const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0, 'control-url-mapping regression — calm-cli host-allowlist check failing again');
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'Robustness T-R1-3 follow-up (B-charge-jdbc-driver) — real multi-root closure of the flagship Fineract residual: ChargesApiResource -> ChargeReadPlatformServiceImpl now resolves, real cross-root confidence 10',
+  {
+    skip: !fs.existsSync(FINERACT_PROVIDER_ROOT) && 'spikes/fineract/repo/fineract-provider not present (scratch clone, see CLAUDE.md)',
+    timeout: 180_000, // real combined scan of 2733+37 Java files — genuinely slow, not a hang
+  },
+  () => {
+    // fineract-provider (2733 files) needs a raised heap ceiling — a real,
+    // separate, non-bug finding from the earlier pushAll crash-fix session
+    // (Node's default ~4GB limit, confirmed not a leak). Not needed for any
+    // other test in this suite; scoped to this one via nodeArgs.
+    const { outDir } = runPipeline(
+      [path.join(FINERACT_ROOT, 'fineract-charge'), FINERACT_PROVIDER_ROOT],
+      [],
+      ['--max-old-space-size=8192']
+    );
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const units = new Map(facts.units.map((u) => [u.id, u]));
+
+      // The real closure: ChargeReadPlatformServiceImpl now imports a
+      // catalogue-recognized driver (org.springframework.jdbc.core) directly,
+      // so it becomes its OWN real database unit (Phase 1 "implementer IS the
+      // store" case — R2b's extra hop isn't even needed for this one).
+      const implUnit = [...units.values()].find((u) => u.filePath.endsWith('ChargeReadPlatformServiceImpl.java'));
+      assert.ok(implUnit, 'ChargeReadPlatformServiceImpl.java must now be a real database unit');
+      assert.equal(implUnit.kind, 'database');
+      assert.ok(
+        implUnit.evidence.some((e) => e.signal === 'org.springframework.jdbc.core.JdbcTemplate' || e.signal.startsWith('org.springframework.jdbc.core')),
+        `expected evidence naming the real org.springframework.jdbc.core import, got: ${implUnit.evidence.map((e) => e.signal).join(', ')}`
+      );
+
+      // The flagship relationship itself — real, cross-root (fineract-charge
+      // -> fineract-provider), R2 Phase 1's cross-root confidence tier (10),
+      // not R2b's (R2b's extra hop wasn't needed once the implementer became
+      // a unit in its own right).
+      const flagshipRel = facts.relationships.find(
+        (r) => r.from.endsWith('ChargesApiResource.java') && r.to.includes('ChargeReadPlatformServiceImpl')
+      );
+      assert.ok(flagshipRel, 'expected ChargesApiResource -> ChargeReadPlatformServiceImpl relationship — the exact residual named since requirements v0.9');
+      assert.equal(flagshipRel.kind, 'calls');
+      assert.equal(flagshipRel.crossPackage, true, 'ChargesApiResource (fineract-charge) and ChargeReadPlatformServiceImpl (fineract-provider) are in different roots');
+      assert.equal(flagshipRel.confidence, 10, 'expected R2 Phase 1 cross-root confidence (10) — the implementer resolved as its own store unit, not via the R2b hop');
+      assert.equal(flagshipRel.grade, 'architecture');
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      assert.equal(warnings, 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -464,7 +521,13 @@ test(
 
       const r2Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-confidence') !== undefined);
       const r0Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-confidence') === undefined);
-      assert.equal(r0Graded.length, 85, `expected exactly 85 direct-reconciler relationships (pre-R2b baseline), got ${r0Graded.length}`);
+      // 85 pre-T-R1-3 -> 96 after: T-R1-3 added org.postgresql/org.jooq/
+      // org.springframework.jdbc.core as real driver-import rows (previously
+      // unreachable due to the Java symbol-vs-package Graphify gap), which
+      // surfaced 11 more real database units and their real entity-mesh
+      // edges in fineract-core alone — a real, expected count shift from a
+      // separate, later fix, not a rebaseline-to-force-green.
+      assert.equal(r0Graded.length, 96, `expected exactly 96 direct-reconciler relationships (post-T-R1-3 baseline), got ${r0Graded.length}`);
       for (const rel of r0Graded) {
         assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural', `expected structural grade on ${rel['unique-id']} (entity<->entity, no service endpoint)`);
       }
@@ -1432,6 +1495,69 @@ test('Protocol population — JDBC inferred from real evidence (org.postgresql),
   const calmWithoutEvidence = buildCalm(makeFacts('sqlalchemy'), false);
   assert.equal(calmWithoutEvidence.relationships[0].protocol, undefined, 'sqlalchemy has no CALM protocol enum equivalent (Python, not JDBC) — must stay null, not invented');
 });
+
+test(
+  'Robustness T-R1-3 — Java Graphify import target normalization: real Fineract org.postgresql import now correctly becomes a database unit (was silently unreachable before this fix)',
+  { skip: !fs.existsSync(FINERACT_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir, calm } = runPipeline([FINERACT_SECURITY_ROOT]);
+    try {
+      // Grep-verified: SqlInjectionPreventerServiceImpl.java:29 has
+      // `import org.postgresql.core.Utils;` — Graphify's own edge target for
+      // this is the bare symbol "utils" (confirmed real, not assumed), which
+      // never matched the org.postgresql catalogue row before T-R1-3.
+      const node = findNode(calm, 'SqlInjectionPreventerServiceImpl');
+      assert.ok(node, 'SqlInjectionPreventerServiceImpl.java must be a real CALM node now');
+      assert.equal(node['node-type'], 'database');
+
+      // CALM node metadata only carries file:line provenance, not the raw
+      // evidence signal — check typed-facts.json directly for the real
+      // resolved import text (same pattern the jOOQ test below uses).
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const unit = facts.units.find((u) => u.filePath.endsWith('SqlInjectionPreventerServiceImpl.java'));
+      assert.ok(unit, 'expected a typed-facts unit for SqlInjectionPreventerServiceImpl.java');
+      assert.ok(
+        unit.evidence.some((e) => e.signal === 'org.postgresql.core.Utils'),
+        `expected evidence.signal to name the REAL resolved import "org.postgresql.core.Utils", not a guess or the generic unknown-lib fallback; got: ${unit.evidence.map((e) => e.signal).join(', ')}`
+      );
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      assert.equal(warnings, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'Robustness T-R1-3 — jOOQ strategy dispatched (was not-implemented): real Waltz waltz-data produces 229 real database units, evidence names the real org.jooq.* import',
+  { skip: !fs.existsSync(WALTZ_DATA_ROOT) && 'spikes/waltz/repo/waltz-data not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir } = runPipeline([WALTZ_DATA_ROOT]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const dbUnits = facts.units.filter((u) => u.kind === 'database');
+      assert.equal(dbUnits.length, 229, `expected exactly 229 real database units from waltz-data, got ${dbUnits.length}`);
+
+      // The exact class this catalogue row was originally evidenced against
+      // (persistence-detection-catalogue.yml's jooq strategy comment,
+      // real import org.jooq.Record1 at a grep-verified line).
+      const genericSelector = dbUnits.find((u) => u.filePath.endsWith('GenericSelector.java'));
+      assert.ok(genericSelector, 'GenericSelector.java must be detected as a real database unit');
+      assert.ok(
+        genericSelector.evidence.some((e) => e.signal.startsWith('org.jooq.')),
+        `expected evidence.signal to name a real org.jooq.* import, got: ${genericSelector.evidence.map((e) => e.signal).join(', ')}`
+      );
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      assert.equal(warnings, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
 
 test('shares-secret relationship kind maps to connects with a distinct description, protocol stays null (T-X5-0, golden case)', () => {
   const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));

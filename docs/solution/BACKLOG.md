@@ -57,7 +57,7 @@
 | Persistence ontology decision (Prisma Service vs database) | `done` — decided, not code-fixed (Q13); see **B-ontology** for the deferred code fix |
 | Spring Data repository dispatch | `done` — T-E3 |
 | DynamoDB verified | `done` — T-E3 |
-| jOOQ | re-confirmed root cause (Graphify Java symbol-vs-package gap), not fixed — see **B-java-driver-ref** |
+| jOOQ | `done` (T-R1-3) — root cause fixed, 229 real database units verified against real Waltz `waltz-data` |
 | OpenAPI dual-unit merge (trap T8) + C-contract expand | `done` — T-E4, trap promoted |
 | HITL review trigger (offline, S1/S2 → review-queue.json) | `done` — T-E5 |
 | K8s substring residual | `done` — watched under harder conditions, confirmed clean, no fix needed (T-E6) |
@@ -71,7 +71,7 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 | ID | Item | Status | Why | Spec |
 |---|---|---|---|---|
 | **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `done` (T-R1-2) | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md); real evidence: 11 new relationships in `fineract-provider`, 3 more in `fineract-core` |
-| **B-charge-jdbc-driver** | Spring-JDBC driver-import catalogue row (`org.springframework.jdbc.core`) + Java symbol-vs-package fix, combined | `todo` | The ONE remaining concrete path to close Fineract-charge's own flagship residual — its bridge implementer (`ChargeReadPlatformServiceImpl`) is raw-JDBC and imports neither the entity nor a currently-recognized driver; confirmed R2b's hop correctly finds 0 candidates there, not a bug | Depends on **B-java-driver-ref**; named in `AREC_R2b_Implementer_Store_Hop.md` §1 |
+| **B-charge-jdbc-driver** | Spring-JDBC driver-import catalogue row (`org.springframework.jdbc.core`) + Java symbol-vs-package fix, combined | `done` (T-R1-3) | **Closes the flagship Fineract residual named since requirements v0.9.** Real, verified: `ChargeReadPlatformServiceImpl` now a real `database` unit; `ChargesApiResource → ChargeReadPlatformServiceImpl` real, `calm validate`-clean, confidence-10 cross-root relationship in a real `fineract-charge`+`fineract-provider` run | `persistence-detection-catalogue.yml`'s `org.springframework.jdbc.core` row |
 | **B-arch-cov** | Architecture coverage metric + gate (% services with architecture-grade outbound when store units exist) | `done` (T-R0-2) | S1 is binary; need ongoing quality signal, not only empty/non-empty | `coverage-report.ts`'s `architectureOutboundCoverage` |
 | **B-pilot-scorecard** | Pilot-ready scorecard (which claim cells must be proven/partial) | `done` (T-R0-1) | Enterprise readiness: no single success metric | `Pilot_Ready_Scorecard.md` |
 | **B-R2-eval** | Labeled multi-root L2 remeasure protocol | `done` (T-R0-3) | Q11; single-root ≠ multi-root claims | `coe-lab/docs/multi-root-l2-protocol.md` |
@@ -79,7 +79,7 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 | **B-catalogue-intake** | Catalogue intake rule (evidence + test + claim cell) for new rows | `todo` | Vocab growth without one-offs | Robustness Phase R2 |
 | **B-discovery-cadence** | Scheduled stratified sampling (not one-shot) | `todo` | Avoid overfitting last pain | Robustness Phase R3 |
 | **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `done` (T-R0-5) | Completeness UX under tool failure | S0 silence flag in `coverage-report.ts` |
-| **B-java-driver-ref** | Graphify Java import target normalize (symbol vs qualified package) | `todo` | Silent catalogue miss class | Robustness Phase R1 |
+| **B-java-driver-ref** | Graphify Java import target normalize (symbol vs qualified package) | `done` (T-R1-3) | Silent catalogue miss class | `java-import-resolver.ts`; real evidence: `org.postgresql` (Fineract), `org.jooq` (229 real Waltz units), `org.springframework.jdbc.core` (closes flagship residual, see **B-charge-jdbc-driver**) |
 | **B-trap-promote** | Trap-gold → automated eval/CI gates | `todo` | Docs-only traps don’t enforce honesty | Robustness Phase R3 |
 | **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `done` (T-E5) | Residual human path | Robustness Phase R4 / T-E5 — `hitl-review-trigger.js` |
 
@@ -106,11 +106,11 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | **B-msg-prod** | Messaging **producers** | `done` (Kafka field-type); SQS/SNS producer `todo` | **U-msg-producer**; T-E1 |
 | **B-ontology** | Persist ontology (ORM import ≠ always database) | `decided, not code-fixed` | **U-persist-import**; T-E2 (Q13) |
 | **B-spring-data** | Spring Data repository dispatch | `done` | T-E3 |
-| **B-jooq** | jOOQ strategy dispatch | `todo` — root cause re-confirmed (Graphify Java symbol-vs-package), not fixed | T-E3 |
+| **B-jooq** | jOOQ strategy dispatch | `done` (T-R1-3) | T-E3; real evidence: 229 database units, real Waltz `waltz-data` |
 | **B-dynamo-sqs** | Dynamo / SQS architecture units | `partial` — DynamoDB verified; SQS/SNS producer still open | T-E3 |
 | **B-openapi-dual** | OpenAPI dual-unit policy | `done` | T-E4 |
 | **B-c-contract** | OpenAPI securitySchemes expand | `done`, expanded | **C-contract** |
-| **B-java-driver-ref** | (see robustness) | `todo` | R2 notes |
+| **B-java-driver-ref** | (see robustness) | `done` (T-R1-3) | R2 notes |
 
 ### P3 — Eval, discovery, residual UX
 
@@ -140,10 +140,10 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | Dimension | Assessment |
 |---|---|
 | Honesty / anti-overclaim | Strong (S1, grades, non-fabricating R2, Claim Register) |
-| Hardest story (layered multi-module) | Good progress — **B-R2b** `done` (11 new real fineract-provider relationships, 3 more in fineract-core); Fineract-charge's own flagship case is a real, named residual → **B-charge-jdbc-driver** |
+| Hardest story (layered multi-module) | **Closed.** **B-R2b** + **B-charge-jdbc-driver** both `done` — Fineract-charge's own flagship `ChargesApiResource → Charge`-family residual (open since requirements v0.9) is real, `calm validate`-clean, in a real multi-root run. |
 | Discovery as a system | Weak → **B-discovery-cadence** |
 | Eval enforcement | Fair → **B-trap-promote** (metric itself, **B-arch-cov**, now `done`) |
-| Pilot readiness | Scorecard shipped (**B-pilot-scorecard** `done`) — readiness itself still gated on the last-mile Fineract-charge story, tracked as **B-charge-jdbc-driver** |
+| Pilot readiness | Scorecard shipped (**B-pilot-scorecard** `done`); the last-mile Fineract-charge story is now closed too (**B-charge-jdbc-driver** `done`) |
 
 See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 
@@ -160,3 +160,4 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 | 2026-08-07 | Backlog-hygiene pass: B-arch-cov and B-graphify-partial were shipped in R0 (T-R0-2/T-R0-5 per STATUS.md) but never flipped from `todo`; B-R2-eval was `done` in the Robustness track table but still `todo` in the duplicate P1 reference — both classes of staleness fixed, health note reworded to match |
 | 2026-08-07 | T-R1-1 (R2b design addendum) done — see `AREC_R2b_Implementer_Store_Hop.md`; B-R2b flipped `todo` → `doing`. Separately: real-repo scan sweep against Fineract found and fixed a real crash (`.push(...arr)` spread exceeding V8's argument limit on `fineract-provider`, 2733 files, 167k+ ignored items) — 13 call sites converted to a loop-based `pushAll()`, regression-locked (200k-element synthetic test, no real-repo dependency needed to catch a regression). Not a BACKLOG-tracked item (no open row existed for it — found and fixed same-session); see STATUS.md §E for full detail. |
 | 2026-08-07 | T-R1-2 (R2b implementation) done — `multi-hop-bridge-detector.ts` extended with the implementer-import hop; B-R2b flipped `doing` → `done`. Real multi-root remeasure: 11 new architecture relationships resolved in `fineract-provider`, 3 more in `fineract-core` (single-root) — Fineract-charge's own flagship case stays an honest, named residual (implementer imports 0 candidate stores, confirmed via real run). New backlog row **B-charge-jdbc-driver** names the one concrete remaining path to close it. Claim Register R2 row and STATUS.md §E updated same-session. 48/48 tests green. |
+| 2026-08-08 | T-R1-3 (Java Graphify import target normalization) done — new `java-import-resolver.ts` reads the real import line back from source (Graphify's Java `imports` edges only ever carry the bare symbol, never the qualified package). B-java-driver-ref, B-jooq flipped to `done`; real evidence: `org.postgresql` (Fineract `fineract-security`), `org.jooq` (229 real units, Waltz `waltz-data`). **Follow-up evidence check closes the flagship Fineract residual**: added `org.springframework.jdbc.core`, re-ran the real `fineract-charge`+`fineract-provider` multi-root scan — `ChargesApiResource → ChargeReadPlatformServiceImpl` is now a real, `calm validate`-clean, confidence-10 relationship. B-charge-jdbc-driver flipped `todo` → `done`. Phase R1 complete. 3 new regression tests (2 fast, 1 slow/gated); 1 pre-existing test's hardcoded count moved 85→96 with a real, explained reason. 51/51 tests green. |

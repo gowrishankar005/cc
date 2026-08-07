@@ -1,5 +1,7 @@
+import * as path from 'path';
 import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
 import { TypedUnit, Evidence } from '../../types/typed-facts';
+import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
 
 /**
  * Shared by persistence-detector.ts, messaging-detector.ts, and
@@ -14,6 +16,33 @@ import { TypedUnit, Evidence } from '../../types/typed-facts';
  */
 
 /**
+ * T-R1-3 — Java `imports`-relation edges target the bare, lowercased LAST
+ * SYMBOL (`utils`), never the qualified package (`org.postgresql`), so a
+ * plain `libraries.has(e.target)` check never matches a Java driver row
+ * (`java-import-resolver.ts` has the full real-evidence writeup). This
+ * resolves the edge's REAL qualified import by reading the source line at
+ * its own `source_location` — same read-back technique already proven for
+ * decorator/call arguments — and checks it against the catalogue's package
+ * names as a package-or-member match, not a literal target-id match.
+ *
+ * `fileLineCache` is caller-supplied and shared across the whole detection
+ * pass (not module-global — stays scoped to one run, no cross-test/cross-run
+ * leakage) so a file with many matching import lines is only read once.
+ */
+function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<string>, fileLineCache: Map<string, string[]>): string | undefined {
+  if (!edge.source_file.endsWith('.java')) return undefined;
+  const resolved = run.resolveRoot(edge.source_file);
+  if (!resolved) return undefined;
+  const absPath = path.join(resolved.root, resolved.relativeFilePath);
+  const qualified = resolveJavaImportPackage(absPath, edge.source_location, fileLineCache);
+  if (!qualified) return undefined;
+  for (const lib of libraries) {
+    if (javaImportMatchesPackage(qualified, lib)) return qualified;
+  }
+  return undefined;
+}
+
+/**
  * Step 1, shared, at the lowest common granularity (raw matching EDGES, not
  * deduped files) — the two real consumers genuinely need different shapes
  * on top of it: outbound-http-detector.ts emits one ignored-item PER EDGE
@@ -24,8 +53,12 @@ import { TypedUnit, Evidence } from '../../types/typed-facts';
  * consumer fold however its real semantics require, instead of forcing a
  * single dedup policy that would be wrong for one of them.
  */
-export function findLibraryImportEdges(run: GraphifyRun, libraries: Set<string>): GraphifyEdge[] {
-  return run.graph.edges.filter((e) => (e.relation === 'imports_from' || e.relation === 'imports') && libraries.has(e.target));
+export function findLibraryImportEdges(run: GraphifyRun, libraries: Set<string>, fileLineCache: Map<string, string[]> = new Map()): GraphifyEdge[] {
+  return run.graph.edges.filter((e) => {
+    if (e.relation !== 'imports_from' && e.relation !== 'imports') return false;
+    if (libraries.has(e.target)) return true;
+    return resolveJavaMatch(run, e, libraries, fileLineCache) !== undefined;
+  });
 }
 
 /** Convenience wrapper over findLibraryImportEdges for consumers that only need the unique set of matching files (not per-edge detail). */
@@ -69,7 +102,8 @@ export function detectUnitsByImportStrategy(
 ): Map<string, TypedUnit[]> {
   const { graph } = run;
   const unitsByRoot = new Map<string, TypedUnit[]>();
-  const files = findFilesImportingLibraries(run, libraries);
+  const fileLineCache = new Map<string, string[]>();
+  const files = [...new Set(findLibraryImportEdges(run, libraries, fileLineCache).map((e) => e.source_file))];
 
   for (const file of files) {
     const resolved = run.resolveRoot(file);
@@ -93,8 +127,14 @@ export function detectUnitsByImportStrategy(
 
       // Same fileNodeId-based lookup the original detectors used (not the
       // file-string-keyed match from findFilesImportingLibraries) — exact
-      // parity with the pre-consolidation algorithm.
-      const matchedLibrary = graph.edges.find((e) => e.source === fileNodeId && libraries.has(e.target))?.target;
+      // parity with the pre-consolidation algorithm. Falls back to the Java
+      // qualified-import resolution (T-R1-3) when no literal/ref_ target
+      // matched — surfaces the REAL package name as evidence.signal (e.g.
+      // "org.postgresql.core.Utils") instead of the generic unknown-lib text.
+      const fileEdges = graph.edges.filter((e) => e.source === fileNodeId);
+      const matchedLibrary =
+        fileEdges.find((e) => libraries.has(e.target))?.target ??
+        fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined);
 
       const unit: TypedUnit = {
         id: `${resolved.relativeFilePath}::${classNode.label}`,
