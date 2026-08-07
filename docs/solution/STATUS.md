@@ -17,7 +17,7 @@ Master list: `AGENT_TASKS_Master_Sequence_Claim_Honesty_and_AREC.md`
 |---|---|---|
 | **Wave 1** claim honesty / discovery | **done** (2026-08-07) | `Claim_Register.md`, `coe-lab/docs/validation-approach-vnext.md`, Fineract finding, probes |
 | **Wave 2** AREC design lock | **done** (2026-08-07) | `Architecture_Relation_Evidence_Completeness.md` |
-| **Wave 3** AREC strategy implementation | **backlog** | `AREC_Wave3_Implementation_Backlog.md` — no strategy code until prioritized |
+| **Wave 3** AREC strategy implementation | **ready to execute** | Spec: `AGENT_TASKS_AREC_Wave3_Implementation.md` (sessions A→E); summary: `AREC_Wave3_Implementation_Backlog.md`. Start at **Session A** (S + R0 + eval + L4). |
 
 **Do not mark relationship/control completeness as built** without Claim Register + AREC claim binding.  
 **Fineract L2 story** is **not** built (R2/C-call unbuilt).

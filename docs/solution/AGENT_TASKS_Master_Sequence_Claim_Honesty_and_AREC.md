@@ -1,7 +1,9 @@
 # Master sequence — Claim honesty + AREC pillar
 
-**Status:** Wave 1 + Wave 2 **executed** (2026-08-07). Wave 3 backlog written; strategy **code** waits on user priority.  
-**G0:** cleared by user “start/unblocked.”
+**Status:** Wave 1 + Wave 2 **executed** (2026-08-07).  
+**Wave 3 execution spec:** `AGENT_TASKS_AREC_Wave3_Implementation.md` (session A→E, task-level why/how/acceptance).  
+**Wave 3 backlog summary:** `AREC_Wave3_Implementation_Backlog.md`  
+**G0:** cleared.
 
 This merges:
 

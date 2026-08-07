@@ -1,8 +1,9 @@
 # AREC Wave 3 — ordered implementation backlog (W3-0)
 
-**Status:** backlog only — **do not implement until user prioritizes first cell**  
+**Status:** superseded for **execution detail** by `AGENT_TASKS_AREC_Wave3_Implementation.md` (keep this file as priority summary).  
 **Depends on:** Wave 2 lock (`Architecture_Relation_Evidence_Completeness.md`)  
-**Forbidden:** one-off `ChargesApi → Charge` patches
+**Forbidden:** one-off `ChargesApi → Charge` patches  
+**Start:** Session A in the agent task file.
 
 ---
 
