@@ -147,7 +147,7 @@ Baseline (pre-Wave-3): charge/core **L1 strong**, **L2 story fail** (0 service-t
 | **Inputs** | `Architecture_Relation_Evidence_Completeness.md` §5; `typed-facts.ts`; `coverage-report.ts` (already has relationshipsByKind/Source). |
 | **Integrity home** | `platform-artefact` + optional thin analysis helper (not calm-generator-only). |
 | **Implementation details** | 1) Define metrics on **TypedFacts** (or AnalysisContext → coverage-report): e.g. `serviceTouchingRelationshipCount`, `serviceUnitCount`, `databaseUnitCount`, `httpUnitsWithoutSecurityControlCount`. 2) **S1:** if serviceCount≥1 and databaseCount≥1 and serviceTouchingRelCount===0 → flag in coverage and/or ignored-items / completeness section (do not invent relationships). 3) **S2:** count service units with http-entry-point evidence and no security-control evidence (reuse same definition as threat-signals). 4) Surface in `coverage-report.json` and a short section of `intelligence-ir.md`. 5) Prefer generic field names, not `fineractIncomplete`. |
-| **Acceptance** | Fineract-charge remeasure shows S1 active (or equivalent metric = 0 service-touching). Regression: unit test or pipeline test on fixture that has service+db and no edge **or** real Fineract-charge when clone present. Claim Register **S-silence** → partial. |
+| **Acceptance** | Fineract-charge remeasure shows S1 active (or equivalent metric = 0 service-touching). Regression: unit test or pipeline test on fixture that has service+db and no edge **or** real Fineract-charge when clone present. Claim Register **S-silence** → partial. Document **S4** in coverage/IR or limitations: high unit confidence does not imply L2 story pass. |
 | **Out of scope** | Implementing R2; changing dual-unit reconciler; auto-adding edges. |
 | **Hard predecessors** | None (Session A start). |
 
@@ -177,8 +177,8 @@ Baseline (pre-Wave-3): charge/core **L1 strong**, **L2 story fail** (0 service-t
 | **Why** | Last session: validate-calm-pair “ALL PASS” on lab core was L1-style; Fineract hand gold L2 failed. Soft comparator + soft messaging caused false comfort. |
 | **Inputs** | `validation-approach-vnext.md`; `validate-calm-pair.mjs`; `scoreboard.mjs`; Fineract gold packages. |
 | **Integrity home** | `eval` (coe-lab scripts only). |
-| **Implementation details** | 1) Print explicit `L0 schema` / `L1 unit` / `L2 story` lines in validate-calm-pair (and scoreboard if cheap). 2) For packages `fineract-charge`, `fineract-core`: if L2 story fails, exit code policy documented (e.g. non-zero only with `--require-l2`, default report FAIL L2 without failing whole lab core). 3) **Never L2-compare** `fineract-system-map` to class-level generated CALM (incomparable grain) — print N/A. 4) Document in `calm-snapshot-validation.md` / validation-approach. |
-| **Acceptance** | Running validate on lab core still useful; Fineract story clearly FAIL L2 or N/A; system-map not false-fail on unit topology. |
+| **Implementation details** | 1) Print explicit `L0 schema` / `L1 unit` / `L2 story` lines in validate-calm-pair (and scoreboard if cheap). 2) For packages `fineract-charge`, `fineract-core`: if L2 story fails, exit code policy documented (e.g. non-zero only with `--require-l2`, default report FAIL L2 without failing whole lab core). 3) **Never L2-compare** `fineract-system-map` to class-level generated CALM (incomparable grain) — print N/A. 4) Document that **empty gold relationships** (e.g. lab java-jaxrs/spring with `relationships: []`) mean L2 is **not asserted** — unit L1 pass must not be reported as “architecture links verified.” 5) Document in `calm-snapshot-validation.md` / validation-approach. |
+| **Acceptance** | Running validate on lab core still useful; Fineract story clearly FAIL L2 or N/A; system-map not false-fail on unit topology; empty-gold-rel packages not over-claimed. |
 | **Out of scope** | Full rewrite of scorer; implementing R2 so L2 passes. |
 | **Hard predecessors** | None. |
 
@@ -208,7 +208,22 @@ Baseline (pre-Wave-3): charge/core **L1 strong**, **L2 story fail** (0 service-t
 | **Steps** | `cd pipeline && npm test` — all 30+ tests green. If clone missing, note skip and do not delete tests. |
 | **Acceptance** | Full suite pass (or documented skips only for missing spikes). |
 | **Integrity home** | regression |
-| **Out of scope** | New features. |
+| **Out of scope** | New features; full Ghostfolio apps/api unit-count CI lock (explicitly OOS — access-slice + behaviour tests suffice). |
+
+---
+
+### T-A6 — Claim wording: module vs multi-root scan mode (Q11)
+
+| Field | Content |
+|---|---|
+| **Goal** | Close parked Claim Register **Q11**: product claims must state whether they apply to **single package-root** scans, **multi-root** runs, or both. |
+| **Why** | Cross-package edge sets and Graphify scope change with multi-root; last session multi-root charge+core ≠ single-module charge. Silent claim mode caused overgeneralization. |
+| **Inputs** | `Claim_Register.md` Q11; `Open_Questions_Validation.md`; run-slice multi-root behaviour. |
+| **Integrity home** | docs (Claim Register) + optional one line in validate/scoreboard help text. |
+| **Implementation details** | 1) Write Q11 decision in Claim Register (recommended default: **module-root is the primary claim mode**; multi-root claims must be labeled and may include cross-package edges). 2) Mark Q11 **decided** in Open_Questions_Validation.md. 3) If eval scripts print package lists, note scan mode when multi-root. |
+| **Acceptance** | Q11 no longer “parked”; STATUS or Claim Register states primary claim mode. |
+| **Out of scope** | Changing Graphify combined-scan algorithm. |
+| **Hard predecessors** | None (Session A). |
 
 ---
 
@@ -316,14 +331,15 @@ Baseline (pre-Wave-3): charge/core **L1 strong**, **L2 story fail** (0 service-t
 
 ---
 
-### T-D2 — C-rich control payload (optional same session if cheap)
+### T-D2 — C-rich control payload (**required** for P2 — same session if cheap, else T-E0)
 
 | Field | Content |
 |---|---|
 | **Goal** | Include expression/authority snippet in control config when available. |
-| **Why** | Hand gold RBAC had richer config than gen (presence + line only). |
-| **Implementation details** | Extend control-builder config from decorator argument or call argument string when extractable; still placeholder requirement-url + `-u` mapping. |
-| **Acceptance** | At least one control requirement config includes non-empty expression or authority field. |
+| **Why** | Hand gold RBAC had richer config than gen (presence + line only). P2 critical list item — not optional forever. |
+| **Priority rule** | **Prefer ship in Session D** with T-D1. If time-boxed, agent **must** leave open **T-E0** (mandatory Session E first task) — do not close Wave 3 with C-rich untracked. |
+| **Implementation details** | Extend control-builder config from decorator argument or call argument string when extractable; still placeholder requirement-url + `-u` mapping. Apply to C-dec and C-call when both exist. |
+| **Acceptance** | At least one control requirement config includes non-empty expression or authority field; Claim Register **C-rich** → partial. |
 | **Out of scope** | Hosting real requirement schemas. |
 | **Hard predecessors** | T-D1 or existing C-dec path. |
 
@@ -341,12 +357,25 @@ Baseline (pre-Wave-3): charge/core **L1 strong**, **L2 story fail** (0 service-t
 
 ---
 
-# Session E — Ranked remainder
+# Session E — Ranked remainder (Tier 2 + P2/P3)
 
-**Goal of session:** Clear secondary cells without derailing R2/C-call.  
+**Goal of session:** Clear **Tier 2** / remaining P2–P3 without derailing A–D.  
 **Why:** Probes ranked producers, ontology, Dynamo, Spring Data, OpenAPI dual unit, HITL trigger.
 
-Do **not** start E as a substitute for A–D. Pick tasks by product priority.
+Do **not** start E as a substitute for A–D.  
+**Session E first task if C-rich deferred:** **T-E0** before T-E1.
+
+---
+
+### T-E0 — C-rich if deferred from Session D (mandatory when T-D2 skipped)
+
+| Field | Content |
+|---|---|
+| **Goal** | Same as T-D2 — close P2 C-rich if not done in D. |
+| **Why** | C-rich must not vanish as “optional forever.” |
+| **Acceptance** | Identical to T-D2. |
+| **Hard predecessors** | T-D1 or C-dec; only if T-D2 not completed. |
+| **Skip** | If T-D2 already accepted in Session D. |
 
 ---
 
@@ -417,29 +446,100 @@ Do **not** start E as a substitute for A–D. Pick tasks by product priority.
 
 | Task | Hard predecessors |
 |---|---|
-| T-A* | None |
+| T-A1…T-A6 | None (Session A) |
 | T-B1 | T-A2 preferred |
 | T-B2 | T-A1 recommended |
 | T-C1 | T-B2, T-A1 |
 | T-C2 | T-C1 |
 | T-D1 | T-A1 |
-| T-D2 | T-D1 or C-dec path |
+| T-D2 | T-D1 or C-dec path (**required** or T-E0) |
+| T-E0 | Only if T-D2 skipped |
 | T-E5 | T-A1 |
-| T-E* others | Session A done recommended |
+| T-E1…T-E4, T-E6 | Session A done recommended; prefer A–D done |
 
 ---
 
 # Definition of Wave 3 program done
 
-- [ ] S1/S2 visible on Fineract-class runs  
+- [ ] S1/S2 visible on Fineract-class runs (+ S4 honesty)  
 - [ ] R0 graded/labeled  
-- [ ] Eval distinguishes L0/L1/L2; system-map N/A  
+- [ ] Eval distinguishes L0/L1/L2; system-map N/A; empty gold rels not over-claimed  
 - [ ] scope-limitations match Claim Register  
+- [ ] Q11 claim mode decided (T-A6)  
 - [ ] R1 locked by regression  
 - [ ] R2 strategy shipped or residual documented with Claim R2 status honest  
 - [ ] C-call partial+ on real sample  
+- [ ] C-rich partial (T-D2 or T-E0)  
 - [ ] Regression shields still green  
 - [ ] No Fineract-only hardcode patches  
+- [ ] Session E items done or explicitly OOS with claim cells  
+
+---
+
+# Appendix — P0–P3 and Tier coverage (authoritative traceability)
+
+Agents: **do not close Wave 3** until each row is Done or explicit OOS in Claim Register.
+
+## Tiers → sessions
+
+| Tier | Intent | Session(s) | Tasks |
+|---|---|---|---|
+| **Tier 0** Honesty substrate | Silence, R0 grade, eval labels, L4, shields, claim mode | **A** | T-A1…T-A6 |
+| **Tier 1** Fineract-class product | R1, R2, C-call, threat narrative | **B, C, D** | T-B1, T-B2, T-C1, T-C2, T-D1, T-D3 (+ T-D2) |
+| **Tier 2** Ranked remainder | Producers, ontology, cloud, OpenAPI, HITL, k8s watch, deferred C-rich | **E** | T-E0…T-E6 |
+
+**A–D alone do not complete Tier 2.** Program complete only after E (or OOS decisions).
+
+## P0 → tasks
+
+| P0 item | Task IDs |
+|---|---|
+| Silence S1/S2 (+ S4 honesty) | T-A1 |
+| R0 structural vs architecture | T-A2 |
+| Eval L0/L1/L2; Fineract expected L2-fail; system-map N/A; empty gold rels | T-A3, T-C2 |
+| scope-limitations ↔ Claim Register | T-A4 |
+| Regression shields (ref_, service-wins, k8s service-only) | T-A5, §0.7 |
+| Module vs multi-root claim mode (Q11) | T-A6 |
+
+## P1 → tasks
+
+| P1 item | Task IDs |
+|---|---|
+| R1 one-hop lock | T-B1 |
+| R2 multi-hop design + ship | T-B2, T-C1 |
+| Fineract L2 remeasure / eval | T-C2 |
+| C-call call-site auth | T-D1 |
+| Threat narrative S3 | T-D3 |
+| Interesting-edge quality (not entity-mesh-only success) | T-B2 success criteria, T-C1 |
+
+## P2 → tasks
+
+| P2 item | Task IDs |
+|---|---|
+| C-rich control payload | **T-D2 required**, else **T-E0** |
+| Messaging producers | T-E1 |
+| Persist ontology (Prisma Service vs DB) | T-E2 |
+| Dynamo/SQS / Spring Data / jOOQ | T-E3 |
+| OpenAPI dual unit / C-contract | T-E4 |
+| K8s substring residual | T-E6 |
+
+## P3 → tasks
+
+| P3 item | Task IDs |
+|---|---|
+| HITL empty-neighborhood trigger | T-E5 (after T-A1) |
+| System-map grain policy | T-A3 |
+| Full Ghostfolio apps/api CI for unit counts | **Explicit OOS** (T-A5 out of scope) |
+| Q11 | T-A6 |
+
+## Traceability one-liner
+
+```text
+P0 → Session A (T-A1…T-A6)
+P1 → Sessions B–D (R1, R2, C-call)
+P2 → T-D2/T-E0 + Session E (T-E1…T-E4, T-E6)
+P3 → T-A3, T-E5 (+ OOS notes)
+```
 
 ---
 
@@ -448,3 +548,4 @@ Do **not** start E as a substitute for A–D. Pick tasks by product priority.
 | Date | Note |
 |---|---|
 | 2026-08-08 | Initial session A–E agent task list from revised plan + last-session learning capture review |
+| 2026-08-08 | Appendix P0–P3/Tier coverage; T-A6 Q11; C-rich required via T-D2 or T-E0; empty gold-rel eval note; S4 in T-A1 |
