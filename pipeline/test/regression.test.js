@@ -1836,6 +1836,33 @@ test(
   }
 );
 
+test(
+  'Robustness T-R4-1 — HITL review trigger: low-architecture-coverage fires on real Fineract fineract-security (17% coverage, S1 does NOT fire), mutually exclusive with S1',
+  { skip: !fs.existsSync(FINERACT_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+    const { outDir } = runPipeline([FINERACT_SECURITY_ROOT]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      // Real baseline: fineract-security has real service->database
+      // relationships (S1 does not fire) but only 17% architecture
+      // coverage (1/6 services) — exactly the sparse-but-nonzero case S1
+      // alone was designed to miss.
+      assert.equal(coverage.completeness.architectureOutboundCoverage < 0.5, true, 'expected real sub-50% coverage on this fixture — if this fails, the fixture or catalogue changed and the test needs re-baselining, not silently loosening');
+      const queue = buildReviewQueue(facts, coverage);
+      assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0, 'S1 must not fire — real relationships exist');
+      const lowCoverageItems = queue.items.filter((i) => i.trigger === 'low-architecture-coverage');
+      assert.ok(lowCoverageItems.length > 0, 'expected low-architecture-coverage items given real sub-threshold coverage');
+      for (const item of lowCoverageItems) {
+        assert.equal(item.unitKind, 'service');
+      }
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
 test('AREC T-E5 — HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
   const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
   const facts = {

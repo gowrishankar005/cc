@@ -24,6 +24,7 @@
 | **What’s built vs partial** | [`STATUS.md`](./STATUS.md) |
 | **What we may claim** | [`Claim_Register.md`](./Claim_Register.md) |
 | **Eval traps** | [`../../coe-lab/docs/trap-gold-backlog.md`](../../coe-lab/docs/trap-gold-backlog.md) |
+| **Architect residual review session (proposed)** | [`Architect_Residual_Review_Session.md`](./Architect_Residual_Review_Session.md) — **review before implementing** |
 | **Pilot-ready scorecard** | [`Pilot_Ready_Scorecard.md`](./Pilot_Ready_Scorecard.md) |
 | **Standing OOS registry** | [`OOS_Registry.md`](./OOS_Registry.md) |
 | **Multi-root L2 protocol** | [`../../coe-lab/docs/multi-root-l2-protocol.md`](../../coe-lab/docs/multi-root-l2-protocol.md) |
@@ -81,7 +82,7 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 | **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `done` (T-R0-5) | Completeness UX under tool failure | S0 silence flag in `coverage-report.ts` |
 | **B-java-driver-ref** | Graphify Java import target normalize (symbol vs qualified package) | `done` (T-R1-3) | Silent catalogue miss class | `java-import-resolver.ts`; real evidence: `org.postgresql` (Fineract), `org.jooq` (229 real Waltz units), `org.springframework.jdbc.core` (closes flagship residual, see **B-charge-jdbc-driver**) |
 | **B-trap-promote** | Trap-gold → automated eval/CI gates | `done` (T-R3-3) | Docs-only traps don’t enforce honesty | `coe-lab/docs/trap-gold-backlog.md`; 7/8 traps promoted |
-| **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `done` (T-E5) | Residual human path | Robustness Phase R4 / T-E5 — `hitl-review-trigger.js` |
+| **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `done` (T-E5 + T-R4-1) | Residual human path | Robustness Phase R4 — `hitl-review-trigger.js`. T-R4-1 closed a real gap: the task's own original goal named "S1 fires OR arch coverage below threshold," but only S1/S2 were ever wired in until T-R4-1 added a `low-architecture-coverage` trigger (real evidence: Fineract `fineract-security`, 17% coverage, S1 does not fire, 5 real services flagged) |
 
 ---
 
@@ -120,8 +121,9 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 |---|---|---|---|
 | **B-discovery-cadence** | (see robustness) | `done` (T-R3-1/T-R3-2/T-R3-4) | Phase R3 |
 | **B-trap-promote** | (see robustness) | `done` (T-R3-3) | Phase R3 |
-| **B-hitl-s1** | (see robustness) | `todo` | Phase R4 |
-| **B-k8s-fp** | Deployment correlation residual FPs | `done` — watched, confirmed clean, no fix needed | T-E6 |
+| **B-hitl-s1** | HITL empty-neighborhood queue (`hitl-review-trigger`) | `done` (T-E5 + T-R4-1) | Phase R4 — queue only, both original triggers (S1/S2 + low-architecture-coverage) now wired; not full residual UX, see **B-review-session** |
+| **B-review-session** | Architect-friendly residual session (session pack + VS Code LLM agent; Tier A human / Tier B evidenced LLM drafts → DR+Override only) | `proposed — **review before implementing**` | [`Architect_Residual_Review_Session.md`](./Architect_Residual_Review_Session.md). **Do not start Phase 1 pack tooling until this design is reviewed/accepted.** Productizes §7.1 residual UX without putting LLM on `run-slice`. |
+| **B-k8s-fp** | Deployment correlation residual FPs | `done` (T-E6, re-checked T-R4-2) — watched under harder conditions, confirmed clean both times, no fix needed | T-E6; T-R4-2 checked whether T-R1-3's 3 new Java driver-import rows introduced any new FP risk into the real BoA k8s-correlation evidence base — grep-confirmed zero of BoA's Java services import any of them, so no new units, no new risk |
 | **B-scope-hygiene** | scope-limitations ↔ Claim Register | `ongoing` | every wave |
 
 ### Later / platform
@@ -169,6 +171,7 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | **B-review-session** added (P3): architect residual review session design in `Architect_Residual_Review_Session.md` — status `proposed — review before implementing`. **B-hitl-s1** flipped to `done` (T-E5 already shipped queue CLI; full residual UX is B-review-session, not a second hitl-s1). Doc link added to “How to use” table. |
 | 2026-08-08 | Initial thin index after Wave 3 A–D |
 | 2026-08-08 | Robustness track folded in; link to AGENT_TASKS_Weaver_Robustness.md |
 | 2026-08-08 | Session E (T-E1–T-E6) marked done — was stale `todo` from before this session's work landed |
@@ -179,3 +182,4 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 | 2026-08-08 | T-R1-3 (Java Graphify import target normalization) done — new `java-import-resolver.ts` reads the real import line back from source (Graphify's Java `imports` edges only ever carry the bare symbol, never the qualified package). B-java-driver-ref, B-jooq flipped to `done`; real evidence: `org.postgresql` (Fineract `fineract-security`), `org.jooq` (229 real units, Waltz `waltz-data`). **Follow-up evidence check closes the flagship Fineract residual**: added `org.springframework.jdbc.core`, re-ran the real `fineract-charge`+`fineract-provider` multi-root scan — `ChargesApiResource → ChargeReadPlatformServiceImpl` is now a real, `calm validate`-clean, confidence-10 relationship. B-charge-jdbc-driver flipped `todo` → `done`. Phase R1 complete. 3 new regression tests (2 fast, 1 slow/gated); 1 pre-existing test's hardcoded count moved 85→96 with a real, explained reason. 51/51 tests green. |
 | 2026-08-08 | Phase R2 complete (T-R2-1, T-R2-2, T-R2-3). New `Catalogue_Intake.md` (B-catalogue-intake → done). Two new C-call rows: Waltz `hasRole` (security-rbac-003, real 4-call-site evidence) and Fineract `isAuthenticated` (security-auth-002, weighted lower on a real stated authn-vs-authz distinction) — B-C-call-expand → done. New `authorityRef` structured field (control-builder.ts) — B-C-rich-authority → done. 4 new/extended regression tests. 53/53 tests green. |
 | 2026-08-08 | T-R3-1/T-R3-2 (discovery refresh + re-rank) done — `coe-lab/docs/pattern-coverage-matrix.md`'s Wave R3-1 section: 18 samples probed (9 carried forward + Waltz data/web, Fineract security/provider, and 5 previously-unprobed lab fixtures — none had ever been added to this matrix despite being real evidence repos this whole session). Wave 1-B3's #1/#2/#6 ranked risks (R2 multi-hop, call-site auth, Spring Data/jOOQ) retired as closed; **B-ontology** and a new, split-out **B-msg-prod-sqs** promoted to P1 as the new #1/#2 ranked risks. `OOS_Registry.md` checked — nothing new warranted an OOS row, both promoted to active backlog instead; its stale "B-java-driver-ref not listed" note updated to reflect it's now done. |
+| 2026-08-08 | Phase R4 complete (T-R4-1, T-R4-2). T-R4-1 found and closed a real gap, not just doc-sync: the task's own original goal named two triggers ("S1 fires OR arch coverage below threshold"), but `hitl-review-trigger.ts` had only ever wired in S1/S2 (T-E5 shipped before T-R0-2's `architectureOutboundCoverage` metric existed). New `low-architecture-coverage` trigger added, mutually exclusive with S1, real-verified against Fineract `fineract-security` (17% coverage, 5 real services flagged). T-R4-2 legitimately skipped — checked (not assumed) whether T-R1-3's 3 new Java driver-import rows introduced new FP risk into the real BoA k8s evidence base; grep-confirmed zero BoA Java services import any of them. 1 new regression test. **Robustness program (R0-R4) now fully complete.** |

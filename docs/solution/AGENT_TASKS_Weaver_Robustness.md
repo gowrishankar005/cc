@@ -353,16 +353,20 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 **Goal:** Human path when automatic story incomplete; operator clarity.
 
+**Phase R4 complete** (2026-08-08): T-R4-1 done (both original triggers now wired in, not just S1); T-R4-2 legitimately skipped (checked, not assumed — see below).
+
 ---
 
 ### T-R4-1 — HITL path when S1 / low architecture coverage
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | Document + optional offline trigger: when S1 fires or arch coverage below threshold, point operator to overrides / IR — never auto-LLM into facts. |
 | **Why** | Robust product still needs residual human completion. |
 | **Backlog ID** | B-hitl-s1 |
 | **Integrity home** | docs + optional offline script |
+| **Implementation details** | T-E5 (Wave 3 Session E) had already shipped the S1/S2 half of this task's own two-part goal (`hitl-review-trigger.js`), but shipped *before* T-R0-2's `architectureOutboundCoverage` metric existed — the "OR arch coverage below threshold" half was a real, unclosed gap, not a doc-sync item, confirmed by reading the script: zero references to `architectureOutboundCoverage` anywhere in it. Closed here: new `low-architecture-coverage` trigger, threshold 50% (a real, reviewable starting value, same "draft not physics" framing as every other weight in this project), deliberately mutually exclusive with S1 (S1's own items already cover the degenerate 0%-coverage case more directly — this trigger is specifically for the SPARSE-but-nonzero case S1 was structurally unable to see). Reuses `coverage.completeness.architectureOutboundCoverage` and `facts.relationships` already computed — no new detection mechanism. **Real verification, not synthetic**: real Fineract `fineract-security` — 17% architecture coverage, S1 correctly does NOT fire (real relationships exist), 5 real service units correctly flagged by the new trigger. Still fully offline, deterministic, no LLM — same acceptance bar as T-E5. 1 new regression test. |
 | **Acceptance** | Documented path; if tool, offline only. |
 | **Hard predecessors** | T-R0-2. |
 
@@ -372,9 +376,11 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Legitimately skipped** (2026-08-08) — checked, not assumed. |
 | **Goal** | Tighten deployment correlation without name denylists. |
 | **Backlog ID** | B-k8s-fp |
 | **Skip** | If no new FPs. |
+| **Implementation details** | T-E6 already re-watched this under harder conditions (new `Transaction.java`/`TransactionRepository.java` database units, real substring-collision risk against `TransactionHistoryController`) and found 0 FPs. Since then, T-R1-3 added 3 new Java driver-import catalogue rows (`org.postgresql`, `org.jooq`, `org.springframework.jdbc.core`) — a real, concrete new-FP-risk vector worth actually checking rather than assuming T-E6's result still holds. Checked directly: `grep -rln "org.postgresql\|org.jooq\|org.springframework.jdbc.core" spikes/boa/repo/src --include="*.java"` returns zero matches — none of BoA's Java services (the real k8s-correlation evidence base) import any of the 3 new packages, so T-R1-3 introduced no new database units into that evidence base at all. Skip condition genuinely satisfied, not defaulted to. |
 | **Hard predecessors** | None. |
 
 ---
@@ -398,19 +404,21 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 # Definition of robustness program “MVP done”
 
-- [ ] Pilot scorecard published  
-- [ ] Architecture coverage metric shipping  
-- [ ] Multi-root L2 protocol written and used once  
-- [ ] OOS registry live  
-- [ ] R2b shipped or residual explicitly permanent-bounded  
-- [ ] Java driver-ref fixed or OOS with reason  
-- [ ] Catalogue intake rule live  
-- [ ] ≥1 C-call expansion **or** documented freeze with risk accepted  
-- [ ] Discovery pass #2 + cadence policy  
-- [ ] ≥2 traps automated  
-- [ ] HITL residual path documented  
-- [ ] BACKLOG/STATUS/Claim aligned  
-- [ ] Suite green  
+**All 13 items done as of 2026-08-08 — the robustness program (Phases R0–R4) is MVP complete.**
+
+- [x] Pilot scorecard published — T-R0-1, `Pilot_Ready_Scorecard.md`
+- [x] Architecture coverage metric shipping — T-R0-2, `coverage-report.ts`'s `architectureOutboundCoverage`
+- [x] Multi-root L2 protocol written and used once — T-R0-3, `coe-lab/docs/multi-root-l2-protocol.md`, used for real in T-R1-2/T-R1-3's `fineract-charge`+`fineract-provider` remeasures
+- [x] OOS registry live — T-R0-4, `OOS_Registry.md`
+- [x] R2b shipped or residual explicitly permanent-bounded — T-R1-2 shipped; the one genuinely permanent residual (command-bus dynamic dispatch) is named `OOS-command-bus`, not left ambiguous
+- [x] Java driver-ref fixed or OOS with reason — T-R1-3, fixed (not OOS) — **and its follow-up evidence check closed the flagship Fineract-charge residual itself**, beyond this checklist item's own bar
+- [x] Catalogue intake rule live — T-R2-1, `Catalogue_Intake.md`
+- [x] ≥1 C-call expansion **or** documented freeze with risk accepted — T-R2-2, 2 new vocabularies (exceeds the "≥1" bar)
+- [x] Discovery pass #2 + cadence policy — T-R3-1/T-R3-2 (pass #2) + T-R3-4 (cadence policy)
+- [x] ≥2 traps automated — T-R3-3, 7/8 (well past the "≥2" bar)
+- [x] HITL residual path documented — T-R4-1, both original triggers now wired (S1/S2 + low-architecture-coverage), still fully offline
+- [x] BACKLOG/STATUS/Claim aligned — updated at every phase close, this session
+- [x] Suite green — 55/55, confirmed after T-R4-1's new test
 
 ---
 

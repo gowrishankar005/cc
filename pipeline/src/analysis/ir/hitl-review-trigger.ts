@@ -24,15 +24,39 @@ import { CoverageReport } from '../coverage-report';
  * so a human reviewing a run doesn't have to re-derive that from
  * typed-facts.json by hand — exactly the "Fineract miss was exactly false
  * confidence without a flag" rationale review-flow-capability-map.md names.
+ *
+ * Robustness T-R4-1 added a THIRD trigger, `low-architecture-coverage`
+ * (see the threshold constant below for why): the original T-E5 scope only
+ * ever wired in S1/S2, but T-R4-1's own goal always named "S1 fires OR arch
+ * coverage below threshold" — the second half was a real, unclosed gap
+ * until this trigger was added, not a hypothetical extension.
  */
 
 export interface ReviewQueueItem {
-  trigger: 'S1-zero-service-touching-relationships' | 'S2-http-without-security-control';
+  trigger: 'S1-zero-service-touching-relationships' | 'S2-http-without-security-control' | 'low-architecture-coverage';
   unitId: string;
   unitKind: TypedUnit['kind'];
   confidence: number;
   rationale: string;
 }
+
+/**
+ * T-R4-1 (Robustness Phase R4) — the task's own original goal named TWO
+ * triggers ("when S1 fires OR arch coverage below threshold"), but only S1
+ * was ever wired in (T-E5 shipped before T-R0-2's architectureOutboundCoverage
+ * metric existed at all). Real gap, not just a doc-sync item: S1 only fires
+ * on ZERO service-touching relationships — a run with SOME but SPARSE
+ * architecture coverage (say 20%) never trips S1 at all, yet is exactly the
+ * "residual human completion" case this task exists for. Closed here by
+ * reusing coverage-report.ts's own already-computed rate, no new detection.
+ *
+ * 50% is a real, reviewable starting threshold (below half of a run's
+ * services having ANY real outbound architecture edge is a reasonable bar
+ * for "worth a human look"), same "draft, not physics, expected to be
+ * recalibrated" framing as every other weight/threshold in this project
+ * (Gap_Closure_Build_Ready_Specs_v0.1.md §7's own confidence-band framing).
+ */
+const LOW_ARCHITECTURE_COVERAGE_THRESHOLD = 0.5;
 
 export interface ReviewQueue {
   generatedAt: string;
@@ -60,6 +84,28 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
         unitKind: unit.kind,
         confidence: unit.confidence,
         rationale: `Run has service+database units but 0 relationships touch a service unit. Review whether "${unit.id}" should connect to another unit in this run (see AREC R2 for why an automatic edge wasn't produced).`,
+      });
+    }
+  }
+
+  // low-architecture-coverage — only when S1 did NOT already fire (S1's own
+  // items already cover the degenerate 0%-coverage case more directly;
+  // this trigger is specifically for the SPARSE-but-nonzero case S1 misses)
+  // and only when the rate is even defined (same precondition as S1/S0 —
+  // undefined means no store units exist, nothing to review).
+  const s1Fired = silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships'));
+  const rate = coverage.completeness.architectureOutboundCoverage;
+  if (!s1Fired && rate !== undefined && rate < LOW_ARCHITECTURE_COVERAGE_THRESHOLD) {
+    const architectureSourceIds = new Set(facts.relationships.filter((r) => r.grade === 'architecture').map((r) => r.from));
+    for (const unit of facts.units) {
+      if (unit.kind !== 'service') continue;
+      if (architectureSourceIds.has(unit.id)) continue; // this one already has real architecture-grade outbound coverage
+      items.push({
+        trigger: 'low-architecture-coverage',
+        unitId: unit.id,
+        unitKind: unit.kind,
+        confidence: unit.confidence,
+        rationale: `Run-wide architecture coverage is ${Math.round(rate * 100)}% (below the ${Math.round(LOW_ARCHITECTURE_COVERAGE_THRESHOLD * 100)}% review threshold) and "${unit.id}" has no real outbound architecture-grade relationship. Review whether it should connect to a store/service this run's mechanisms (R1/R2/R2b) didn't resolve.`,
       });
     }
   }
