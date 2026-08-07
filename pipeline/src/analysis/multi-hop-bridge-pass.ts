@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass } from './pass-registry';
+import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { detectMultiHopBridgeRelationships } from './cross_package/multi-hop-bridge-detector';
 
 /**
@@ -18,7 +18,7 @@ export const multiHopBridgePass: AnalysisPass = {
     if (relationships.length > 0) {
       console.log(`[run-slice] multi-hop bridge (R2): ${relationships.length} architecture relationship(s) resolved`);
     }
-    ctx.relationships.push(...relationships);
-    ctx.allIgnoredItems.push(...ignoredItems);
+    pushAll(ctx.relationships, relationships);
+    pushAll(ctx.allIgnoredItems, ignoredItems);
   },
 };

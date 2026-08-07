@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass, existingServiceFilePaths } from './pass-registry';
+import { AnalysisContext, AnalysisPass, existingServiceFilePaths, pushAll } from './pass-registry';
 import { composeRoutesForFile } from './route-composer-registry';
 import { mapSignalsToUnits } from './signal-mapper';
 import { runGraphifyPass } from '../scanner/graphify-provider';
@@ -28,7 +28,8 @@ export const composeRoutesPass: AnalysisPass = {
       const result: typeof raw.decoratorFacts = [];
       for (const [, fileFacts] of byFile) {
         const { composed, consumed } = composeRoutesForFile(fileFacts);
-        result.push(...fileFacts.filter((f) => !consumed.has(f)), ...composed);
+        pushAll(result, fileFacts.filter((f) => !consumed.has(f)));
+        pushAll(result, composed);
       }
       raw.decoratorFacts = result;
     }
@@ -48,7 +49,7 @@ export const mapSignalsPass: AnalysisPass = {
           ctx.allUnits.push(u);
         }
       }
-      ctx.allIgnoredItems.push(...ignoredItems);
+      pushAll(ctx.allIgnoredItems, ignoredItems);
       ctx.unitsByRoot.set(root, units);
       console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${units.length} unit(s)`);
     }
@@ -65,8 +66,11 @@ export const detectPersistencePass: AnalysisPass = {
       const persistenceUnitsByRoot = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx));
       for (const [root, persistenceUnits] of persistenceUnitsByRoot) {
         console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via graphify`);
-        ctx.allUnits.push(...persistenceUnits);
-        ctx.unitsByRoot.set(root, [...(ctx.unitsByRoot.get(root) ?? []), ...persistenceUnits]);
+        pushAll(ctx.allUnits, persistenceUnits);
+        const rootUnits: typeof persistenceUnits = [];
+        pushAll(rootUnits, ctx.unitsByRoot.get(root) ?? []);
+        pushAll(rootUnits, persistenceUnits);
+        ctx.unitsByRoot.set(root, rootUnits);
       }
     } catch (err) {
       ctx.graphifyError = err;

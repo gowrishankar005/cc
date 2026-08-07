@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass } from './pass-registry';
+import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { CONFIDENCE_FLOOR } from './passes';
 import { discoverOpenApiDocuments, OpenApiSecurityScheme } from '../scanner/openapi-provider';
 import { ignoreLowConfidence } from './ignored-items';
@@ -108,7 +108,7 @@ export const openApiPass: AnalysisPass = {
           // Real overlap with exactly one code-derived unit — attach this
           // document's evidence there instead of spawning a competing
           // service node for the same real service (trap card T8 fix).
-          overlappingUnits[0].evidence.push(...evidence);
+          pushAll(overlappingUnits[0].evidence, evidence);
           overlappingUnits[0].confidence = scoreConfidence(overlappingUnits[0].evidence);
           continue;
         }

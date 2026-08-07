@@ -1,5 +1,6 @@
 import { DecoratorFact } from '../scanner/structural-engine';
 import { composeJaxRsRoutes } from './jaxrs-route-composer';
+import { pushAll } from './pass-registry';
 
 /**
  * Wave M T-M8 (Modularity_and_Integration_Assessment.md friction F4):
@@ -47,7 +48,7 @@ export function composeRoutesForFile(fileDecoratorFacts: DecoratorFact[]): { com
   for (const composer of ROUTE_COMPOSERS) {
     if (!composer.languages.includes(language)) continue;
     const result = composer.compose(fileDecoratorFacts);
-    composed.push(...result.composed);
+    pushAll(composed, result.composed);
     for (const f of result.consumed) consumed.add(f);
   }
   return { composed, consumed };

@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass } from './pass-registry';
+import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { discoverDeployments, discoverConfigMapKeys } from '../scanner/k8s-manifest-provider';
 import { detectEnvSoftGraphRelationships } from './cross_package/env-soft-graph-detector';
 import { loadEnvRelationshipAllowlist } from '../rules/env-relationship-schema';
@@ -21,8 +21,8 @@ export const envSoftGraphPass: AnalysisPass = {
     const allowlist = loadEnvRelationshipAllowlist(path.join(__dirname, '..', 'rules'));
 
     const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, ctx.allUnits, allowlist);
-    ctx.relationships.push(...relationships);
-    ctx.allIgnoredItems.push(...ignoredItems);
+    pushAll(ctx.relationships, relationships);
+    pushAll(ctx.allIgnoredItems, ignoredItems);
 
     console.log(`[env-soft-graph] ${relationships.length} low-confidence relationship(s), ${ignoredItems.length} unresolved (opt-in, --enable-env-soft-graph)`);
   },

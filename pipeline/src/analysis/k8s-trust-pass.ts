@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass } from './pass-registry';
+import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { discoverDeployments } from '../scanner/k8s-manifest-provider';
 import { detectK8sTrustRelationships } from './cross_package/k8s-trust-detector';
 
@@ -19,8 +19,8 @@ export const k8sTrustPass: AnalysisPass = {
     const deployments = discoverDeployments(ctx.k8sManifestsDir);
     const { relationships, ignoredItems } = detectK8sTrustRelationships(deployments, ctx.allUnits);
 
-    ctx.relationships.push(...relationships);
-    ctx.allIgnoredItems.push(...ignoredItems);
+    pushAll(ctx.relationships, relationships);
+    pushAll(ctx.allIgnoredItems, ignoredItems);
 
     console.log(`[k8s-trust] ${deployments.length} deployment(s) read, ${relationships.length} trust relationship(s), ${ignoredItems.length} unresolved`);
   },

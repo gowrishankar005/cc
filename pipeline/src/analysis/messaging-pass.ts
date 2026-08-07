@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass, existingUnitFilePaths } from './pass-registry';
+import { AnalysisContext, AnalysisPass, existingUnitFilePaths, pushAll } from './pass-registry';
 import { detectMessagingUnits } from './cross_package/messaging-detector';
 
 /**
@@ -25,7 +25,7 @@ export const detectMessagingPass: AnalysisPass = {
     for (const [root, messagingUnits] of messagingUnitsByRoot) {
       if (messagingUnits.length === 0) continue;
       console.log(`[run-slice] ${root}: ${messagingUnits.length} messaging unit(s) detected via graphify (import-only, low confidence)`);
-      ctx.allUnits.push(...messagingUnits);
+      pushAll(ctx.allUnits, messagingUnits);
       ctx.unitsByRoot.set(root, [...(ctx.unitsByRoot.get(root) ?? []), ...messagingUnits]);
     }
   },

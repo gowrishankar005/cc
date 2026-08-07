@@ -512,6 +512,20 @@ test('Robustness T-R0-2 — architecture coverage: N/A (undefined), not a fake 0
   }
 });
 
+test('Robustness — pushAll never throws RangeError on arrays large enough to exceed V8 call-argument limits (real crash found scanning fineract-provider, 2733 files, 167k+ ignored items)', () => {
+  const { pushAll } = require(path.join(PIPELINE_ROOT, 'dist/analysis/pass-registry'));
+  // 200k comfortably exceeds V8's spread/apply argument ceiling (the exact
+  // shape that crashed `ctx.allIgnoredItems.push(...ignoredItems)` for real
+  // against fineract-provider) — `target.push(...items)` throws
+  // RangeError: Maximum call stack size exceeded at this size; pushAll must not.
+  const large = new Array(200000).fill(0).map((_, i) => i);
+  const target = [];
+  assert.doesNotThrow(() => pushAll(target, large));
+  assert.equal(target.length, 200000);
+  assert.equal(target[0], 0);
+  assert.equal(target[199999], 199999);
+});
+
 test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging double-detector collision fix: lab ts-orders-dynamo fixture, no duplicate unique-ids, calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-orders-dynamo');
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });

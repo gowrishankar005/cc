@@ -100,3 +100,19 @@ export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
 export function existingUnitFilePaths(ctx: AnalysisContext): Set<string> {
   return new Set(ctx.allUnits.map((u) => u.filePath));
 }
+
+/**
+ * Real crash found running the pipeline against `fineract-provider` (2733
+ * real Java files, single root, no multi-root involved): `target.push(...items)`
+ * throws `RangeError: Maximum call stack size exceeded` once `items` is large
+ * enough to exceed V8's call-argument limit — `fineract-core` (823 files)
+ * already produced 25,283 ignored-items, well within range of tripping this
+ * at `fineract-provider`'s scale. Every pass in this directory pushes a
+ * per-root/per-file result array onto a run-wide accumulator (ignoredItems,
+ * units, relationships) — the same latent crash risk existed at all 13 call
+ * sites, just not yet triggered by a small enough array. Loop-based, not
+ * spread-based, has no such limit.
+ */
+export function pushAll<T>(target: T[], items: T[]): void {
+  for (const item of items) target.push(item);
+}

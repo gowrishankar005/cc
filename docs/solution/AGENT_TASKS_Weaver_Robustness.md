@@ -185,11 +185,12 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-07) — see [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md). |
 | **Goal** | Extend AREC_R2 strategy: after sole implementer found, if implementer is not DB/topic unit, allow **one** hop to DB/topic units the implementer **imports/references** (exactly-one rule or bounded multi with low confidence). |
 | **Why** | Multi-root still residual when impl is JDBC/service-layer without being the entity. |
 | **Backlog ID** | B-R2b (design half) |
 | **Integrity home** | docs |
-| **Implementation details** | Addendum section on AREC_R2_MultiHop_Strategy.md or new `AREC_R2b_Implementer_Store_Hop.md`. Rules: no hardcodes; hop bound; ambiguous → unresolved-multi-hop; confidence ≤ R2 Phase 1; grade architecture; command-bus still OOS. |
+| **Implementation details** | Delivered as new file `AREC_R2b_Implementer_Store_Hop.md` (not an addendum section — kept the Phase 1 doc's regression-locked claims untouched). Rules: no hardcodes; hop bound (2 bridge hops, unchanged from Phase 1); ambiguous → unresolved-multi-hop; new confidence tiers 8 (same-root)/5 (cross-root), below both Phase 1 tiers; grade architecture; command-bus still OOS. **Real re-verified evidence attached, not just the original spike's recollection**: `fineract-provider` (2733 files) confirmed present locally for a real multi-root remeasure; `ChargeReadPlatformServiceImpl`'s own imports re-checked directly — it imports no entity/repository at all (raw JDBC), so R2b's hop has nothing to chase to on the *read* path; the *write*-path implementer (`ChargeWritePlatformServiceJpaRepositoryImpl`) does import the entity+repository directly (the exact R2b shape) but is unreachable from `ChargesApiResource` via any static edge (command-bus dispatch, already-named non-goal). **Documented prediction, to be confirmed not assumed at T-R1-2 Step 4**: R2b's mechanism is real and generalizes, but will most likely NOT close Fineract's own flagship residual — closing that specific case needs a separate Spring-JDBC driver-import catalogue row combined with T-R1-3's fix, out of R2b's own scope. |
 | **Acceptance** | Design approved shape written before code. |
 | **Hard predecessors** | T-R0-1 recommended. |
 
@@ -203,10 +204,10 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 | **Why** | Current r2-bridge-sample uses entity-as-implementer (artificial). Need realistic isolation test. |
 | **Backlog ID** | B-R2b |
 | **Integrity home** | analysis-pass (`multi-hop-bridge-detector` or sibling) |
-| **Implementation details** | Extend detector; new fixture under `test/fixtures/r2b-…`; regression for positive path + still non-fabricating when ambiguous; keep Phase 1 residual tests. Remeasure multi-root sample **if** available — report, don’t force green. |
-| **Acceptance** | New fixture green; suite green; Claim R2 notes R2b partial/proven-for-shape. |
+| **Implementation details** | Full 6-step execution plan (each with its own verify step) already written in [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md) §5 — follow it directly rather than re-deriving: (1) design lock, done; (2) extend `multi-hop-bridge-detector.ts` only, no changes to pass-registry/coverage-report/CALM builders; (3) new fixture `test/fixtures/r2b-implementer-hop-sample/` (positive + ambiguity cases), keep existing `r2-bridge-sample` Phase 1 tests untouched; (4) real single-root regression re-run (must stay the same honest residual) **then** a real multi-root `fineract-charge`+`fineract-provider` remeasure, report the actual result against the documented prediction, don't force green; (5) docs sync (Claim Register/BACKLOG/STATUS/scope-limitations, including a new narrower backlog row if Fineract's case stays open for a named reason); (6) T-R1-3 noted as parallel, not blocking. |
+| **Acceptance** | New fixture green; suite green; Claim R2 notes R2b partial/proven-for-shape; multi-root remeasure result reported honestly whichever way it lands. |
 | **Out of scope** | Command-bus resolution. |
-| **Hard predecessors** | T-R1-1. |
+| **Hard predecessors** | T-R1-1 (done). |
 
 ---
 

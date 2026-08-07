@@ -70,14 +70,14 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 
 | ID | Item | Status | Why | Spec |
 |---|---|---|---|---|
-| **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `todo` | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | Robustness Phase R1; AREC_R2 strategy |
-| **B-arch-cov** | Architecture coverage metric + gate (% services with architecture-grade outbound when store units exist) | `todo` | S1 is binary; need ongoing quality signal, not only empty/non-empty | Robustness Phase R0 |
+| **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `doing` — design done (T-R1-1), code not started | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md) |
+| **B-arch-cov** | Architecture coverage metric + gate (% services with architecture-grade outbound when store units exist) | `done` (T-R0-2) | S1 is binary; need ongoing quality signal, not only empty/non-empty | `coverage-report.ts`'s `architectureOutboundCoverage` |
 | **B-pilot-scorecard** | Pilot-ready scorecard (which claim cells must be proven/partial) | `done` (T-R0-1) | Enterprise readiness: no single success metric | `Pilot_Ready_Scorecard.md` |
 | **B-R2-eval** | Labeled multi-root L2 remeasure protocol | `done` (T-R0-3) | Q11; single-root ≠ multi-root claims | `coe-lab/docs/multi-root-l2-protocol.md` |
 | **B-oos-registry** | Standing OOS registry (command-bus, Helm, …) | `done` (T-R0-4) | Permanent non-goals must not vanish | `OOS_Registry.md` |
 | **B-catalogue-intake** | Catalogue intake rule (evidence + test + claim cell) for new rows | `todo` | Vocab growth without one-offs | Robustness Phase R2 |
 | **B-discovery-cadence** | Scheduled stratified sampling (not one-shot) | `todo` | Avoid overfitting last pain | Robustness Phase R3 |
-| **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `todo` | Completeness UX under tool failure | Robustness Phase R0 / R4 |
+| **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `done` (T-R0-5) | Completeness UX under tool failure | S0 silence flag in `coverage-report.ts` |
 | **B-java-driver-ref** | Graphify Java import target normalize (symbol vs qualified package) | `todo` | Silent catalogue miss class | Robustness Phase R1 |
 | **B-trap-promote** | Trap-gold → automated eval/CI gates | `todo` | Docs-only traps don’t enforce honesty | Robustness Phase R3 |
 | **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `done` (T-E5) | Residual human path | Robustness Phase R4 / T-E5 — `hitl-review-trigger.js` |
@@ -93,7 +93,7 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | ID | Item | Status | Spec / claim |
 |---|---|---|---|
 | **B-R2b** | (see robustness) | `todo` | Claim **R2** |
-| **B-R2-eval** | (see robustness) | `todo` | Q11 |
+| **B-R2-eval** | (see robustness) | `done` (T-R0-3) | Q11 |
 | **B-C-call-expand** | Expand call-site control vocabularies | `todo` | Claim **C-call** |
 | **B-C-rich-authority** | Richer control config (structured authority) | `todo` | Claim **C-rich** |
 | **B-S3** | Threat narrative honesty | `done` | T-D3 |
@@ -139,10 +139,10 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | Dimension | Assessment |
 |---|---|
 | Honesty / anti-overclaim | Strong (S1, grades, non-fabricating R2, Claim Register) |
-| Hardest story (layered multi-module) | Fair — mechanism yes, product close needs **B-R2b** + **B-R2-eval** |
+| Hardest story (layered multi-module) | Fair — mechanism yes, product close needs **B-R2b** (remeasure protocol itself now shipped, **B-R2-eval** `done`) |
 | Discovery as a system | Weak → **B-discovery-cadence** |
-| Eval enforcement | Fair → **B-trap-promote** + **B-arch-cov** |
-| Pilot readiness | Needs **B-pilot-scorecard** |
+| Eval enforcement | Fair → **B-trap-promote** (metric itself, **B-arch-cov**, now `done`) |
+| Pilot readiness | Scorecard shipped (**B-pilot-scorecard** `done`) — readiness itself still gated on **B-R2b** |
 
 See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 
@@ -156,3 +156,5 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 | 2026-08-08 | Robustness track folded in; link to AGENT_TASKS_Weaver_Robustness.md |
 | 2026-08-08 | Session E (T-E1–T-E6) marked done — was stale `todo` from before this session's work landed |
 | 2026-08-08 | Robustness Phase R0 (T-R0-1…T-R0-5) done: B-pilot-scorecard, B-R2-eval, B-oos-registry flipped; new Pilot_Ready_Scorecard.md / multi-root-l2-protocol.md / OOS_Registry.md linked above |
+| 2026-08-07 | Backlog-hygiene pass: B-arch-cov and B-graphify-partial were shipped in R0 (T-R0-2/T-R0-5 per STATUS.md) but never flipped from `todo`; B-R2-eval was `done` in the Robustness track table but still `todo` in the duplicate P1 reference — both classes of staleness fixed, health note reworded to match |
+| 2026-08-07 | T-R1-1 (R2b design addendum) done — see `AREC_R2b_Implementer_Store_Hop.md`; B-R2b flipped `todo` → `doing`. Separately: real-repo scan sweep against Fineract found and fixed a real crash (`.push(...arr)` spread exceeding V8's argument limit on `fineract-provider`, 2733 files, 167k+ ignored items) — 13 call sites converted to a loop-based `pushAll()`, regression-locked (200k-element synthetic test, no real-repo dependency needed to catch a regression). Not a BACKLOG-tracked item (no open row existed for it — found and fixed same-session); see STATUS.md §E for full detail. |
