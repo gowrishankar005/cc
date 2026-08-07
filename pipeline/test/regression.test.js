@@ -902,6 +902,28 @@ test(
   }
 );
 
+test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP/persistence/messaging/control evidence) must NOT become CALM nodes: lab lib-fintech-common produces ZERO nodes, calm validate 0 errors', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/lib-fintech-common');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+    // StringUtils.java / Money.java: plain business-logic classes, no HTTP
+    // route, no @Entity, no decorator, no call-site control — zero
+    // catalogue evidence of ANY kind, so zero units, so zero CALM nodes.
+    // The trap: a naive "every class is a node" heuristic would wrongly
+    // surface these as services.
+    assert.equal(calm.nodes.length, 0, `expected ZERO CALM nodes from pure-helper classes, got ${calm.nodes.length}: ${calm.nodes.map((n) => n['unique-id']).join(', ')}`);
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test(
   'Node/TS real evidence (ghostfolio/ghostfolio, NestJS+Prisma) — Graphify ref_ target normalization + Controller/database precedence (generic fixes, real bugs found by testing against a real repo)',
   { skip: !fs.existsSync(GHOSTFOLIO_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },

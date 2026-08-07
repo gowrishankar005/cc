@@ -19,7 +19,7 @@
 | **OOS-full-frontend-analysis** | Deep static analysis of frontend framework code (React/Angular/Vue component trees, client-side routing) beyond basic file/import detection | Not evidenced as a near-term enterprise-pilot need; backend/service architecture is the primary target | A pilot repo where the frontend IS the primary architectural surface to document |
 | **OOS-lang-expansion** | Languages beyond Java/Python/Node-TypeScript (Go, .NET/C#, Ruby, etc.) | No real evidence repo or pilot need yet exercised; each language needs its own decorator/call/extends extraction verification, not assumed to transfer | A pilot repo whose dominant language is outside the current three |
 
-**Deliberately NOT listed here:** the Java Graphify import-target gap (jOOQ, `org.postgresql`, and every driver-import row) is real and confirmed twice over, but it is **active tracked backlog** (`B-java-driver-ref`, Robustness Phase R1 — see `BACKLOG.md`), not a non-goal — it fails this registry's own bar (§ "Rule," above): it already has an owner and a phase, so filing it here would misrepresent scheduled work as abandoned/permanent.
+**Deliberately NOT listed here:** the Java Graphify import-target gap (jOOQ, `org.postgresql`, and every driver-import row) was tracked as active backlog (`B-java-driver-ref`) rather than filed here, since it had an owner and a phase — **now `done` (T-R1-3)**, confirming that call was correct: it was scheduled work, not a permanent non-goal, and shipping it proves the distinction this registry's own bar exists to protect.
 
 ---
 
@@ -28,3 +28,4 @@
 | Date | Note |
 |---|---|
 | 2026-08-08 | T-R0-4 — initial registry, seeded from real, already-named non-goals across AREC/robustness docs |
+| 2026-08-08 | T-R3-2 (Robustness Phase R3 re-rank) — checked whether the discovery refresh (`pattern-coverage-matrix.md` Wave R3-1) surfaced anything warranting a new OOS row; it did not — the refresh's findings (import-graph ontology, SQS/SNS messaging producer) are real, scoped, actionable gaps with a clear path forward, not permanent non-goals, so both were promoted to active P1 backlog (`B-ontology`, `B-msg-prod-sqs`) instead of filed here. `B-java-driver-ref`'s "deliberately not listed" note above updated to reflect it's now `done`. |

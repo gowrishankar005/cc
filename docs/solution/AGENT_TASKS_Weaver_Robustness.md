@@ -288,16 +288,20 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 **Goal:** Standing discovery, not one matrix forever.  
 **Why:** Robustness requires continuous disconfirmation.
 
+**Phase R3 complete** (2026-08-08): T-R3-1 through T-R3-4 all done.
+
 ---
 
 ### T-R3-1 — Stratified sample pass #2
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | Refresh `pattern-coverage-matrix.md` with 5–15 packages (existing clones + FINOS landscape candidates if justified). Static probes first. |
 | **Why** | Wave 1-B3 was a single pass; attention clustered on last hard sample. |
 | **Backlog ID** | B-discovery-cadence |
 | **Integrity home** | docs (coe-lab) |
+| **Implementation details** | New "Wave R3-1" section appended to `coe-lab/docs/pattern-coverage-matrix.md` (Wave 1-B3's own section kept, not overwritten). 18 samples probed (static grep, no full pipeline run): 9 carried forward + Waltz `waltz-data`/`waltz-web` + Fineract `fineract-security`/`fineract-provider` + 5 previously-unprobed `coe-lab` lab fixtures. Real finding, not just a data refresh: Waltz and two Fineract modules had been used as real evidence repos across Phase R1/R2 work but were **never added to this matrix** — a genuine process gap this refresh names and closes, not only new numbers. |
 | **Acceptance** | Updated matrix + ranked families; no requirement to pipeline-scan all. |
 | **Hard predecessors** | None. |
 
@@ -307,8 +311,10 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | After T-R3-1, adjust BACKLOG priorities; mark new OOS if warranted. |
 | **Backlog ID** | B-discovery-cadence |
+| **Implementation details** | Wave 1-B3's #1 (R2 multi-hop) and #2/#6 (call-site auth breadth, Spring Data/jOOQ) ranked risks retired as closed (Phase R1/R2 work). New #1 (`B-ontology`, U-persist-import) and new #2 (`B-msg-prod-sqs`, split out of the existing messaging-producer row — SQS/SNS producer specifically) promoted from P2 to P1 in `BACKLOG.md`. `OOS_Registry.md` checked for anything the refresh surfaced warranting a new non-goal row — nothing did (both new top risks are real, scoped, actionable gaps with a clear path, not permanent non-goals); its stale note about `B-java-driver-ref` updated to reflect that item is now done. |
 | **Acceptance** | BACKLOG changelog entry; OOS registry updated if needed. |
 | **Hard predecessors** | T-R3-1. |
 
@@ -318,10 +324,12 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08) — 7/8, well past the ≥2 bar. |
 | **Goal** | Promote ≥2 trap cards to automated test or validate-calm-pair expected-fail/pass. |
 | **Why** | Docs-only traps don’t enforce honesty. |
 | **Backlog ID** | B-trap-promote |
 | **Integrity home** | eval / regression |
+| **Implementation details** | Audited all 8 trap cards in `coe-lab/docs/trap-gold-backlog.md` against the real regression suite — found 6 (T1, T2, T4, T5, T6, T7) already had real, passing, pre-existing tests that were never marked as promoted in the trap doc (a doc-sync gap, not missing coverage). T3 (pure-helper classes must not become services, `lib-fintech-common`) genuinely had no test despite its fixture already existing — new test added: `lib-fintech-common`'s `StringUtils`/`Money` classes (zero catalogue evidence of any kind) correctly produce ZERO CALM nodes, `calm validate` 0 errors. T7's SQS/SNS **producer** half specifically (as opposed to its already-proven DynamoDB persistence half) remains genuinely unpromoted, since that detection isn't built yet — see T-R3-2's `B-msg-prod-sqs` — honestly left as such rather than force-promoted against unbuilt capability. |
 | **Acceptance** | Two traps gated in CI when fixtures/clones available; document skips. |
 | **Hard predecessors** | T-R0-1 recommended. |
 
@@ -331,9 +339,11 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | Write cadence (e.g. every major wave or N weeks: re-probe sample set). |
 | **Why** | Without cadence, discovery dies after one iteration. |
 | **Backlog ID** | B-discovery-cadence |
+| **Implementation details** | `BACKLOG.md`'s health note gained a "Discovery cadence policy" section: cadence tied to Robustness phase boundaries (not a fixed calendar — phase completions are this project's real unit of progress), a 4-step repeatable procedure mirroring what T-R3-1/T-R3-2 just did, owner named as "whichever agent/session executes the current phase" (not a separate standing role), and the concrete failure mode this exists to prevent stated explicitly (Wave 1-B3's #1 risk closing with nothing forcing a re-rank, until this phase did it manually). |
 | **Acceptance** | Policy paragraph in BACKLOG or NEXT_ITERATION; owner role named. |
 | **Hard predecessors** | T-R3-1. |
 
