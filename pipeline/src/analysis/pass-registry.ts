@@ -25,6 +25,12 @@ import { DeployableManifest } from '../scanner/deployable-manifest-provider';
 export interface RawRootFacts {
   nativeRoutes: NativeRouteFact[];
   decoratorFacts: DecoratorFact[];
+  /** AREC Wave 3 T-D1 — call-site facts (referenceKind: 'calls'), same shape/scoping as decoratorFacts. */
+  callFacts: DecoratorFact[];
+  /** AREC Wave 3 T-E1 — field/variable type-reference facts (referenceKind: 'references'), same shape/scoping. */
+  typeReferenceFacts: DecoratorFact[];
+  /** AREC Wave 3 T-E3 — extends/implements supertype facts (referenceKind: 'extends'), same shape/scoping. */
+  extendsFacts: DecoratorFact[];
   /** T-X0-1 coverage report input — indexed source files by extension, captured at scan time since only run-slice.ts's scan loop calls listIndexedFiles(). */
   filesByExt: Record<string, number>;
   /** T-X8-1 — deployable-unit manifests (package.json/pom.xml/build.gradle/Dockerfile) found directly at this root. */
@@ -72,4 +78,25 @@ export async function runPasses(passes: AnalysisPass[], ctx: AnalysisContext): P
  */
 export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
   return new Set(ctx.allUnits.filter((u) => u.kind === 'service').map((u) => u.filePath));
+}
+
+/**
+ * AREC Wave 3 T-E3 — real bug found by testing the lab `ts-orders-dynamo`
+ * fixture (imports BOTH `@aws-sdk/client-dynamodb` and `@aws-sdk/client-sqs`
+ * in one file): detectPersistencePass and detectMessagingPass each
+ * independently walk file->contains->class over the SAME Graphify run —
+ * neither knows about the other's output, so a file matching both a
+ * persistence AND a messaging library produced TWO TypedUnits with the
+ * SAME `id` (`filePath::ClassName`) but different `kind` — a live
+ * `unique-ids-must-be-unique-in-architecture` calm validate ERROR, not a
+ * cosmetic issue. Generalizes existingServiceFilePaths's own "a file
+ * already claimed by an earlier pass must not also get a competing unit
+ * from a later import-strategy pass" principle: ANY unit already in
+ * ctx.allUnits (not just service-kind) by the time a LATER pass runs
+ * excludes that file. Only messaging-pass.ts needs this (it runs after
+ * detectPersistencePass in DEFAULT_PASSES) — detectPersistencePass runs
+ * first, so no messaging units exist yet for it to exclude.
+ */
+export function existingUnitFilePaths(ctx: AnalysisContext): Set<string> {
+  return new Set(ctx.allUnits.map((u) => u.filePath));
 }

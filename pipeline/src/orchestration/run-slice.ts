@@ -13,7 +13,7 @@ import { DEFAULT_PASSES } from '../analysis/passes';
 import { writePlatformArtefacts } from './platform-artefacts';
 import { buildEvidencePacks } from '../analysis/ir/evidence-packs';
 import { renderIntelligenceIR } from '../analysis/ir/intelligence-ir';
-import { CoverageReport } from '../analysis/coverage-report';
+import { CoverageReport, computeCompleteness } from '../analysis/coverage-report';
 import { UnmappedSignalsReport } from '../analysis/unmapped-signals';
 import { TypedFacts, CONTRACT_VERSION } from '../types/typed-facts';
 
@@ -105,13 +105,16 @@ async function runSlice(
 
     const indexedFiles = engine.listIndexedFiles(handle, ['.py', '.ts', '.java']);
     const decoratorFacts = indexedFiles.flatMap((file) => engine.extractDecoratorFacts(handle, root, file));
+    const callFacts = indexedFiles.flatMap((file) => engine.extractCallFacts(handle, root, file)); // T-D1
+    const typeReferenceFacts = indexedFiles.flatMap((file) => engine.extractTypeReferenceFacts(handle, root, file)); // T-E1
+    const extendsFacts = indexedFiles.flatMap((file) => engine.extractExtendsFacts(handle, root, file)); // T-E3
     const filesByExt: Record<string, number> = {};
     for (const file of indexedFiles) {
       const ext = path.extname(file);
       filesByExt[ext] = (filesByExt[ext] ?? 0) + 1;
     }
     const deployableManifests = discoverDeployableManifests(root); // T-X8-1
-    rawByRoot.set(root, { nativeRoutes, decoratorFacts, filesByExt, deployableManifests });
+    rawByRoot.set(root, { nativeRoutes, decoratorFacts, callFacts, typeReferenceFacts, extendsFacts, filesByExt, deployableManifests });
   }
 
   // T-X1-2 — detect-gate-smoketest.ts already computes suspectedSilentFailure
@@ -208,6 +211,10 @@ function runFromFacts(
     relationshipsByKind: {},
     relationshipsBySource: {},
     unresolvedByMechanism: {},
+    // T-A1: real, not placeholder — facts.units/relationships are available
+    // even in --from-facts mode, so S1/S2 can be computed honestly here
+    // rather than zeroed out with everything else this mode can't recompute.
+    completeness: computeCompleteness(facts.units, facts.relationships),
   };
   const placeholderUnmapped: UnmappedSignalsReport = {
     generatedAt: facts.generatedAt,

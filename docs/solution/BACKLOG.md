@@ -31,9 +31,9 @@
 
 | ID | Item | Status | Detail |
 |---|---|---|---|
-| **E** | AREC Session E (breadth) | `todo` | [T-E1…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) (T-E0 only if C-rich skipped in D) |
+| **E** | AREC Session E (breadth) | `done` (2026-08-08) | [T-E1…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) all shipped (T-E0 correctly skipped — C-rich already landed in D) |
 | **RB** | Weaver robustness program (phased) | `todo` | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) — after or interleaved with E per that file |
-| **W3-close** | Close Wave 3 checklist / OOS decisions | `todo` | AREC Wave 3 § done criteria |
+| **W3-close** | Close Wave 3 checklist / OOS decisions | `done` | AREC Wave 3 DoD — all checkboxes closed, Sessions A–E complete |
 
 ### Recently landed (Wave 3 A–D) — do not re-queue
 
@@ -45,6 +45,19 @@
 | R1 one-hop regression lock | `done` |
 | R2 multi-hop **mechanism** (non-fabricating) | `done` — **product residual** → **B-R2b** |
 | C-call (bounded vocab) + C-rich (expression text) | `done` — expand → **B-C-call-expand** / **B-C-rich-authority** |
+
+### Recently landed (Wave 3 E) — do not re-queue
+
+| Item | Status |
+|---|---|
+| Messaging producers (KafkaTemplate field-type) | `done` — T-E1; SQS/SNS producer still open, see **B-dynamo-sqs** |
+| Persistence ontology decision (Prisma Service vs database) | `done` — decided, not code-fixed (Q13); see **B-ontology** for the deferred code fix |
+| Spring Data repository dispatch | `done` — T-E3 |
+| DynamoDB verified | `done` — T-E3 |
+| jOOQ | re-confirmed root cause (Graphify Java symbol-vs-package gap), not fixed — see **B-java-driver-ref** |
+| OpenAPI dual-unit merge (trap T8) + C-contract expand | `done` — T-E4, trap promoted |
+| HITL review trigger (offline, S1/S2 → review-queue.json) | `done` — T-E5 |
+| K8s substring residual | `done` — watched under harder conditions, confirmed clean, no fix needed (T-E6) |
 
 ---
 
@@ -64,7 +77,7 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 | **B-graphify-partial** | Operator visibility when Graphify fail-soft / partial backbone | `todo` | Completeness UX under tool failure | Robustness Phase R0 / R4 |
 | **B-java-driver-ref** | Graphify Java import target normalize (symbol vs qualified package) | `todo` | Silent catalogue miss class | Robustness Phase R1 |
 | **B-trap-promote** | Trap-gold → automated eval/CI gates | `todo` | Docs-only traps don’t enforce honesty | Robustness Phase R3 |
-| **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `todo` | Residual human path | Robustness Phase R4 / T-E5 |
+| **B-hitl-s1** | HITL/advisory path when S1 fires (offline; no TypedFacts write) | `done` (T-E5) | Residual human path | Robustness Phase R4 / T-E5 — `hitl-review-trigger.js` |
 
 ---
 
@@ -80,19 +93,19 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | **B-R2-eval** | (see robustness) | `todo` | Q11 |
 | **B-C-call-expand** | Expand call-site control vocabularies | `todo` | Claim **C-call** |
 | **B-C-rich-authority** | Richer control config (structured authority) | `todo` | Claim **C-rich** |
-| **B-S3** | Threat narrative honesty | `partial` | T-D3 |
+| **B-S3** | Threat narrative honesty | `done` | T-D3 |
 
 ### P2 — Breadth (Session E + catalogue debt)
 
 | ID | Item | Status | Spec / claim |
 |---|---|---|---|
-| **B-msg-prod** | Messaging **producers** | `todo` | **U-msg-producer**; T-E1 |
-| **B-ontology** | Persist ontology (ORM import ≠ always database) | `todo` | **U-persist-import**; T-E2 |
-| **B-spring-data** | Spring Data repository dispatch | `todo` | T-E3 |
-| **B-jooq** | jOOQ strategy dispatch | `todo` | T-E3 |
-| **B-dynamo-sqs** | Dynamo / SQS architecture units | `todo` | T-E3 |
-| **B-openapi-dual** | OpenAPI dual-unit policy | `todo` | T-E4 |
-| **B-c-contract** | OpenAPI securitySchemes expand | `partial` | **C-contract** |
+| **B-msg-prod** | Messaging **producers** | `done` (Kafka field-type); SQS/SNS producer `todo` | **U-msg-producer**; T-E1 |
+| **B-ontology** | Persist ontology (ORM import ≠ always database) | `decided, not code-fixed` | **U-persist-import**; T-E2 (Q13) |
+| **B-spring-data** | Spring Data repository dispatch | `done` | T-E3 |
+| **B-jooq** | jOOQ strategy dispatch | `todo` — root cause re-confirmed (Graphify Java symbol-vs-package), not fixed | T-E3 |
+| **B-dynamo-sqs** | Dynamo / SQS architecture units | `partial` — DynamoDB verified; SQS/SNS producer still open | T-E3 |
+| **B-openapi-dual** | OpenAPI dual-unit policy | `done` | T-E4 |
+| **B-c-contract** | OpenAPI securitySchemes expand | `done`, expanded | **C-contract** |
 | **B-java-driver-ref** | (see robustness) | `todo` | R2 notes |
 
 ### P3 — Eval, discovery, residual UX
@@ -102,7 +115,7 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | **B-discovery-cadence** | (see robustness) | `todo` | Phase R3 |
 | **B-trap-promote** | (see robustness) | `todo` | Phase R3 |
 | **B-hitl-s1** | (see robustness) | `todo` | Phase R4 |
-| **B-k8s-fp** | Deployment correlation residual FPs | `todo` | T-E6 if observed |
+| **B-k8s-fp** | Deployment correlation residual FPs | `done` — watched, confirmed clean, no fix needed | T-E6 |
 | **B-scope-hygiene** | scope-limitations ↔ Claim Register | `ongoing` | every wave |
 
 ### Later / platform
@@ -138,3 +151,4 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 |---|---|
 | 2026-08-08 | Initial thin index after Wave 3 A–D |
 | 2026-08-08 | Robustness track folded in; link to AGENT_TASKS_Weaver_Robustness.md |
+| 2026-08-08 | Session E (T-E1–T-E6) marked done — was stale `todo` from before this session's work landed |

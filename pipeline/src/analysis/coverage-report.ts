@@ -1,4 +1,5 @@
 import { AnalysisContext } from './pass-registry';
+import { TypedUnit, TypedRelationship } from '../types/typed-facts';
 
 /**
  * T-X0-1 (AGENT_TASKS_Extraction_Enrichment.md) — without counts, a high
@@ -60,6 +61,71 @@ export interface CoverageReport {
    * names. Items with no recognized prefix are bucketed under "other".
    */
   unresolvedByMechanism: Record<string, number>;
+  /**
+   * AREC Wave 3 T-A1 (S1/S2, validation-approach-vnext.md §L3) — completeness
+   * signals, distinct from confidence. A package can have high-confidence
+   * units and still be an architecturally silent/incomplete run (Fineract
+   * charge/core: 64 relationships, 0 touching a service unit). These fields
+   * make that visible without a hand audit, using dimensions every
+   * TypedUnit/TypedRelationship already carries — no Fineract-specific or
+   * any other repo-specific logic here.
+   */
+  completeness: {
+    serviceUnitCount: number;
+    databaseUnitCount: number;
+    /** Relationships where `from` or `to` resolves to a unit with kind 'service'. Zero here, with services and databases both present, is exactly the silent-incompleteness shape S1 names. */
+    serviceTouchingRelationshipCount: number;
+    /**
+     * Units with http-entry-point evidence and no security-control evidence
+     * — the SAME definition threat-signals module uses (deliberately kept
+     * in sync so the two never silently diverge; see S3 — this is a count,
+     * not a claim that no auth exists in source).
+     */
+    httpUnitsWithoutSecurityControlCount: number;
+    /**
+     * S4 (confidence-not-completeness) is a documentation invariant, not a
+     * computed field — deliberately not modelled here; see
+     * scope-limitations.yml / metadata-builder.ts for where it's asserted.
+     */
+    silenceFlags: string[];
+  };
+}
+
+/**
+ * Extracted so `--from-facts` reconstruct-only mode (run-slice.ts) can
+ * compute real S1/S2 numbers from a frozen typed-facts.json without a
+ * rescan — the same definition used for a live run, not a second one that
+ * could silently drift.
+ */
+export function computeCompleteness(units: TypedUnit[], relationships: TypedRelationship[]): CoverageReport['completeness'] {
+  const serviceUnitIds = new Set(units.filter((u) => u.kind === 'service').map((u) => u.id));
+  const databaseUnitCount = units.filter((u) => u.kind === 'database').length;
+  const serviceTouchingRelationshipCount = relationships.filter(
+    (rel) => serviceUnitIds.has(rel.from) || serviceUnitIds.has(rel.to)
+  ).length;
+  const httpUnitsWithoutSecurityControlCount = units.filter(
+    (u) => u.evidence.some((e) => e.category === 'http-entry-point') && !u.evidence.some((e) => e.category === 'security-control')
+  ).length;
+
+  const silenceFlags: string[] = [];
+  if (serviceUnitIds.size >= 1 && databaseUnitCount >= 1 && serviceTouchingRelationshipCount === 0) {
+    silenceFlags.push(
+      `S1-zero-service-touching-relationships: ${serviceUnitIds.size} service unit(s) and ${databaseUnitCount} database unit(s) present, but 0 relationships touch a service unit — likely a multi-hop/layered architecture story not yet recovered (see AREC R2), not "no architecture here"`
+    );
+  }
+  if (httpUnitsWithoutSecurityControlCount > 0) {
+    silenceFlags.push(
+      `S2-http-without-security-control: ${httpUnitsWithoutSecurityControlCount} HTTP-entry-point unit(s) have no security-control evidence — may reflect a missing detection mechanism (see AREC C-call), not necessarily "no auth in source"`
+    );
+  }
+
+  return {
+    serviceUnitCount: serviceUnitIds.size,
+    databaseUnitCount,
+    serviceTouchingRelationshipCount,
+    httpUnitsWithoutSecurityControlCount,
+    silenceFlags,
+  };
 }
 
 export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
@@ -114,6 +180,8 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
     relationshipsBySource[rel.source] = (relationshipsBySource[rel.source] ?? 0) + 1;
   }
 
+  const completeness = computeCompleteness(ctx.allUnits, ctx.relationships);
+
   return {
     generatedAt: new Date().toISOString(),
     graphifyStatus,
@@ -125,5 +193,6 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
     relationshipsByKind,
     relationshipsBySource,
     unresolvedByMechanism,
+    completeness,
   };
 }

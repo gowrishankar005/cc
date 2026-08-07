@@ -19,3 +19,75 @@ controls:
     language: java
     matchSignal: "PreAuthorize"
     requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac.requirement.json"
+
+  # AREC Wave 3 T-D1 (C-call) — same real-world control (permission/role
+  # enforcement) as security-rbac-001 above, detected via a different
+  # mechanism (call-site, not decorator). Kept as its own controlId, not
+  # folded into security-rbac-001: `detectionMechanism` differs, and
+  # collapsing them would hide the C-dec vs C-call distinction the AREC
+  # pillar exists to make visible (S3 — narrative honesty about HOW a
+  # control was found).
+  - controlId: security-rbac-002
+    name: "Role-Based Access Control (call-site)"
+    description: "Method or endpoint access restricted by role/authority, enforced via an explicit call-site permission check (e.g. Fineract's validateHasReadPermission) rather than a decorator/annotation"
+    detectionMechanism: call
+    language: java
+    matchSignal: "validateHasReadPermission|validateHasPermission|validateHasCheckerPermission"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac-call-site.requirement.json"
+
+  # Deliberately a DIFFERENT controlId family (auth, not rbac) — a bare
+  # jwt.decode() call is token PARSING evidence, not proven role/permission
+  # enforcement (a real jwt.decode() with verify_signature disabled, as this
+  # project's own py-jwt-gateway lab fixture demonstrates, isn't even proven
+  # AUTHENTICATION). Named honestly as "token-handling evidence found," not
+  # "access control enforced," matching the signal-catalogue.yml row's own
+  # lower (20) weight.
+  - controlId: security-auth-001
+    name: "Token-based authentication (call-site, unverified enforcement)"
+    description: "A JWT decode call was found at this call site — evidence that token handling occurs here, NOT proof that signature verification or authorization was enforced (see evidenceRef and the pipeline's own scope-limitations)"
+    detectionMechanism: call
+    language: python
+    matchSignal: "jwt.decode"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/jwt-decode-call.requirement.json"
+
+  # AREC Wave 3 T-E4 (C-contract expand) — OpenAPI/Swagger securitySchemes,
+  # matched against their real structural type/scheme fields (never the
+  # author-chosen scheme NAME — see openapi-pass.ts's openApiSecuritySchemeSignal),
+  # so these rows generalize across any real spec regardless of naming
+  # convention. `language: any` — deliberately honest: an OpenAPI contract's
+  # declared auth mechanism is not tied to an implementation language the
+  # way a decorator/call-site control is; "any" is a real, non-invented
+  # value for this field (ControlRequirementRule.language is a plain
+  # string, not a closed union). Real evidence: lab ts-nestjs-users'
+  # openapi.yaml declares `bearerAuth: {type: http, scheme: bearer}`.
+  - controlId: security-contract-http-bearer-001
+    name: "Bearer token authentication (OpenAPI contract)"
+    description: "OpenAPI/Swagger securityScheme declares HTTP Bearer token authentication for this API — contract-level evidence, not proof the implementation actually enforces it on every operation (see evidenceRef)"
+    detectionMechanism: openapi-contract
+    language: any
+    matchSignal: "http-bearer"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/openapi-http-bearer.requirement.json"
+
+  - controlId: security-contract-http-basic-001
+    name: "HTTP Basic authentication (OpenAPI contract)"
+    description: "OpenAPI/Swagger securityScheme declares HTTP Basic authentication for this API — contract-level evidence, not proof of implementation enforcement"
+    detectionMechanism: openapi-contract
+    language: any
+    matchSignal: "http-basic"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/openapi-http-basic.requirement.json"
+
+  - controlId: security-contract-apikey-001
+    name: "API key authentication (OpenAPI contract)"
+    description: "OpenAPI/Swagger securityScheme declares API key authentication for this API — contract-level evidence, not proof of implementation enforcement"
+    detectionMechanism: openapi-contract
+    language: any
+    matchSignal: "apiKey"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/openapi-apikey.requirement.json"
+
+  - controlId: security-contract-oauth2-001
+    name: "OAuth2 authentication (OpenAPI contract)"
+    description: "OpenAPI/Swagger securityScheme declares OAuth2 authentication for this API — contract-level evidence, not proof of implementation enforcement"
+    detectionMechanism: openapi-contract
+    language: any
+    matchSignal: "oauth2"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/openapi-oauth2.requirement.json"

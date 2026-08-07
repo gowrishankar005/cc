@@ -52,7 +52,13 @@ strategies:
       # DynamoDB genuinely IS a database, so it's correct to type via this
       # strategy (unlike SQS/SNS below, which are messaging, not persistence
       # — see the cloud-messaging strategy entry for why those are NOT here).
-      - { name: "@aws-sdk/client-dynamodb", language: typescript, evidenceLevel: unverified }
+      # AREC Wave 3 T-E3 (2026-08-08) — verified via lab fixture
+      # ts-orders-dynamo (real @aws-sdk/client-dynamodb import): correctly
+      # detected as a real database unit. Also surfaced and fixed a real,
+      # generic bug this same round — a file importing BOTH a persistence
+      # AND a messaging library produced duplicate unique-ids (see
+      # existingUnitFilePaths, pass-registry.ts).
+      - { name: "@aws-sdk/client-dynamodb", language: typescript, evidenceLevel: verified }
       - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — covers DynamoDB use but also other AWS services, so a real false-positive risk this catalogue row doesn't hide
       # Java — Fidelity-evidenced (v0.14), not yet added to real Graphify
       # import-edge matching — named here as the concrete next catalogue
@@ -84,14 +90,42 @@ strategies:
     mechanism: decorator (signal-catalogue.yml jpa-entity/jpa-table rows)
 
   - id: spring-data-repository
-    description: An interface extending CrudRepository/JpaRepository.
-    status: not-implemented
-    mechanism: would-need extractFromSource() interface-extends detection
+    description: >
+      AREC Wave 3 T-E3 (2026-08-08) — BUILT. An interface extending
+      CrudRepository/JpaRepository/PagingAndSortingRepository/JpaSpecificationExecutor,
+      from CodeGraph's extractFromSource() `referenceKind: 'extends'` entries
+      (signal-catalogue.yml's spring-data-repository-extends row, matchSource:
+      extends). Real evidence: Fineract's ChargeRepository.java (`interface
+      ChargeRepository extends JpaRepository<Charge, Long>,
+      JpaSpecificationExecutor<Charge>`) — verified via run-slice.js, real
+      `database` node, plus a genuine knock-on win: ChargeRepository is now a
+      visible TypedUnit, so the standard R0 Graphify reconciler picks up its
+      real `imports` edge to Charge (a real, additional relationship, not
+      fabricated). calm validate 0 errors, 0 warnings.
+    status: dispatched
+    mechanism: extends reference (codegraph-provider.ts's extractExtendsFacts, signal-mapper.ts extends loop)
 
   - id: jooq
-    description: org.jooq.* import + typed-field usage (evidenced at Waltz, GenericSelector.java:23-24).
+    description: >
+      org.jooq.* import + typed-field usage (evidenced at Waltz,
+      GenericSelector.java:20-23: real `import org.jooq.Record1; import
+      org.jooq.Select;`). AREC Wave 3 T-E3 (2026-08-08) re-checked this
+      against real Waltz source (spikes/waltz/repo, already cloned) — CONFIRMED,
+      not just theorized, why this can't reuse the driver-import strategy
+      as-is: a real Graphify extraction of GenericSelector.java shows the
+      import edge target is the bare lowercased SYMBOL name ("record1",
+      "select"), never the qualified package "org.jooq". This is the SAME
+      root-cause limitation already disclosed for org.postgresql (found
+      during T-C1's R2 bridge-fixture work) — now confirmed to be a general
+      Java Graphify import-normalization gap, not a one-off. Deliberately
+      NOT attempted this round: fixing Java package-vs-symbol import
+      matching is a real, cross-cutting change affecting every Java
+      driver-import row (org.postgresql, org.jooq, and any future one), not
+      a jOOQ-specific patch — shipping an unproven fix to a shared mechanism
+      under time pressure is exactly what this project's own "verify before
+      asserting" discipline warns against.
     status: not-implemented
-    mechanism: would-need Graphify import-edge + typed-field detection, similar to driver-import but with an added type check
+    mechanism: would-need a Java-specific import-target resolution fix (Graphify normalizes to bare symbol name, not qualified package) shared across ALL Java driver-import rows — not just jOOQ
 
   - id: cloud-messaging-sqs-sns
     description: >

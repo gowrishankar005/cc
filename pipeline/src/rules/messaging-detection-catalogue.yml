@@ -42,16 +42,18 @@ strategies:
 
   - id: typed-field-producer
     description: >
-      A typed field/variable of type KafkaTemplate (or similar) with a
-      .send()/.publish() call — the PRODUCER-side signal named in
-      requirements v0.11 ("messaging detection gets a real two-mechanism
-      design: decorator for consumers, typed-field for producers").
-      Genuinely NOT built this round: this needs call-based typed-field
-      usage detection, a mechanism this pipeline has never built (every
-      existing extraction mechanism is either native-route typing,
-      decorator/extractFromSource(), or Graphify import-edges — none of
-      those detect "a call to .send() on a field of a specific type").
-      Left honestly unimplemented rather than attempted under time pressure
-      with an unproven approach.
-    status: not-implemented
-    mechanism: would-need call-based typed-field-usage detection (new mechanism, not yet built anywhere in this pipeline)
+      AREC Wave 3 T-E1 (2026-08-08) — BUILT. A field/variable's declared
+      TYPE (KafkaTemplate), from CodeGraph's extractFromSource()
+      `referenceKind: 'references'` entries (signal-catalogue.yml's
+      kafka-template-field row, matchSource: field-type). Deliberately
+      matches on the field's TYPE name, not a paired .send() call — a
+      KafkaTemplate-typed field is real, sufficient-alone evidence of
+      producer capability (weight 40, same tier as jpa-entity), and pairing
+      it with a call-site check would need cross-referencing two different
+      referenceKind extractions within one file, a real mechanism this
+      pipeline hasn't built. Real evidence: Fineract's
+      KafkaExternalEventProducer.java (`fineract-provider`) — verified via
+      run-slice.js, real `topic`/`network` node at the grep-verified field
+      declaration line (48), calm validate 0 errors.
+    status: dispatched
+    mechanism: field-type reference (codegraph-provider.ts's extractTypeReferenceFacts, signal-mapper.ts field-type loop)

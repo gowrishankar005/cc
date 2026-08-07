@@ -23,7 +23,9 @@ const CONTROL_URL_MAPPING = path.join(PIPELINE_ROOT, 'dist', 'rules', 'control-u
 const BOA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/accounts');
 const FINERACT_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/fineract/repo');
 const FINERACT_KAFKA_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/springbatch/messagehandler/kafka');
+const FINERACT_KAFKA_PRODUCER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/event/external/producer/kafka');
 const GHOSTFOLIO_ACCESS_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/app/access');
+const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
 
 function runPipeline(roots, extraArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
@@ -53,6 +55,10 @@ function validateCalm(calmPath) {
 
 function findNode(calm, uniqueIdSuffix) {
   return calm.nodes.find((n) => n['unique-id'].endsWith(uniqueIdSuffix));
+}
+
+function relMetadata(rel, key) {
+  return rel.metadata?.find((m) => m.key === key)?.value;
 }
 
 test('NestJS fixture — native-route-beats-decorator-fallback precedence (checked in, always runs)', () => {
@@ -93,6 +99,36 @@ test('Bank of Anthos — cross-package Graphify pass, real relationships, 0 erro
     assert.equal(contactsDb['node-type'], 'database');
 
     assert.ok(calm.relationships.length >= 1, 'expected at least 1 real relationship from the Graphify pass — 0 here means the cross-package/persistence fix regressed');
+
+    // AREC T-A2 — every real (non-system-node) relationship must be graded;
+    // a service<->database edge (R1 one-hop) must be graded 'architecture',
+    // never left ungraded or mis-labeled 'structural'. The system node's own
+    // composed-of relationship (T-X7-3) is excluded: it's synthetic CALM
+    // scaffolding built directly by system-node-builder.ts, not a
+    // TypedRelationship any Analysis-layer producer emitted — grading it
+    // would be meaningless (there is no R/S question to answer about "the
+    // system contains node X").
+    for (const rel of calm.relationships) {
+      if (rel['relationship-type']['composed-of']) continue;
+      assert.ok(relMetadata(rel, 'x-aac-relationship-grade'), `relationship ${rel['unique-id']} missing x-aac-relationship-grade`);
+    }
+    const serviceIds = new Set([userservice, contacts].map((n) => n['unique-id']));
+    const dbIds = new Set([userDb, contactsDb].map((n) => n['unique-id']));
+    const serviceToDbRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      if (!conn) return false;
+      const a = conn.source.node,
+        b = conn.destination.node;
+      return (serviceIds.has(a) && dbIds.has(b)) || (serviceIds.has(b) && dbIds.has(a));
+    });
+    // AREC Wave 3 T-B1 (R1 lock) — this IS the hard regression T-B1 asks
+    // for: a real service->database `connects` relationship, asserted by
+    // ENDPOINT KIND (not just "relationships.length >= 1", which a
+    // structural-only entity mesh could also satisfy) so R2 work in Session
+    // C/D cannot silently regress the one architecture shape that already
+    // works. If this starts failing, R1 broke — fix R1, don't loosen this.
+    assert.ok(serviceToDbRel, 'T-B1 R1 lock: expected a service->database relationship (R1 one-hop) — BoA-class shape must never regress');
+    assert.equal(relMetadata(serviceToDbRel, 'x-aac-relationship-grade'), 'architecture', 'service->database relationship must be graded architecture, not structural');
 
     // T-X2-1 acceptance ("no duplicate DB nodes") — the decorator-based
     // jpa-entity path and the driver-import Graphify path use disjoint
@@ -136,8 +172,23 @@ test(
       assert.equal(charge['node-type'], 'database', 'Charge.java must be typed database, not service — the signal-mapper.ts hardcoded-kind bug');
       assert.equal(charge.interfaces, undefined, 'Charge.java must have NO interfaces — the @Getter/GET word-boundary-matching bug');
 
-      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      // AREC Wave 3 T-E3 — Spring Data repository detection (extends-based).
+      // Real evidence: ChargeRepository.java's `extends JpaRepository<Charge, Long>`.
+      const repo = findNode(calm, 'ChargeRepository.java');
+      assert.ok(repo, 'ChargeRepository.java node missing — spring-data-repository extends-detection regression');
+      assert.equal(repo['node-type'], 'database', 'a Spring Data repository interface must be typed database');
+      // Real knock-on win: ChargeRepository is now a visible TypedUnit, so
+      // the standard R0 Graphify reconciler picks up its real imports edge
+      // to Charge — a genuine additional relationship, not fabricated.
+      const repoToCharge = calm.relationships.find((rel) => {
+        const conn = rel['relationship-type']?.connects;
+        return conn && conn.source.node === repo['unique-id'] && conn.destination.node === charge['unique-id'];
+      });
+      assert.ok(repoToCharge, 'expected a real ChargeRepository -> Charge connects relationship now that ChargeRepository is a real unit');
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
+      assert.equal(warnings, 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -171,6 +222,18 @@ test(
       const ids = calm.nodes.map((n) => n['unique-id']);
       assert.equal(new Set(ids).size, ids.length, 'duplicate unique-id found — persistence double-emit regression');
 
+      // AREC Wave 3 T-D1 — real bug found and fixed this session:
+      // AppUser.java is a genuine @Entity that ALSO calls
+      // validateHasPermission()/validateHasReadPermission() internally. The
+      // old "service wins any tie" precedence would have mistyped it
+      // 'service', discarding its persistence identity. Must stay 'database'
+      // AND still carry the real security-rbac-002 (call-site) control —
+      // both facts are true about this class at once.
+      const appUser = findNode(calm, 'AppUser.java');
+      assert.ok(appUser, 'AppUser.java node missing');
+      assert.equal(appUser['node-type'], 'database', 'a real @Entity with internal auth-check calls must stay database, not be reclassified service (T-D1 precedence fix)');
+      assert.ok(appUser.controls?.['security-rbac-002'], 'expected AppUser to also carry the call-site security-rbac-002 control despite being database-typed');
+
       const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0, 'control-url-mapping regression — calm-cli host-allowlist check failing again');
     } finally {
@@ -178,6 +241,239 @@ test(
     }
   }
 );
+
+test(
+  'AREC T-D1/T-D2 — call-site control detection: real Fineract fineract-charge ChargesApiResource gets security-rbac-002 with expression, at grep-verified lines',
+  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    try {
+      const resource = findNode(calm, 'ChargesApiResource.java');
+      assert.ok(resource, 'ChargesApiResource.java node missing');
+      const rbac = resource.controls?.['security-rbac-002'];
+      assert.ok(rbac, 'expected security-rbac-002 (call-site) control — context.authenticatedUser().validateHasReadPermission(...) is real, grep-verified evidence in this file');
+      // Grep-verified exact lines: 84, 101, 129 (docs/solution/AREC_R2_MultiHop_Strategy.md §1's own re-investigation of this file).
+      const lines = rbac.requirements.map((r) => r.config.evidenceRef).sort();
+      assert.deepEqual(lines, [
+        'src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java:101',
+        'src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java:129',
+        'src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java:84',
+      ]);
+      // T-D2 (C-rich) — the call's raw argument text, not a resolved constant value.
+      for (const req of rbac.requirements) {
+        assert.equal(req.config.expression, 'RESOURCE_NAME_FOR_PERMISSIONS');
+      }
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test('AREC T-D1/T-D2 — call-site control detection: lab py-jwt-gateway fixture gets security-auth-001 (low weight, honest "token handling" wording), calm validate 0 errors', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/py-jwt-gateway');
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    const node = findNode(calm, 'auth_gateway.py');
+    assert.ok(node, 'auth_gateway.py node missing');
+    const auth = node.controls?.['security-auth-001'];
+    assert.ok(auth, 'expected security-auth-001 (jwt.decode call-site) control');
+    assert.equal(auth.requirements[0].config.evidenceRef, 'auth_gateway.py:14');
+    // T-D2 — real, honest richness: shows the exact anti-pattern in source (verify_signature disabled), not hidden.
+    assert.ok(auth.requirements[0].config.expression.includes('verify_signature'));
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('AREC T-D1 — TypeScript decorator/call dedup: NestJS fixture produces ZERO unmapped signals despite call-fact extraction now running (real dup finding: TS decorators are ALSO referenceKind calls)', () => {
+  const { outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const unmapped = facts.ignoredItems.filter((i) => i.detail?.includes('No signal-catalogue.yml rule matched'));
+    assert.equal(unmapped.length, 0, `expected 0 unmapped signals (decorator/call dedup should prevent TS @Controller/@Get/@Post from double-counting as calls), got: ${unmapped.map((i) => i.detail).join(' | ')}`);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('AREC T-C1 — R2 multi-hop bridge: synthetic fixture proves the mechanism (service -> zero-evidence interface -> sole @Entity implementer)', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2-bridge-sample');
+  // Real finding while building this: graphify's persistent per-root cache
+  // (.graphify-cache) can retain a stale node-id assignment across repeated
+  // hand-edits of the SAME fixture during development — force a clean
+  // extraction so this test never depends on whatever cache state a prior
+  // local run left behind.
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    const resource = findNode(calm, 'WidgetApiResource.java');
+    const impl = findNode(calm, 'WidgetReadServiceImpl.java');
+    assert.ok(resource, 'WidgetApiResource.java node missing');
+    assert.equal(resource['node-type'], 'service');
+    assert.ok(impl, 'WidgetReadServiceImpl.java node missing (@Entity path)');
+    assert.equal(impl['node-type'], 'database');
+
+    // WidgetReadService.java (the bridge interface) must NOT become a node —
+    // R2 never creates units for bridges themselves (design note §2.6).
+    assert.equal(findNode(calm, 'WidgetReadService.java'), undefined, 'bridge interface must not become its own CALM node');
+
+    const r2Rel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === resource['unique-id'] && conn.destination.node === impl['unique-id'];
+    });
+    assert.ok(r2Rel, 'expected a resolved R2 relationship from WidgetApiResource to WidgetReadServiceImpl');
+    assert.equal(relMetadata(r2Rel, 'x-aac-relationship-grade'), 'architecture');
+    assert.equal(relMetadata(r2Rel, 'x-aac-confidence'), 15, 'R2 same-root confidence must be low and fixed, per the design note (below any R1 value)');
+    assert.ok(r2Rel.description.includes('calls'), 'R2 must use the calls kind, distinct from R1 imports/connects');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
+test(
+  'AREC T-C1 — R2 multi-hop bridge: real Fineract fineract-charge produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
+  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const multiHopItems = facts.ignoredItems.filter((i) => i.detail?.startsWith('unresolved-multi-hop'));
+      // Real Fineract-charge alone: ChargesApiResource's ChargeReadPlatformService
+      // bridge has 0 candidate implementers in scope (the real implementer
+      // lives in fineract-provider, a third module — see the design note §1)
+      // and a ChargeRequest DTO bridge also resolves to 0 — exactly 2, not the
+      // 34 annotation-noise items an earlier version of this detector produced
+      // before the isRealBridgeCandidate fix.
+      assert.equal(multiHopItems.length, 2, `expected exactly 2 honest unresolved-multi-hop items, got ${multiHopItems.length}: ${multiHopItems.map((i) => i.detail).join(' | ')}`);
+      const r2Relationships = facts.relationships.filter((r) => r.kind === 'calls' && r.source === 'graphify' && r.confidence !== undefined);
+      assert.equal(r2Relationships.length, 0, 'fineract-charge alone must NOT close its S1 gap via R2 Phase 1 — a real, honestly-predicted residual (design note §1), never a fabricated edge');
+
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      assert.ok(
+        coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
+        'S1 must still fire — this IS the honest residual, not a regression'
+      );
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'AREC T-A2 — R0 grading: Fineract fineract-core entity<->entity edges graded structural, never architecture',
+  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-core')]);
+    try {
+      // Documented baseline: fineract-core's 64 typed-facts relationships are
+      // ALL database<->database (dual-unit Graphify entity mesh, no service
+      // endpoint) — see coe-lab/docs/fineract-gold-vs-platform-finding.md.
+      // Every one of them must be graded 'structural', never 'architecture'
+      // (that would misrepresent entity-mesh noise as a real architecture
+      // link — exactly what T-A2 exists to stop).
+      assert.ok(calm.relationships.length > 0, 'expected real relationships from fineract-core');
+      // Excludes the system node's own composed-of relationship (T-X7-3) —
+      // synthetic CALM scaffolding, not a graded TypedRelationship; see the
+      // BoA test above for the full rationale.
+      const graded = calm.relationships.filter((rel) => !rel['relationship-type']['composed-of']);
+      assert.ok(graded.length > 0, 'expected real graded relationships from fineract-core');
+      for (const rel of graded) {
+        assert.ok(relMetadata(rel, 'x-aac-relationship-grade'), `relationship ${rel['unique-id']} missing x-aac-relationship-grade`);
+        assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural', `expected structural grade on ${rel['unique-id']} (entity<->entity, no service endpoint)`);
+      }
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'AREC T-A1 — silence metrics: Fineract fineract-charge flags S1 (service+db present, 0 service-touching relationships)',
+  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    try {
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      // This IS the documented baseline (coe-lab/docs/fineract-gold-vs-platform-finding.md):
+      // ChargesApiResource (service) + Charge (database) both present, 0
+      // relationships touch a service unit — dual-unit Graphify gate +
+      // multi-hop layering (AREC R2, not yet built). If R2 ships and this
+      // starts failing, that's real progress — update this test then, don't
+      // silently leave S1 unasserted.
+      assert.ok(coverage.completeness.serviceUnitCount >= 1, 'expected at least one service unit');
+      assert.ok(coverage.completeness.databaseUnitCount >= 1, 'expected at least one database unit');
+      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 0, 'expected 0 service-touching relationships (pre-R2 baseline)');
+      assert.ok(
+        coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
+        'expected S1 silence flag to be raised'
+      );
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'AREC T-A1 — silence metrics: S1 does NOT fire when a real service-touching relationship exists (Bank of Anthos, false-positive guard)',
+  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir } = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    try {
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      assert.ok(coverage.completeness.serviceTouchingRelationshipCount > 0, 'expected BoA to have real service-touching relationships (R1 one-hop)');
+      assert.ok(
+        !coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
+        'S1 must not fire when service-touching relationships exist'
+      );
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging double-detector collision fix: lab ts-orders-dynamo fixture, no duplicate unique-ids, calm validate 0 errors', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-orders-dynamo');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // Real bug found this session: OrdersDynamoStore imports BOTH
+    // @aws-sdk/client-dynamodb (persistence) AND @aws-sdk/client-sqs
+    // (messaging) — detectPersistencePass and detectMessagingPass each
+    // independently walked file->contains->class over the same file,
+    // producing TWO TypedUnits with the SAME id but different kind, a live
+    // calm-cli unique-ids-must-be-unique-in-architecture ERROR. Fixed via
+    // existingUnitFilePaths (pass-registry.ts) — persistence wins (runs
+    // first), messaging is correctly excluded for an already-claimed file.
+    const ids = calm.nodes.map((n) => n['unique-id']);
+    assert.equal(new Set(ids).size, ids.length, 'duplicate unique-id found — persistence/messaging double-detector collision regression');
+
+    const store = findNode(calm, 'OrdersDynamoStore');
+    assert.ok(store, 'OrdersDynamoStore node missing — DynamoDB driver-import detection regression');
+    assert.equal(store['node-type'], 'database', 'DynamoDB-importing class must be typed database (persistence wins the priority tie over messaging)');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
 
 test('SQS/SNS import-only messaging detection — low confidence, topic kind, dispatcher wiring (T-X7-2, synthetic — no real fixture yet)', () => {
   const { detectMessagingUnits } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/messaging-detector'));
@@ -214,6 +510,27 @@ test(
       // Grep-verified ground truth: @KafkaListener is at line 45.
       const provenance = listener.metadata.find((m) => m.key === 'x-aac-provenance').value;
       assert.ok(provenance.some((ref) => ref.endsWith(':45')), 'expected provenance at the real @KafkaListener line (45)');
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'AREC T-E1 — messaging PRODUCER: real Fineract KafkaExternalEventProducer.java (KafkaTemplate-typed field) detected as a real topic/network node',
+  { skip: !fs.existsSync(FINERACT_KAFKA_PRODUCER_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir, calm } = runPipeline([FINERACT_KAFKA_PRODUCER_ROOT]);
+    try {
+      const producer = findNode(calm, 'KafkaExternalEventProducer.java');
+      assert.ok(producer, 'KafkaExternalEventProducer.java node missing — closes messaging-detection-catalogue.yml\'s previously not-implemented typed-field-producer strategy');
+      assert.equal(producer['node-type'], 'network', 'topic-kind units must map to CALM node-type network (node-type-mapping.yml)');
+      // Grep-verified ground truth: the KafkaTemplate-typed field is declared at line 48.
+      const provenance = producer.metadata.find((m) => m.key === 'x-aac-provenance').value;
+      assert.ok(provenance.some((ref) => ref.endsWith(':48')), 'expected provenance at the real KafkaTemplate field declaration line (48)');
 
       const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
@@ -655,6 +972,48 @@ test('OpenAPI fixture — static provider discovers routes + securitySchemes, st
   }
 });
 
+test('AREC T-E4 — OpenAPI dual-unit merge (trap card T8): lab ts-nestjs-users (openapi.yaml + real controller, same routes) produces ONE node, not two', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-nestjs-users');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // Before this fix: TWO service nodes for one real service
+    // ('src/users.controller.ts' AND 'openapi.yaml') — a real unit-level
+    // false positive (trap card T8). Merge policy: overlapping routes ->
+    // one unit, openapi evidence (routes + securitySchemes) attached to the
+    // code-derived unit, not a competing node.
+    const serviceNodes = calm.nodes.filter((n) => n['node-type'] === 'service');
+    assert.equal(serviceNodes.length, 1, `expected exactly 1 service node, got ${serviceNodes.length}: ${serviceNodes.map((n) => n['unique-id']).join(', ')}`);
+    assert.equal(serviceNodes[0]['unique-id'], 'src/users.controller.ts');
+    assert.equal(findNode(calm, 'openapi.yaml'), undefined, 'openapi.yaml must NOT be a standalone node once merged into the code-derived unit');
+
+    // Native-route interfaces still win precedence (T-X4-2) — merge does
+    // not duplicate interfaces from the lower-precedence openapi evidence.
+    const paths = serviceNodes[0].interfaces.map((i) => i.path).sort();
+    assert.deepEqual(paths, ['GET /users', 'GET /users/:id', 'POST /users']);
+
+    // Real, additional value from the merge: the openapi doc's real
+    // bearerAuth securityScheme is now security-control evidence ON the
+    // merged unit, correctly suppressing threat-signals' "no
+    // security-control evidence" false positive for this unit.
+    const threatReport = JSON.parse(fs.readFileSync(path.join(outDir, 'modules/threat-signals/threat-signals-report.json'), 'utf8'));
+    assert.equal(threatReport.findings.length, 0, 'bearerAuth securityScheme evidence should suppress the threat-signals false positive once merged');
+
+    // AREC T-E4 (C-contract expand) — the real bearerAuth scheme
+    // (`{type: http, scheme: bearer}`) must attach a REAL controls entry,
+    // matched by its structural type/scheme, not its author-chosen name.
+    assert.ok(serviceNodes[0].controls?.['security-contract-http-bearer-001'], 'expected a real security-contract-http-bearer-001 control from the openapi.yaml bearerAuth scheme');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test(
   'Outbound HTTP — real requests import in BoA frontend.py produces unresolved-http-target, not a fabricated relationship (T-X8-3, real evidence)',
   { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
@@ -1043,3 +1402,57 @@ test(
     }
   }
 );
+
+test(
+  'AREC T-E5 — HITL review trigger: real Fineract fineract-charge (S1) lists the actual units, real BoA (S2 only, S1 does not fire) lists only the flagged unit — offline, deterministic, no LLM',
+  { skip: (!fs.existsSync(FINERACT_ROOT) || !fs.existsSync(BOA_ROOT)) && 'spikes/fineract or spikes/boa not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+
+    const charge = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'typed-facts.json'), 'utf8'));
+      const coverage = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'coverage-report.json'), 'utf8'));
+      const queue = buildReviewQueue(facts, coverage);
+      // Real baseline: fineract-charge has 1 service + 2 database units, 0
+      // service-touching relationships -> S1 fires for all 3.
+      assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 3);
+      assert.ok(queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')));
+      // S2 must NOT fire here — ChargesApiResource has real security-rbac-002
+      // call-site control evidence (T-D1), so it correctly has no S2 item.
+      assert.equal(queue.items.filter((i) => i.trigger === 'S2-http-without-security-control').length, 0);
+    } finally {
+      fs.rmSync(charge.outDir, { recursive: true, force: true });
+    }
+
+    const boa = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(boa.outDir, 'typed-facts.json'), 'utf8'));
+      const coverage = JSON.parse(fs.readFileSync(path.join(boa.outDir, 'coverage-report.json'), 'utf8'));
+      const queue = buildReviewQueue(facts, coverage);
+      // Real baseline: BoA has real service->database relationships (R1) ->
+      // S1 must NOT fire. userservice.py has no security-control evidence -> S2 fires for it alone.
+      assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0);
+      const s2Items = queue.items.filter((i) => i.trigger === 'S2-http-without-security-control');
+      assert.ok(s2Items.some((i) => i.unitId === 'userservice.py'));
+    } finally {
+      fs.rmSync(boa.outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test('AREC T-E5 — HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [],
+    relationships: [],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  assert.deepEqual(queue.items, []);
+});

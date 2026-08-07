@@ -36,6 +36,48 @@ export interface DecoratorFact {
 }
 
 /**
+ * AREC Wave 3 T-D1 — a call-SITE fact (e.g. Java's
+ * `context.authenticatedUser().validateHasReadPermission(RESOURCE)`,
+ * Python's `jwt.decode(token, ...)`), same shape as DecoratorFact
+ * deliberately reused rather than duplicated: both come from the same
+ * extractFromSource() API, differ only in which `referenceKind` was
+ * filtered for (`decorates` vs `calls`), and both flow through the same
+ * signal-catalogue.yml matching / Evidence construction path downstream —
+ * only `matchSource`/`Evidence.source` distinguish them from here on.
+ * `argument` here is the call's raw parenthesized TEXT (e.g.
+ * "RESOURCE_NAME_FOR_PERMISSIONS"), never a resolved constant value — same
+ * same-line-only, no-cross-file-resolution scoping limit
+ * extractLiteralArgument() already holds for decorators.
+ */
+export type CallFact = DecoratorFact;
+
+/**
+ * AREC Wave 3 T-E1 — a field/variable TYPE reference (e.g. `private
+ * KafkaTemplate<Long, byte[]> externalEventsKafkaTemplate;`), from the same
+ * extractFromSource() API, filtered on referenceKind: 'references' instead
+ * of 'decorates'/'calls'. Real evidence this was built for: Fineract's
+ * KafkaExternalEventProducer.java — messaging-detection-catalogue.yml's own
+ * "typed-field-producer" strategy was named `not-implemented` because no
+ * mechanism to detect a class's field TYPE (as opposed to a decorator or a
+ * call) existed; this closes that specific, previously-honestly-disclosed
+ * gap. Same DecoratorFact shape reused deliberately, same reasons as CallFact.
+ */
+export type TypeReferenceFact = DecoratorFact;
+
+/**
+ * AREC Wave 3 T-E3 — an `extends`/`implements` supertype reference (e.g.
+ * `interface ChargeRepository extends JpaRepository<Charge, Long>`), from
+ * the same extractFromSource() API, filtered on referenceKind: 'extends'
+ * instead of 'references'/'calls'/'decorates'. Closes
+ * persistence-detection-catalogue.yml's `spring-data-repository` strategy,
+ * previously `status: not-implemented`. `referenceName` includes the
+ * generic type argument text (e.g. "JpaRepository<Charge, Long>") — the
+ * existing word-boundary catalogue matcher (findRule) still matches the
+ * base type name correctly since `<` is a non-word character.
+ */
+export type ExtendsFact = DecoratorFact;
+
+/**
  * `handle` is deliberately opaque (`unknown`) — whatever internal state an
  * engine needs between its own `indexPackage`/`extractDecoratorFacts`/
  * `listIndexedFiles` calls, consumers never introspect it, only pass it
@@ -45,5 +87,11 @@ export interface DecoratorFact {
 export interface StructuralEngine {
   indexPackage(packageRoot: string): Promise<{ handle: unknown; nativeRoutes: NativeRouteFact[] }>;
   extractDecoratorFacts(handle: unknown, packageRoot: string, relativeFilePath: string): DecoratorFact[];
+  /** AREC Wave 3 T-D1 — call-site facts (referenceKind: 'calls'), same handle/scoping contract as extractDecoratorFacts. */
+  extractCallFacts(handle: unknown, packageRoot: string, relativeFilePath: string): CallFact[];
+  /** AREC Wave 3 T-E1 — field/variable type-reference facts (referenceKind: 'references'), same handle/scoping contract. */
+  extractTypeReferenceFacts(handle: unknown, packageRoot: string, relativeFilePath: string): TypeReferenceFact[];
+  /** AREC Wave 3 T-E3 — extends/implements supertype facts (referenceKind: 'extends'), same handle/scoping contract. */
+  extractExtendsFacts(handle: unknown, packageRoot: string, relativeFilePath: string): ExtendsFact[];
   listIndexedFiles(handle: unknown, extensions: string[]): string[];
 }

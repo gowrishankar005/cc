@@ -1,0 +1,5 @@
+{
+  "control-id": "security-contract-http-bearer-001",
+  "name": "Bearer token authentication (OpenAPI contract)",
+  "description": "OpenAPI/Swagger securityScheme declares HTTP Bearer token authentication for this API — contract-level evidence, not proof the implementation actually enforces it on every operation"
+}

@@ -80,6 +80,12 @@ export function buildRelationships(
           // edges); every other producer leaves rel.confidence unset, so no
           // x-aac-confidence entry is added for them — absence, not a fake 0.
           ...(rel.confidence !== undefined ? [{ key: 'x-aac-confidence', value: rel.confidence }] : []),
+          // AREC T-A2 — 'structural' | 'architecture' | 'trust', set by
+          // gradeRelationshipsPass for every relationship a real run
+          // produces. Exists so a dual-unit Graphify entity<->entity edge
+          // (structural) is never visually indistinguishable in the
+          // generated CALM from a real service->database architecture link.
+          ...(rel.grade !== undefined ? [{ key: 'x-aac-relationship-grade', value: rel.grade }] : []),
         ],
       };
       const protocol = rule.protocol ?? inferredProtocol(rel.to) ?? inferredProtocol(rel.from);

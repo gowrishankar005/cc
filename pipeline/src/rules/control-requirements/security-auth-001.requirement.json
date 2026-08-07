@@ -1,0 +1,5 @@
+{
+  "control-id": "security-auth-001",
+  "name": "Token-based authentication (call-site, unverified enforcement)",
+  "description": "A JWT decode call was found at this call site — evidence that token handling occurs here, NOT proof that signature verification or authorization was enforced"
+}

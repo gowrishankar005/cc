@@ -1,0 +1,5 @@
+{
+  "control-id": "security-contract-http-basic-001",
+  "name": "HTTP Basic authentication (OpenAPI contract)",
+  "description": "OpenAPI/Swagger securityScheme declares HTTP Basic authentication for this API — contract-level evidence, not proof of implementation enforcement"
+}

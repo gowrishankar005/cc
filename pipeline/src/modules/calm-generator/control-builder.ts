@@ -53,6 +53,13 @@ export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue:
         config: {
           detectedVia: rule.detectionMechanism,
           evidenceRef: ev.ref,
+          // AREC Wave 3 T-D2 (C-rich) — the evidence's own raw source-line
+          // argument (e.g. "RESOURCE_NAME_FOR_PERMISSIONS" for a call-site
+          // control), when the extractor found one. Absent, not a fake
+          // empty string, for decorator evidence that carries no argument
+          // today (e.g. @PreAuthorize) — this is real per-signal richness,
+          // not invented for every control uniformly.
+          ...(ev.argument !== undefined ? { expression: ev.argument } : {}),
           // Honest per v0.10 §0: requirement-url is a placeholder this
           // project doesn't yet host as a real schema — say so inline, not
           // just in a document-level disclosure someone could miss.

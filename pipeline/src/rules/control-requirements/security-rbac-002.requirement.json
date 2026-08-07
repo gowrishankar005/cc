@@ -1,0 +1,5 @@
+{
+  "control-id": "security-rbac-002",
+  "name": "Role-Based Access Control (call-site)",
+  "description": "Method or endpoint access restricted by role/authority, enforced via an explicit call-site permission check (e.g. Fineract's validateHasReadPermission) rather than a decorator/annotation"
+}

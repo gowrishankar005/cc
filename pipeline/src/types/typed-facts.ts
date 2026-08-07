@@ -11,10 +11,32 @@ export interface Evidence {
   // engine (the OpenAPI provider) now produces Evidence for the same
   // construct kind (interfaces/routes) native-route/decorator already
   // produce, so the freeze documented there is void as of this version.
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi';
+  // 'call' added in CONTRACT_VERSION 5.0.0 (AREC Wave 3 T-D1) — call-site
+  // security signals (e.g. `validateHasReadPermission(...)`, `jwt.decode(...)`)
+  // matched from CodeGraph's extractFromSource() `referenceKind: 'calls'`
+  // entries — the same extraction API decorator evidence already uses, a
+  // different reference kind, not a new engine.
+  // 'field-type' added in CONTRACT_VERSION 6.0.0 (AREC Wave 3 T-E1) — a
+  // field/variable's declared TYPE (e.g. a KafkaTemplate-typed field, real
+  // messaging-producer evidence), same extraction API, `referenceKind:
+  // 'references'` instead of 'calls'/'decorates'.
+  // 'extends' added in CONTRACT_VERSION 7.0.0 (AREC Wave 3 T-E3) — a
+  // class/interface's supertype (e.g. `extends JpaRepository<Charge, Long>`,
+  // real Spring Data repository evidence), `referenceKind: 'extends'`.
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends';
   category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control';
   weight: number;
   ref: string; // file:line for code-sourced evidence; "relativeFilePath:paths"-style pointer for openapi (no line numbers available from a parsed YAML/JSON document)
+  /**
+   * AREC Wave 3 T-D2 (C-rich) — additive OPTIONAL field (Contract_Evolution_Policy.md
+   * §2(b), no separate bump beyond the source-union change above). The
+   * evidence's own raw source-line argument/expression text when
+   * extractable (e.g. "RESOURCE_NAME_FOR_PERMISSIONS" for a call-site
+   * control, or a JAX-RS path segment for a decorator) — never a resolved
+   * runtime VALUE, always the literal source text at that one line. Unset
+   * when no argument was extractable (most evidence never sets this).
+   */
+  argument?: string;
 }
 
 export interface TypedUnit {
@@ -56,6 +78,22 @@ export interface TypedRelationship {
   // other relationship producer leaves it unset, which relationship-builder.ts
   // correctly treats as "no confidence claim," not zero.
   confidence?: number;
+  // AREC Wave 3 T-A2 — additive OPTIONAL field (Contract_Evolution_Policy.md
+  // §2(b), no CONTRACT_VERSION bump). Design (A) from
+  // Architecture_Relation_Evidence_Completeness.md §3's "TypedFacts impact"
+  // options. Computed generically by analysis/relationship-grading.ts's
+  // gradeRelationshipsPass (last pass in DEFAULT_PASSES, after every
+  // relationship producer) from rel.kind + endpoint TypedUnit.kind — never
+  // from a repo-specific name. 'structural': Graphify dual-unit edge with
+  // neither endpoint a service (e.g. Fineract's entity<->entity mesh — real,
+  // but not an "architecture" claim on its own, per the Claim Register's
+  // dual-unit decision). 'architecture': at least one endpoint is a service
+  // unit (R1 one-hop service->database/topic, or a real service->service
+  // call/import). 'trust': kind === 'shares-secret' (implicit trust via a
+  // shared credential, not a code-level edge). Always set by the time a run
+  // completes — absence would only mean an older typed-facts.json predating
+  // this field, never a live-run gap.
+  grade?: 'structural' | 'architecture' | 'trust';
 }
 
 export interface IgnoredItem {
@@ -106,7 +144,34 @@ export interface IgnoredItem {
 // "4": calm-generator needed the new mapping row (now present);
 // threat-signals needed no change (filters on Evidence.category, which is
 // unaffected — 'messaging' already existed in the category union).
-export const CONTRACT_VERSION = '4.0.0';
+//
+// 5.0.0 (AREC Wave 3 T-D1, Contract_Evolution_Policy.md §5): Evidence.source
+// gained 'call' — another closed-union extension, tier (c), for call-site
+// security-control detection (control-builder's DatatableWriteService-class
+// finding extended from decorator-only to call-site-capable). Both modules
+// reviewed and bumped to supportedMajorVersion "5": calm-generator's
+// control-builder.ts filters on `Evidence.category === 'security-control'`
+// only, never on `.source` — needed no code change; threat-signals filters
+// on category only too, same as every prior bump. `Evidence.argument?:
+// string` (same change) is additive-optional, tier (b), no separate bump.
+//
+// 6.0.0 (AREC Wave 3 T-E1, Contract_Evolution_Policy.md §5): Evidence.source
+// gained 'field-type' — another closed-union extension, tier (c), for the
+// messaging-producer typed-field detection (KafkaTemplate field type).
+// Both modules reviewed and bumped to supportedMajorVersion "6":
+// calm-generator's control-builder.ts/interface-builder.ts filter on
+// category/precedence-table, both already generalize (interface-builder's
+// SOURCE_PRECEDENCE table gained a 'field-type' entry, same as 'call' did);
+// threat-signals filters on category only, unaffected.
+//
+// 7.0.0 (AREC Wave 3 T-E3, Contract_Evolution_Policy.md §5): Evidence.source
+// gained 'extends' — another closed-union extension, tier (c), for
+// Spring Data repository detection (`extends JpaRepository<...>`). Both
+// modules reviewed and bumped to supportedMajorVersion "7": calm-generator's
+// interface-builder.ts SOURCE_PRECEDENCE table gained the new key in the
+// same change, before this bump; control-builder.ts/threat-signals filter
+// on category, unaffected.
+export const CONTRACT_VERSION = '7.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

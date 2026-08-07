@@ -42,7 +42,7 @@ const ALL_GOLD = [
 ];
 
 function parseArgs(argv) {
-  const out = { strict: false, allCore: false, allGold: false, generate: false, goldOnly: false };
+  const out = { strict: false, allCore: false, allGold: false, generate: false, goldOnly: false, requireL2: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--package') out.pkg = argv[++i];
@@ -51,6 +51,15 @@ function parseArgs(argv) {
     else if (a === '--strict') out.strict = true;
     else if (a === '--generate-first') out.generate = true;
     else if (a === '--gold-only') out.goldOnly = true;
+    // AREC Wave 3 T-A3 — L2 (architecture-story/relationship-topology) is
+    // the layer this project's own methodology (Fineract RCA) found weakest
+    // and least built (R2 multi-hop is specified-unbuilt). Default exit code
+    // does NOT fail on an L2-only gap — L0 (schema) and L1 (unit/node
+    // recall) are what CI-style gating should hold the line on today; L2 is
+    // reported honestly (PASS/FAIL/N/A) but only affects exit code with this
+    // flag, so it can be turned on deliberately once R2 lands (T-C2) without
+    // a silent behavior change today.
+    else if (a === '--require-l2') out.requireL2 = true;
     else if (a === '--help' || a === '-h') out.help = true;
   }
   return out;
@@ -106,24 +115,45 @@ function hasControls(node) {
 }
 
 /**
+ * AREC Wave 3 T-A3 — gold marked with an explicit grain (e.g. `x-lab-grain:
+ * gradle-module` on fineract-system-map, module-level nodes) is not
+ * comparable to a class/file-grain generated CALM at all — not just for L2
+ * topology, for L1 node matching too (every "gold node" would spuriously
+ * read as missing). Reads a real metadata key rather than naming any
+ * specific package, so a future non-Fineract module-grain gold gets the
+ * same honest N/A automatically.
+ */
+function goldGrain(gold) {
+  return gold.metadata?.find((m) => m.key === 'x-lab-grain')?.value;
+}
+
+/**
  * Match gold architectural units against generated units by type + interface paths.
  * Generated may use file-based unique-ids; we match by content.
+ *
+ * AREC Wave 3 T-A3 — issues are now split into l1 (node/unit-level: missing
+ * gold node, missing interface path, missing controls, extra generated
+ * node) and l2 (relationship/architecture-story-level: missing connects
+ * topology) buckets, since lab L1 "ALL PASS" was previously indistinguishable
+ * from a real L2 architecture-story pass — exactly the false-comfort finding
+ * from the Fineract RCA (validation-approach-vnext.md).
  */
 function semanticCompare(gold, generated) {
-  const issues = [];
+  const l1 = [];
+  const l2 = [];
   const gNodes = architecturalNodes(gold);
   const aNodes = architecturalNodes(generated);
 
   // Trap / empty architecture
   if (gNodes.length === 0) {
     if (aNodes.length > 0) {
-      issues.push(
+      l1.push(
         `trap/empty gold expects 0 architectural nodes, generated has ${aNodes.length}: ${aNodes
           .map((n) => `${n['node-type']}:${n.name || n['unique-id']}`)
           .join(', ')}`
       );
     }
-    return issues;
+    return { l1, l2, l2Applicable: false, l2NotApplicableReason: 'trap/empty gold — no architecture asserted' };
   }
 
   const used = new Set();
@@ -166,7 +196,7 @@ function semanticCompare(gold, generated) {
     }
 
     if (best === null) {
-      issues.push(
+      l1.push(
         `missing gold node: ${g['unique-id']} (${gType}${gPaths.size ? ' paths=' + [...gPaths].join('|') : ''})`
       );
       continue;
@@ -178,27 +208,28 @@ function semanticCompare(gold, generated) {
     if (gPaths.size > 0) {
       const aPaths = pathSet(matched);
       for (const p of gPaths) {
-        if (!aPaths.has(p)) issues.push(`missing interface path on ${g['unique-id']}: ${p}`);
+        if (!aPaths.has(p)) l1.push(`missing interface path on ${g['unique-id']}: ${p}`);
       }
     }
 
     // Controls presence
     if (hasControls(g) && !hasControls(matched)) {
-      issues.push(`missing controls on matched node for gold ${g['unique-id']} (matched ${matched['unique-id']})`);
+      l1.push(`missing controls on matched node for gold ${g['unique-id']} (matched ${matched['unique-id']})`);
     }
   }
 
   // Extra generated architectural nodes (not system) beyond gold — informational unless strict
   const extras = aNodes.filter((_, i) => !used.has(i));
   if (extras.length) {
-    issues.push(
+    l1.push(
       `extra generated node(s) not in gold: ${extras
         .map((n) => `${n['node-type']}:${n.name || n['unique-id']}`)
         .join(', ')}`
     );
   }
 
-  // Relationship topology: gold connects pairs of (sourceType→destType) with optional path context
+  // Relationship topology (L2 — architecture story, not unit recall): gold
+  // connects pairs of (sourceType→destType) with optional path context.
   const goldConnects = (gold.relationships || [])
     .map((r) => r['relationship-type']?.connects)
     .filter(Boolean);
@@ -206,40 +237,46 @@ function semanticCompare(gold, generated) {
     .map((r) => r['relationship-type']?.connects)
     .filter(Boolean);
 
-  if (goldConnects.length > 0) {
-    // Build type multiset for gold endpoints
-    const gIdToType = Object.fromEntries(gNodes.map((n) => [n['unique-id'], n['node-type']]));
-    const aIdToType = Object.fromEntries(
-      (generated.nodes || []).map((n) => [n['unique-id'], n['node-type']])
-    );
+  // AREC T-A3 — a package whose gold has ZERO connects-shaped relationships
+  // makes no L2 claim at all (either it's a pure unit-recall fixture, or —
+  // like fineract-system-map — its only relationships are composed-of, not
+  // connects). L1 "ALL PASS" on such a package must never be read as
+  // "architecture links verified" — reported as N/A, not PASS, so it can't
+  // be misquoted as a green L2 result.
+  if (goldConnects.length === 0) {
+    return { l1, l2, l2Applicable: false, l2NotApplicableReason: 'gold has no connects-shaped relationships — L2 not asserted by this gold' };
+  }
 
-    const goldPairs = goldConnects.map((c) => {
-      const st = gIdToType[c.source?.node] || '?';
-      const dt = gIdToType[c.destination?.node] || '?';
-      return `${st}->${dt}`;
-    });
-    const genPairs = genConnects.map((c) => {
-      const st = aIdToType[c.source?.node] || '?';
-      const dt = aIdToType[c.destination?.node] || '?';
-      return `${st}->${dt}`;
-    });
+  // Build type multiset for gold endpoints
+  const gIdToType = Object.fromEntries(gNodes.map((n) => [n['unique-id'], n['node-type']]));
+  const aIdToType = Object.fromEntries((generated.nodes || []).map((n) => [n['unique-id'], n['node-type']]));
 
-    const genBag = {};
-    for (const p of genPairs) genBag[p] = (genBag[p] || 0) + 1;
-    const needed = {};
-    for (const p of goldPairs) needed[p] = (needed[p] || 0) + 1;
-    for (const [pair, count] of Object.entries(needed)) {
-      const have = genBag[pair] || 0;
-      if (have < count) {
-        issues.push(`missing connects topology ${pair} (gold needs ${count}, generated has ${have})`);
-      }
+  const goldPairs = goldConnects.map((c) => {
+    const st = gIdToType[c.source?.node] || '?';
+    const dt = gIdToType[c.destination?.node] || '?';
+    return `${st}->${dt}`;
+  });
+  const genPairs = genConnects.map((c) => {
+    const st = aIdToType[c.source?.node] || '?';
+    const dt = aIdToType[c.destination?.node] || '?';
+    return `${st}->${dt}`;
+  });
+
+  const genBag = {};
+  for (const p of genPairs) genBag[p] = (genBag[p] || 0) + 1;
+  const needed = {};
+  for (const p of goldPairs) needed[p] = (needed[p] || 0) + 1;
+  for (const [pair, count] of Object.entries(needed)) {
+    const have = genBag[pair] || 0;
+    if (have < count) {
+      l2.push(`missing connects topology ${pair} (gold needs ${count}, generated has ${have})`);
     }
   }
 
-  return issues;
+  return { l1, l2, l2Applicable: true };
 }
 
-function validateOne(pkg, { strict, goldOnly }) {
+function validateOne(pkg, { strict, goldOnly, requireL2 }) {
   const goldPath = path.join(LAB, 'gold/calm', pkg, 'architecture.calm.json');
   const actualPath = path.join(LAB, 'generated', pkg, 'architecture.calm.json');
 
@@ -279,24 +316,59 @@ function validateOne(pkg, { strict, goldOnly }) {
   const genSchema = calmValidate(actualPath);
   const gold = JSON.parse(fs.readFileSync(goldPath, 'utf8'));
   const actual = JSON.parse(fs.readFileSync(actualPath, 'utf8'));
-  const issues = semanticCompare(gold, actual);
+
+  // AREC T-A3 — grain mismatch (e.g. fineract-system-map's module-level gold
+  // vs a class/file-grain generated CALM) makes BOTH L1 and L2 meaningless,
+  // not just L2: every gold node would spuriously read as "missing". Detected
+  // generically from gold's own x-aac/x-lab metadata, never a package-name check.
+  const grain = goldGrain(gold);
+  if (grain) {
+    return {
+      pkg,
+      ok: genSchema.ok, // exit code depends only on schema validity, never on an incomparable-grain compare
+      goldSchemaOk: true,
+      genSchemaOk: genSchema.ok,
+      genSchemaLog: genSchema.ok ? 'ok' : genSchema.log,
+      goldWarnings: goldSchema.hasWarnings,
+      genWarnings: genSchema.hasWarnings,
+      l1Status: 'N/A',
+      l1Reason: `grain mismatch (gold x-lab-grain: "${grain}") — not comparable to a class/file-grain generated CALM`,
+      l2Status: 'N/A',
+      l2Reason: `grain mismatch (gold x-lab-grain: "${grain}")`,
+    };
+  }
+
+  const { l1, l2, l2Applicable, l2NotApplicableReason } = semanticCompare(gold, actual);
 
   // In non-strict mode, "extra" nodes are soft (score as warning, not fail)
-  const hard = issues.filter((i) => !i.startsWith('extra generated'));
-  const soft = issues.filter((i) => i.startsWith('extra generated'));
-  const structuralOk = strict ? issues.length === 0 : hard.length === 0;
+  const hard = l1.filter((i) => !i.startsWith('extra generated'));
+  const soft = l1.filter((i) => i.startsWith('extra generated'));
+  const l1Ok = strict ? l1.length === 0 : hard.length === 0;
+  const l2Ok = l2Applicable ? l2.length === 0 : true; // N/A counts as "not failing"
+
+  // AREC T-A3 exit-code policy: default exit code is L0 (schema) + L1 (unit
+  // recall) only. An L2 (architecture-story) gap alone does NOT fail the run
+  // unless --require-l2 is passed — this is deliberate, not an oversight:
+  // R2 (multi-hop architecture links) is Claim-Register specified-unbuilt
+  // today, so gating CI on L2 would make every layered-Java package
+  // permanently red for a gap that's honestly documented, not silently
+  // ignored (see the l2Status line every result prints below).
+  const ok = genSchema.ok && l1Ok && (!requireL2 || l2Ok);
 
   return {
     pkg,
-    ok: structuralOk && genSchema.ok,
+    ok,
     goldSchemaOk: true,
     genSchemaOk: genSchema.ok,
-    structuralOk,
     hardIssues: hard,
     softIssues: soft,
     genSchemaLog: genSchema.ok ? 'ok' : genSchema.log,
     goldWarnings: goldSchema.hasWarnings,
     genWarnings: genSchema.hasWarnings,
+    l1Status: l1Ok ? 'PASS' : 'FAIL',
+    l2Status: !l2Applicable ? 'N/A' : l2Ok ? 'PASS' : 'FAIL',
+    l2Reason: !l2Applicable ? l2NotApplicableReason : undefined,
+    l2Issues: l2,
   };
 }
 
@@ -304,12 +376,17 @@ function main() {
   const args = parseArgs(process.argv);
   if (args.help || (!args.pkg && !args.allCore && !args.allGold)) {
     console.log(`Usage:
-  node scripts/validate-calm-pair.mjs --package <id> [--generate-first] [--strict] [--gold-only]
-  node scripts/validate-calm-pair.mjs --all-core [--generate-first] [--strict]
+  node scripts/validate-calm-pair.mjs --package <id> [--generate-first] [--strict] [--gold-only] [--require-l2]
+  node scripts/validate-calm-pair.mjs --all-core [--generate-first] [--strict] [--require-l2]
   node scripts/validate-calm-pair.mjs --all-gold [--gold-only]
 
 Gold is hand-authored under gold/calm/ (not generator bootstrap).
-Compare is semantic: node-type + path interfaces + connects topology + controls.`);
+Compare is layered: L0 schema, L1 unit/node recall, L2 architecture-story
+(relationship topology). Exit code = L0 + L1 by default; pass --require-l2 to
+also gate on L2 (off by default since R2 multi-hop is specified-unbuilt —
+see Claim_Register.md). A package whose gold has no connects-shaped
+relationships, or is module-grain (x-lab-grain metadata), reports L2 as N/A,
+never a false PASS or FAIL.`);
     process.exit(args.help ? 0 : 2);
   }
 
@@ -342,11 +419,16 @@ Compare is semantic: node-type + path interfaces + connects topology + controls.
       console.log('PASS gold calm validate', r.goldWarnings ? '(with warnings)' : '(0 errors, clean)');
       continue;
     }
-    console.log(`gold schema:  ${r.goldSchemaOk ? 'PASS' : 'FAIL'}${r.goldWarnings ? ' (warnings)' : ''}`);
-    console.log(`gen schema:   ${r.genSchemaOk ? 'PASS' : 'FAIL'} ${r.genSchemaOk ? '' : r.genSchemaLog}`);
-    console.log(`semantic:     ${r.structuralOk ? 'PASS' : 'FAIL'}`);
-    for (const i of r.hardIssues || []) console.log('  -', i);
-    for (const i of r.softIssues || []) console.log('  ~', i);
+    // AREC T-A3 — explicit L0/L1/L2 lines so a reader can never mistake an
+    // L1 (unit) pass for an L2 (architecture story) pass, the exact
+    // confusion the Fineract RCA found (validation-approach-vnext.md).
+    console.log(`L0 schema (gold): ${r.goldSchemaOk ? 'PASS' : 'FAIL'}${r.goldWarnings ? ' (warnings)' : ''}`);
+    console.log(`L0 schema (gen):  ${r.genSchemaOk ? 'PASS' : 'FAIL'} ${r.genSchemaOk ? '' : r.genSchemaLog}`);
+    console.log(`L1 unit recall:   ${r.l1Status}${r.l1Reason ? ` (${r.l1Reason})` : ''}`);
+    console.log(`L2 story:         ${r.l2Status}${r.l2Reason ? ` (${r.l2Reason})` : ''}`);
+    for (const i of r.hardIssues || []) console.log('  L1 -', i);
+    for (const i of r.softIssues || []) console.log('  L1 ~', i);
+    for (const i of r.l2Issues || []) console.log('  L2 -', i);
     if (!r.ok) allOk = false;
   }
 

@@ -65,10 +65,18 @@ Implement later (Wave 3-S); **policy now**:
 | Tool | Layer |
 |---|---|
 | `calm validate` | L0 |
-| `gold/packages` + `score-calm` | L1 (P/R style) |
-| `gold/calm` + `validate-calm-pair` | L0 + semantic L1; tighten for L2 |
+| `gold/packages` + `score-calm` | L1 (P/R style); `rel R` column is an L2 proxy, read separately from `pass` (T-A3) |
+| `gold/calm` + `validate-calm-pair` | L0 + explicit L1 + explicit L2 (T-A3 — no longer bundled into one `semantic` line) |
 | Claim register / scope-limitations | L4 |
 | Overrides | L5 |
+
+### `validate-calm-pair.mjs` L0/L1/L2 (T-A3, 2026-08-07)
+
+Each package result now prints separate `L0 schema`, `L1 unit recall`, `L2 story` lines instead of one bundled `semantic: PASS/FAIL` — the previous shape made it impossible to tell an L1-only pass from an L2 story pass by output alone, which is exactly the false-comfort the Fineract finding named.
+
+- **L2 = N/A** (not PASS, not FAIL) when: gold has zero `connects`-shaped relationships (most lab-core packages — they assert unit/interface recall, not architecture links), OR gold carries an `x-lab-grain` metadata key (module-grain gold, e.g. `fineract-system-map`, is not comparable to a class/file-grain generated CALM at all — both L1 and L2 are N/A for those).
+- **Exit code default = L0 + L1 only.** An L2-only failure does not fail the run. Pass `--require-l2` to also gate on L2 — deliberately off by default while R2 (multi-hop architecture links) is Claim-Register `specified-unbuilt`; turning default exit code red for an honestly-documented, not-yet-built capability would just train operators to ignore red, the opposite of this file's purpose.
+- Real verified result (2026-08-07): `fineract-charge`/`fineract-core` now print `L1: PASS`, `L2: FAIL` (exit 0 by default, exit 1 with `--require-l2`) — matching the documented baseline (`coe-lab/docs/fineract-gold-vs-platform-finding.md`) exactly, not a new claim.
 
 ---
 
@@ -76,12 +84,14 @@ Implement later (Wave 3-S); **policy now**:
 
 | Package | Expected at L2 today |
 |---|---|
-| fineract-charge | **FAIL** story (no service→db) |
-| fineract-core | **FAIL** story (no service→db; HTTP controls absent) |
+| fineract-charge | **FAIL** story — R2 (T-C1, 2026-08-07) was implemented and RUN against this exact package (both single-root and a `fineract-charge`+`fineract-provider` multi-root scan) and did NOT close the gap: a real, evidenced residual, not an unbuilt-mechanism gap anymore. `ChargesApiResource`'s bridge to `ChargeReadPlatformService` resolves correctly, but the real implementer (`ChargeReadPlatformServiceImpl`, in `fineract-provider`) has no catalogue-recognized persistence evidence of its own (raw JDBC, not `@Entity`/a matched driver import) — see `AREC_R2_MultiHop_Strategy.md` §1 and `STATUS.md` §D T-C1. |
+| fineract-core | **FAIL** story (no service→db; HTTP controls absent) — R2 not yet remeasured against `fineract-core` specifically (T-C1 remeasured `fineract-charge`); expect the same class of residual until C-call (Session D) or a Phase 2 engine closes the implementer-evidence gap |
 | ts-orders-dynamo | **FAIL** or weak until cloud units exist |
 | java-kafka-settlement | Partial L1 network; L2 producer edges fail |
 
 Lab core may **L1 pass** while wild L2 fails — that is consistent, not a contradiction.
+
+**R2 mechanism status (T-C1, 2026-08-07)**: built and verified NON-FABRICATING on two real scan shapes — never invents an edge when a bridge is ambiguous or its implementer lacks persistence evidence, always reports an honest `unresolved-multi-hop` ignored-item instead. Proven POSITIVE on a synthetic fixture (`pipeline/test/fixtures/r2-bridge-sample`) where the full chain (service → bridge → persistence-evidenced implementer) is resolvable within scanned roots. Fineract-charge's own L2 failure is now a genuinely evidenced residual (the real implementer lacks its own persistence evidence), not an "unbuilt mechanism" gap — worth re-testing once C-call (Session D) or a broader persistence catalogue closes that specific evidence gap.
 
 ---
 
@@ -90,3 +100,4 @@ Lab core may **L1 pass** while wild L2 fails — that is consistent, not a contr
 | Date | Note |
 |---|---|
 | 2026-08-07 | Wave 1-A2 initial |
+| 2026-08-07 | AREC Wave 3 T-A3: `validate-calm-pair.mjs` prints explicit L0/L1/L2 lines; `--require-l2` gates exit code; system-map/empty-gold-rel packages report L2 N/A generically (metadata-driven, no package-name check) |

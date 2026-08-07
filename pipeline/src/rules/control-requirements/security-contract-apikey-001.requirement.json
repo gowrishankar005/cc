@@ -1,0 +1,5 @@
+{
+  "control-id": "security-contract-apikey-001",
+  "name": "API key authentication (OpenAPI contract)",
+  "description": "OpenAPI/Swagger securityScheme declares API key authentication for this API — contract-level evidence, not proof of implementation enforcement"
+}

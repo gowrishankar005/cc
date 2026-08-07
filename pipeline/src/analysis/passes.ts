@@ -10,6 +10,8 @@ import { k8sTrustPass } from './k8s-trust-pass';
 import { detectMessagingPass } from './messaging-pass';
 import { outboundHttpPass } from './outbound-http-pass';
 import { envSoftGraphPass } from './env-soft-graph-pass';
+import { gradeRelationships } from './relationship-grading';
+import { multiHopBridgePass } from './multi-hop-bridge-pass';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -38,7 +40,7 @@ export const mapSignalsPass: AnalysisPass = {
   name: 'mapSignals',
   run(ctx: AnalysisContext) {
     for (const [root, raw] of ctx.rawByRoot) {
-      const { units, ignoredItems } = mapSignalsToUnits(raw.nativeRoutes, raw.decoratorFacts, ctx.catalogue);
+      const { units, ignoredItems } = mapSignalsToUnits(raw.nativeRoutes, raw.decoratorFacts, ctx.catalogue, raw.callFacts, raw.typeReferenceFacts, raw.extendsFacts);
       for (const u of units) {
         if (u.confidence < CONFIDENCE_FLOOR) {
           ctx.allIgnoredItems.push(ignoreLowConfidence(u.id, u.confidence));
@@ -86,6 +88,14 @@ export const reconcilePass: AnalysisPass = {
   },
 };
 
+/** AREC Wave 3 T-A2 — grades every relationship the run collectively produced. MUST run LAST: it needs to see the final ctx.relationships array, after every producer (reconcile/k8s-trust/env-soft-graph) has added its own. */
+export const gradeRelationshipsPass: AnalysisPass = {
+  name: 'gradeRelationships',
+  run(ctx: AnalysisContext) {
+    gradeRelationships(ctx.relationships, ctx.allUnits);
+  },
+};
+
 /**
  * Default pass order. openApiPass (T-X4-1) added after mapSignalsPass —
  * independent of it (reads no shared state), grouped here since both are
@@ -93,6 +103,25 @@ export const reconcilePass: AnalysisPass = {
  * (T-X5-1) MUST run LAST, after reconcilePass — reconcilePass does
  * `ctx.relationships = reconcileCrossPackageEdges(...)` (an overwrite, not
  * an append), so anything pushed to ctx.relationships before it runs would
- * be silently discarded.
+ * be silently discarded. multiHopBridgePass (AREC T-C1, R2) is APPEND-only
+ * and also needs the final ctx.unitsByRoot, so it must run after
+ * reconcilePass too — placed right after it, before the other append-only
+ * relationship passes (order among k8sTrust/envSoftGraph/multiHopBridge
+ * doesn't matter, none of them read each other's output).
+ * gradeRelationshipsPass MUST be the true last pass for the same reason, one
+ * level further — it reads (not overwrites) ctx.relationships, so it has to
+ * run after every pass that appends to it.
  */
-export const DEFAULT_PASSES: AnalysisPass[] = [composeRoutesPass, mapSignalsPass, openApiPass, detectPersistencePass, detectMessagingPass, outboundHttpPass, reconcilePass, k8sTrustPass, envSoftGraphPass];
+export const DEFAULT_PASSES: AnalysisPass[] = [
+  composeRoutesPass,
+  mapSignalsPass,
+  openApiPass,
+  detectPersistencePass,
+  detectMessagingPass,
+  outboundHttpPass,
+  reconcilePass,
+  multiHopBridgePass,
+  k8sTrustPass,
+  envSoftGraphPass,
+  gradeRelationshipsPass,
+];

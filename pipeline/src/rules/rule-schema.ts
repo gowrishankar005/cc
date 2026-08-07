@@ -7,7 +7,17 @@ export interface CatalogueRule {
   language: string;
   framework: string;
   matchSignal: string; // literal or | -separated alternatives, matched case-sensitively against raw signal name
-  matchSource: 'native-route' | 'decorator';
+  // 'call' added AREC Wave 3 T-D1 — call-site security signals (e.g. Java's
+  // `context.authenticatedUser().validateHasReadPermission(...)`, Python's
+  // `jwt.decode(...)`) matched from CodeGraph's extractFromSource()
+  // `referenceKind: 'calls'` entries, the exact same mechanism family as
+  // 'decorator' (referenceKind: 'decorates'), just a different reference kind.
+  // 'field-type' added AREC Wave 3 T-E1 — a field/variable's declared TYPE
+  // (referenceKind: 'references'), e.g. a KafkaTemplate-typed field as
+  // producer-capability evidence.
+  // 'extends' added AREC Wave 3 T-E3 — a class/interface's supertype
+  // (referenceKind: 'extends'), e.g. `extends JpaRepository<Charge, Long>`.
+  matchSource: 'native-route' | 'decorator' | 'call' | 'field-type' | 'extends';
   category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control';
   weight: number;
   calmNodeType: 'service' | 'database' | 'topic'; // 'topic' added T-X7-2, for messaging-consumer decorator rules (@KafkaListener/@JmsListener) — same CONTRACT_VERSION 4.0.0 bump as TypedUnit.kind's own 'topic' addition
@@ -59,7 +69,7 @@ export function loadSignalCatalogue(catalogueDir: string = __dirname): SignalCat
 export function findRule(
   catalogue: SignalCatalogue,
   rawSignal: string,
-  matchSource: 'native-route' | 'decorator',
+  matchSource: 'native-route' | 'decorator' | 'call' | 'field-type' | 'extends',
   language?: string
 ): CatalogueRule | undefined {
   const candidates = catalogue.rules.filter((rule) => {

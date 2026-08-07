@@ -12,6 +12,6 @@ Not all need fixtures yet — cards guide Wave 3 eval (W3-eval).
 | T5 | K8s name ≠ entity | Deployment must not bind to JPA entity | BoA Transaction.java FP fixed | L2 k8s endpoints service-only |
 | T6 | Messaging producer only | send() without listener | Fineract/lab producer path | L1/L2 producer OOS or fail |
 | T7 | Dynamo/SQS cloud import | Cloud native units | lab ts-orders-dynamo | L1 weak until strategies |
-| T8 | OpenAPI dual unit | Spec + controller same routes | lab ts-nestjs-users | L1 ignore openapi FP or merge |
+| T8 | OpenAPI dual unit | Spec + controller same routes | lab ts-nestjs-users | **PROMOTED (T-E4, 2026-08-08)** — automated expected-pass test in `pipeline/test/regression.test.js` ("AREC T-E4 — OpenAPI dual-unit merge"). Merge policy: overlapping normalized routes -> one unit; 0 or 2+ overlaps fall back to standalone (never guessed) |
 
 Promotion: when Wave 3 implements a cell, convert card to automated expected-fail or expected-pass test.

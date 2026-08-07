@@ -172,6 +172,50 @@ rules:
     weight: 40
     calmNodeType: service
 
+  # --- AREC Wave 3 T-D1 (C-call): call-site security-control evidence ---
+  # v0.10 §0 specified TWO control-detection mechanisms: decorator (built
+  # above, spring-preauthorize) and call-based (never built until now).
+  # Real evidence, verified via a direct extractFromSource() probe before
+  # writing this row (not assumed): Fineract's ChargesApiResource.java calls
+  # `context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS)`
+  # at lines 84/101/129 — CodeGraph's extractFromSource() reports this as a
+  # `referenceKind: 'calls'` entry with `referenceName:
+  # "context.authenticatedUser().validateHasReadPermission"`, the exact same
+  # mechanism family as the `decorates` refs every other Java row here uses,
+  # just a different reference kind (see codegraph-provider.ts's new
+  # extractCallFacts()). Weighted 40, same tier as spring-preauthorize — this
+  # IS definite evidence of an authorization check (Fineract's own security
+  # API), not weaker just because it's a call instead of a decorator.
+  - id: fineract-call-site-permission
+    language: java
+    framework: fineract-security
+    matchSignal: "validateHasReadPermission|validateHasPermission|validateHasCheckerPermission"
+    matchSource: call
+    category: security-control
+    weight: 40
+    calmNodeType: service
+
+  # Real evidence: coe-lab/fixtures/monorepo/packages/py-jwt-gateway's
+  # auth_gateway.py calls `jwt.decode(token, options={"verify_signature":
+  # False})` — CodeGraph's extractFromSource() reports this as a `calls`
+  # entry with `referenceName: "jwt.decode"`, verified via the same direct
+  # probe as the Java row above. Weighted LOWER (20, corroboration-only tier,
+  # matching the import-only persistence/messaging convention) deliberately:
+  # unlike a decorator or a named permission-check API, a bare `jwt.decode(...)`
+  # call does NOT by itself prove verification happened — this exact fixture
+  # passes `verify_signature: False`, a real anti-pattern, not a definite
+  # control. Detecting the CALL is real and useful (S3: category presence ≠
+  # source-security-guarantee), but must not be sold as high-confidence proof
+  # of enforcement the way spring-preauthorize/fineract-call-site-permission are.
+  - id: python-jwt-decode-call
+    language: python
+    framework: pyjwt
+    matchSignal: "jwt.decode"
+    matchSource: call
+    category: security-control
+    weight: 20
+    calmNodeType: service
+
   # --- Java: messaging consumers (T-X7-2, G-L2-03) ---
   # @KafkaListener/@JmsListener are consumer-side markers, decorator-detected
   # via the SAME proven extractFromSource()/decorates-ref mechanism as every
@@ -201,6 +245,57 @@ rules:
     framework: jms
     matchSignal: "JmsListener"
     matchSource: decorator
+    category: messaging
+    weight: 40
+    calmNodeType: topic
+
+  # --- AREC Wave 3 T-E1: messaging PRODUCER (typed-field-producer strategy) ---
+  # Closes messaging-detection-catalogue.yml's own "typed-field-producer"
+  # gap, previously status: not-implemented. Real evidence, verified via a
+  # direct extractFromSource() probe before writing this row: Fineract's
+  # KafkaExternalEventProducer.java has `private KafkaTemplate<Long, byte[]>
+  # externalEventsKafkaTemplate;` — CodeGraph reports a `referenceKind:
+  # 'references'` entry with `referenceName: "KafkaTemplate"` (the field's
+  # declared TYPE, not the Fineract-specific field NAME). Weighted 40
+  # (sufficient alone, same tier as jpa-entity/kafka-listener) — real
+  # finding while verifying this against KafkaExternalEventProducer.java
+  # itself: an initial weight-20 "import-only tier" guess (matching SQS/SNS's
+  # weak, corroboration-only tier) left this real class BELOW the 40-point
+  # confidence floor with no other evidence in the file, silently producing
+  # ZERO output — the exact opposite of this task's purpose. Re-evaluated: a
+  # field's DECLARED TYPE as a class member is direct architectural
+  # commitment (this class was built to hold a Kafka producer dependency),
+  # meaningfully stronger than a bare file-level import (which only proves
+  # the library is on the classpath) — the same "sufficient alone" logic
+  # jpa-entity's own weight-40 comment already uses. Re-verified after the
+  # fix: real KafkaExternalEventProducer.java now correctly produces a
+  # `topic` unit.
+  # --- AREC Wave 3 T-E3: Spring Data repository (persistence, extends-based) ---
+  # Closes persistence-detection-catalogue.yml's own "spring-data-repository"
+  # gap, previously status: not-implemented. Real evidence, verified via a
+  # direct extractFromSource() probe before writing this row: Fineract's
+  # ChargeRepository.java (`interface ChargeRepository extends
+  # JpaRepository<Charge, Long>, JpaSpecificationExecutor<Charge>`) — the
+  # word-boundary matcher matches "JpaRepository" correctly against the
+  # captured referenceName "JpaRepository<Charge, Long>" (generic args
+  # included, `<` is a non-word boundary). Weighted 40 (sufficient alone,
+  # same tier as jpa-entity) — an interface extending a real Spring Data base
+  # type is definite, first-party evidence of a repository, not weaker than
+  # a bare @Entity.
+  - id: spring-data-repository-extends
+    language: java
+    framework: spring-data
+    matchSignal: "JpaRepository|CrudRepository|PagingAndSortingRepository|JpaSpecificationExecutor"
+    matchSource: extends
+    category: persistence
+    weight: 40
+    calmNodeType: database
+
+  - id: kafka-template-field
+    language: java
+    framework: spring-kafka
+    matchSignal: "KafkaTemplate"
+    matchSource: field-type
     category: messaging
     weight: 40
     calmNodeType: topic

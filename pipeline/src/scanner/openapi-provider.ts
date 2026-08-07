@@ -19,11 +19,25 @@ export interface OpenApiOperation {
   method: string; // uppercase, e.g. "GET"
 }
 
+/**
+ * AREC Wave 3 T-E4 (C-contract expand) — real structural fields, not just
+ * the scheme's user-chosen NAME (`bearerAuth`, `myAuth`, `jwt`, ... — the
+ * author picks this string freely, so matching on it can never generalize
+ * across real specs). `type`/`scheme` are the actual OpenAPI/Swagger
+ * vocabulary values (`http`+`bearer`, `apiKey`, `oauth2`, `openIdConnect`),
+ * the same across every spec regardless of naming convention.
+ */
+export interface OpenApiSecurityScheme {
+  name: string; // the author-chosen key, kept for provenance/ref only, never matched against
+  type?: string; // 'http' | 'apiKey' | 'oauth2' | 'openIdConnect' | ... (OpenAPI 3); 'basic' | 'apiKey' | 'oauth2' (Swagger 2)
+  scheme?: string; // only present when type === 'http', e.g. 'bearer' | 'basic'
+}
+
 export interface OpenApiDocument {
   filePath: string; // relative to packageRoot
   title?: string;
   operations: OpenApiOperation[];
-  securitySchemeNames: string[];
+  securitySchemes: OpenApiSecurityScheme[];
 }
 
 function findOpenApiFiles(packageRoot: string): string[] {
@@ -44,24 +58,28 @@ function findOpenApiFiles(packageRoot: string): string[] {
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
 
-function parseOpenApiFile(absPath: string): { title?: string; paths?: Record<string, unknown>; securitySchemeNames: string[] } {
+function parseOpenApiFile(absPath: string): { title?: string; paths?: Record<string, unknown>; securitySchemes: OpenApiSecurityScheme[] } {
   const raw = fs.readFileSync(absPath, 'utf8');
   const doc = absPath.endsWith('.json') ? JSON.parse(raw) : parseYaml(raw);
 
   const title = doc?.info?.title;
   const paths = doc?.paths ?? {};
   // OpenAPI 3: components.securitySchemes; Swagger 2: securityDefinitions.
-  const securitySchemes = doc?.components?.securitySchemes ?? doc?.securityDefinitions ?? {};
-  const securitySchemeNames = Object.keys(securitySchemes);
+  const rawSchemes = doc?.components?.securitySchemes ?? doc?.securityDefinitions ?? {};
+  const securitySchemes: OpenApiSecurityScheme[] = Object.entries(rawSchemes).map(([name, def]: [string, any]) => ({
+    name,
+    type: def?.type,
+    scheme: def?.scheme,
+  }));
 
-  return { title, paths, securitySchemeNames };
+  return { title, paths, securitySchemes };
 }
 
 /** Discovers and parses every OpenAPI/Swagger file under packageRoot. Empty array (not an error) when none exist — "run without file ok" per T-X4-1's own acceptance. */
 export function discoverOpenApiDocuments(packageRoot: string): OpenApiDocument[] {
   return findOpenApiFiles(packageRoot).map((absPath) => {
     const relativeFilePath = path.relative(packageRoot, absPath);
-    const { title, paths, securitySchemeNames } = parseOpenApiFile(absPath);
+    const { title, paths, securitySchemes } = parseOpenApiFile(absPath);
     const operations: OpenApiOperation[] = [];
     for (const [routePath, methods] of Object.entries(paths ?? {})) {
       if (typeof methods !== 'object' || methods === null) continue;
@@ -71,6 +89,6 @@ export function discoverOpenApiDocuments(packageRoot: string): OpenApiDocument[]
         }
       }
     }
-    return { filePath: relativeFilePath, title, operations, securitySchemeNames };
+    return { filePath: relativeFilePath, title, operations, securitySchemes };
   });
 }

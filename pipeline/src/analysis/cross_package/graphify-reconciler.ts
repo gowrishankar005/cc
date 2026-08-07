@@ -28,8 +28,20 @@ import { TypedUnit, TypedRelationship } from '../../types/typed-facts';
  * (real for Slice 1's one-unit-per-file granularity — a Graphify node deep
  * in a file still belongs to that file's unit).
  */
-export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): TypedRelationship[] {
-  const nodeToUnit = new Map<string, { root: string; unit: TypedUnit }>();
+export interface NodeUnitMatch {
+  root: string;
+  unit: TypedUnit;
+}
+
+/**
+ * AREC Wave 3 T-C1 — extracted so multi-hop-bridge-detector.ts (R2) can
+ * reuse the EXACT same node->unit resolution reconcileCrossPackageEdges
+ * already uses, instead of a second, potentially-drifting copy of the same
+ * filePath/line-span matching logic. Behavior unchanged from before this
+ * extraction (verified: full regression suite unchanged after the split).
+ */
+export function buildNodeToUnitMap(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): Map<string, NodeUnitMatch> {
+  const nodeToUnit = new Map<string, NodeUnitMatch>();
 
   for (const node of run.graph.nodes) {
     const resolved = run.resolveRoot(node.source_file);
@@ -54,6 +66,12 @@ export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<st
       nodeToUnit.set(node.id, { root: resolved.root, unit: match });
     }
   }
+
+  return nodeToUnit;
+}
+
+export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): TypedRelationship[] {
+  const nodeToUnit = buildNodeToUnitMap(run, unitsByRoot);
 
   const relationships: TypedRelationship[] = [];
   for (const edge of run.graph.edges) {

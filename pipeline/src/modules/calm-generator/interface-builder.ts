@@ -26,6 +26,9 @@ const SOURCE_PRECEDENCE: Record<Evidence['source'], number> = {
   openapi: 1,
   decorator: 2,
   'graphify-import': 3, // never actually contributes interfaces today (no node-type-mapping row lists persistence/graphify-import under interfaceCategories) — ordered last for completeness, not because it's been exercised
+  call: 4, // AREC T-D1 — security-control category only, never interface-building; ordered last for the same reason as graphify-import (completeness, not exercised)
+  'field-type': 5, // AREC T-E1 — messaging category only, never interface-building; ordered last for the same reason
+  extends: 6, // AREC T-E3 — persistence category only, never interface-building; ordered last for the same reason
 };
 
 export function attachInterfaces(units: TypedUnit[], nodes: CalmNode[], mapping: NodeTypeMapping): void {

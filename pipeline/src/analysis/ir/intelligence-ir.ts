@@ -52,6 +52,22 @@ export function renderIntelligenceIR(
     `- unresolved by mechanism: ${Object.entries(coverage.unresolvedByMechanism).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     ''
   );
+
+  h(`## Completeness (AREC S1/S2 — distinct from confidence; see S4)`);
+  lines.push(
+    `- service units: ${coverage.completeness.serviceUnitCount}, database units: ${coverage.completeness.databaseUnitCount}`,
+    `- relationships touching a service unit: ${coverage.completeness.serviceTouchingRelationshipCount}`,
+    `- HTTP-entry-point units without security-control evidence: ${coverage.completeness.httpUnitsWithoutSecurityControlCount}`,
+    ''
+  );
+  if (coverage.completeness.silenceFlags.length > 0) {
+    lines.push(`**Silence flags:**`, '');
+    for (const flag of coverage.completeness.silenceFlags) lines.push(`- ⚠️ ${flag}`);
+    lines.push('');
+  } else {
+    lines.push(`No silence flags raised.`, '');
+  }
+
   for (const root of coverage.roots) {
     lines.push(`### \`${root.packageRoot}\``);
     lines.push(

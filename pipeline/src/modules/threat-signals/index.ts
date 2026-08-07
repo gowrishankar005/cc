@@ -28,7 +28,17 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
     .map((u) => ({
       unitId: u.id,
       stride: 'spoofing' as const,
-      rationale: 'HTTP-entry-point evidence present; no security-control evidence found for this unit.',
+      // AREC Wave 3 T-D3 (S3, narrative honesty) — the original wording
+      // ("no security-control evidence found") reads as "no auth exists in
+      // source," which is a different, stronger, unverified claim. Even
+      // with C-call built (T-D1), this pipeline's detection is bounded by
+      // its own catalogue — absence here means "this pipeline's category
+      // coverage found nothing," not "an auditor confirmed there is no
+      // auth." Softened per S3 and pointed at the concrete pipeline
+      // capability (Claim Register C-dec/C-call cells) rather than implying
+      // a completeness guarantee this module was never built to make.
+      rationale:
+        'HTTP-entry-point evidence present; this pipeline found no security-control evidence (decorator or call-site) for this unit. This reflects the DETECTION CATALOGUE\'s coverage, not a confirmed absence of authorization in source — see docs/solution/Claim_Register.md (C-dec/C-call) for what is and is not detected today.',
       evidenceRefs: u.evidence.map((e) => e.ref),
     }));
 
@@ -45,6 +55,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '4', // bumped for CONTRACT_VERSION 4.0.0 (T-X7-1) — filters on Evidence.category only, unaffected by the new TypedUnit.kind: 'topic' value; re-verified, not just left stale
+  supportedMajorVersion: '7', // bumped for CONTRACT_VERSION 7.0.0 (T-E3) — filters on Evidence.category only, unaffected by the new Evidence.source: 'extends' value; re-verified, not just left stale
   run,
 };

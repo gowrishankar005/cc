@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass, existingServiceFilePaths } from './pass-registry';
+import { AnalysisContext, AnalysisPass, existingUnitFilePaths } from './pass-registry';
 import { detectMessagingUnits } from './cross_package/messaging-detector';
 
 /**
@@ -15,7 +15,13 @@ export const detectMessagingPass: AnalysisPass = {
   name: 'detectMessaging',
   run(ctx: AnalysisContext) {
     if (!ctx.graphifyRun) return;
-    const messagingUnitsByRoot = detectMessagingUnits(ctx.graphifyRun, existingServiceFilePaths(ctx));
+    // AREC Wave 3 T-E3 — widened from existingServiceFilePaths to
+    // existingUnitFilePaths: detectPersistencePass runs before this pass and
+    // has already pushed real units into ctx.allUnits by this point, so
+    // excluding by ALL kinds (not just service) prevents the same class
+    // being independently re-emitted as a competing messaging unit — a real
+    // duplicate-unique-id calm validate error, not a hypothetical one.
+    const messagingUnitsByRoot = detectMessagingUnits(ctx.graphifyRun, existingUnitFilePaths(ctx));
     for (const [root, messagingUnits] of messagingUnitsByRoot) {
       if (messagingUnits.length === 0) continue;
       console.log(`[run-slice] ${root}: ${messagingUnits.length} messaging unit(s) detected via graphify (import-only, low confidence)`);

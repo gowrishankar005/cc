@@ -71,6 +71,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '4', // bumped for CONTRACT_VERSION 4.0.0 (T-X7-1) — node-builder.ts/interface-builder.ts already generalize over TypedUnit.kind via node-type-mapping.yml; the new 'topic' row was added in the same change, before this bump
+  supportedMajorVersion: '7', // bumped for CONTRACT_VERSION 7.0.0 (T-E3) — control-builder.ts filters on Evidence.category only; interface-builder.ts's SOURCE_PRECEDENCE table gained an 'extends' entry in the same change, before this bump
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };
