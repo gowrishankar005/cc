@@ -8,7 +8,7 @@
 # the unimplemented one, so the strategy inventory is honest and complete —
 # same discipline as persistence-detection-catalogue.yml's jooq/spring-data-repository rows.
 
-version: "0.1.0"
+version: "0.2.0"
 
 strategies:
   - id: import-only-cloud-client
@@ -21,9 +21,24 @@ strategies:
       proves the code CAN talk to a queue/topic, not that it does, and says
       nothing about which queue/topic. Never promoted to high confidence
       from import alone, per this task's own explicit instruction.
+
+      B-msg-prod-sqs (Robustness, real re-check) — VERIFIED against real
+      evidence: lab fixture `ts-orders-dynamo`'s `OrdersDynamoStore` class
+      genuinely imports both `@aws-sdk/client-dynamodb` (persistence) and
+      `@aws-sdk/client-sqs` (messaging) — a real, evidenced, single-class
+      dual-role shape (Fidelity-aligned AWS pattern), not a hypothetical
+      edge case. Previously this class's messaging evidence was silently
+      DROPPED (T-E3's own fix excluded any file already claimed by an
+      earlier pass, to avoid a duplicate-unique-id error, at the cost of
+      losing real evidence). Fixed properly: `messaging-pass.ts` now merges
+      messaging evidence onto an already-typed unit instead of dropping it
+      or duplicating — real, `calm validate`-clean output confirms the
+      merged unit carries BOTH `ref_aws_sdk_client_dynamodb` and
+      `ref_aws_sdk_client_sqs` evidence, kind stays `database` (persistence
+      still wins the kind tie, unchanged precedent).
     status: dispatched
     libraries:
-      - { name: "@aws-sdk/client-sqs", language: typescript, evidenceLevel: unverified }
+      - { name: "@aws-sdk/client-sqs", language: typescript, evidenceLevel: verified } # real evidence: lab ts-orders-dynamo
       - { name: "@aws-sdk/client-sns", language: typescript, evidenceLevel: unverified }
       - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — same false-positive caveat as its persistence-detection-catalogue.yml entry
 

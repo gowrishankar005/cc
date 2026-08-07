@@ -9,7 +9,7 @@
 # docs/solution/language/java.md §3.1 are NOT dispatched by this file —
 # stated honestly per strategy below, not silently implied working.
 
-version: "0.2.0"
+version: "0.3.0"
 
 strategies:
   - id: driver-import
@@ -30,18 +30,33 @@ strategies:
       - { name: mysqlclient, language: python, evidenceLevel: verified }
       - { name: pymysql, language: python, evidenceLevel: verified }
       # Node/TS — @prisma/client is now VERIFIED: run against a real
-      # NestJS+Prisma fintech repo (ghostfolio/ghostfolio, apps/api) and
-      # confirmed real detection (87 real persistence units) — this also
-      # found and fixed a real bug affecting every Node/TS entry in this
+      # NestJS+Prisma fintech repo (ghostfolio/ghostfolio, apps/api). This
+      # also found and fixed a real bug affecting every Node/TS entry in this
       # list: Graphify normalizes external package import targets to
       # `ref_<sanitized-name>` (`@prisma/client` -> `ref_prisma_client`),
       # never the literal package name — see graphify-import-target.ts.
       # Every OTHER Node/TS entry below is still unverified for its OWN
       # detection (the ref_ transform is now correctly applied to all of
       # them, but no real fixture has exercised typeorm/mongoose/etc yet).
+      #
+      # Q13 ontology fix (Open_Questions_Validation.md, Robustness) —
+      # ownerBaseClass: PrismaClient. Real evidence: a plain import-only
+      # count of 87 units on Ghostfolio's apps/api was a KNOWN, DISCLOSED
+      # false-positive risk (Q13) — most of those 87 were classes (e.g.
+      # AccessService) importing Prisma's generated TYPES for their own
+      # method signatures, not owning a database connection. The class that
+      # genuinely does (PrismaService) declares `extends PrismaClient` in
+      # real source (services/prisma/prisma.service.ts:13-14) — confirmed
+      # this does NOT produce a Graphify `inherits` edge (external base
+      # class, no in-repo node to target — see class-ownership-resolver.ts's
+      # own doc comment for the full real-evidence writeup), so ownership is
+      # verified via a bounded, multi-line-aware source read-back instead of
+      # a graph edge. Every other catalogue library's plain-import behavior
+      # is UNCHANGED — this fix is scoped to @prisma/client only, per Q13's
+      # own explicit "not re-verified against BoA/Fineract" deferral.
       - { name: typeorm, language: typescript, evidenceLevel: unverified }
       - { name: prisma, language: typescript, evidenceLevel: unverified }
-      - { name: "@prisma/client", language: typescript, evidenceLevel: verified }
+      - { name: "@prisma/client", language: typescript, evidenceLevel: verified, ownerBaseClass: PrismaClient }
       - { name: mongoose, language: typescript, evidenceLevel: unverified }
       - { name: sequelize, language: typescript, evidenceLevel: unverified }
       - { name: pg, language: typescript, evidenceLevel: unverified }

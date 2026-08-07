@@ -1,80 +1,78 @@
 # Weaver — next iteration (critical todos)
 
-**Date:** 2026-08-08 (updated: robustness rows folded)  
-**Context:** AREC Wave 3 **A–D done**. Product is **Weaver**.  
+**Date:** 2026-08-08 (post robustness R0–R4 review)  
+**Context:** AREC Wave 3 **done**. Robustness program **R0–R4 MVP done** (55/55 tests). Product is **Weaver**.  
 **Backlog index:** [`BACKLOG.md`](./BACKLOG.md)  
-**Robustness agent tasks:** [`AGENT_TASKS_Weaver_Robustness.md`](./AGENT_TASKS_Weaver_Robustness.md)  
-**Breadth agent tasks:** Session E in [`AGENT_TASKS_AREC_Wave3_Implementation.md`](./AGENT_TASKS_AREC_Wave3_Implementation.md)
+**Capability matrix:** [`STATUS.md`](./STATUS.md)  
+**Claims:** [`Claim_Register.md`](./Claim_Register.md)  
+**Residual UX design (proposed):** [`Architect_Residual_Review_Session.md`](./Architect_Residual_Review_Session.md)
 
 ---
 
-## Iteration goals
+## Iteration goals (this round)
 
-1. **Session E** — finish Wave 3 breadth (or OOS with claim cells).  
-2. **Robustness Phase R0–R1** — pilot scorecard, architecture coverage metric, multi-root L2 protocol, **R2b**, Java import normalize.  
-3. **Discovery** — sample pass #2 + trap automation so the queue stays evidence-ranked.  
-4. Keep **honesty > green** (no fabricated edges, no sample-repo hardcodes).
+1. **Ship ranked product residuals** — ontology (Prisma service-vs-database) and SQS/SNS producers.  
+2. **Review then (if accepted) implement residual-session UX** — session pack + VS Code agent; end state = **semantically correct effective architecture IR** after HITL/LLM residual.  
+3. **Decide query surface** for “questioning” flows and auth methods (CALM JSON today; optional query helper later — not a second source of truth).  
+4. Keep **honesty > green** (no fabricated edges; catalogue intake for new rows).
 
 ---
 
-## Recommended sequence (two tracks)
+## What just closed (do not re-queue)
+
+| Program | Result |
+|---|---|
+| Wave 3 A–E | Silence, grades, R1 lock, R2 mechanism, C-call/C-rich base, breadth (Kafka producers, Spring Data, Dynamo, OpenAPI dual-unit, HITL queue) |
+| Robustness R0 | Pilot scorecard, arch-cov metric, multi-root L2 protocol, OOS registry, S0 Graphify flag |
+| Robustness R1 | R2b + Java import normalize; **flagship Fineract multi-root story closed** |
+| Robustness R2 | Catalogue intake, C-call expand, C-rich `authorityRef` |
+| Robustness R3 | Discovery refresh/re-rank, trap promote 7/8, cadence policy |
+| Robustness R4 | HITL low-architecture-coverage trigger; k8s FP re-check clean |
+
+---
+
+## Recommended sequence
 
 ```text
-Track Breadth:     Session E (T-E1…T-E6)     ── can run in parallel with R0 docs ──
-Track Robustness:  Phase R0 → R1 → R2 → R3 → R4   (see AGENT_TASKS_Weaver_Robustness.md)
-
-Suggested calendar:
-  Slice 1:  Commit hygiene + Session E start + Robustness R0 (scorecard, arch-cov, multi-root protocol, OOS registry)
-  Slice 2:  R2b design + implement + realistic synthetic fixture
-  Slice 3:  Java driver-ref normalize + multi-root L2 remeasure on 1–2 samples
-  Slice 4:  Discovery pass #2 + trap promote + C-call vocab expand (as ranked)
-  Ongoing:  BACKLOG/STATUS/Claim sync after each drop
+1. Review Architect_Residual_Review_Session.md (product owner)
+2. P1 code: B-ontology  then  B-msg-prod-sqs   (can parallel if two agents)
+3. If residual design accepted: B-review-session Phase 1 pack → validate_drafts → pilot
+4. Optional: IR “effective architecture” appendix + light query helper over reviewed CALM
+5. Hygiene: Claim Register forbidden-phrase cleanup; scope-limitations ↔ claims
 ```
-
-If capacity is limited: **R0 + R2b before finishing all of Session E** — robustness of architecture stories > more partial cells.
 
 ---
 
-## Tier 0 — Critical this iteration
+## Tier 0 — Critical next
 
 | # | Todo | Backlog ID | Exit |
 |---|---|---|---|
-| 1 | Session E (or explicit OOS for each E item) | E | Claim cells + suite green |
-| 2 | Pilot scorecard | B-pilot-scorecard | Doc: cells required for pilot |
-| 3 | Architecture coverage metric + S1/S2 consumers | B-arch-cov | In coverage-report + test |
-| 4 | Multi-root L2 remeasure protocol (labeled root sets) | B-R2-eval | Written protocol + example |
-| 5 | Standing OOS registry | B-oos-registry | Doc section or BACKLOG table living |
-| 6 | R2b: implementer → imported DB/topic unit | B-R2b | Mechanism + tests; residual documented |
-| 7 | Commit hygiene Wave 3 A–D if needed | — | Tree matches STATUS |
-| 8 | BACKLOG discipline | B-scope-hygiene | Rows flip on ship |
+| 1 | Product review of residual-session design (incl. effective IR + query Q) | B-review-session | Accept / amend / park |
+| 2 | Persist ontology code fix (ORM import ≠ always database) | B-ontology | Claim U-persist-import updated; BoA + Ghostfolio-class regression |
+| 3 | SQS/SNS producer detection | B-msg-prod-sqs | Lab fixture + claim U-msg-producer; trap T7 full |
 
 ---
 
-## Tier 1 — Critical product depth
+## Tier 1 — Residual UX (after design accept)
 
 | # | Todo | Backlog ID |
 |---|---|---|
-| 9 | C-call vocabulary expand (catalogue + evidence) | B-C-call-expand |
-| 10 | Messaging producers | B-msg-prod |
-| 11 | Java Graphify import target normalize | B-java-driver-ref |
-| 12 | Catalogue intake rule (evidence + test + claim) | B-catalogue-intake |
+| 4 | Session pack builder (`tools/review-session/pack`) | B-review-session |
+| 5 | Draft validate + apply via `--from-facts --overrides` | B-review-session |
+| 6 | **Effective architecture IR** after residual (semantically correct reviewed model) | B-review-session / IR follow-on |
+| 7 | Optional: query helper / Q&A over reviewed CALM (flows, auth methods) | design §12 — not yet a BACKLOG code row until accepted |
 
 ---
 
-## Tier 2 — Discovery & eval enforcement
+## Tier 2 — Platform / later
 
 | # | Todo | Backlog ID |
 |---|---|---|
-| 13 | Stratified sample pass #2 | B-discovery-cadence |
-| 14 | Re-rank pattern families | B-discovery-cadence |
-| 15 | Trap-gold → automated gates (≥2) | B-trap-promote |
-| 16 | Disconfirming-pair enforced in review | Design gates + STATUS |
-
----
-
-## Tier 3 — Breadth remainder / later
-
-Ontology, Spring Data, jOOQ, Dynamo/SQS, OpenAPI dual-unit, HITL S1, k8s FP watch, Phase 2 engines, plugins — see BACKLOG P2/P3/Later.
+| 8 | Phase-2 engines only on measured gap | B-phase2-engines |
+| 9 | Module plugin / embed API | B-plugin |
+| 10 | Two-tier mapping-config | B-two-tier-map |
+| 11 | ADR → CALM `adrs[]` | B-adr |
+| 12 | Discovery second cycle (prove cadence) | B-discovery-cadence (process) |
 
 ---
 
@@ -82,31 +80,18 @@ Ontology, Spring Data, jOOQ, Dynamo/SQS, OpenAPI dual-unit, HITL S1, k8s FP watc
 
 | Do not | Why |
 |---|---|
-| Sample-repo class hardcodes | Weaver is generic |
+| Re-open Robustness R0–R4 as if unfinished | MVP checklist complete |
+| Sample-repo hardcodes | Weaver is generic |
 | Fabricate edges to clear S1 | Honesty |
-| Bootstrap gold from generator | Circular eval |
-| LLM in core path | Principle |
-| Skip R2b because “R2 shipped” | Mechanism ≠ product story |
+| LLM in `run-slice` core | Principle |
+| Treat lab L1 green as pilot complete | Pilot_Ready_Scorecard |
 
 ---
 
 ## Iteration success criteria
 
-- [ ] Session E complete or OOS documented  
-- [ ] Pilot scorecard exists  
-- [ ] Architecture coverage metric shipping  
-- [ ] R2b shipped or residual explicitly bounded  
-- [ ] Multi-root L2 protocol written + used once  
-- [ ] Discovery matrix refreshed once  
-- [ ] ≥2 trap cards automated  
-- [ ] BACKLOG + STATUS + Claim Register aligned  
-- [ ] Regression suite green  
-
----
-
-## Changelog
-
-| Date | Note |
-|---|---|
-| 2026-08-08 | Initial post A–D plan |
-| 2026-08-08 | Robustness rows + two-track sequence + link to AGENT_TASKS_Weaver_Robustness |
+- [ ] B-ontology shipped or explicitly bounded with claim cell  
+- [ ] B-msg-prod-sqs shipped or OOS with reason  
+- [ ] Residual-session design reviewed (accept/amend/park recorded on BACKLOG)  
+- [ ] If accepted: at least pack + one pilot residual → valid post-override CALM + effective IR  
+- [ ] Suite stays green; Claim Register phrases match reality (R2 flagship closed)

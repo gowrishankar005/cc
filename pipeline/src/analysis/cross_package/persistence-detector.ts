@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { GraphifyRun } from '../../scanner/graphify-provider';
 import { TypedUnit } from '../../types/typed-facts';
-import { loadPersistenceDetectionCatalogue, driverImportLibraries } from '../../rules/persistence-detection-schema';
+import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportOwnerBaseClasses } from '../../rules/persistence-detection-schema';
 import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector';
 
 /**
@@ -29,6 +29,7 @@ import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector
 export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): Map<string, TypedUnit[]> {
   const catalogue = loadPersistenceDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
   const libraries = driverImportLibraries(catalogue);
+  const ownerBaseClasses = driverImportOwnerBaseClasses(catalogue);
 
   return detectUnitsByImportStrategy(
     run,
@@ -40,6 +41,7 @@ export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePath
       confidence: 20,
       unknownLibraryFallback: 'unknown-persistence-lib',
     },
-    existingServiceFilePaths
+    existingServiceFilePaths,
+    ownerBaseClasses
   );
 }

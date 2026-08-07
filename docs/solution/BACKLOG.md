@@ -36,8 +36,10 @@
 | ID | Item | Status | Detail |
 |---|---|---|---|
 | **E** | AREC Session E (breadth) | `done` (2026-08-08) | [T-E1…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) all shipped (T-E0 correctly skipped — C-rich already landed in D) |
-| **RB** | Weaver robustness program (phased) | `done` (2026-08-08) — Phases R0–R4 all complete, MVP checklist 13/13 | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) |
+| **RB** | Weaver robustness program (phased) | `done` (2026-08-08) — Phases R0–R4 all complete, MVP checklist 13/13 | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md); reviewed + suite **55/55** green |
 | **W3-close** | Close Wave 3 checklist / OOS decisions | `done` | AREC Wave 3 DoD — all checkboxes closed, Sessions A–E complete |
+| **P1-next** | Ontology + SQS/SNS producers | `done` (2026-08-08) | **B-ontology**, **B-msg-prod-sqs** — both closed with real evidence, see rows below |
+| **UX-next** | Architect residual review session | `proposed — review before implement` | **B-review-session** → [`Architect_Residual_Review_Session.md`](./Architect_Residual_Review_Session.md) (effective architecture IR end-state + optional query surface — see design §7/§12) |
 
 ### Recently landed (Wave 3 A–D) — do not re-queue
 
@@ -54,8 +56,8 @@
 
 | Item | Status |
 |---|---|
-| Messaging producers (KafkaTemplate field-type) | `done` — T-E1; SQS/SNS producer still open, see **B-dynamo-sqs** |
-| Persistence ontology decision (Prisma Service vs database) | `done` — decided, not code-fixed (Q13); see **B-ontology** for the deferred code fix |
+| Messaging producers (KafkaTemplate field-type + SQS/SNS import-only) | `done` — T-E1 + **B-msg-prod-sqs** (T-R3-2 follow-up) |
+| Persistence ontology decision + fix (Prisma Service vs database) | `done` — decided (Q13, T-E2) AND code-fixed (**B-ontology**, T-R3-2 follow-up) |
 | Spring Data repository dispatch | `done` — T-E3 |
 | DynamoDB verified | `done` — T-E3 |
 | jOOQ | `done` (T-R1-3) — root cause fixed, 229 real database units verified against real Waltz `waltz-data` |
@@ -99,18 +101,18 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | **B-C-call-expand** | Expand call-site control vocabularies | `done` (T-R2-2) | Claim **C-call**; real evidence: Waltz `hasRole` (security-rbac-003), Fineract `isAuthenticated` (security-auth-002) |
 | **B-C-rich-authority** | Richer control config (structured authority) | `done` (T-R2-3) | Claim **C-rich**; new `authorityRef` field, `control-builder.ts` |
 | **B-S3** | Threat narrative honesty | `done` | T-D3 |
-| **B-ontology** ⬆ | Persist ontology (ORM import ≠ always database) | `decided, not code-fixed` | **U-persist-import**; T-E2 (Q13). **Promoted from P2, T-R3-2 (Robustness Phase R3 re-rank)** — now the #1 ranked risk family per `coe-lab/docs/pattern-coverage-matrix.md`'s Wave R3-1 refresh, since R2/jOOQ/Spring-Data (the prior #1/#6) closed this round. |
-| **B-msg-prod-sqs** ⬆ | SQS/SNS messaging **producer** detection (distinct from the already-done Kafka field-type producer and from DynamoDB persistence) | `todo` | **U-msg-producer**. **Promoted from P2 (split out of B-msg-prod/B-dynamo-sqs), T-R3-2** — now the #2 ranked risk family; real evidence a single fixture (`lab-ts-orders-dynamo`) already imports both `@aws-sdk/client-dynamodb` (persistence, done) and `@aws-sdk/client-sqs` (messaging producer, still undetected) — the same file shape, only half-covered. |
+| **B-ontology** | Persist ontology (ORM import ≠ always database) | `done` (2026-08-08) | **U-persist-import**; T-E2 (Q13) decided it, this round code-fixed it. Real, verified: new `ownerBaseClass` catalogue field (`persistence-detection-catalogue.yml`) + `class-ownership-resolver.ts` — a matched library can now require the class to itself `extends <ownerBaseClass>`, not just import. Real Ghostfolio re-run: `AccessService` (imports Prisma types only) now correctly produces ZERO database units (was wrongly 1 of the old 87); `PrismaService` (genuinely `extends PrismaClient`) still correctly does, exactly 1 unit. **Real finding that falsified Q13's own proposed fix before it was implemented**: Graphify emits NO `inherits` edge when the base class is external (confirmed: `PrismaClient` has zero in-repo node to target) — ownership had to be verified via a bounded, multi-line-aware source read-back instead of a graph edge. Scoped narrowly to `@prisma/client` only (the one library with real evidence); every other driver-import library is unchanged, per Q13's own explicit deferral. |
+| **B-msg-prod-sqs** | SQS/SNS messaging **producer** detection (distinct from the already-done Kafka field-type producer and from DynamoDB persistence) | `done` (2026-08-08) | **U-msg-producer**. Real fix, not just a new catalogue row (the SQS/SNS import-only strategy already existed, `evidenceLevel: unverified`) — the real gap was `messaging-pass.ts` silently DROPPING messaging evidence for any file already claimed by an earlier pass (T-E3's own fix for a duplicate-unique-id bug, at the cost of losing real evidence). Fixed: messaging evidence for an already-typed unit now MERGES onto it instead of being dropped or duplicated. Real evidence: lab `ts-orders-dynamo`'s `OrdersDynamoStore` (imports BOTH `@aws-sdk/client-dynamodb` and `@aws-sdk/client-sqs`) now carries BOTH persistence and messaging evidence on one `database`-kind unit (persistence still wins the kind tie, unchanged precedent), `calm validate` 0 errors. `@aws-sdk/client-sqs` promoted `unverified` → `verified`. |
 
 ### P2 — Breadth (Session E + catalogue debt)
 
 | ID | Item | Status | Spec / claim |
 |---|---|---|---|
-| **B-msg-prod** | Messaging **producers** | `done` (Kafka field-type); SQS/SNS producer split out and promoted to P1 → **B-msg-prod-sqs** | **U-msg-producer**; T-E1 |
-| **B-ontology** | Persist ontology (ORM import ≠ always database) | `decided, not code-fixed` — promoted to P1 (see above), row kept here for its original T-E2/Q13 context | **U-persist-import**; T-E2 (Q13) |
+| **B-msg-prod** | Messaging **producers** | `done` (Kafka field-type + SQS/SNS, see **B-msg-prod-sqs** in P1) | **U-msg-producer**; T-E1 |
+| **B-ontology** | Persist ontology (ORM import ≠ always database) | `done` — see **B-ontology** in P1 for the real fix | **U-persist-import**; T-E2 (Q13) |
 | **B-spring-data** | Spring Data repository dispatch | `done` | T-E3 |
 | **B-jooq** | jOOQ strategy dispatch | `done` (T-R1-3) | T-E3; real evidence: 229 database units, real Waltz `waltz-data` |
-| **B-dynamo-sqs** | Dynamo / SQS architecture units | `partial` — DynamoDB verified; SQS/SNS producer split out, see **B-msg-prod-sqs** (P1) | T-E3 |
+| **B-dynamo-sqs** | Dynamo / SQS architecture units | `done` — DynamoDB verified; SQS/SNS producer now closed too, see **B-msg-prod-sqs** (P1) | T-E3 |
 | **B-openapi-dual** | OpenAPI dual-unit policy | `done` | T-E4 |
 | **B-c-contract** | OpenAPI securitySchemes expand | `done`, expanded | **C-contract** |
 | **B-java-driver-ref** | (see robustness) | `done` (T-R1-3) | R2 notes |
@@ -147,7 +149,8 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | Hardest story (layered multi-module) | **Closed.** **B-R2b** + **B-charge-jdbc-driver** both `done` — Fineract-charge's own flagship `ChargesApiResource → Charge`-family residual (open since requirements v0.9) is real, `calm validate`-clean, in a real multi-root run. |
 | Discovery as a system | **Improving** — Wave R3-1 refresh done (T-R3-1/T-R3-2), cadence policy now written (below); still needs a second real cycle to prove the cadence holds, not just that it was written once |
 | Eval enforcement | Good → **B-trap-promote** `done` (7/8 traps promoted, T-R3-3); **B-arch-cov** `done` |
-| Pilot readiness | Scorecard shipped (**B-pilot-scorecard** `done`); the last-mile Fineract-charge story is now closed too (**B-charge-jdbc-driver** `done`) |
+| Pilot readiness | Scorecard shipped; Fineract-charge flagship closed; **robustness R0–R4 MVP done**; **B-ontology** + **B-msg-prod-sqs** both closed with real evidence. Remaining gap: residual UX (**B-review-session** proposed, gated on review) |
+| Residual UX | HITL queue done (S1/S2 + low arch-cov); full architect residual session **not built** — design under review |
 
 ### Discovery cadence policy (T-R3-4)
 
@@ -171,6 +174,7 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | **Robustness R0–R4 MVP complete** (agent delivery reviewed): Now/next flipped **RB** `doing` → `done`; P1-next/UX-next called out. Suite 55/55. |
 | 2026-08-08 | **B-review-session** added (P3): architect residual review session design in `Architect_Residual_Review_Session.md` — status `proposed — review before implementing`. **B-hitl-s1** flipped to `done` (T-E5 already shipped queue CLI; full residual UX is B-review-session, not a second hitl-s1). Doc link added to “How to use” table. |
 | 2026-08-08 | Initial thin index after Wave 3 A–D |
 | 2026-08-08 | Robustness track folded in; link to AGENT_TASKS_Weaver_Robustness.md |
@@ -183,3 +187,4 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 | 2026-08-08 | Phase R2 complete (T-R2-1, T-R2-2, T-R2-3). New `Catalogue_Intake.md` (B-catalogue-intake → done). Two new C-call rows: Waltz `hasRole` (security-rbac-003, real 4-call-site evidence) and Fineract `isAuthenticated` (security-auth-002, weighted lower on a real stated authn-vs-authz distinction) — B-C-call-expand → done. New `authorityRef` structured field (control-builder.ts) — B-C-rich-authority → done. 4 new/extended regression tests. 53/53 tests green. |
 | 2026-08-08 | T-R3-1/T-R3-2 (discovery refresh + re-rank) done — `coe-lab/docs/pattern-coverage-matrix.md`'s Wave R3-1 section: 18 samples probed (9 carried forward + Waltz data/web, Fineract security/provider, and 5 previously-unprobed lab fixtures — none had ever been added to this matrix despite being real evidence repos this whole session). Wave 1-B3's #1/#2/#6 ranked risks (R2 multi-hop, call-site auth, Spring Data/jOOQ) retired as closed; **B-ontology** and a new, split-out **B-msg-prod-sqs** promoted to P1 as the new #1/#2 ranked risks. `OOS_Registry.md` checked — nothing new warranted an OOS row, both promoted to active backlog instead; its stale "B-java-driver-ref not listed" note updated to reflect it's now done. |
 | 2026-08-08 | Phase R4 complete (T-R4-1, T-R4-2). T-R4-1 found and closed a real gap, not just doc-sync: the task's own original goal named two triggers ("S1 fires OR arch coverage below threshold"), but `hitl-review-trigger.ts` had only ever wired in S1/S2 (T-E5 shipped before T-R0-2's `architectureOutboundCoverage` metric existed). New `low-architecture-coverage` trigger added, mutually exclusive with S1, real-verified against Fineract `fineract-security` (17% coverage, 5 real services flagged). T-R4-2 legitimately skipped — checked (not assumed) whether T-R1-3's 3 new Java driver-import rows introduced new FP risk into the real BoA k8s evidence base; grep-confirmed zero BoA Java services import any of them. 1 new regression test. **Robustness program (R0-R4) now fully complete.** |
+| 2026-08-08 | **B-ontology** and **B-msg-prod-sqs** (P1 #1/#2 ranked risks) both closed with real evidence. B-ontology: new `ownerBaseClass` catalogue field + `class-ownership-resolver.ts` — a real finding falsified Q13's own proposed fix before it was implemented (Graphify emits no `inherits` edge for an external base class like `PrismaClient`), so ownership is verified via bounded multi-line source read-back instead; real Ghostfolio re-run: `AccessService` correctly no longer `database`, `PrismaService` correctly still is (1 real unit, down from 87 mislabeled). B-msg-prod-sqs: `messaging-pass.ts` now merges messaging evidence onto an already-typed unit instead of silently dropping it (T-E3's original fix's real cost); real lab `ts-orders-dynamo` evidence: `OrdersDynamoStore` now carries both persistence and messaging evidence on one unit. 2 pre-existing regression tests fixed for a real, expected side effect (1 new `architecture-nodes-must-be-referenced` warning where a removed false-positive node orphaned a real one) — not silenced, the assertion was corrected to expect the honest new count. 3 new/updated regression tests. |

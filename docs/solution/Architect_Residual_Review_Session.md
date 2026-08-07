@@ -213,44 +213,64 @@ Bound playbook (not free-form monorepo chat):
 
 ## 7. What happens to the Intelligence IR after HITL / LLM residual work?
 
-### Short answer
+### Product end-state (what you asked for)
+
+**Yes — the residual session’s intended end artefact is a single IR document that presents the *semantically correct architecture* after architect + evidenced-LLM residual work** — not only the raw deterministic extract.
+
+That end document is the **effective architecture IR** (name TBD in implementation; conceptually distinct from today’s facts-only notebook body):
+
+| Document | Role |
+|---|---|
+| **`intelligence-ir.md` (today)** | Deterministic notebook: TypedFacts units/edges, silence, unmapped — “what the scanner found” |
+| **`architecture.calm.json` (today)** | Machine CALM model; **includes overrides** after apply |
+| **Effective architecture IR (required end-state of this design)** | Human-readable **reviewed** model: nodes, relationships, controls/auth evidence, residual decisions — **aligned with post-override CALM**, plus decision log. This is what an architect should hand a stakeholder as “the architecture we agree on for this run.” |
+
+Implementation options (pick at Phase 2/3; product requirement is the end-state, not a particular filename):
+
+1. **Preferred:** regenerate IR with a first-class section **“Effective architecture (post-override)”** listing CALM nodes/relationships/controls after apply, plus applied override ids / decision refs. Keep a collapsible or trailing appendix for raw TypedFacts/silence (honesty).  
+2. **Alternative:** write `effective-architecture-ir.md` in the session pack / out-dir, generated only after residual apply.  
+3. **Non-goal:** rewriting TypedFacts so silence metrics lie about what analysis found.
+
+### What the platform does *today* (without B-review-session code)
 
 | Layer | Updated after residual apply? | How |
 |---|---|---|
-| **`intelligence-ir.md` file** | **Yes — rewritten** when you re-run `run-slice` with `--from-facts` + `--overrides` (or a full rescan with overrides) | `finishRun` always re-renders IR **after** modules (including override apply) |
-| **IR body (units / relationships / ignored / unmapped)** | **No semantic change from overrides alone** | Rendered from **TypedFacts**, which overrides **must not** mutate |
-| **IR completeness / S1–S2 block** | **Usually still reflects pre-override facts** | Completeness is computed from TypedFacts relationships + unit evidence, not from post-override CALM |
-| **IR “Module projections” appendix** | **Yes — reflects post-override CALM counts** | Reads `architecture.calm.json` after calm-generator + override-applier |
-| **`architecture.calm.json`** | **Yes** | This is what overrides actually change |
-| **Session pack `decisions-log.md` / `apply-report.md`** | **Yes (session side)** | Residual audit trail lives here, not only in IR |
+| **`intelligence-ir.md` file** | **Yes — rewritten** on `--from-facts` + `--overrides` | `finishRun` re-renders after modules |
+| **IR body (units / relationships)** | **No semantic change from overrides alone** | Still from **TypedFacts** |
+| **IR completeness / S1–S2** | **Still facts-based** | Override edges do not clear S1 in coverage alone |
+| **IR “Module projections”** | **Yes — CALM counts** | Post-override `architecture.calm.json` |
+| **`architecture.calm.json`** | **Yes** | Authoritative reviewed machine model today |
 
-### Implications (honest)
+### Design commitment for residual-session v1+
 
-1. **Overrides improve the CALM artefact**, not the TypedFacts “ground truth” notebook.
-2. After a successful residual session, the architect should look at:
-   - **CALM** (and `calm validate`) for the corrected architecture model  
-   - **IR module projection line** for updated node/relationship **counts**  
-   - **Session `decisions-log.md`** for who decided what  
-3. **Clearing S1 in `coverage-report` / IR completeness via override alone is not guaranteed** today: adding a service→DB edge only in CALM does **not** add a TypedRelationship. That is intentional for determinism, but it means residual review is **L5 completion of the delivered model**, not a silent rewrite of analysis completeness metrics.
-4. **If product later wants IR to show “effective architecture after overrides”**, that is a **separate, small IR enhancement** (e.g. appendix: applied overrides + effective CALM relationship list) — recommended as a follow-on once the session pack ships; not required for v1 apply.
+When **B-review-session** ships, **Definition of Done for a residual session** includes:
 
-### Recommended apply loop (IR-aware)
+1. Post-override `architecture.calm.json` (calm validate 0 errors under project mapping).  
+2. **`effective-architecture-ir.md` (or equivalent section)** containing:
+   - Service / API nodes and discovered endpoints (interfaces)  
+   - Database / messaging / external connections (relationships)  
+   - Control / auth evidence attached to nodes (decorator, call-site, contract) where known  
+   - Explicit “residual open / OOS” list (what was *not* decided)  
+   - Pointers to Decision Records (who decided what)  
+3. Session `decisions-log.md` audit trail.
+
+Raw TypedFacts IR may still exist for engineers debugging the scanner; **architect-facing deliverable is the effective IR.**
+
+### Recommended apply loop
 
 ```bash
-# After drafts approved:
 node dist/orchestration/run-slice.js \
   --from-facts ./out/my-run/typed-facts.json \
   --overrides ./review-sessions/my-run/drafts/overrides \
   --out ./out/my-run-reviewed \
   --strict-overrides
 
-# Then:
-# - architecture.calm.json  → authoritative reviewed model
-# - intelligence-ir.md      → regenerated; facts body same; CALM projection updated
-# - modules/calm-generator/overrides-applied-report.json → apply audit
+# Target after residual session tooling:
+# - architecture.calm.json           → machine model
+# - effective-architecture-ir.md     → semantically correct reviewed architecture (human)
+# - intelligence-ir.md               → still shows extract honesty (facts + silence)
+# - overrides-applied-report.json    → apply audit
 ```
-
-Optional full rescan (same overrides) if catalogue/source changed; not required for pure residual overrides.
 
 ---
 
@@ -296,8 +316,37 @@ Tracked as **`B-review-session`** in [`BACKLOG.md`](./BACKLOG.md).
 | All applied changes go through DR + Override | Integrity |
 | TypedFacts unchanged by session | Determinism |
 | One real residual session produces valid post-override CALM | Evidence |
+| **Effective architecture IR** lists reviewed nodes, edges, auth/controls, open residuals | Architect deliverable |
 | Insufficient-evidence trap: no fabricated relationship_add | Honesty |
-| IR behaviour documented and understood (this §7) | No false expectation that S1 “disappears” from facts-IR solely via overrides |
+| Facts-IR honesty preserved (S1/S2 still explain extract gaps) | No silent rewrite of analysis |
+
+---
+
+## 12. Queryable architecture model (flows, auth methods) — answer
+
+### Can we question the architecture after a run?
+
+| Need | Today | After residual session (designed) | Optional later product |
+|---|---|---|---|
+| **Machine model** | **Yes** — `architecture.calm.json` + `typed-facts.json` are structured JSON | Same + overrides applied; effective IR is markdown projection | — |
+| **“What services and endpoints exist?”** | **Yes** — CALM nodes + interfaces; TypedUnits with http-entry-point evidence | Same, residual-corrected | Query CLI/API over CALM |
+| **“What DB / messaging / external deps?”** | **Partial–strong** — relationships `connects` / grades; messaging partial (Kafka yes, SQS open) | Stronger after residual fills known gaps | Query by relationship kind / grade |
+| **“What auth methods / controls on a service?”** | **Partial** — CALM `controls` from C-dec / C-call / C-contract where catalogue matched; not every call-site vocab | Residual can attach overrides or catalogue rows; still not unbounded inference | Query: list controls by node id |
+| **“Walk the request flow end-to-end”** | **Limited** — static connects/calls graph, not runtime traces; command-bus OOS | Residual can add missing static edges if evidenced | Graph query / path search over CALM edges |
+| **Conversational Q&A** | **Not productized** — architect uses IR + CALM manually (or ad-hoc IDE agent) | Session agent is residual-focused, not a general chat over whole architecture | Thin **query layer**: load reviewed CALM (+ controls) into agent or `jq`/graph tool with a fixed schema prompt |
+
+### Honest product stance
+
+1. **You already have a queryable *data* model:** CALM JSON is the architecture model. Anything that can read JSON (scripts, IDE agent, BI, graph DB import) can ask “nodes with controls”, “service→database connects”, “interfaces on node X”.  
+2. **You do *not* yet have a first-class Weaver “ask architecture questions” product** (no dedicated query API, no stored graph DB, no guaranteed full flow/auth coverage).  
+3. **Auth methods in the model** only appear when extraction/catalogue/residual put them in `controls` (or related evidence). Unlisted call-site patterns stay silent — residual session + catalogue intake are the growth paths.  
+4. **Flows** are **static architecture relationships**, not distributed-tracing request paths. Good for “service depends on DB/topic/HTTP client”; weak for “runtime call order through command bus.”  
+5. **Recommended build order if you want Q&A:**  
+   - ship residual session → **effective IR + reviewed CALM**  
+   - then a small **`query-architecture` helper** (CLI): inputs = reviewed `architecture.calm.json`; outputs = answers to fixed templates (“list auth on node”, “outbound stores for service”, “paths service→database depth≤2”)  
+   - optional: VS Code agent playbook that **only** reads that CALM + effective IR (same bound discipline as residual agent)
+
+So: **yes, a queryable model is realistic and mostly already present as CALM; full “question any flow/auth” depends on residual completeness + an optional thin query/Q&A layer, not on re-scanning with an LLM.**
 
 ---
 
@@ -305,4 +354,5 @@ Tracked as **`B-review-session`** in [`BACKLOG.md`](./BACKLOG.md).
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | Product end-state: **effective architecture IR** required after residual; §12 queryable model / flows / auth Q&A answered |
 | 2026-08-08 | Initial proposed design from residual-UX discussion; IR post-HITL behaviour spelled out; backlog row: review before implement |

@@ -2,6 +2,7 @@ import * as path from 'path';
 import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
 import { TypedUnit, Evidence } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
+import { classExtendsBaseClass } from '../../rules/class-ownership-resolver';
 
 /**
  * Shared by persistence-detector.ts, messaging-detector.ts, and
@@ -98,7 +99,14 @@ export function detectUnitsByImportStrategy(
   run: GraphifyRun,
   libraries: Set<string>,
   config: ImportStrategyUnitConfig,
-  existingServiceFilePaths: Set<string> = new Set()
+  existingServiceFilePaths: Set<string> = new Set(),
+  /**
+   * Q13 ontology fix — matched-library name -> required owner base class
+   * (`persistence-detection-schema.ts`'s `driverImportOwnerBaseClasses()`).
+   * Only libraries present here get the extra ownership check; every other
+   * library's behavior is byte-for-byte unchanged (empty Map by default).
+   */
+  ownerBaseClasses: Map<string, string> = new Map()
 ): Map<string, TypedUnit[]> {
   const { graph } = run;
   const unitsByRoot = new Map<string, TypedUnit[]>();
@@ -135,6 +143,18 @@ export function detectUnitsByImportStrategy(
       const matchedLibrary =
         fileEdges.find((e) => libraries.has(e.target))?.target ??
         fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined);
+
+      // Q13 ontology fix — for a library that requires ownership proof
+      // (e.g. @prisma/client), a plain import is no longer sufficient: THIS
+      // class must itself declare `extends <ownerBaseClass>` (read back
+      // from its own real source, multi-line-aware — class-ownership-resolver.ts).
+      // A file importing the driver for its own TYPES only (real Ghostfolio
+      // AccessService shape) correctly produces no unit for that class here.
+      const requiredBaseClass = matchedLibrary ? ownerBaseClasses.get(matchedLibrary) : undefined;
+      if (requiredBaseClass) {
+        const absPath = path.join(resolved.root, resolved.relativeFilePath);
+        if (!classExtendsBaseClass(absPath, classNode.source_location, requiredBaseClass, fileLineCache)) continue;
+      }
 
       const unit: TypedUnit = {
         id: `${resolved.relativeFilePath}::${classNode.label}`,

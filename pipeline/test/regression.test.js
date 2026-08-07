@@ -25,6 +25,7 @@ const FINERACT_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/fineract/repo');
 const FINERACT_KAFKA_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/springbatch/messagehandler/kafka');
 const FINERACT_KAFKA_PRODUCER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/event/external/producer/kafka');
 const GHOSTFOLIO_ACCESS_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/app/access');
+const GHOSTFOLIO_PRISMA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/services/prisma');
 const FINERACT_SECURITY_ROOT = path.resolve(FINERACT_ROOT, 'fineract-security');
 const FINERACT_PROVIDER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider');
 const WALTZ_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
@@ -761,20 +762,37 @@ test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging doubl
   try {
     fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
-    // Real bug found this session: OrdersDynamoStore imports BOTH
+    // Real bug found this session (T-E3): OrdersDynamoStore imports BOTH
     // @aws-sdk/client-dynamodb (persistence) AND @aws-sdk/client-sqs
     // (messaging) — detectPersistencePass and detectMessagingPass each
     // independently walked file->contains->class over the same file,
     // producing TWO TypedUnits with the SAME id but different kind, a live
-    // calm-cli unique-ids-must-be-unique-in-architecture ERROR. Fixed via
-    // existingUnitFilePaths (pass-registry.ts) — persistence wins (runs
-    // first), messaging is correctly excluded for an already-claimed file.
+    // calm-cli unique-ids-must-be-unique-in-architecture ERROR.
     const ids = calm.nodes.map((n) => n['unique-id']);
     assert.equal(new Set(ids).size, ids.length, 'duplicate unique-id found — persistence/messaging double-detector collision regression');
 
     const store = findNode(calm, 'OrdersDynamoStore');
     assert.ok(store, 'OrdersDynamoStore node missing — DynamoDB driver-import detection regression');
     assert.equal(store['node-type'], 'database', 'DynamoDB-importing class must be typed database (persistence wins the priority tie over messaging)');
+
+    // B-msg-prod-sqs (Robustness, real re-check): T-E3's original fix
+    // avoided the duplicate-id error by silently DROPPING the messaging
+    // evidence for an already-claimed file — a real gap named and fixed
+    // this round. The messaging evidence must now be MERGED onto the same
+    // unit (still database-kind — persistence still wins the kind tie,
+    // unchanged precedent), not lost. CALM node metadata doesn't carry raw
+    // evidence.signal text (only file:line provenance — same lesson as
+    // T-R1-3's own test fix), so check typed-facts.json directly for the
+    // real merged evidence, matching the established pattern.
+    assert.equal(store.description, 'Discovered from 2 signal(s) in src/orders.service.ts', 'expected 2 merged evidence signals (persistence + messaging), not 1');
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const storeUnit = facts.units.find((u) => u.id === 'src/orders.service.ts::OrdersDynamoStore');
+    assert.ok(storeUnit, 'expected a typed-facts unit for OrdersDynamoStore');
+    assert.ok(storeUnit.evidence.some((e) => e.category === 'persistence' && e.signal === 'ref_aws_sdk_client_dynamodb'));
+    assert.ok(
+      storeUnit.evidence.some((e) => e.category === 'messaging' && e.signal === 'ref_aws_sdk_client_sqs'),
+      'expected the real SQS evidence merged onto this unit, not silently dropped'
+    );
 
     const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
     assert.equal(errors, 0);
@@ -930,17 +948,22 @@ test(
   () => {
     const { outDir, calm } = runPipeline([GHOSTFOLIO_ACCESS_ROOT]);
     try {
-      // Real bug #1 (fixed): Graphify never uses the literal "@prisma/client" as an
-      // imports_from edge target for external packages — only its own ref_prisma_client
-      // normalization. Without expandWithGraphifyRefTargets(), this would be 0.
-      const accessService = findNode(calm, 'AccessService');
-      assert.ok(accessService, 'AccessService must be detected as a real Prisma-importing persistence unit');
-      assert.equal(accessService['node-type'], 'database');
-      assert.equal(accessService.metadata.find((m) => m.key === 'x-aac-confidence').value, 20, 'import-only evidence stays low confidence');
+      // Q13 ontology fix (Robustness): AccessService merely imports Prisma's
+      // TYPES for its own method signatures (`import { Access, Prisma } from
+      // '@prisma/client'`) — it does NOT own the client (does not `extends
+      // PrismaClient`). Real evidence, re-verified: it must NOT be typed
+      // database. This was the ORIGINAL real bug #1 fix's own follow-on
+      // false-positive risk, disclosed as Q13 and left unfixed for a full
+      // session before this ownership check closed it — see
+      // class-ownership-resolver.ts / persistence-detection-catalogue.yml's
+      // ownerBaseClass for the full real-evidence writeup.
+      assert.equal(findNode(calm, 'AccessService'), undefined, 'AccessService must NOT be a database node — it imports Prisma types for typing only, never owns the client');
 
-      // Real bug #2 (fixed): AccessController ALSO imports @prisma/client (for its own
-      // DTO typing, `import { Access as AccessModel } from '@prisma/client'`) but has
-      // real route evidence — it must stay `service`, not become a second, wrong `database` node.
+      // Real bug #2 (fixed, unrelated to Q13, still real): AccessController
+      // ALSO imports @prisma/client (for its own DTO typing, `import {
+      // Access as AccessModel } from '@prisma/client'`) but has real route
+      // evidence — it must stay `service`, not become a second, wrong
+      // `database` node.
       const accessController = findNode(calm, 'access.controller.ts');
       assert.ok(accessController, 'access.controller.ts must exist as a service unit');
       assert.equal(accessController['node-type'], 'service');
@@ -948,7 +971,41 @@ test(
 
       const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
-      assert.equal(warnings, 0);
+      // 1 real, expected warning as of the Q13 fix (was 0 before it): with
+      // AccessService correctly no longer a database node, AccessController
+      // has nothing left in this narrow scan to connect to — a real,
+      // honest `architecture-nodes-must-be-referenced` warning, not a bug.
+      // Removing a false-positive node can orphan a previously-connected
+      // real one; this is that trade-off made visible, not hidden.
+      assert.equal(warnings, 1);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
+  'Robustness (B-ontology, Q13 fix) — real Ghostfolio PrismaService (extends PrismaClient) correctly IS a database unit — the positive case the ownership check must not over-correct away',
+  { skip: !fs.existsSync(GHOSTFOLIO_PRISMA_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },
+  () => {
+    const { outDir, calm } = runPipeline([GHOSTFOLIO_PRISMA_ROOT]);
+    try {
+      // Real source, grep-verified: services/prisma/prisma.service.ts:13-14
+      // is `export class PrismaService\n  extends PrismaClient`, a genuinely
+      // multi-line class header (class/extends/implements each on their own
+      // line) — this is exactly the shape class-ownership-resolver.ts's
+      // bounded multi-line scan exists for; a naive single-line read-back
+      // would miss this.
+      const prismaService = findNode(calm, 'PrismaService');
+      assert.ok(prismaService, 'PrismaService must be detected as a real database unit — it genuinely owns the Prisma client');
+      assert.equal(prismaService['node-type'], 'database');
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      // 1 real, expected warning — this narrow scan (services/prisma only)
+      // has exactly one node with nothing else in scope to connect to; an
+      // artifact of the deliberately small scan scope, not the Q13 fix.
+      assert.equal(warnings, 1);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
