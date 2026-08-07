@@ -70,7 +70,8 @@ These exist so Weaver stays honest under enterprise monorepos — not optional p
 
 | ID | Item | Status | Why | Spec |
 |---|---|---|---|---|
-| **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `doing` — design done (T-R1-1), code not started | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md) |
+| **B-R2b** | R2 extension: sole implementer → **imported** DB/topic unit (impl need not be the entity) | `done` (T-R1-2) | Phase-1 R2 residual: real layered services rarely make the implementer itself `@Entity` | [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md); real evidence: 11 new relationships in `fineract-provider`, 3 more in `fineract-core` |
+| **B-charge-jdbc-driver** | Spring-JDBC driver-import catalogue row (`org.springframework.jdbc.core`) + Java symbol-vs-package fix, combined | `todo` | The ONE remaining concrete path to close Fineract-charge's own flagship residual — its bridge implementer (`ChargeReadPlatformServiceImpl`) is raw-JDBC and imports neither the entity nor a currently-recognized driver; confirmed R2b's hop correctly finds 0 candidates there, not a bug | Depends on **B-java-driver-ref**; named in `AREC_R2b_Implementer_Store_Hop.md` §1 |
 | **B-arch-cov** | Architecture coverage metric + gate (% services with architecture-grade outbound when store units exist) | `done` (T-R0-2) | S1 is binary; need ongoing quality signal, not only empty/non-empty | `coverage-report.ts`'s `architectureOutboundCoverage` |
 | **B-pilot-scorecard** | Pilot-ready scorecard (which claim cells must be proven/partial) | `done` (T-R0-1) | Enterprise readiness: no single success metric | `Pilot_Ready_Scorecard.md` |
 | **B-R2-eval** | Labeled multi-root L2 remeasure protocol | `done` (T-R0-3) | Q11; single-root ≠ multi-root claims | `coe-lab/docs/multi-root-l2-protocol.md` |
@@ -92,7 +93,7 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 
 | ID | Item | Status | Spec / claim |
 |---|---|---|---|
-| **B-R2b** | (see robustness) | `todo` | Claim **R2** |
+| **B-R2b** | (see robustness) | `done` (T-R1-2) | Claim **R2** |
 | **B-R2-eval** | (see robustness) | `done` (T-R0-3) | Q11 |
 | **B-C-call-expand** | Expand call-site control vocabularies | `todo` | Claim **C-call** |
 | **B-C-rich-authority** | Richer control config (structured authority) | `todo` | Claim **C-rich** |
@@ -139,10 +140,10 @@ Statuses: `todo` · `partial` · `doing` · `oos` · `done`
 | Dimension | Assessment |
 |---|---|
 | Honesty / anti-overclaim | Strong (S1, grades, non-fabricating R2, Claim Register) |
-| Hardest story (layered multi-module) | Fair — mechanism yes, product close needs **B-R2b** (remeasure protocol itself now shipped, **B-R2-eval** `done`) |
+| Hardest story (layered multi-module) | Good progress — **B-R2b** `done` (11 new real fineract-provider relationships, 3 more in fineract-core); Fineract-charge's own flagship case is a real, named residual → **B-charge-jdbc-driver** |
 | Discovery as a system | Weak → **B-discovery-cadence** |
 | Eval enforcement | Fair → **B-trap-promote** (metric itself, **B-arch-cov**, now `done`) |
-| Pilot readiness | Scorecard shipped (**B-pilot-scorecard** `done`) — readiness itself still gated on **B-R2b** |
+| Pilot readiness | Scorecard shipped (**B-pilot-scorecard** `done`) — readiness itself still gated on the last-mile Fineract-charge story, tracked as **B-charge-jdbc-driver** |
 
 See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 
@@ -158,3 +159,4 @@ See [NEXT_ITERATION.md](./NEXT_ITERATION.md) for sequencing.
 | 2026-08-08 | Robustness Phase R0 (T-R0-1…T-R0-5) done: B-pilot-scorecard, B-R2-eval, B-oos-registry flipped; new Pilot_Ready_Scorecard.md / multi-root-l2-protocol.md / OOS_Registry.md linked above |
 | 2026-08-07 | Backlog-hygiene pass: B-arch-cov and B-graphify-partial were shipped in R0 (T-R0-2/T-R0-5 per STATUS.md) but never flipped from `todo`; B-R2-eval was `done` in the Robustness track table but still `todo` in the duplicate P1 reference — both classes of staleness fixed, health note reworded to match |
 | 2026-08-07 | T-R1-1 (R2b design addendum) done — see `AREC_R2b_Implementer_Store_Hop.md`; B-R2b flipped `todo` → `doing`. Separately: real-repo scan sweep against Fineract found and fixed a real crash (`.push(...arr)` spread exceeding V8's argument limit on `fineract-provider`, 2733 files, 167k+ ignored items) — 13 call sites converted to a loop-based `pushAll()`, regression-locked (200k-element synthetic test, no real-repo dependency needed to catch a regression). Not a BACKLOG-tracked item (no open row existed for it — found and fixed same-session); see STATUS.md §E for full detail. |
+| 2026-08-07 | T-R1-2 (R2b implementation) done — `multi-hop-bridge-detector.ts` extended with the implementer-import hop; B-R2b flipped `doing` → `done`. Real multi-root remeasure: 11 new architecture relationships resolved in `fineract-provider`, 3 more in `fineract-core` (single-root) — Fineract-charge's own flagship case stays an honest, named residual (implementer imports 0 candidate stores, confirmed via real run). New backlog row **B-charge-jdbc-driver** names the one concrete remaining path to close it. Claim Register R2 row and STATUS.md §E updated same-session. 48/48 tests green. |

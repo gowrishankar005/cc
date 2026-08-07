@@ -343,6 +343,64 @@ test('AREC T-C1 — R2 multi-hop bridge: synthetic fixture proves the mechanism 
   }
 });
 
+test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the mechanism (service -> zero-evidence interface -> PLAIN implementer -> imported entity), and the ambiguity path still refuses to guess', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2b-implementer-hop-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // Positive path: WidgetReadServiceImpl (the implementer) is a PLAIN
+    // class — no @Entity, no driver import — distinct from r2-bridge-sample
+    // (Phase 1) where the implementer itself IS the store. R2b must chase
+    // the implementer's own import to WidgetEntity, and the implementer
+    // itself must NOT become a CALM node (pure plumbing, same as the bridge
+    // interface — design note §2.6 extended to this hop).
+    const resource = findNode(calm, 'WidgetApiResource.java');
+    const entity = findNode(calm, 'WidgetEntity.java');
+    assert.ok(resource, 'WidgetApiResource.java node missing');
+    assert.equal(resource['node-type'], 'service');
+    assert.ok(entity, 'WidgetEntity.java node missing');
+    assert.equal(entity['node-type'], 'database');
+    assert.equal(findNode(calm, 'WidgetReadService.java'), undefined, 'bridge interface must not become its own CALM node');
+    assert.equal(findNode(calm, 'WidgetReadServiceImpl.java'), undefined, 'plain implementer must not become its own CALM node — it is plumbing, same as the bridge (§2.6)');
+
+    const r2bRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === resource['unique-id'] && conn.destination.node === entity['unique-id'];
+    });
+    assert.ok(r2bRel, 'expected a resolved R2b relationship from WidgetApiResource to WidgetEntity');
+    assert.equal(relMetadata(r2bRel, 'x-aac-relationship-grade'), 'architecture');
+    assert.equal(relMetadata(r2bRel, 'x-aac-confidence'), 8, 'R2b same-root confidence must be below both R2 Phase 1 tiers (15/10)');
+    assert.ok(r2bRel.description.includes('calls'), 'R2b must use the calls kind, same as R2 Phase 1');
+
+    // Ambiguity path: GadgetReadServiceImpl imports TWO real stores — R2b
+    // must refuse to guess, same "never guess" discipline as Phase 1's own
+    // 0-or-2+-implementers case, not silently pick one.
+    assert.equal(findNode(calm, 'GadgetReadServiceImpl.java'), undefined, 'ambiguous implementer must not become a node either');
+    const gadgetResource = findNode(calm, 'GadgetApiResource.java');
+    const gadgetRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === gadgetResource['unique-id'];
+    });
+    assert.equal(gadgetRel, undefined, 'ambiguous R2b case (2 store imports) must NOT emit a fabricated relationship');
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const ambiguousItem = facts.ignoredItems.find(
+      (i) => i.detail?.startsWith('unresolved-multi-hop') && i.detail.includes('GadgetApiResource')
+    );
+    assert.ok(ambiguousItem, 'expected an honest unresolved-multi-hop ignored-item for the ambiguous Gadget case');
+    assert.ok(ambiguousItem.detail.includes('2 candidate store unit'), `expected the item to name 2 candidates, got: ${ambiguousItem.detail}`);
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test(
   'AREC T-C1 — R2 multi-hop bridge: real Fineract fineract-charge produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
   { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
@@ -373,26 +431,48 @@ test(
 );
 
 test(
-  'AREC T-A2 — R0 grading: Fineract fineract-core entity<->entity edges graded structural, never architecture',
+  'AREC T-A2/R2b — R0 grading: Fineract fineract-core direct-reconciler edges stay structural; R2b now resolves 3 real service->repository chains, graded architecture',
   { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-core')]);
     try {
-      // Documented baseline: fineract-core's 64 typed-facts relationships are
+      // Documented pre-R2b baseline: fineract-core's 85 direct-reconciler
+      // (graphify-reconciler.ts, confidence: undefined) relationships are
       // ALL database<->database (dual-unit Graphify entity mesh, no service
       // endpoint) — see coe-lab/docs/fineract-gold-vs-platform-finding.md.
-      // Every one of them must be graded 'structural', never 'architecture'
+      // Every one of THOSE must stay graded 'structural', never 'architecture'
       // (that would misrepresent entity-mesh noise as a real architecture
-      // link — exactly what T-A2 exists to stop).
+      // link — exactly what T-A2 exists to stop). R2b (confidence: defined,
+      // 8/5 same-root/cross-root — the ONLY producers that set confidence on
+      // a 'calls' relationship) is a SEPARATE, later-added mechanism that
+      // correctly finds real service-rooted chains R0 structurally cannot
+      // see — those must be graded 'architecture', not lumped in with R0's
+      // entity mesh. Real, grep-verified finding (not assumed): R2b resolves
+      // BusinessDateApiResource -> BusinessDateRepository,
+      // ExternalEventConfigurationApiResource -> ExternalEventConfigurationRepository,
+      // PaymentTypeApiResource -> PaymentTypeRepository — each a real
+      // ApiResource referencing a bare bridge interface whose sole
+      // implementer (e.g. BusinessDateReadPlatformServiceImpl) is not itself
+      // a store but directly imports the real Spring Data repository
+      // interface (confirmed via `grep -n "^import.*BusinessDate" ...Impl.java`).
       assert.ok(calm.relationships.length > 0, 'expected real relationships from fineract-core');
       // Excludes the system node's own composed-of relationship (T-X7-3) —
       // synthetic CALM scaffolding, not a graded TypedRelationship; see the
       // BoA test above for the full rationale.
       const graded = calm.relationships.filter((rel) => !rel['relationship-type']['composed-of']);
       assert.ok(graded.length > 0, 'expected real graded relationships from fineract-core');
-      for (const rel of graded) {
-        assert.ok(relMetadata(rel, 'x-aac-relationship-grade'), `relationship ${rel['unique-id']} missing x-aac-relationship-grade`);
+
+      const r2Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-confidence') !== undefined);
+      const r0Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-confidence') === undefined);
+      assert.equal(r0Graded.length, 85, `expected exactly 85 direct-reconciler relationships (pre-R2b baseline), got ${r0Graded.length}`);
+      for (const rel of r0Graded) {
         assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural', `expected structural grade on ${rel['unique-id']} (entity<->entity, no service endpoint)`);
+      }
+
+      assert.equal(r2Graded.length, 3, `expected exactly 3 R2b-resolved relationships, got ${r2Graded.length}: ${r2Graded.map((r) => r['unique-id']).join(' | ')}`);
+      for (const rel of r2Graded) {
+        assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'architecture', `expected architecture grade on R2b relationship ${rel['unique-id']}`);
+        assert.equal(relMetadata(rel, 'x-aac-confidence'), 8, 'R2b same-root confidence must be the fixed R2b tier (below both R2 Phase 1 tiers)');
       }
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });

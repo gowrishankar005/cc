@@ -1,6 +1,6 @@
 import { GraphifyRun } from '../../scanner/graphify-provider';
 import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-facts';
-import { buildNodeToUnitMap } from './graphify-reconciler';
+import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 
 /**
  * AREC Wave 3 T-C1 (docs/solution/AREC_R2_MultiHop_Strategy.md — the R2
@@ -24,6 +24,16 @@ import { buildNodeToUnitMap } from './graphify-reconciler';
 const R2_SAME_ROOT_CONFIDENCE = 15;
 /** Lower again — the bridge's implementer was resolved in a DIFFERENT scanned root than the source service, a larger, Q11-labeled claim. */
 const R2_CROSS_ROOT_CONFIDENCE = 10;
+/**
+ * AREC R2b (docs/solution/AREC_R2b_Implementer_Store_Hop.md §2.1) — the sole
+ * implementer is itself not a database/topic unit (a plain service/JDBC/
+ * RowMapper-shaped class, real layered-Java shape), but it imports/references
+ * EXACTLY ONE database/topic unit directly. Two inference layers deep (bridge
+ * resolution + implementer-import chase), so below BOTH Phase 1 tiers.
+ */
+const R2B_SAME_ROOT_CONFIDENCE = 8;
+/** Deepest, most-inferred tier this pipeline produces — implementer-import chase AND a root-boundary claim together. */
+const R2B_CROSS_ROOT_CONFIDENCE = 5;
 
 export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
@@ -59,10 +69,21 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
   // bridge's implementer count is a single lookup, not an O(edges) scan per
   // bridge candidate.
   const implementersByTarget = new Map<string, string[]>();
+  // AREC R2b — same imports/references edges bridge-discovery already reads
+  // (line ~98 below), re-indexed by SOURCE this time: given an implementer
+  // node, what does it itself import/reference? Reused, not re-derived, so
+  // R2b's "does the implementer import a store" test is the exact same
+  // relation vocabulary as R2 Phase 1's "does the service import a bridge"
+  // test — one mechanism, two hops, not two mechanisms.
+  const importsBySource = new Map<string, string[]>();
   for (const edge of run.graph.edges) {
-    if (edge.relation !== 'implements') continue;
-    if (!implementersByTarget.has(edge.target)) implementersByTarget.set(edge.target, []);
-    implementersByTarget.get(edge.target)!.push(edge.source);
+    if (edge.relation === 'implements') {
+      if (!implementersByTarget.has(edge.target)) implementersByTarget.set(edge.target, []);
+      implementersByTarget.get(edge.target)!.push(edge.source);
+    } else if (edge.relation === 'imports' || edge.relation === 'references') {
+      if (!importsBySource.has(edge.source)) importsBySource.set(edge.source, []);
+      importsBySource.get(edge.source)!.push(edge.target);
+    }
   }
 
   for (const edge of run.graph.edges) {
@@ -103,38 +124,66 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     }
 
     const implMatch = nodeToUnit.get(implementers[0]);
-    if (!implMatch || (implMatch.unit.kind !== 'database' && implMatch.unit.kind !== 'topic')) {
-      // Implementer exists but is not itself a persistence/messaging unit
-      // (e.g. it's a plain service, or has no catalogue evidence of its
-      // own either — Fineract's real JDBC-RowMapper impl shape, which
-      // imports no known persistence-driver library). Bounded at 2 hops
-      // total (service -> bridge -> implementer) per §2.4.2 — do not chase
-      // a third hop.
-      const key = `${fromMatch.unit.id}|${bridgeNodeId}|no-terminal-unit`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        ignoredItems.push({
-          ref: `${fromMatch.unit.filePath}`,
-          reason: 'CROSS_DOMAIN_UNRESOLVED',
-          detail: `unresolved-multi-hop: "${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implementers[0]}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) — hop bound reached, no architecture relationship emitted.`,
-        });
-      }
+    if (implMatch && (implMatch.unit.kind === 'database' || implMatch.unit.kind === 'topic')) {
+      emitBridgeRelationship(fromMatch, implMatch, R2_SAME_ROOT_CONFIDENCE, R2_CROSS_ROOT_CONFIDENCE);
       continue;
     }
 
-    if (fromMatch.unit.id === implMatch.unit.id) continue; // degenerate: bridge resolves back to the source's own unit
+    // AREC R2b (docs/solution/AREC_R2b_Implementer_Store_Hop.md §2) —
+    // Phase 1's terminal check just failed (implementer is absent, or exists
+    // but isn't itself a database/topic unit — the real Fineract
+    // JDBC-RowMapper/plain-service-layer shape). Before giving up, chase ONE
+    // more hop through what the implementer itself imports/references,
+    // filtered to targets that are ALREADY a database/topic TypedUnit (no
+    // new detection mechanism — reuses whatever R1/persistence-detector/
+    // spring-data-repository/etc. already produced). Still bounded at 2
+    // bridge hops total (service -> bridge -> implementer -> store) per
+    // §2.4.2 — this is a filter added at the existing second hop, not a new
+    // third hop; an implementer's implementer is never chased.
+    const implNodeId = implementers[0];
+    const implCandidateTargets = implNodeId ? importsBySource.get(implNodeId) ?? [] : [];
+    const storeCandidates = implCandidateTargets
+      .map((targetId) => nodeToUnit.get(targetId))
+      .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
+    // Dedupe by unit id — the same store can be imported via more than one edge.
+    const uniqueStoreUnits = [...new Map(storeCandidates.map((m) => [m.unit.id, m])).values()];
 
-    const dedupeKey = `${fromMatch.unit.id}|${implMatch.unit.id}`;
-    if (seen.has(dedupeKey)) continue;
+    if (uniqueStoreUnits.length === 1) {
+      emitBridgeRelationship(fromMatch, uniqueStoreUnits[0], R2B_SAME_ROOT_CONFIDENCE, R2B_CROSS_ROOT_CONFIDENCE);
+      continue;
+    }
+
+    // Still unresolved after the R2b hop: 0 implementers, an implementer with
+    // no store import, or 2+ ambiguous store imports — never guess (§2.4.1
+    // unchanged, now also covers the R2b hop's own ambiguity case).
+    const key = `${fromMatch.unit.id}|${bridgeNodeId}|no-terminal-unit`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      ignoredItems.push({
+        ref: `${fromMatch.unit.filePath}`,
+        reason: 'CROSS_DOMAIN_UNRESOLVED',
+        detail: `unresolved-multi-hop: "${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
+      });
+    }
+  }
+
+  function emitBridgeRelationship(
+    from: NodeUnitMatch,
+    to: NodeUnitMatch,
+    sameRootConfidence: number,
+    crossRootConfidence: number
+  ): void {
+    if (from.unit.id === to.unit.id) return; // degenerate: bridge resolves back to the source's own unit
+    const dedupeKey = `${from.unit.id}|${to.unit.id}`;
+    if (seen.has(dedupeKey)) return;
     seen.add(dedupeKey);
-
     relationships.push({
-      from: fromMatch.unit.id,
-      to: implMatch.unit.id,
+      from: from.unit.id,
+      to: to.unit.id,
       kind: 'calls', // distinct from R1's 'imports'/'connects' — this is an inferred call chain through a bridge, not a direct import (§2.2)
-      crossPackage: fromMatch.root !== implMatch.root,
+      crossPackage: from.root !== to.root,
       source: 'graphify',
-      confidence: fromMatch.root === implMatch.root ? R2_SAME_ROOT_CONFIDENCE : R2_CROSS_ROOT_CONFIDENCE,
+      confidence: from.root === to.root ? sameRootConfidence : crossRootConfidence,
     });
   }
 
