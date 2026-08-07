@@ -36,7 +36,7 @@
 | ID | Item | Status | Detail |
 |---|---|---|---|
 | **E** | AREC Session E (breadth) | `done` (2026-08-08) | [T-E1…T-E6](./AGENT_TASKS_AREC_Wave3_Implementation.md) all shipped (T-E0 correctly skipped — C-rich already landed in D) |
-| **RB** | Weaver robustness program (phased) | `doing` — Phase R0 in progress | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) |
+| **RB** | Weaver robustness program (phased) | `done` (2026-08-08) — Phases R0–R4 all complete, MVP checklist 13/13 | [AGENT_TASKS_Weaver_Robustness.md](./AGENT_TASKS_Weaver_Robustness.md) |
 | **W3-close** | Close Wave 3 checklist / OOS decisions | `done` | AREC Wave 3 DoD — all checkboxes closed, Sessions A–E complete |
 
 ### Recently landed (Wave 3 A–D) — do not re-queue
