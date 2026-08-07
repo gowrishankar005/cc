@@ -1,0 +1,5 @@
+{
+  "control-id": "security-rbac-003",
+  "name": "Role-Based Access Control (call-site, Waltz)",
+  "description": "Method or endpoint access restricted by role, enforced via an explicit call-site role check (Waltz's UserRoleService.hasRole, which throws NotAuthorizedException on failure) rather than a decorator/annotation"
+}

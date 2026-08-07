@@ -28,6 +28,7 @@ const GHOSTFOLIO_ACCESS_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio
 const FINERACT_SECURITY_ROOT = path.resolve(FINERACT_ROOT, 'fineract-security');
 const FINERACT_PROVIDER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider');
 const WALTZ_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
+const WALTZ_WEB_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-web');
 const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
@@ -319,6 +320,9 @@ test(
       // T-D2 (C-rich) — the call's raw argument text, not a resolved constant value.
       for (const req of rbac.requirements) {
         assert.equal(req.config.expression, 'RESOURCE_NAME_FOR_PERMISSIONS');
+        // T-R2-3 (C-rich structured authority) — bare ALL_CAPS constant
+        // shape, extracted as a literal token, never resolved to a value.
+        assert.equal(req.config.authorityRef, 'RESOURCE_NAME_FOR_PERMISSIONS');
       }
 
       const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
@@ -346,6 +350,87 @@ test('AREC T-D1/T-D2 — call-site control detection: lab py-jwt-gateway fixture
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
   }
+});
+
+test(
+  'Robustness T-R2-2 (C-call expansion) — real Waltz waltz-web: 4 real call sites get security-rbac-003 (UserRoleService.hasRole, a DIFFERENT real repo\'s own RBAC vocabulary), calm validate 0 errors',
+  { skip: !fs.existsSync(WALTZ_WEB_ROOT) && 'spikes/waltz/repo/waltz-web not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir, calm } = runPipeline([WALTZ_WEB_ROOT]);
+    try {
+      // Grep-verified real call sites (WebUtilities.java:148, plus 3 real
+      // endpoint classes that call it or the underlying service directly).
+      // authorityRef (T-R2-3, C-rich structured authority): the 3 endpoint
+      // classes' real argument text names a qualified SystemRole.XXX enum
+      // member, extracted structurally; WebUtilities.java's own call site
+      // (`hasRole(user, requiredRoles)`) only has plain variables — expect
+      // NO authorityRef there, a real negative case, not an oversight.
+      const expectedAuthorityRef = {
+        'WebUtilities.java': undefined,
+        'BulkUploadLegalEntityRelationshipEndpoint.java': 'SystemRole.BULK_LEGAL_ENTITY_RELATIONSHIP_EDITOR',
+        'LicenceEndpoint.java': 'SystemRole.LICENCE_ADMIN',
+        'SettingsEndpoint.java': 'SystemRole.ADMIN',
+      };
+      for (const [fileName, authorityRef] of Object.entries(expectedAuthorityRef)) {
+        const node = findNode(calm, fileName);
+        assert.ok(node, `${fileName} node missing`);
+        const rbac = node.controls?.['security-rbac-003'];
+        assert.ok(rbac, `expected security-rbac-003 (Waltz hasRole call-site) control on ${fileName}`);
+        assert.equal(rbac.requirements[0].config.detectedVia, 'call');
+        assert.equal(rbac.requirements[0].config.authorityRef, authorityRef, `authorityRef mismatch for ${fileName}`);
+      }
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      assert.equal(warnings, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test('Robustness T-R2-2 (C-call expansion) — Fineract isAuthenticated() call-site: weighted 30 (below the fine-grained RBAC tier, a real stated distinction — authentication proves login, not authorization), synthetic buildCalm check since the signal alone sits below the unit confidence floor when isolated (same as jwt.decode\'s tier, by design)', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'ClientSearchService.java',
+        kind: 'service',
+        name: 'ClientSearchService.java',
+        filePath: 'ClientSearchService.java',
+        startLine: 1,
+        endLine: 20,
+        evidence: [
+          { signal: 'GET /clients/search', source: 'native-route', category: 'http-entry-point', weight: 40, ref: 'ClientSearchService.java:1' },
+          // Real evidence: context.isAuthenticated() at ClientSearchService.java:52
+          // (spikes/fineract/repo/fineract-provider) — grep-verified before
+          // writing the catalogue row, not assumed. Combined here with a
+          // route signal so the unit clears the confidence floor for this
+          // shape-proof test, matching how it would combine in a real file
+          // that also has an HTTP entry point.
+          { signal: 'context.isAuthenticated', source: 'call', category: 'security-control', weight: 30, ref: 'ClientSearchService.java:52' },
+        ],
+        confidence: 70,
+      },
+    ],
+    relationships: [],
+    ignoredItems: [],
+  };
+
+  const calm = buildCalm(facts, false);
+  const node = findNode(calm, 'ClientSearchService.java');
+  assert.ok(node, 'ClientSearchService.java node missing');
+  const auth = node.controls?.['security-auth-002'];
+  assert.ok(auth, 'expected security-auth-002 (Fineract isAuthenticated call-site) control');
+  assert.equal(auth.requirements[0].config.evidenceRef, 'ClientSearchService.java:52');
+  assert.ok(
+    auth.description.includes('NOT that they are authorized'),
+    'description must state the real distinction from RBAC (authentication != authorization), not imply equivalent strength'
+  );
 });
 
 test('AREC T-D1 — TypeScript decorator/call dedup: NestJS fixture produces ZERO unmapped signals despite call-fact extraction now running (real dup finding: TS decorators are ALSO referenceKind calls)', () => {

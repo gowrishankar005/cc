@@ -3,6 +3,30 @@ import { CalmNode } from '../../types/calm';
 import { ControlRequirementCatalogue, findControlRequirement } from '../../rules/construct-mapping-schema';
 
 /**
+ * T-R2-3 (C-rich structured authority, Robustness Phase R2). Beyond the raw
+ * `expression` text (T-D2), pulls out the one thing that's SAFELY structural
+ * within it: a Java constant-style authority reference — either a qualified
+ * enum member (`SystemRole.ADMIN`) or a bare ALL_CAPS constant
+ * (`RESOURCE_NAME_FOR_PERMISSIONS`) — real, grep-verified shapes from both
+ * evidence repos this catalogue is built against (Waltz's
+ * `SystemRole.LICENCE_ADMIN`/`SystemRole.ADMIN`, Fineract's
+ * `RESOURCE_NAME_FOR_PERMISSIONS`). Deliberately NEVER resolves what the
+ * constant equals (that's cross-file/whole-program resolution this
+ * mechanism has never done and explicitly won't — see `extractCallArgumentText`'s
+ * own comment) — this only extracts the LITERAL TOKEN already present in the
+ * source text `expression` already captures, a naming-convention match, not
+ * an inferred value. Absent, not a fake empty string, when no such token is
+ * present (e.g. a call whose only arguments are plain variables) — matches
+ * `expression`'s own "real per-signal richness, not invented uniformly"
+ * discipline.
+ */
+const AUTHORITY_REF = /\b([A-Z][A-Za-z0-9]*\.[A-Z][A-Z0-9_]+|[A-Z][A-Z0-9_]{2,})\b/;
+
+function extractAuthorityRef(expression: string | undefined): string | undefined {
+  return expression ? AUTHORITY_REF.exec(expression)?.[1] : undefined;
+}
+
+/**
  * The sixth builder (Solution Design v2 §5.5) — attaches CALM `controls` to
  * already-built nodes (mutates in place), from evidence signal-mapper.ts
  * already tagged `category: 'security-control'`. Two-catalogue lookup, same
@@ -60,6 +84,9 @@ export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue:
           // today (e.g. @PreAuthorize) — this is real per-signal richness,
           // not invented for every control uniformly.
           ...(ev.argument !== undefined ? { expression: ev.argument } : {}),
+          // T-R2-3 (C-rich structured authority) — see extractAuthorityRef's
+          // own doc comment for what this is and isn't.
+          ...(extractAuthorityRef(ev.argument) ? { authorityRef: extractAuthorityRef(ev.argument) } : {}),
           // Honest per v0.10 §0: requirement-url is a placeholder this
           // project doesn't yet host as a real schema — say so inline, not
           // just in a document-level disclosure someone could miss.

@@ -12,6 +12,8 @@
 | [`Claim_Register.md`](./Claim_Register.md) | Claim cells |
 | [`Architecture_Relation_Evidence_Completeness.md`](./Architecture_Relation_Evidence_Completeness.md) | AREC pillar |
 | [`AREC_R2_MultiHop_Strategy.md`](./AREC_R2_MultiHop_Strategy.md) | R2 Phase 1 design |
+| [`AREC_R2b_Implementer_Store_Hop.md`](./AREC_R2b_Implementer_Store_Hop.md) | R2b design + evidence |
+| [`Catalogue_Intake.md`](./Catalogue_Intake.md) | Rule for new catalogue rows (T-R2-1) |
 | [`AGENT_TASKS_AREC_Wave3_Implementation.md`](./AGENT_TASKS_AREC_Wave3_Implementation.md) | Session E breadth (parallel track) |
 | [`coe-lab/docs/validation-approach-vnext.md`](../../coe-lab/docs/validation-approach-vnext.md) | L0–L5 |
 | [`coe-lab/docs/trap-gold-backlog.md`](../../coe-lab/docs/trap-gold-backlog.md) | Traps |
@@ -240,10 +242,12 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08) — see [`Catalogue_Intake.md`](./Catalogue_Intake.md). |
 | **Goal** | Written rule: new signal/control/persistence/messaging row requires evidence sample, claim cell, regression, scope-limitations note. |
 | **Why** | Prevent one-off catalogue sprawl and undocumented vocab. |
 | **Backlog ID** | B-catalogue-intake |
 | **Integrity home** | docs (Module_Authoring or short `Catalogue_Intake.md`) |
+| **Implementation details** | New `docs/solution/Catalogue_Intake.md` — four requirements (evidence sample cited by file/line, Claim Register update, regression test, scope-limitations note when narrower than the name suggests), what does NOT satisfy the rule (unevidenced "seems likely" rows, single-repo-shaped literals, crash-only tests, silent regex widening), a retroactive worked example (T-R1-3's `org.jooq` row) proving the rule against something already merged, not just prose. |
 | **Acceptance** | Rule linked from BACKLOG and agent headers. |
 | **Hard predecessors** | T-R0-1. |
 
@@ -253,11 +257,12 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | Add catalogue-driven call-site auth signals beyond current set, with evidence. |
 | **Why** | Enterprise stacks use many call patterns; two rows are not robust. |
 | **Backlog ID** | B-C-call-expand |
 | **Integrity home** | catalogue + scanner call-site path |
-| **Implementation details** | Follow intake rule; prefer patterns evidenced in samples or lab fixtures; no single-repo-only strings unless generalized. Confidence discipline unchanged. |
+| **Implementation details** | Two new rows, both following `Catalogue_Intake.md`'s own rule (evidence + claim cell + regression + scope note). (1) `waltz-user-role-service` (`signal-catalogue.yml`) / `security-rbac-003` (`control-requirement-catalogue.yml`) — real evidence: Waltz's `WebUtilities.requireRole()` calls `userRoleService.hasRole(user, requiredRoles)` and throws `NotAuthorizedException` on failure (confirmed via real source, `waltz-web/.../WebUtilities.java:127-150`), weighted 40 (same tier as the existing fine-grained rows) — a genuinely DIFFERENT real repo's own vocabulary, not a Fineract-shaped guess. (2) `fineract-call-site-authenticated` / `security-auth-002` — Fineract's OWN `PlatformSecurityContext.isAuthenticated()` (confirmed real void assert-or-throw implementation, `SpringSecurityPlatformSecurityContext.java:81`), weighted 30 — deliberately BELOW the fine-grained RBAC tier on a real, stated distinction: authentication (logged in) is a materially weaker claim than authorization (allowed to do this specific thing), same honesty discipline as the existing `jwt.decode` row's lower weight. Real verification: Waltz `waltz-web` (225 files) — 4 real call sites get `security-rbac-003`, `calm validate` 0 errors; Fineract `isAuthenticated` confirmed matching (correctly sits below the unit confidence floor when isolated with no other evidence — same behavior as every other corroboration-tier signal, not a bug). 2 new regression tests. |
 | **Acceptance** | ≥1 new vocabulary with test; Claim C-call still partial until broader coverage stated. |
 | **Hard predecessors** | T-R2-1. |
 
@@ -267,10 +272,12 @@ Keep existing suite green (R1 BoA, R2 synthetic + non-fabricating residual, S1, 
 
 | Field | Content |
 |---|---|
+| **Status** | **Done** (2026-08-08). |
 | **Goal** | Beyond raw source-line text: structured fields where safely extractable (without resolving constants incorrectly). |
 | **Why** | Gold often wants authority semantics; raw text is a start. |
 | **Backlog ID** | B-C-rich-authority |
-| **Integrity home** | control-builder |
+| **Integrity home** | control-builder (`control-builder.ts`) |
+| **Implementation details** | New `authorityRef` field, alongside the existing `expression` field, extracted via `extractAuthorityRef()` — a regex over the ALREADY-captured raw expression text (no new extraction mechanism) matching a Java constant-style authority reference: a qualified enum member (`SystemRole.ADMIN`) or a bare ALL_CAPS constant (`RESOURCE_NAME_FOR_PERMISSIONS`). Deliberately NEVER resolves what the constant equals — a naming-convention token match, not cross-file value resolution (matches `extractCallArgumentText`'s own long-standing non-goal). Real, grep-verified against both evidence repos: Fineract's `RESOURCE_NAME_FOR_PERMISSIONS` (bare form), Waltz's `SystemRole.LICENCE_ADMIN`/`SystemRole.ADMIN`/`SystemRole.BULK_LEGAL_ENTITY_RELATIONSHIP_EDITOR` (qualified form) — all three real endpoint classes correctly get the field; `WebUtilities.java`'s own call site (`hasRole(user, requiredRoles)`, plain variables only) correctly gets NO field — a real negative case, not an oversight. Absent (not a fake empty string) whenever no such token is present, matching `expression`'s own discipline. 2 existing regression tests extended (not a new redundant test) with `authorityRef` assertions, including the negative case. |
 | **Acceptance** | Documented field contract; at least one structured field when possible; never invent resolved secrets. |
 | **Hard predecessors** | C-rich partial already shipped. |
 

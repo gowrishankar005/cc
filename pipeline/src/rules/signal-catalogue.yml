@@ -195,6 +195,48 @@ rules:
     weight: 40
     calmNodeType: service
 
+  # T-R2-2 (C-call expansion, Catalogue_Intake.md). Real evidence, verified
+  # directly against real Waltz source (spikes/waltz/repo), not assumed:
+  # `WebUtilities.requireRole()` (waltz-web/.../WebUtilities.java:127-150)
+  # calls `userRoleService.hasRole(user, requiredRoles)` and THROWS
+  # `NotAuthorizedException()` when it returns false — a genuine, definite
+  # fine-grained role-authorization gate, same strength as Fineract's
+  # validateHasPermission family, just a different framework's own vocabulary
+  # (confirmed real call sites beyond the helper itself: SettingsEndpoint.java:100,
+  # LicenceEndpoint.java:119, BulkUploadLegalEntityRelationshipEndpoint.java:98).
+  # A DIFFERENT real repo's real vocabulary, not a Fineract-shaped guess —
+  # exactly the breadth this task exists to add. Weighted 40, same tier as
+  # the other definite (not merely corroborating) call-site controls.
+  - id: waltz-user-role-service
+    language: java
+    framework: waltz-security
+    matchSignal: "hasRole"
+    matchSource: call
+    category: security-control
+    weight: 40
+    calmNodeType: service
+
+  # T-R2-2 (C-call expansion). Real evidence: Fineract's OWN
+  # PlatformSecurityContext (the same class fineract-call-site-permission
+  # above already keys off) also exposes `isAuthenticated()` — confirmed via
+  # its real implementation (fineract-security/.../SpringSecurityPlatformSecurityContext.java:81):
+  # `void isAuthenticated() { authenticatedUser(); }`, a void "assert or
+  # throw" method (same shape as validateHasReadPermission), real call site
+  # at fineract-provider/.../ClientSearchService.java:52. Weighted LOWER than
+  # the fine-grained permission family (30, not 40) on a real, stated
+  # distinction, not an arbitrary number: isAuthenticated() proves a user is
+  # LOGGED IN, not that they're AUTHORIZED for the specific action being
+  # guarded — a materially weaker claim than validateHasPermission's
+  # fine-grained check, so it must not be scored as equally strong evidence.
+  - id: fineract-call-site-authenticated
+    language: java
+    framework: fineract-security
+    matchSignal: "isAuthenticated"
+    matchSource: call
+    category: security-control
+    weight: 30
+    calmNodeType: service
+
   # Real evidence: coe-lab/fixtures/monorepo/packages/py-jwt-gateway's
   # auth_gateway.py calls `jwt.decode(token, options={"verify_signature":
   # False})` — CodeGraph's extractFromSource() reports this as a `calls`

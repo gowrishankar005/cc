@@ -35,6 +35,41 @@ controls:
     matchSignal: "validateHasReadPermission|validateHasPermission|validateHasCheckerPermission"
     requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac-call-site.requirement.json"
 
+  # T-R2-2 (C-call expansion) — same real-world control family as
+  # security-rbac-002 (fine-grained role/permission enforcement, confirmed
+  # via WebUtilities.requireRole()'s real NotAuthorizedException throw), a
+  # DIFFERENT real repo's own vocabulary (Waltz, not Fineract). Own
+  # controlId, not folded into security-rbac-002, for the same reason
+  # security-rbac-002 itself isn't folded into security-rbac-001 — S3
+  # narrative honesty about which real framework's own API was matched.
+  - controlId: security-rbac-003
+    name: "Role-Based Access Control (call-site, Waltz)"
+    description: "Method or endpoint access restricted by role, enforced via an explicit call-site role check (Waltz's UserRoleService.hasRole, which throws NotAuthorizedException on failure) rather than a decorator/annotation"
+    detectionMechanism: call
+    language: java
+    matchSignal: "hasRole"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac-call-site-waltz.requirement.json"
+
+  # T-R2-2 (C-call expansion) — a DIFFERENT, WEAKER claim than
+  # security-rbac-002, kept as its own controlId deliberately: this is
+  # authentication (is a user logged in), not authorization (is this user
+  # allowed to do this specific thing). Real evidence: Fineract's
+  # PlatformSecurityContext.isAuthenticated() is a genuine void assert-or-throw
+  # method (confirmed via its real implementation,
+  # SpringSecurityPlatformSecurityContext.java:81 — `authenticatedUser()`
+  # throws when unauthenticated), unlike security-auth-001's jwt.decode()
+  # (which, per THAT row's own real evidence, can be called with signature
+  # verification disabled and prove nothing) — so this sits at a real,
+  # distinct, INTERMEDIATE strength: a definite check, but of a narrower
+  # claim than RBAC.
+  - controlId: security-auth-002
+    name: "Authentication check (call-site, Fineract)"
+    description: "A call-site authentication check was found (Fineract's PlatformSecurityContext.isAuthenticated(), a real assert-or-throw method) — proves a user is authenticated, NOT that they are authorized for the specific action being guarded (see security-rbac-002 for the stronger, fine-grained claim)"
+    detectionMechanism: call
+    language: java
+    matchSignal: "isAuthenticated"
+    requirementUrl: "https://project-owned-placeholder.invalid/controls/auth-call-site-fineract.requirement.json"
+
   # Deliberately a DIFFERENT controlId family (auth, not rbac) — a bare
   # jwt.decode() call is token PARSING evidence, not proven role/permission
   # enforcement (a real jwt.decode() with verify_signature disabled, as this
