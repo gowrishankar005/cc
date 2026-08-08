@@ -1108,6 +1108,55 @@ test('T-Y5-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md, HT-ASB-006 class) 
   }
 });
 
+test('HITL review trigger — S5 triggers wired in (found via Architect_Residual_Review_Session.md review 2026-08-09: review-queue.json never surfaced S5 despite it existing in coverage-report.json since the same day RS-0 signed off)', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+
+  const orphanRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-orphan-store');
+  fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
+  fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
+  const { outDir: orphanOutDir } = runPipeline([orphanRoot], ['--cfn-manifests', orphanRoot]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(orphanOutDir, 'typed-facts.json'), 'utf8'));
+    const coverage = JSON.parse(fs.readFileSync(path.join(orphanOutDir, 'coverage-report.json'), 'utf8'));
+    const queue = buildReviewQueue(facts, coverage);
+
+    const storeItems = queue.items.filter((i) => i.trigger === 'S5-zero-service-units-with-store-present');
+    assert.ok(storeItems.length >= 1, 'expected at least 1 S5-zero-service-units-with-store-present item for OrderStore');
+    assert.ok(storeItems.some((i) => i.unitId.includes('OrderStore.java')), `expected OrderStore.java named, got: ${storeItems.map((i) => i.unitId)}`);
+    assert.ok(storeItems.every((i) => i.unitKind === 'database' || i.unitKind === 'topic'));
+
+    const cfnItems = queue.items.filter((i) => i.trigger === 'S5-cfn-routes-found-but-unbound');
+    assert.equal(cfnItems.length, 1, 'S5-cfn-routes-found-but-unbound is run-level — exactly 1 item, not per-unit');
+    assert.equal(cfnItems[0].unitId, undefined, 'run-level item must have no unitId — no unit was matched, by the flag\'s own definition');
+    assert.ok(cfnItems[0].rationale.includes('unresolved-cfn-route:'), `expected the specific unresolved-cfn-route detail cited, got: ${cfnItems[0].rationale}`);
+  } finally {
+    fs.rmSync(orphanOutDir, { recursive: true, force: true });
+    fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
+    fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
+  }
+
+  // Negative path: the healthy fixture must not produce either S5 review item.
+  const healthyRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
+  fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
+  fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
+  const { outDir: healthyOutDir } = runPipeline([healthyRoot], ['--cfn-manifests', healthyRoot]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(healthyOutDir, 'typed-facts.json'), 'utf8'));
+    const coverage = JSON.parse(fs.readFileSync(path.join(healthyOutDir, 'coverage-report.json'), 'utf8'));
+    const queue = buildReviewQueue(facts, coverage);
+    const s5Items = queue.items.filter((i) => i.trigger.startsWith('S5'));
+    assert.deepEqual(s5Items, [], `expected no S5 review items on the healthy fixture, got: ${JSON.stringify(s5Items)}`);
+  } finally {
+    fs.rmSync(healthyOutDir, { recursive: true, force: true });
+    fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
+    fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
+  }
+});
+
 test(
   'Node/TS real evidence (ghostfolio/ghostfolio, NestJS+Prisma) — Graphify ref_ target normalization + Controller/database precedence (generic fixes, real bugs found by testing against a real repo)',
   { skip: !fs.existsSync(GHOSTFOLIO_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },

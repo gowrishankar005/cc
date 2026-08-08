@@ -30,13 +30,29 @@ import { CoverageReport } from '../coverage-report';
  * ever wired in S1/S2, but T-R4-1's own goal always named "S1 fires OR arch
  * coverage below threshold" — the second half was a real, unclosed gap
  * until this trigger was added, not a hypothetical extension.
+ *
+ * Found during the Architect_Residual_Review_Session.md review (2026-08-09,
+ * not hypothetical — this file's own §4.2 lists review-queue.json as a key
+ * residual-session input, and S5 already existed in coverage-report.json
+ * the same day RS-0 was signed off, but was never wired in here): S5's two
+ * conditions are now real triggers too. `S5-zero-service-units-with-store-present`
+ * has natural unit candidates (every database/topic unit, same "list every
+ * plausible unit" pattern as S1). `S5-cfn-routes-found-but-unbound` does
+ * NOT — by definition, no unit was matched, so `unitId`/`unitKind` are
+ * optional here (a genuine run-level residual, not per-unit).
  */
 
 export interface ReviewQueueItem {
-  trigger: 'S1-zero-service-touching-relationships' | 'S2-http-without-security-control' | 'low-architecture-coverage';
-  unitId: string;
-  unitKind: TypedUnit['kind'];
-  confidence: number;
+  trigger:
+    | 'S1-zero-service-touching-relationships'
+    | 'S2-http-without-security-control'
+    | 'low-architecture-coverage'
+    | 'S5-zero-service-units-with-store-present'
+    | 'S5-cfn-routes-found-but-unbound';
+  /** Absent for a genuinely run-level residual (S5-cfn-routes-found-but-unbound) — no unit was matched, so none can be named. */
+  unitId?: string;
+  unitKind?: TypedUnit['kind'];
+  confidence?: number;
   rationale: string;
 }
 
@@ -129,6 +145,39 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
     }
   }
 
+  if (silenceFlags.some((f) => f.startsWith('S5-zero-service-units-with-store-present'))) {
+    for (const unit of facts.units) {
+      if (unit.kind !== 'database' && unit.kind !== 'topic') continue;
+      items.push({
+        trigger: 'S5-zero-service-units-with-store-present',
+        unitId: unit.id,
+        unitKind: unit.kind,
+        confidence: unit.confidence,
+        rationale: `Run has real persistence/messaging evidence for "${unit.id}" but 0 service units anywhere in this run — no entry point (HTTP route, Lambda handler, …) was found to own it. Review whether the owning code lives in a package root not scanned this run, or uses an entry-point shape this pipeline doesn't yet recognize.`,
+      });
+    }
+  }
+
+  // S5-cfn-routes-found-but-unbound is genuinely run-level, not per-unit —
+  // by the flag's own definition, 0 bindings resolved to any scanned unit,
+  // so there is no unitId to name. Same enrichment pattern as the
+  // unresolved-multi-hop detail above: cite the real unresolved-cfn-route
+  // ignored-items (cfn-route-pass.ts) instead of only the bare count.
+  if (silenceFlags.some((f) => f.startsWith('S5-cfn-routes-found-but-unbound'))) {
+    const unresolvedCfnRoutes = facts.ignoredItems.filter((item) => item.detail?.startsWith('unresolved-cfn-route:'));
+    const flagText = silenceFlags.find((f) => f.startsWith('S5-cfn-routes-found-but-unbound'))!;
+    items.push({
+      trigger: 'S5-cfn-routes-found-but-unbound',
+      rationale:
+        unresolvedCfnRoutes.length > 0
+          ? `${flagText} Specific unresolved bindings: ${unresolvedCfnRoutes
+              .slice(0, 5)
+              .map((i) => i.detail)
+              .join(' | ')}${unresolvedCfnRoutes.length > 5 ? ` (+${unresolvedCfnRoutes.length - 5} more)` : ''}`
+          : flagText,
+    });
+  }
+
   if (silenceFlags.some((f) => f.startsWith('S2-http-without-security-control'))) {
     for (const unit of facts.units) {
       const hasHttp = unit.evidence.some((e) => e.category === 'http-entry-point');
@@ -154,7 +203,7 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
 function main() {
   const outDir = process.argv[2];
   if (!outDir) {
-    console.error('Usage: hitl-review-trigger.js <run-slice-output-dir>\n\nReads typed-facts.json + coverage-report.json from a completed run-slice.js output directory and writes review-queue.json listing units an S1/S2 silence flag named for human review. Offline, deterministic, read-only over both inputs — never an LLM call, never writes TypedFacts.');
+    console.error('Usage: hitl-review-trigger.js <run-slice-output-dir>\n\nReads typed-facts.json + coverage-report.json from a completed run-slice.js output directory and writes review-queue.json listing units an S1/S2/S5/low-architecture-coverage silence flag named for human review. Offline, deterministic, read-only over both inputs — never an LLM call, never writes TypedFacts.');
     process.exit(2);
   }
 
@@ -173,11 +222,12 @@ function main() {
   fs.writeFileSync(outPath, JSON.stringify(queue, null, 2));
 
   if (queue.items.length === 0) {
-    console.log('[hitl-review-trigger] no S1/S2 silence flags fired for this run — nothing to review');
+    console.log('[hitl-review-trigger] no silence flags fired for this run — nothing to review');
   } else {
     console.log(`[hitl-review-trigger] ${queue.items.length} review item(s) written to ${outPath}`);
     for (const item of queue.items) {
-      console.log(`  - [${item.trigger}] ${item.unitId} (${item.unitKind}, confidence ${item.confidence})`);
+      const target = item.unitId ? `${item.unitId} (${item.unitKind}, confidence ${item.confidence})` : '(run-level, no unit matched)';
+      console.log(`  - [${item.trigger}] ${target}`);
     }
   }
 }
