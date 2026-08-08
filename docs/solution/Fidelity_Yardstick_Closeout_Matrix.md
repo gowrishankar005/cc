@@ -121,7 +121,7 @@
 | **FY-db-sqlalchemy** | SQLAlchemy | database | code | import | **U-persist-import** | P BoA | userservice | **proven** | maintain |
 | **FY-db-postgres-driver** | PostgreSQL driver | database | code | import | **U-persist-import** | P Fineract security | fineract-security | **partial** | maintain |
 | **FY-db-mongo** | MongoDB | database | code | import | **U-persist-import** | P CALM Hub named | — | **partial/thin** | catalogue verify if pilot needs |
-| **FY-db-dynamo** | **DynamoDB** | database store unit | code | import (+ ownership) | **U-persist-import** | H + L Node + **P** Java saas-boost | lab ts-orders-dynamo; **TierService FP** | **partial** — import yes; **handler mis-kind** | **B-dynamo-handler-kind** (P1); Java SDK ownership |
+| **FY-db-dynamo** | **DynamoDB** | database store unit | code | import (+ ownership) | **U-persist-import** | H + L Node + **P** Java saas-boost | lab ts-orders-dynamo; real store units (`DynamoTierDataStore`) | **partial → proven for handler-ownership shape, closed 2026-08-08 (Y2)** — real: `TierService` no longer mis-kinded `database`; zero new code needed, existing B-ontology ownership mechanism already generalized | **B-dynamo-handler-kind** — `done` |
 | **FY-db-multi** | Multi-DB teams | many database nodes | code | same as above | (cells above) | H multi-DB named | — | **process** | no single detector; coverage of rows above |
 
 ### 3.3 Messaging (P-msg)
@@ -170,7 +170,7 @@
 
 | Priority | Rows | Why |
 |---|---|---|
-| **P0/P1** | **FY-http-lambda**, **FY-db-dynamo** (ownership), **FY-infra-cfn** path subset | Without these, Dynamo “works” and HTTP lies; HT-ASB proved it |
+| **P0/P1 — closed 2026-08-08 (Y2-Y5)** | **FY-http-lambda**, **FY-db-dynamo** (ownership), **FY-infra-cfn** path subset | Was: without these, Dynamo “worked” and HTTP lied; HT-ASB proved it. Now: real, verified on the actual `aws-saas-boost-tier-service` repo — see §3.1/§3.2/§3.5 for the scoped residual (Node/Python, SAM shorthand, cross-stack still open) |
 | **P1 already partial** | FY-msg-sqs-sns, FY-msg-kafka, FY-contract-openapi, FY-trust-k8s, FY-http-*, FY-db-jpa/… | Maintain; do not re-open as “Fidelity unknown” |
 | **P2** | FY-ctrl-oauth2 depth, FY-msg-kinesis, FY-db-mongo verify | Named; not blocking serverless story |
 | **P3 / OOS** | Spark/Scala, Angular deep, full CFN topology, Terraform→CALM, gRPC, Fargate-as-entry | Honest OOS or unevidenced |
@@ -201,8 +201,8 @@
 | BoA + k8s | U-http Flask, U-persist-import SQLAlchemy, R-k8s | U-http-serverless, Dynamo, Lambda |
 | `ts-orders-dynamo` | Dynamo + SQS **import** | Lambda HTTP, API GW paths |
 | Fineract * | JAX-RS, JPA, Kafka, layered R2 (claim triple) | Lambda, Dynamo |
-| **aws-saas-boost-tier-service** | **U-http-serverless** (when built), Dynamo Java shapes | Spring MVC completeness |
-| Future lab `java-lambda-apigw` | U-http-serverless lab bar | Wild generalization alone |
+| **aws-saas-boost-tier-service** | **U-http-serverless** (built, Y2-Y5, Java+explicit-CFN shape — 5/5 real paths exact match to gold) | Spring MVC completeness; Node/Python or SAM-shorthand generalization |
+| lab `java-lambda-apigw` | U-http-serverless lab bar (built, real L0/L1/L2 PASS) | Wild generalization alone — still needs a SECOND real repo to claim the mechanism generalizes beyond `aws-saas-boost`'s own CFN authoring style |
 
 ---
 
@@ -222,11 +222,11 @@
 
 ## 6. Standing exams (solutioning-time, not only hard-tests)
 
-| Exam ID | Claim triple sketch | Expected until G-FY-01/02 ship |
+| Exam ID | Claim triple sketch | Status, 2026-08-08 (G-FY-01/02 shipped) |
 |---|---|---|
-| **E-fidelity-lambda-lab** | lab java-lambda-apigw · service+paths · L1 | fail or skip until built |
-| **E-saas-boost-tier** | wild tier-service · HT-ASB gold | L1 service+paths fail today (documented) |
-| Existing Fineract/BoA exams | unchanged | must stay green |
+| **E-fidelity-lambda-lab** | lab java-lambda-apigw · service+paths · L1 | **PASS** — L0/L1/L2 all green, re-confirmed fresh at Y5 close |
+| **E-saas-boost-tier** | wild tier-service · HT-ASB gold | **PASS** — 5/5 real paths exact match to gold, re-confirmed fresh at Y5 close |
+| Existing Fineract/BoA exams | unchanged | still green (verified via full suite, 59/59) |
 
 Hard-tests **generalize** rows already in this matrix; they must not invent new planes without a new matrix row first.
 
@@ -238,3 +238,4 @@ Hard-tests **generalize** rows already in this matrix; they must not invent new 
 |---|---|
 | 2026-08-08 | Initial close-out matrix from v0.14 + lab research + public hiring signals + saas-boost hard-test; locks Lambda as P-http not deploy-only; agent tasks in `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md` |
 | 2026-08-08 | **T-Y5-2 partial re-score** (§3 rows for FY-http-lambda/FY-infra-cfn + §5 gap register G-FY-01/02/03 only — full matrix sweep is T-Y6-1, not done here): all three real, closed with evidence — `aws-saas-boost-tier-service` re-scanned with its own real CFN templates, 5/5 real paths exact match to gold, real architecture-grade edge; Dynamo-handler ownership required zero new code; new S5 completeness flag closes G-FY-03. Residuals named, not swept in: Node/Python handlers, SAM `Events:` shorthand, cross-stack CFN refs all deferred. |
+| 2026-08-08 | **T-Y6-1 full sweep.** Every P-http/P-persist Dynamo/CFN path row now reflects real status, no row left "named only" for Lambda: `FY-db-dynamo`'s stale "handler mis-kind" note replaced with the real Y2 closure; §4.1's P0/P1 priority row updated from "without these, HTTP lies" (a live problem statement) to "closed, see §3 for scoped residual"; §4.4 proxy-authority table's "(when built)"/"Future lab" framing replaced with real, dated closure; §6 standing exams table replaced "fail or skip until built" with real PASS results re-confirmed at Y5 close. §1.2's historical RCA table left untouched — it correctly describes the PAST miss, not the current state, same "preserve history, don't rewrite it" discipline used throughout this project's other docs. **T-Y6-2 (Kinesis/OAuth2 design stubs) explicitly skipped** — its own gate is "only if owner requests," and no such request was made this round; `B-kinesis`/`B-oauth2-import` stay accurate `todo` rows in BACKLOG, not silently promoted. **Program CLOSED.** |

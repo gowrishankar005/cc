@@ -232,7 +232,7 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Update every P-http / P-persist Dynamo / CFN path row status. Changelog on matrix. STATUS § Fidelity serverless → done/partial. |
 | **Verify** | No row left “named only” for Lambda |
-| **Status** | todo |
+| **Status** | **done, 2026-08-08** — full sweep: `FY-db-dynamo` (§3.2, stale "handler mis-kind" replaced with real Y2 closure), §4.1 priority table (P0/P1 row reframed from live-problem to closed-with-residual), §4.4 proxy-authority table (both Lambda-related rows' "(when built)"/"Future lab" language replaced with dated, real closure), §6 standing exams table (both exam rows: "fail or skip until built" → real PASS results). §1.2's historical RCA table deliberately left untouched — it correctly describes the original miss, not current state, same history-preservation discipline as every other doc this session. `STATUS.md` → `done`, program CLOSED. |
 
 ### T-Y6-2 — Optional G-FY-04 / G-FY-05 design-only
 
@@ -240,7 +240,7 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Only if owner requests: thin design stubs for Kinesis and OAuth2 import — **no code** unless promoted to P1. |
 | **Verify** | BACKLOG rows accurate |
-| **Status** | todo |
+| **Status** | **explicitly skipped, 2026-08-08** — its own gate is "only if owner requests," and no such request was made this round. `B-kinesis`/`B-oauth2-import` remain accurate `todo` rows, not silently promoted or dropped. |
 
 ---
 
@@ -275,5 +275,6 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | **PROGRAM CLOSED (Y6).** Full matrix sweep — every P-http/P-persist Dynamo/CFN row reflects real, dated status; no row left "named only" for Lambda. T-Y6-2 explicitly skipped (owner-request gate not met, not silently dropped). `docs/solution/STATUS.md`'s Fidelity yardstick row → `done`. All Y0-Y6 phases complete: matrix lock → design → lab gold → Dynamo ownership (zero new code) → handler-as-service → CFN path join → completeness flag → full re-score. Real, verified on the actual wild repo this program was built around throughout, not just synthetic. Honest residuals carried forward, not swept in: Node/Python Lambda handlers, SAM `Events:` shorthand, cross-stack CFN refs, only one real evidenced CFN-authoring style (a second real repo would strengthen the generalization claim). |
 | 2026-08-08 | **Y5 complete + Program DoD met.** New `S5` completeness flag (`coverage-report.ts`) closes the HT-ASB-006 class generically — two real conditions (0 service units with a real store present; CFN routes found but unbound), verified on a new, deliberately generic lab fixture and confirmed silent on the healthy real repo. Both standing exams re-run fresh, still PASS. `Fidelity_Yardstick_Closeout_Matrix.md` partially re-scored (2 rows + 3 gap-register entries). `B-lambda-http` → `done for Java+explicit-CFN shape` with residuals explicitly listed. Full suite 59/59 green. Only Y6 (thin, docs-only) remains. |
 | 2026-08-08 | Initial program: yardstick-first phases Y0–Y6; serverless + Dynamo ownership implementation gated on matrix/design/lab |
