@@ -56,6 +56,7 @@ Implement later (Wave 3-S); **policy now**:
 | **S2** | If unit has `http-entry-point` and claim requires C-call or C-dec, then either security-control evidence or explicit OOS/scope id | Silent “secure by omission” |
 | **S3** | Threat-signals “no security-control” on HTTP must not be marketed as “no auth in source” without C-call status | Narrative honesty |
 | **S4** | High `x-aac-confidence` on units does not imply L2 pass | confidence-not-completeness |
+| **S5** | T-Y5-1, HT-ASB-006 class: (a) 0 service units present but ≥1 database/topic unit exists — real persistence code with no discovered entry-point surface at all; (b) `--cfn-manifests` found real API Gateway route bindings but bound none of them to a scanned unit | The degenerate, loudest-should-be case S1 structurally cannot catch (S1 requires ≥1 service unit to even fire) — real, pre-Y3 `aws-saas-boost-tier-service`/`tenant-service` baseline (0 services, N Dynamo units, `silenceFlags: []`) named this gap; still fires post-Y4 for Node/Python handlers (no sample yet) or CFN routes whose handler code lives outside the scanned roots |
 
 **Fineract charge/core today:** S1 fails under architecture claim; S2 fails for HTTP APIs under full control claim.
 

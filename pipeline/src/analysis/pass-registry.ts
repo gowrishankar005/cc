@@ -56,6 +56,9 @@ export interface AnalysisContext {
   enableEnvSoftGraph?: boolean;
   /** T-Y4-1 — set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
   cfnManifestsDir?: string;
+  /** T-Y5-1 — set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
+  cfnRouteBindingsFound?: number;
+  cfnRouteBindingsBound?: number;
 }
 
 export interface AnalysisPass {

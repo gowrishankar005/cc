@@ -1063,6 +1063,51 @@ test('T-Y4-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §2) — CFN/SAM pa
   }
 });
 
+test('T-Y5-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md, HT-ASB-006 class) — S5 completeness flag: 0 service units with a real store present, AND real CFN routes found but unbound, both fire; neither fires on the healthy java-lambda-apigw fixture', () => {
+  const orphanRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-orphan-store');
+  fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
+  fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
+  // OrderStore.java is a real Dynamo store with NO handler anywhere in
+  // this root; api-gateway.yaml's OrderHandlerFn.Handler references a
+  // class ("OrderHandler") deliberately absent from the scanned source —
+  // fires BOTH real S5 conditions in one fixture.
+  const { outDir: orphanOutDir, calm: orphanCalm } = runPipeline([orphanRoot], ['--cfn-manifests', orphanRoot]);
+  try {
+    const orderStore = findNode(orphanCalm, 'OrderStore');
+    assert.ok(orderStore, 'OrderStore must be a real database unit');
+    assert.equal(orderStore['node-type'], 'database');
+
+    const coverage = JSON.parse(fs.readFileSync(path.join(orphanOutDir, 'coverage-report.json'), 'utf8'));
+    const flags = coverage.completeness.silenceFlags;
+    assert.ok(flags.some((f) => f.startsWith('S5-zero-service-units-with-store-present')), `expected S5-zero-service-units-with-store-present, got: ${flags}`);
+    assert.ok(flags.some((f) => f.startsWith('S5-cfn-routes-found-but-unbound')), `expected S5-cfn-routes-found-but-unbound, got: ${flags}`);
+  } finally {
+    fs.rmSync(orphanOutDir, { recursive: true, force: true });
+    fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
+    fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
+  }
+
+  // Negative path: the healthy java-lambda-apigw fixture (real service
+  // units, real bound CFN routes) must NOT trip either S5 condition.
+  const healthyRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
+  fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
+  fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
+  const { outDir: healthyOutDir } = runPipeline([healthyRoot], ['--cfn-manifests', healthyRoot]);
+  try {
+    const coverage = JSON.parse(fs.readFileSync(path.join(healthyOutDir, 'coverage-report.json'), 'utf8'));
+    const s5Flags = coverage.completeness.silenceFlags.filter((f) => f.startsWith('S5'));
+    assert.deepEqual(s5Flags, [], `expected no S5 flags on the healthy fixture, got: ${s5Flags}`);
+  } finally {
+    fs.rmSync(healthyOutDir, { recursive: true, force: true });
+    fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
+    fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
+  }
+});
+
 test(
   'Node/TS real evidence (ghostfolio/ghostfolio, NestJS+Prisma) — Graphify ref_ target normalization + Controller/database precedence (generic fixes, real bugs found by testing against a real repo)',
   { skip: !fs.existsSync(GHOSTFOLIO_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },

@@ -74,6 +74,17 @@ export const cfnRoutePass: AnalysisPass = {
       boundCount++;
     }
 
+    // T-Y5-1 — real counts exposed for coverage-report.ts's S5 flag: a real
+    // CFN scan that finds real routes but binds NONE of them to a scanned
+    // unit is exactly the HT-ASB-006 class generalized (real infra evidence
+    // of an HTTP surface, invisible code-side) — still a real possibility
+    // even after Y3/Y4, e.g. the handler's code lives in a root not passed
+    // to this scan (the real 21/26-unresolved case found in T-Y4-2's own
+    // wild exam, where SaaS Boost's other services' routes were correctly
+    // left unresolved).
+    ctx.cfnRouteBindingsFound = bindings.length;
+    ctx.cfnRouteBindingsBound = boundCount;
+
     console.log(`[cfn-route] ${bindings.length} real CFN route binding(s) found, ${boundCount} bound to a scanned unit, ${unresolvedCount} unresolved`);
   },
 };

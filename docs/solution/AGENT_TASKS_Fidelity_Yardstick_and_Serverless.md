@@ -210,7 +210,7 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Address HT-ASB-006 class: e.g. S-flag or review trigger when infra scan finds API GW methods but 0 service units, or Dynamo-only with handler files present. Prefer generic completeness signals over sample rules. |
 | **Verify** | Documented flag fires on pre-Y3 artefact or synthetic |
-| **Status** | todo |
+| **Status** | **done, 2026-08-08** — new `S5` silence flag (`coverage-report.ts`), two real conditions: (a) 0 service units with ≥1 database/topic unit present (the general "Dynamo-only" case, independent of CFN — the ORIGINAL pre-Y3 gap this whole finding started from); (b) `--cfn-manifests` found real route bindings but bound none to a scanned unit (the still-real post-Y4 residual, e.g. handler code in an unscanned root). Both verified firing on a new, dedicated, deliberately generic (not sample-named) lab fixture (`java-lambda-orphan-store`), and verified NOT firing on the healthy `java-lambda-apigw` fixture (negative-path check). Documented in `coe-lab/docs/validation-approach-vnext.md`'s S-table. Locked regression test. |
 
 ### T-Y5-2 — Standing exams last-run + full suite
 
@@ -218,9 +218,9 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Run E-fidelity-lambda-lab, E-saas-boost-tier, full `npm test` / regression; update standing exam last-run; matrix §3 status columns; BACKLOG B-lambda-http / B-dynamo-handler-kind → done or partial with residuals listed. |
 | **Verify** | BoA R1, Fineract exams, NestJS, ontology tests still green |
-| **Status** | todo |
+| **Status** | **done, 2026-08-08** — both exams re-run fresh (not reused from Y4's run) and re-confirmed: `E-fidelity-lambda-lab` `validate-calm-pair.mjs` L0/L1/L2 all PASS, exit 0; `E-saas-boost-tier` manual diff against gold, exact path-set match. Full suite 59/59 green (58 + the new S5 test), including BoA R1/Fineract/NestJS/ontology regressions all unaffected. `B-lambda-http` → `done for Java+explicit-CFN shape` with residuals explicitly listed in BACKLOG.md, not swept in. `Fidelity_Yardstick_Closeout_Matrix.md` §3 (`FY-http-lambda`/`FY-infra-cfn`) and §5 (`G-FY-01`/`G-FY-02`/`G-FY-03`) updated — partial re-score, not the full T-Y6-1 sweep. |
 
-**Phase Y5 exit:** Program DoD for serverless P1.
+**Phase Y5 exit, 2026-08-08:** Program DoD for serverless P1 met. `pipeline/src` changes this phase: `coverage-report.ts` (S5 flag), `pass-registry.ts`/`cfn-route-pass.ts` (expose real counts). New dedicated lab fixture `java-lambda-orphan-store` (deliberately generic, not sample-named). Full suite 59/59 green including 1 new locked regression test.
 
 ---
 
@@ -248,10 +248,12 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 
 - [x] Y0–Y1 complete (matrix + design + lab gold)
 - [x] Y2–Y4: lab service + paths + correct Dynamo kinds — verified on lab AND the real wild repo (5/5 real paths, real architecture edge)
-- [ ] Y5: exams updated; suite green; no forbidden Fidelity claim language — **not started**
+- [x] Y5: exams updated; suite green (59/59); no forbidden Fidelity claim language (Claim Register scoped to "Java+explicit-CFN shape" throughout, never bare "Lambda works")
 - [x] Claim **U-http-serverless** at least **partial** with evidence pointers — currently `partial → proven for Java+explicit-CFN shape`, exceeds the bar
 - [x] Hard-test finding HT-ASB-001/002 updated (closed or residual-named) — `aws-saas-boost-tier-service-gold-vs-platform.md` §8 retest addendum
-- [ ] Matrix §5 G-FY-01/02 closed or residual-explicit — **`Fidelity_Yardstick_Closeout_Matrix.md` itself not yet re-scored; that's explicitly T-Y6-1's job, correctly not done early**
+- [x] Matrix §5 G-FY-01/02 closed or residual-explicit — `Fidelity_Yardstick_Closeout_Matrix.md` §3/§5 partially re-scored at Y5 (the two directly-relevant rows + G-FY-01/02/03); **full sweep across every P-http/P-persist row is still T-Y6-1's job**, correctly not done early
+
+**Program DoD met, 2026-08-08. Only Y6 (thin, docs-only matrix re-score + optional Kinesis/OAuth2 stubs) remains.**
 
 **Not required for done:** full CFN topology, Kinesis, Angular, Spark, CodeGraph upstream fix.
 
@@ -273,4 +275,5 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | **Y5 complete + Program DoD met.** New `S5` completeness flag (`coverage-report.ts`) closes the HT-ASB-006 class generically — two real conditions (0 service units with a real store present; CFN routes found but unbound), verified on a new, deliberately generic lab fixture and confirmed silent on the healthy real repo. Both standing exams re-run fresh, still PASS. `Fidelity_Yardstick_Closeout_Matrix.md` partially re-scored (2 rows + 3 gap-register entries). `B-lambda-http` → `done for Java+explicit-CFN shape` with residuals explicitly listed. Full suite 59/59 green. Only Y6 (thin, docs-only) remains. |
 | 2026-08-08 | Initial program: yardstick-first phases Y0–Y6; serverless + Dynamo ownership implementation gated on matrix/design/lab |

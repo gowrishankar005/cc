@@ -107,7 +107,7 @@
 | **FY-http-spring** | Spring MVC / Boot REST | service + path interfaces | code | native + decorates | **U-http** | H + P (BoA Java services; lab spring) | lab `java-spring-payments`; BoA Java | **partial** (Java Spring native still thin vs JAX-RS proven) | catalogue/regression as needed; not blocking serverless |
 | **FY-http-jaxrs** | JAX-RS / Quarkus-style REST | service + composed paths | code | decorates + compose | **U-http** | P Fineract | fineract-charge | **built/proven** | maintain |
 | **FY-http-flask-nest** | Flask / NestJS APIs | service + paths | code | native | **U-http** | P/L BoA, Nest | BoA, lab nestjs | **proven** | maintain |
-| **FY-http-lambda** | **AWS Lambda + API Gateway** | service + **HTTP path/method interfaces** | **both** (handler code + API GW/CFN/SAM) | **decorates/extends/implements (handler) + structured-file (paths)** | **U-http-serverless** | H (Lambda in AWS lists) + **P** saas-boost | **aws-saas-boost-tier-service**; lab lambda (Y1) | **specified-unbuilt** | **B-lambda-http** (P1) |
+| **FY-http-lambda** | **AWS Lambda + API Gateway** | service + **HTTP path/method interfaces** | **both** (handler code + API GW/CFN/SAM) | **decorates/extends/implements (handler) + structured-file (paths)** | **U-http-serverless** | H (Lambda in AWS lists) + **P** saas-boost | **aws-saas-boost-tier-service**; lab lambda (Y1) | **partial → proven for Java + explicit-CFN-resources** (Y2-Y4, 2026-08-08) — real: `TierService` real `service` unit, 5/5 real paths exact match to gold on the actual `aws-saas-boost-tier-service` repo; residual: Node/Python handlers + SAM `Events:` shorthand + cross-stack refs all deferred, no sample yet | **B-lambda-http** (`partial → proven` for the evidenced shape) |
 | **FY-http-fargate-ec2** | Fargate / EC2 process HTTP | service (container/process) | infra+code | structured-file deploy + code routes | — | H | none | **unevidenced** as distinct entry | defer; routes still via FY-http-*; deploy metadata later |
 | **FY-http-grpc** | gRPC | service + rpc interfaces | code | unevidenced | — | checked absent in proxies | — | **unevidenced** | no backlog until P evidence |
 
@@ -149,7 +149,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | **FY-contract-openapi** | **Swagger/OpenAPI** | interfaces + securitySchemes | docs/file | structured-file | **C-contract** + U-http merge | H + L | ts-nestjs-users | **partial** | maintain; merge precedence fixed |
 | **FY-trust-k8s** | **EKS / k8s** secrets & deploy | trust edges, deploy meta | infra | structured-file | **R-k8s** | H + P BoA | BoA multi-svc k8s | **partial** | maintain |
-| **FY-infra-cfn** | **CloudFormation** (incl. API GW methods) | deploy graph + **HTTP path join for Lambda** | infra | structured-file | **U-http-serverless** (paths) + future deploy | H + P saas-boost templates | saas-boost | **specified-unbuilt** for path join | **part of B-lambda-http** (not separate “full CFN topology” in v1) |
+| **FY-infra-cfn** | **CloudFormation** (incl. API GW methods) | deploy graph + **HTTP path join for Lambda** | infra | structured-file | **U-http-serverless** (paths) + future deploy | H + P saas-boost templates | saas-boost | **path join built (Y4), 2026-08-08** — `cfn-manifest-provider.ts` real cross-file `Resource`→`Method`→`Function` join, verified on the real repo's actual templates; deploy-graph half (beyond HTTP paths) still unbuilt, correctly out of `B-lambda-http`'s scope | **part of B-lambda-http** (not separate “full CFN topology” in v1) |
 | **FY-infra-sam-serverless** | SAM / Serverless Framework | same as CFN paths | infra | structured-file | **U-http-serverless** | industry pattern; Fidelity may use CFN | lab template | **specified-unbuilt** | same as B-lambda-http |
 | **FY-infra-terraform** | Terraform | deploy symbols | infra | structured-file | — | CodeGraph TF index exists; Weaver not consuming | — | **unevidenced** Weaver | later; OOS near-term for CALM deploy nodes |
 
@@ -210,9 +210,9 @@
 
 | Gap ID | Yardstick rows | Backlog | Claim target | Severity |
 |---|---|---|---|---|
-| **G-FY-01** | FY-http-lambda, FY-infra-cfn (path join) | **B-lambda-http** | U-http-serverless → partial | **High** — Fidelity cloud HTTP |
-| **G-FY-02** | FY-db-dynamo handler ownership | **B-dynamo-handler-kind** | U-persist-import Java Dynamo | **High** — false database units |
-| **G-FY-03** | Completeness when 0 services + DBs | part of B-lambda-http / S-silence | S-silence | Medium |
+| **G-FY-01** | FY-http-lambda, FY-infra-cfn (path join) | **B-lambda-http** | U-http-serverless → **partial → proven for Java+explicit-CFN, closed 2026-08-08 (Y2-Y4)** | **High** — Fidelity cloud HTTP — **residual-named, not fully closed**: Node/Python + SAM shorthand deferred |
+| **G-FY-02** | FY-db-dynamo handler ownership | **B-dynamo-handler-kind** | U-persist-import Java Dynamo — **closed 2026-08-08 (Y2)**, real finding: zero new code needed, existing B-ontology mechanism already generalized | **High** — false database units — **closed** |
+| **G-FY-03** | Completeness when 0 services + DBs | part of B-lambda-http / S-silence — **closed 2026-08-08 (T-Y5-1, new S5 flag)** | S-silence | Medium — **closed** |
 | **G-FY-04** | FY-msg-kinesis | **B-kinesis** (new, P3) | new or U-msg-* | Low until sample |
 | **G-FY-05** | FY-ctrl-oauth2 import depth | **B-oauth2-import** (new, P2) | C-* | Medium |
 | **G-FY-06** | FY-batch-spring | backlog P3 | — | Low |
@@ -237,3 +237,4 @@ Hard-tests **generalize** rows already in this matrix; they must not invent new 
 | Date | Note |
 |---|---|
 | 2026-08-08 | Initial close-out matrix from v0.14 + lab research + public hiring signals + saas-boost hard-test; locks Lambda as P-http not deploy-only; agent tasks in `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md` |
+| 2026-08-08 | **T-Y5-2 partial re-score** (§3 rows for FY-http-lambda/FY-infra-cfn + §5 gap register G-FY-01/02/03 only — full matrix sweep is T-Y6-1, not done here): all three real, closed with evidence — `aws-saas-boost-tier-service` re-scanned with its own real CFN templates, 5/5 real paths exact match to gold, real architecture-grade edge; Dynamo-handler ownership required zero new code; new S5 completeness flag closes G-FY-03. Residuals named, not swept in: Node/Python handlers, SAM `Events:` shorthand, cross-stack CFN refs all deferred. |

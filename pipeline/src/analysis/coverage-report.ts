@@ -142,6 +142,24 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
       `S2-http-without-security-control: ${httpUnitsWithoutSecurityControlCount} HTTP-entry-point unit(s) have no security-control evidence — may reflect a missing detection mechanism (see AREC C-call), not necessarily "no auth in source"`
     );
   }
+  // T-Y5-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md, HT-ASB-006
+  // class) — the original, still-real gap S1 structurally cannot catch:
+  // S1 requires >=1 service unit to even look at relationship count, so a
+  // run with ZERO service units (real pre-Y3 aws-saas-boost-tier-service:
+  // 0 services, N Dynamo-import database units, silenceFlags: []) passes
+  // through S1 completely silent — the degenerate, LOUDEST-should-be case
+  // was the one this project's own silence invariants missed. Real,
+  // generic condition (no framework/language name): 0 service units but
+  // >=1 database/topic unit exists — that persistence signal proves real
+  // architectural code exists, so an entirely absent service surface is
+  // suspicious, not "nothing here." Still fires post-Y3/Y4 for Node/Python
+  // handlers (deferred, no sample yet) or any handler shape this
+  // pipeline's catalogue doesn't recognize.
+  if (serviceUnitIds.size === 0 && databaseUnitCount + topicUnitCount >= 1) {
+    silenceFlags.push(
+      `S5-zero-service-units-with-store-present: 0 service units but ${databaseUnitCount} database + ${topicUnitCount} topic unit(s) present — real persistence/messaging code exists with no discovered HTTP/entry-point surface at all; may be a real gap in entry-point detection for this language/framework (e.g. Node/Python Lambda handlers, not yet built) rather than a service-free codebase`
+    );
+  }
 
   // Robustness T-R0-2 — architecture coverage RATE, same precondition
   // spirit as S1 (only meaningful when a store unit exists to potentially
@@ -237,6 +255,21 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   if (graphifyStatus !== 'ok') {
     completeness.silenceFlags.push(
       `S0-graphify-backbone-incomplete: graphifyStatus is "${graphifyStatus}"${ctx.graphifyError ? ` (${String(ctx.graphifyError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on Graphify; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
+    );
+  }
+  // T-Y5-1 — the second, CFN-specific half of the HT-ASB-006 class: real
+  // infra evidence of an HTTP surface (actual API Gateway Method/Resource
+  // bindings in the passed --cfn-manifests dir) exists, but NONE of it
+  // bound to any unit this scan found — e.g. the handler's Java source
+  // lives in a package root not passed to this scan (the real, honest
+  // 21-of-26-unresolved case found in T-Y4-2's own wild exam against
+  // aws-saas-boost's shared resources/ directory). Only meaningful when
+  // --cfn-manifests was actually passed (undefined, not 0, when it wasn't
+  // — same "don't fake a 0" precondition discipline as every other rate
+  // in this file).
+  if (ctx.cfnRouteBindingsFound !== undefined && ctx.cfnRouteBindingsFound > 0 && ctx.cfnRouteBindingsBound === 0) {
+    completeness.silenceFlags.push(
+      `S5-cfn-routes-found-but-unbound: ${ctx.cfnRouteBindingsFound} real CFN API Gateway route binding(s) found in --cfn-manifests, but 0 bound to any unit in this scan — the handler code for these routes likely lives in a package root not included in this run (or uses a handler shape this pipeline doesn't yet recognize), not "no HTTP surface here"`
     );
   }
 

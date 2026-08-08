@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  T-Y5-1 fixture — a real CFN route binding whose handler class
+  (OrderHandler) is deliberately NOT present anywhere in this package's
+  scanned Java source (only OrderStore.java is). Tests S5's second
+  condition: real CFN routes found, but 0 bound to any scanned unit.
+
+Resources:
+  OrdersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: LabRestApi
+      ParentId: LabRestApi.RootResourceId
+      PathPart: 'orders'
+
+  GetOrdersMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: LabRestApi
+      ResourceId: !Ref OrdersResource
+      HttpMethod: GET
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrderHandlerFn.Arn}/invocations
+
+  OrderHandlerFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-order-get-all
+      Runtime: java11
+      Handler: lab.orphanstore.OrderHandler::getOrders
