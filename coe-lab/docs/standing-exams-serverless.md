@@ -34,6 +34,7 @@
 | Date | Agent/session | Result | Artefact / evidence |
 |---|---|---|---|
 | 2026-08-08 | hard-test #2 (pre-Y0) | **FAIL, as expected pre-fix** — 0 service units, `TierService` typed `database`, 0 architecture-grade relationships | `coe-lab/docs/findings/aws-saas-boost-tier-service-gold-vs-platform.md` |
+| 2026-08-08 | Fidelity yardstick session (Y4 shipped) | **PASS — full real-repo win.** Real re-run with `--cfn-manifests spikes/aws-saas-boost/repo/resources` (the repo's own real CFN templates): `TierService` → real `service` unit, **5/5 real paths exact match to gold** (`GET/POST /tiers`, `GET/PUT/DELETE /tiers/{id}`); real `TierService → DynamoTierDataStore` architecture-grade edge, exact match to gold. HT-ASB-001/002/005 closed. Honest residual: only 5 of 26 real CFN bindings found across the whole shared `resources/` dir bound to this scan's roots — the other 21 are real routes for other SaaS Boost services not in this scan, correctly left unresolved. HT-ASB-003/004 (test/method noise) and HT-ASB-006 (completeness UX) explicitly still open. | `coe-lab/docs/findings/aws-saas-boost-tier-service-gold-vs-platform.md` §8 retest addendum |
 
 ## E-saas-boost-tenant (secondary — WDL-1 generalization check)
 
@@ -63,3 +64,4 @@
 | Date | Note |
 |---|---|
 | 2026-08-08 | Initial file (T-Y1-3). Three exam IDs: `E-fidelity-lambda-lab` (controlled lab fixture, both WDL-1 and WDL-2 shapes), `E-saas-boost-tier` and `E-saas-boost-tenant` (real wild repos, seeded from the two real hard-tests already run). All three currently show the expected pre-fix FAIL state, confirmed real not assumed. |
+| 2026-08-08 | Y2-Y4 shipped: `E-fidelity-lambda-lab` and `E-saas-boost-tier` both re-run and PASS (unit kind + real paths + real architecture edge). `E-saas-boost-tenant` not yet re-run this round (no Dynamo-import handler in that shape to exercise D-dynamo-priority differently; low marginal value — deferred to Y5's full exam close, not silently skipped). |

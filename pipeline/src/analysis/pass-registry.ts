@@ -54,6 +54,8 @@ export interface AnalysisContext {
   k8sManifestsDir?: string;
   /** T-X9-1 — set by run-slice.ts from --enable-env-soft-graph; envSoftGraphPass is a no-op unless this AND k8sManifestsDir are both set. Default false/off. */
   enableEnvSoftGraph?: boolean;
+  /** T-Y4-1 — set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
+  cfnManifestsDir?: string;
 }
 
 export interface AnalysisPass {

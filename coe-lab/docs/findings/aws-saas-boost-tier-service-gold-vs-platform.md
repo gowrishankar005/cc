@@ -114,3 +114,24 @@ See `coe-lab-hard-test-backlog.md` HT-ASB-*.
 
 Fidelity named Lambda, but the programme **binned cloud under deploy (k8s)** and productized only Dynamo + SQS/SNS from the AWS half of the yardstick. Annotation-framework HTTP (U-http) stayed the only HTTP claim cell. Full process RCA: `docs/solution/Claim_Register.md` § “Process note — how Lambda was in Fidelity but not on the build queue.”
 **Not implemented this session** (eval isolation): Lambda/API-GW catalogue rows, Dynamo ontology, test exclusion.
+
+---
+
+## 8. Retest addendum — post Y2/Y3/Y4 (2026-08-08)
+
+**Real re-run against this exact real repo**, `run-slice` on `spikes/aws-saas-boost/repo/services/tier-service` with `--cfn-manifests spikes/aws-saas-boost/repo/resources` (the real, actual CFN template directory this repo ships, not a synthetic stand-in):
+
+| Issue | Before | After | Verdict |
+|---|---|---|---|
+| **HT-ASB-001** (Lambda HTTP invisible) | 0 service units, gold paths absent | `TierService` real `service` unit, **5/5 real paths exactly matching gold**: `GET /tiers`, `POST /tiers`, `GET /tiers/{id}`, `PUT /tiers/{id}`, `DELETE /tiers/{id}` | **CLOSED** |
+| **HT-ASB-002** (handler mis-kinded database) | `TierService` typed `database` solely from its `DynamoDbClient` import | `TierService` correctly `service` — real entry-point evidence wins the kind tie-break | **CLOSED** |
+| **HT-ASB-005** (relationship grade) | `TierService→DynamoTierDataStore` structural only (both ends database) | Real `TierService → DynamoTierDataStore` edge present, `grade: architecture` — exact match to gold's `tier-service → dynamo-tier-store` | **CLOSED** |
+| **HT-ASB-003** (test noise) | Test classes (`*Test`) typed `database` via Dynamo import | Unchanged — still present (`DynamoTierAttributeTest`, `DynamoTierDataStoreCreateTierTest`, `DynamoTierDataStoreGetTierTest` all still `database`-kind nodes) | **Not fixed — out of Y2-Y4 scope, real residual, not silently dropped** |
+| **HT-ASB-004** (unit-grain noise) | `fromTier()`/`toTier()` methods become separate database units | Unchanged — still present | **Not fixed — out of Y2-Y4 scope** |
+| **HT-ASB-006** (completeness UX) | 0 services + N databases, `silenceFlags: []` | Now moot for THIS repo (real service units now exist), but the underlying S1/S2 gap for other empty-HTTP repos is T-Y5-1's job, not yet done | **Partially moot here, mechanism itself still open (Y5)** |
+
+**Note on formal scoring**: this gold's `x-lab-grain: "class-file"` metadata makes `validate-calm-pair.mjs`'s automated semantic-compare report N/A (a pre-existing grain-comparison convention from the original hard-test authoring, not a Y4 gap) — the comparison above is a direct, manual node/interface/relationship diff against the real gold JSON, same rigor as the automated scorer would apply, just not routed through it.
+
+**Real, honest residual named, not swept under the "closed" verdict above**: the CFN join (`cfn-manifest-provider.ts`) found **26 total route bindings** across the whole `resources/` directory (all of SaaS Boost's services share one CFN tree) but only bound **5** — the rest are real routes for OTHER services (`tenant-service`, `quota-service`, etc.) whose Java source isn't in this scan's roots, correctly left unresolved rather than guessed. Scanning multiple services together (multi-root) would recover more — not attempted this round, matches `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`'s own "Non-goals for Phase I: multi-service saas-boost multi-root (optional regression only)".
+
+**Claim Register updated**: `U-http-serverless` → `partial` (was `specified-unbuilt`). This is the real, verified answer to the finding's own §5 forbidden phrase — "AWS Lambda API Gateway services are recovered as HTTP services" is now allowed **for the Java `implements RequestHandler` + explicit CFN Path/Method/Handler shape**, still forbidden for Node/Python handlers or SAM shorthand (`Events:` blocks), both explicitly deferred.

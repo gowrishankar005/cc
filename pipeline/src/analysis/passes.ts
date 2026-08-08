@@ -12,6 +12,7 @@ import { outboundHttpPass } from './outbound-http-pass';
 import { envSoftGraphPass } from './env-soft-graph-pass';
 import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
+import { cfnRoutePass } from './cfn-route-pass';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -120,6 +121,11 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   composeRoutesPass,
   mapSignalsPass,
   openApiPass,
+  // T-Y4-1 — grouped with openApiPass: another structured-external-source
+  // pass that only ENRICHES units mapSignalsPass already produced (never
+  // creates new ones), so it just needs to run after mapSignalsPass, same
+  // as openApiPass.
+  cfnRoutePass,
   detectPersistencePass,
   detectMessagingPass,
   outboundHttpPass,

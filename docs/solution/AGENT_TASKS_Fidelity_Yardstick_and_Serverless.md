@@ -186,7 +186,7 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Implement minimal structured-file ingestion for API Gateway + Lambda bindings (CloudFormation/SAM-style YAML/JSON): extract path, method, link to handler property / function resource → map to scanned handler unit (by class name, artifact path, or Handler string `package.Class::method`). Emit interface facts or decorator-equivalent route signals for interface-builder. Reuse OpenAPI pass merge rules where both exist; document precedence in design note. |
 | **Verify** | Lab gold paths appear on service; calm validate 0 errors on lab output |
-| **Status** | todo |
+| **Status** | **done, 2026-08-08** — `cfn-manifest-provider.ts` (scanner) does the full path/method/handler join within a same-directory multi-file resource pool (real, empirically-confirmed finding: the `yaml` package resolves `!Ref`/`!GetAtt`/`!Sub` for free, no custom tag handling needed — confirmed by parsing a real fixture template before writing the regex). `cfn-route-pass.ts` (analysis) binds each resolved binding to a real scanned unit by handler class name, same never-guess-on-0-or-2+ discipline as `openApiPass`'s merge check. New `structured-file` Evidence source (CONTRACT_VERSION 9.0.0), `SOURCE_PRECEDENCE` tier 2 (between `openapi` and `decorator`, per D-openapi-fallback). Verified end-to-end on the lab fixture (real two-file CFN split, all 3 bindings resolved, exact path match, `calm validate` 0/0, gold L0/L1/L2 all PASS) and locked into a regression test. |
 
 ### T-Y4-2 — Wild exam: saas-boost tier-service
 
@@ -194,7 +194,9 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Re-run hard-test protocol against gold; update finding HT-ASB-001 status. Fix only generic bugs. |
 | **Verify** | L1 path recall improves vs gold `/tiers*`; document residual honestly |
-| **Status** | todo |
+| **Status** | **done, 2026-08-08** — real re-run against `spikes/aws-saas-boost/repo/services/tier-service` with the repo's own real CFN templates (`--cfn-manifests .../resources`). `TierService` → real `service` unit with **5/5 real paths exactly matching gold** (`GET/POST /tiers`, `GET/PUT/DELETE /tiers/{id}`); real `TierService → DynamoTierDataStore` architecture-grade edge present, exact match to gold. HT-ASB-001/002/005 closed; HT-ASB-003/004 (test noise, method-as-unit noise) and HT-ASB-006 (completeness UX, Y5's job) explicitly named as still-open residuals, not silently swept into "closed." Full retest addendum in `coe-lab/docs/findings/aws-saas-boost-tier-service-gold-vs-platform.md` §8. Only 5 of 26 real CFN bindings found across the whole `resources/` directory bound — the rest are other services' routes, correctly left unresolved (their Java source isn't in this scan's roots), not guessed. |
+
+**Phase Y4 exit, 2026-08-08:** Lab + real wild repo both green on unit-kind + path recall + L2 story. `pipeline/src` changes: `cfn-manifest-provider.ts` (new), `cfn-route-pass.ts` (new), `pass-registry.ts`/`passes.ts` (wiring), `run-slice.ts` (`--cfn-manifests` CLI flag), `interface-builder.ts` (SOURCE_PRECEDENCE), `typed-facts.ts` (CONTRACT_VERSION 9.0.0). Full suite green including 2 new locked regression tests.
 
 **Phase Y4 exit:** U-http-serverless can claim paths on lab; wild partial/proven only if saas-boost meets bar.
 

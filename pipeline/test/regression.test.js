@@ -1031,6 +1031,38 @@ test('T-Y2/T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md) — Lambda Re
   }
 });
 
+test('T-Y4-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §2) — CFN/SAM path join: real path/method/handler binding resolved across TWO separate template files, attached to the real scanned units as real path-interfaces, calm validate + gold L0/L1/L2 all PASS', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
+  fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
+  // --cfn-manifests points at the SAME fixture dir, which real-evidence
+  // testing found needs its own multi-file join: api-gateway.yaml (Resource
+  // tree + Method) and lambda-functions.yaml (Function/Handler) are
+  // deliberately separate files, mirroring the real aws-saas-boost split.
+  const { outDir, calm } = runPipeline([fixtureRoot], ['--cfn-manifests', fixtureRoot]);
+  try {
+    const tierService = findNode(calm, 'TierService.java');
+    assert.ok(tierService, 'TierService.java must be a real service unit');
+    const tierPaths = (tierService.interfaces || []).map((i) => i.path).sort();
+    assert.deepEqual(tierPaths, ['GET /tiers', 'GET /tiers/{id}'], `expected the real CFN-resolved paths on TierService, got: ${tierPaths}`);
+
+    const legacyHandler = findNode(calm, 'LegacyTierHandler.java');
+    assert.ok(legacyHandler, 'LegacyTierHandler.java must be a real unit');
+    const legacyPaths = (legacyHandler.interfaces || []).map((i) => i.path);
+    assert.deepEqual(legacyPaths, ['PUT /tiers/{id}'], `expected the real CFN-resolved path on LegacyTierHandler, got: ${legacyPaths}`);
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
+  }
+});
+
 test(
   'Node/TS real evidence (ghostfolio/ghostfolio, NestJS+Prisma) — Graphify ref_ target normalization + Controller/database precedence (generic fixes, real bugs found by testing against a real repo)',
   { skip: !fs.existsSync(GHOSTFOLIO_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },

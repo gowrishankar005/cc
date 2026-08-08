@@ -71,6 +71,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '8', // bumped for CONTRACT_VERSION 8.0.0 (T-Y3-1) — control-builder.ts filters on 'security-control' only (unaffected); interface-builder.ts is fully catalogue-driven (node-type-mapping.yml's interfaceCategories), no hardcoded category list to update — re-verified the new 'serverless-entry-point' category is correctly excluded there, not just assumed
+  supportedMajorVersion: '9', // bumped for CONTRACT_VERSION 9.0.0 (T-Y4-1) — new 'structured-file' Evidence.source added SOURCE_PRECEDENCE tier 2 in interface-builder.ts (between openapi and decorator, per D-openapi-fallback), re-verified the real fixture now gets real paths, not just bumped
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

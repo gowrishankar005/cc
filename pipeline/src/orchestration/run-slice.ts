@@ -85,7 +85,8 @@ async function runSlice(
   k8sManifestsDir?: string,
   strictOverrides = false,
   includeSystemNode = true,
-  enableEnvSoftGraph = false
+  enableEnvSoftGraph = false,
+  cfnManifestsDir?: string
 ): Promise<void> {
   const catalogue = loadSignalCatalogue(path.join(__dirname, '..', 'rules'));
   logEngineCapabilitySummary(loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner')));
@@ -137,6 +138,7 @@ async function runSlice(
     relationships: [],
     k8sManifestsDir,
     enableEnvSoftGraph,
+    cfnManifestsDir,
   };
   await runPasses(DEFAULT_PASSES, ctx);
   const { coverage, unmapped } = writePlatformArtefacts(ctx, outDir);
@@ -233,7 +235,7 @@ function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error(
-      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph]\n' +
+      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph]\n' +
         '   or: run-slice --from-facts <typed-facts.json> [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--no-snippets] [--strict-overrides] [--no-system-node]'
     );
     process.exit(1);
@@ -262,12 +264,14 @@ function main() {
   const strictDetectIdx = args.indexOf('--strict-detect');
   const k8sManifestsIdx = args.indexOf('--k8s-manifests');
   const k8sManifestsDir = k8sManifestsIdx >= 0 ? path.resolve(args[k8sManifestsIdx + 1]) : undefined;
+  const cfnManifestsIdx = args.indexOf('--cfn-manifests');
+  const cfnManifestsDir = cfnManifestsIdx >= 0 ? path.resolve(args[cfnManifestsIdx + 1]) : undefined;
   const enableEnvSoftGraph = args.includes('--enable-env-soft-graph');
   const enableEnvSoftGraphIdx = args.indexOf('--enable-env-soft-graph');
-  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
-  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph).catch((err) => {
+  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir).catch((err) => {
     console.error('[run-slice] FAILED:', err);
     process.exit(1);
   });

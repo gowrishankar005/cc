@@ -55,6 +55,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '8', // bumped for CONTRACT_VERSION 8.0.0 (T-Y3-1) — filters strictly on category === 'http-entry-point', re-verified this does NOT also match the new 'serverless-entry-point' category (intentional, named residual — scope-limitations.yml's serverless-http-java-only), not a silent gap
+  supportedMajorVersion: '9', // bumped for CONTRACT_VERSION 9.0.0 (T-Y4-1) — new 'structured-file' source still has category 'http-entry-point', so this pass correctly ALSO now flags CFN-bound Lambda routes with no security-control evidence — a real, positive side effect, re-verified not just bumped
   run,
 };

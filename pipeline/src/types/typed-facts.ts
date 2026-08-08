@@ -23,7 +23,14 @@ export interface Evidence {
   // 'extends' added in CONTRACT_VERSION 7.0.0 (AREC Wave 3 T-E3) — a
   // class/interface's supertype (e.g. `extends JpaRepository<Charge, Long>`,
   // real Spring Data repository evidence), `referenceKind: 'extends'`.
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends';
+  // 'structured-file' added in CONTRACT_VERSION 9.0.0 (T-Y4-1) — a real
+  // path/method binding resolved from an infra template (CFN/SAM API
+  // Gateway + Lambda Function join, cfn-manifest-provider.ts), matched to
+  // its scanned handler unit by cfn-route-pass.ts. Same category
+  // (http-entry-point) as native-route/decorator/openapi evidence — this
+  // one carries a REAL path (unlike 'serverless-entry-point', which never
+  // does), so it correctly participates in interface-building.
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 (T-Y3-1,
   // Serverless_HTTP_and_Dynamo_Ownership_Design.md) — a Lambda handler's
   // `implements RequestHandler` clause. Deliberately NOT the same category
@@ -202,7 +209,7 @@ export interface IgnoredItem {
 // interface-builder.ts SOURCE_PRECEDENCE table gained the new key in the
 // same change, before this bump; control-builder.ts/threat-signals filter
 // on category, unaffected.
-export const CONTRACT_VERSION = '8.0.0';
+export const CONTRACT_VERSION = '9.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION
