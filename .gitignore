@@ -54,3 +54,9 @@ coe-lab/generated/**
 # Graphify scratch (tool writes into scanned trees)
 **/.graphify-cache/
 **/graphify-out/
+
+# Residual review sessions (scratch by default — T-RS1-1,
+# Architect_Residual_Review_Session.md §4.1: session packs may contain
+# redacted source snippets and are not committed unless an architect
+# deliberately archives one for audit)
+review-sessions/
