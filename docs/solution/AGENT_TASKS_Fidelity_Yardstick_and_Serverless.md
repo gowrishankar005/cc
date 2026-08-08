@@ -146,9 +146,9 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 |---|---|
 | **Do** | Regression test on lab. Optional gated re-scan of `spikes/aws-saas-boost/.../tier-service`: TierService must not be the sole wrong database owner story once Y3 lands; after Y2 alone, document residual if handler still lacks service signal. |
 | **Verify** | Test asserts kind outcomes by role, not class name literals in production code |
-| **Status** | todo |
+| **Status** | **done, 2026-08-08 (real coverage confirmed, status row was stale — found and fixed during a post-Y4 review pass, not caught at the time)** — lab regression test asserts by role (`node-type === 'service'`, not a name-based check) — verified `pipeline/src/analysis/signal-mapper.ts`/`pass-registry.ts` grep-clean of any `TierService`/`LegacyTierHandler`/`aws-saas-boost` literal. The optional gated wild re-scan happened for real, just under T-Y4-2's own wild-exam task rather than being logged back here — `TierService` confirmed correctly `service` (not the sole wrong-database-owner story) once Y3+Y4 both landed. |
 
-**Phase Y2 exit:** G-FY-02 mechanism in place (possibly complete only after Y3 service signal).
+**Phase Y2 exit:** G-FY-02 mechanism in place, confirmed complete once Y3's service signal landed (verified, not just predicted).
 
 ---
 
@@ -246,12 +246,12 @@ Phase Y0  Yardstick lock (matrix review + claim/OOS alignment)     [docs]
 
 ## Definition of program done
 
-- [ ] Y0–Y1 complete (matrix + design + lab gold)  
-- [ ] Y2–Y4: lab service + paths + correct Dynamo kinds  
-- [ ] Y5: exams updated; suite green; no forbidden Fidelity claim language  
-- [ ] Claim **U-http-serverless** at least **partial** with evidence pointers  
-- [ ] Hard-test finding HT-ASB-001/002 updated (closed or residual-named)  
-- [ ] Matrix §5 G-FY-01/02 closed or residual-explicit  
+- [x] Y0–Y1 complete (matrix + design + lab gold)
+- [x] Y2–Y4: lab service + paths + correct Dynamo kinds — verified on lab AND the real wild repo (5/5 real paths, real architecture edge)
+- [ ] Y5: exams updated; suite green; no forbidden Fidelity claim language — **not started**
+- [x] Claim **U-http-serverless** at least **partial** with evidence pointers — currently `partial → proven for Java+explicit-CFN shape`, exceeds the bar
+- [x] Hard-test finding HT-ASB-001/002 updated (closed or residual-named) — `aws-saas-boost-tier-service-gold-vs-platform.md` §8 retest addendum
+- [ ] Matrix §5 G-FY-01/02 closed or residual-explicit — **`Fidelity_Yardstick_Closeout_Matrix.md` itself not yet re-scored; that's explicitly T-Y6-1's job, correctly not done early**
 
 **Not required for done:** full CFN topology, Kinesis, Angular, Spark, CodeGraph upstream fix.
 
