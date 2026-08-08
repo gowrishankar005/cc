@@ -1,9 +1,14 @@
 # Architect residual review session (VS Code agent + session pack)
 
-**Status:** **PROPOSED — review before implementing.**  
+**Status:** **RS-0 SIGNED OFF — implement via agent tasks** (code not shipped yet).  
 **Product:** Weaver  
-**Related:** design v2 §7.1 (LLM advisory), §5.4 (overrides), intelligence IR (`intelligence-ir.md`); `coe-lab/docs/review-flow-capability-map.md`; `BACKLOG.md` **B-review-session**.  
-**Not yet code.** Do not treat this file as shipped capability.
+**Related:** design v2 §7.1 (LLM advisory), §5.4 (overrides), intelligence IR (`intelligence-ir.md`); `coe-lab/docs/review-flow-capability-map.md`; `BACKLOG.md` **B-review-session** + **B-calm-portable-ir**; layered recovery **[`AGENT_TASKS_Layered_Architecture_Story.md`](./AGENT_TASKS_Layered_Architecture_Story.md)** (**B-layered-story**); **implementation tasks:** [`AGENT_TASKS_Residual_Review_Session.md`](./AGENT_TASKS_Residual_Review_Session.md).  
+**Not yet code.** Do not treat residual pack/apply as shipped capability until RS-1+ land.  
+**Owner:** **Gowri**  
+**RS-0 sign-off:** **2026-08-08** — go-ahead granted; **do not skip safety** (no autonomous chat apply of `apply.py` / `run-slice` / override-applier).
+
+**Phase IDs in this document are `RS-*` (Residual Session), not `L*`.**  
+`L0–L4` in this repo mean the **layered-architecture-story** agent program only. Do not conflate them.
 
 ---
 
@@ -27,6 +32,19 @@ An architect wants one residual workspace and an IDE agent that:
 4. Writes back **only** through Decision Records + Overrides (never TypedFacts)
 
 This document productizes §7.1 + HITL for **how architects actually work** (VS Code agent), without putting an LLM on the deterministic core path.
+
+### 0.1 Boundary with layered-architecture-story (H1 — do not re-litigate)
+
+Residual session **completes a delivered artefact** (post-override CALM + effective IR). It is **not** the primary product path for intermediate-layer recovery, and it must **not** be used to redefine standing exams.
+
+| Concern | Owns it | Residual session may… | Residual session must **not**… |
+|---|---|---|---|
+| Dual-unit / R2 / R2b / store-terminal / multi-root scan mode | **B-layered-story** ([agent tasks](./AGENT_TASKS_Layered_Architecture_Story.md)) | Surface S1 / unresolved-multi-hop as Tier A/C cards; suggest multi-root rescan; after apply, document reviewed edges in effective IR | Claim “single-root charge gold L2 is green” because an architect overrode an edge; mark Claim Register R2 “closed” without standing exam IDs |
+| **E-charge-single-L2** (single-root gold L2) | Standing exams (layered-story L0) | Leave open or human-authorize a one-off override for **this pilot’s** CALM | Treat override as proof the scanner recovered the story under the original exam protocol |
+| **E-charge-multi-story** (multi-root access-layer) | Layered-story + multi-root gold | Help review/name residual after multi-root run | Substitute residual for multi-root mechanism work |
+| One-off wrong kind / missing connects **with both endpoints in TypedFacts** | **This doc (B-review-session)** | Choice cards + DR/Override | Invent endpoints not in the pack |
+
+**Rule of thumb:** systematic intermediate layers → **AREC / multi-root / catalogues**. One-off residual after that → **this session**. Using residual to paper over an expected-fail exam is a **process failure** (same class as RCA #2), not a successful residual pilot.
 
 ---
 
@@ -69,6 +87,37 @@ Rule of thumb (unchanged from review-flow map):
 
 **Mental model:** Session Pack = residual workspace; Agent = residual analyst; Overrides = only write-back into CALM.
 
+### 2.1 Choice-driven UX — the agent asks, it never hands the architect a blank box
+
+The single biggest adoption risk in the original design is that Tier A "architect must decide" items were implicitly free-text prompts ("what is this?"). An architect facing 15 of those in a row is exactly the JSON-editing chore this session is supposed to remove. Instead, **every Tier A item is presented as a choice card**: a short question, 2-4 concrete options synthesized *from the run's own evidence* (never invented), and a mandatory escape hatch.
+
+```
+┌─ Residual R-014 (Tier A: ontology judgment) ───────────────────────────┐
+│ Unit: PrismaService  (services/prisma/prisma.service.ts:1)             │
+│                                                                          │
+│ This class extends PrismaClient (external base, confirmed via source   │
+│ read-back) and is imported by 6 other units. How should it be typed?   │
+│                                                                          │
+│  [1] database        — owns the DB client directly (default here;      │
+│                         matches ownerBaseClass evidence)                │
+│  [2] service          — a thin wrapper/facade, not the persistence     │
+│                         boundary itself                                 │
+│  [3] Leave open (S1)  — insufficient confidence, flag for later        │
+│  [4] Other…            — free text (requires 1-line rationale)          │
+│                                                                          │
+│  Evidence: class-ownership-resolver match (PrismaClient, source L1-L4) │
+│  Similar decisions this session: none yet                              │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Rules for building a choice card, not just its look:
+
+- **Options come from a fixed generator per residual class** (§3's Tier A table maps 1:1 to a card template — ontology judgment always offers `{typeA, typeB, leave-open, other}`; multi-candidate bridge always offers `{each candidate, none-of-these, leave-open, other}`), never from the LLM inventing plausible-sounding categories on the fly. This keeps Tier A answerable in seconds and keeps the option set auditable — the same card template produces the same options given the same evidence, independent of model variance.
+- **"Other…" always requires one line of rationale**, captured verbatim into the Decision Record's `rationale` field — never silently defaulted.
+- **Every card must show its evidence inline** (the file:line / class-ownership / import match that produced the options) so the architect is deciding from what the tool found, not trusting a summary.
+- **Repeat answers are surfaced, not asked twice**: if the architect already resolved the same class/pattern earlier in this session (e.g. "all NestJS `*.service.ts` extending a Prisma/TypeORM client → database"), the agent offers `[1] Apply my earlier answer to all N similar cases]` before falling back to asking one-by-one. This is the concrete mechanism that keeps a 50-residual run from being 50 individual clicks. **Bulk-apply integrity (found on review — a blanket record would let one wrong first answer silently propagate to 49 others):** accepting a bulk-apply option must still list every affected unit id before commit, and must still write **one Decision Record per residual**, not one blanket record for the batch — each one references the same rationale text but keeps its own id, so any single item can later be superseded/corrected via its own new Decision Record without touching the other 49. The chat turn is one click; the audit trail is still per-item.
+- Tier B drafts are shown the same way but framed as **confirm, not decide** — "Agent proposes X, evidence below. [Accept] [Reject] [Edit rationale]" — never silently auto-applied even when the evidence bar is met (Guided mode, §5's default for v1).
+
 ---
 
 ## 3. Residual taxonomy
@@ -77,31 +126,46 @@ Rule of thumb (unchanged from review-flow map):
 
 LLM may **prepare context**, not finalise alone.
 
-| Class | Examples |
-|---|---|
-| Ownership / boundary | Domain ownership, system naming |
-| Ontology judgment | Prisma service-vs-database (Q13) |
-| Multi-candidate / zero-candidate bridges | R2 ambiguous skip |
-| Command-bus / dynamic dispatch | Permanent OOS for inventing edges |
-| Security authority / policy | What *should* be required |
-| Promote large clusters to product claim | “Claim SQS for this pilot?” |
+| Class | Examples | Choice-card options (generator-fixed; not LLM-invented) |
+|---|---|---|
+| Ownership / boundary | Domain ownership, system naming | Context-specific labels from pack + leave-open + other |
+| Ontology judgment | Prisma / ORM service-vs-database | `{typeA, typeB, leave-open, other}` (e.g. database vs service) |
+| Multi-candidate / zero-candidate bridges | R2 ambiguous skip | `{each in-scope candidate unit, none-of-these, leave-open, other}` — **not** free invention of missing modules |
+| Security authority / policy | What *should* be required | Policy options + leave-open + other (does not invent controls without override support — see H4) |
+| Promote large clusters to product claim | “Claim SQS for this pilot?” | Promote / defer / leave-open / other |
+
+**Command-bus / dynamic dispatch** is **not** Tier A “pick an edge.” It is **Tier C / permanent OOS** for inventing relationships: choice card if shown at all is only `{document as OOS, leave open, (optional) multi-root rescan if roots incomplete}` — never `relationship_add` without both endpoints already in TypedFacts.
 
 ### Tier B — LLM may draft if evidence bar met
 
 | Class | Minimum evidence | Allowed draft |
 |---|---|---|
-| Missing `connects` between **existing** units | Both unit ids in TypedFacts; file:line or import/call/edge supports the pair; single unambiguous pair | `relationship_add` (connects) |
+| Missing `connects` between **existing** units | Both unit ids in TypedFacts; file:line or import/call/edge supports the pair; single unambiguous pair | `relationship_add` (connects only — current `override-applier` support) |
 | Wrong kind with strong evidence | Category + source annotation/import | `type_change` |
 | Promote ignored item with clear signal | Snippet maps to known category | `node_add` (+ optional connects) |
-| Auth present but not matched | Prefer **catalogue proposal** if recurring; one-off only if product later supports control override UX | catalogue lane first |
+| Auth present but not matched | Prefer **catalogue proposal** if recurring | Catalogue lane first (`suggest-rules` / proposed-updates) |
 
 If bar fails → **do not decide** → Tier A or leave open.
+
+#### H4 — v1 residual closes nodes/relationships better than controls
+
+First-class Override types today emphasize **nodes** and **connects** (`node_add` / `type_change` / `node_rename` / `node_remove` / `relationship_add` / `relationship_remove`). There is **no** dedicated `control_add` override UX wired as a residual card.
+
+| Residual need | v1 residual session |
+|---|---|
+| Wrong/missing **node kind** or **connects** between existing units | **In scope** (Tier A/B → DR + Override) |
+| Missing **security-control** on HTTP unit (S2) when catalogue already has a row but detection missed | Prefer **re-scan / catalogue** fix; residual may leave open or document OOS |
+| New auth vocabulary not in catalogue | **Catalogue lane**, not one-off control invent |
+| Rich control config / authority | Partial via product C-rich path; not residual free-form |
+
+**Effective IR §4** still **lists** control evidence (and HTTP-without-control silence) from post-override CALM — honesty about controls does not require v1 residual to *write* controls. When control override exists later, add a Tier B class; until then this is a named v1 limitation, not a silent gap.
 
 ### Tier C — Do not invent
 
 | Class | Action |
 |---|---|
-| Missing intermediates not in scan | Multi-root rescan or strategy — not fabricate units from names |
+| Missing intermediates not in scan | Multi-root rescan or layered-story strategy — not fabricate units from names; see §0.1 |
+| Command-bus / dynamic dispatch | Permanent OOS — document, do not invent edges |
 | Unresolvable external HTTP | Leave unresolved / ignored |
 | Entity–entity structural noise | Grade/filter policy — not free-form LLM cleanup |
 | Unmapped ≥5 occurrences | Catalogue session (`suggest-rules` or equivalent proposal file) |
@@ -133,6 +197,8 @@ review-sessions/<run-id>/   Session Pack
 
 **Python prepares and drafts; Weaver still applies.** Do not reimplement `override-applier` in Python.
 
+**Concurrency (found on review, not previously named):** v1 is scoped to **one architect per Session Pack, no concurrent editing story**. `pack.py` should refuse to build a new pack over an existing, not-yet-applied `review-sessions/<run-id>/` directory (fail loud: "a pack for this run already exists and has unapplied drafts — apply or discard it first") rather than silently overwriting in-progress work. Two architects wanting to split one run's residuals is explicitly **out of scope for v1** — not solved, not silently broken either; named here so it doesn't get assumed as "probably fine" during a team pilot.
+
 ### 4.1 Session Pack layout
 
 ```
@@ -152,6 +218,12 @@ review-sessions/<run-id>/
 ```
 
 Do **not** dump full Graphify graphs into the pack (tokens + privacy).
+
+**Redaction, made concrete (found on review — "redacted" was asserted with no mechanism, the exact "specified vs proven" gap this project's own CLAUDE.md principle warns about):** `pack.py` (§8 **RS-1**) must run every source snippet it writes into `evidence/packs.json` through a fixed, testable redaction step before it ever lands on disk, not a documentation promise:
+- A literal secret-pattern scan (reuse an existing scanner if one is already vendored — e.g. a `gitleaks`/`trufflehog`-style ruleset — rather than hand-rolling regexes; if none is available, a documented, checked-in minimal pattern set: AWS-style keys, bearer tokens, private-key headers, connection-string password segments) runs over every snippet before it's written.
+- A match redacts the value in place (`"AKIA****REDACTED****"`, not silent deletion — the architect should still see *that* something was there and why the line is evidence, just not the value).
+- `pack.py`'s own regression test includes a fixture snippet with a known fake secret pattern and asserts it comes out redacted in `packs.json` — this is a testable claim now, not an assertion in a design doc.
+- Session Packs are **scratch state by default, not committed** (same convention as `spikes/<name>/repo` per CLAUDE.md) — `review-sessions/` should be gitignored unless an architect deliberately archives one for audit; `decisions-log.md`/`apply-report.md` (the audit-relevant, non-source-bearing outputs) are the pieces worth checking in, not the evidence packs.
 
 ### 4.2 Inputs (already produced by Weaver)
 
@@ -174,6 +246,25 @@ Do **not** dump full Graphify graphs into the pack (tokens + privacy).
 | Overrides | `--overrides <dir>` |
 | `decisions-log.md` | Audit / pilot disclosure |
 | Catalogue proposal file (optional) | Human promote to `signal-catalogue.yml` — never auto-merge |
+
+### 4.4 Delivery vehicle: VS Code + GitHub Copilot Chat (not a bespoke extension)
+
+Confirmed direction: architects interact via **GitHub Copilot Chat inside VS Code**, not a custom-built VS Code extension. That changes the implementation shape of "the agent" — it isn't a new UI, it's a **bound Copilot Chat configuration** pointed at the Session Pack:
+
+- **Decided: chat-mode/instructions file only, no MCP server.** `.github/chatmodes/residual-review.chatmode.md` (or a repo `.github/prompts/residual-review.prompt.md`) is `AGENTS.md` (§4.1) expressed in Copilot Chat's own instructions format — scopes a chat session to the playbook rules in §5: "read `SESSION.md` + `residuals.json` first, never scan the whole repo, never edit `typed-facts.json`, write only under `drafts/`."
+- **Correction (found on review, was wrong as originally written): "drafts/ is inert until a human runs apply.py" is not true by default in Copilot Chat's agent mode.** Agent mode can execute terminal commands and edit arbitrary workspace files when the user has granted tool/terminal permissions — which is precisely the mode a chat-mode/instructions file is built to enable. Without an explicit restriction, nothing stops the chat agent from invoking `apply.py`/`run-slice`/`override-applier` itself, mid-conversation, which collapses the separation this design's integrity story depends on. This is now a **hard requirement of the chat-mode configuration, not an assumption**:
+  1. The chat-mode file's declared tool/permission set **must not** include unrestricted terminal execution. Either deny terminal tools entirely for this mode, or require VS Code's per-command confirmation prompt (never "auto-approve") for any command touching `run-slice`, `apply.py`, or `override-applier`.
+  2. `apply.py` (§8 **RS-3**) itself is the actual backstop, and it re-validates every draft against the Decision Record/Override JSON schema and the integrity rules already in `override-applier.ts` (active-decision-only, no dangling refs) before calling anything real — so even a permitted invocation still gets rejected there if a draft is malformed. But rule 1 is what keeps that invocation an explicit, confirmed architect action rather than something the model did on its own initiative.
+  3. This is an **RS-0 exit condition**, not a later hardening pass: the chat-mode file's tool permissions must be reviewed and confirmed (e.g. screenshot, config export, or checked-in chat-mode file + checklist in the RS-0 sign-off record) to have no autonomous terminal-execution path, before RS-1 begins.
+  4. Degraded-fallback, stated explicitly rather than left implicit: if an organization's Copilot policy disables agent-mode tool execution entirely, the workflow still works — the architect reads `SESSION.md`/choice cards conversationally, then hand-authors the Decision Record + Override JSON exactly as today's pre-B-review-session flow does. Nothing in this design removes that path; the chat mode is a convenience layer over it, not a replacement for it.
+- **Choice cards (§2.1) render as ordinary Copilot Chat markdown** — numbered options, an evidence blockquote, and a follow-up architect reply of `1`/`2`/`other: ...`. No custom webview needed for v1; a richer picker UI is a legitimate RS-5+ nice-to-have, not a blocker.
+
+### 4.5 CALM viewer — reused, not built
+
+The architect views the generated/reviewed architecture in an **existing CALM viewer plugin** (the FINOS CALM Studio / draw.io↔CALM converter tooling already referenced in `CLAUDE.md`'s CALM Studio contract note), pointed at `architecture.calm.json`. This design adds no new viewer code — its only two obligations toward that plugin are:
+
+1. Keep `architecture.calm.json` at the stable, namespaced path it already has post-apply (true today per Wave M's module-output namespacing) so the viewer's pointed-at file doesn't move between runs.
+2. Note the manual refresh step in `SESSION.md`'s closing instructions ("open `architecture.calm.json` in the CALM viewer; reload after Step 8 apply") — since most static-file viewers don't file-watch by default. If the specific plugin in use *does* support watch-reload, this step disappears; not assumed here.
 
 ---
 
@@ -198,6 +289,55 @@ Bound playbook (not free-form monorepo chat):
 | **Guided** | **Yes (default)** | Ask all Tier A; draft Tier B; architect approves apply |
 | Semi-auto | Later | Tier B auto-draft; one “approve all B” |
 | Auto-B | Later opt-in | Auto-apply only allowlisted, high-evidence relationship_add |
+
+### 5.1 Tier B system prompt (draft, for RS-4)
+
+This is the bound instruction set for the *drafting* half of the agent only — Tier B items, where evidence already clears the bar in §3. It is deliberately narrow and repeats its own limits rather than trusting a single instruction to hold across a long chat session (a real failure mode of long-context agent prompts). Not used for Tier A — those are choice cards answered by the architect, never auto-decided.
+
+```
+You are the Tier B drafting assistant for a Weaver residual review session.
+You draft ONLY. You never apply, never edit typed-facts.json, never touch
+the catalogues. Every draft you write goes to drafts/ and is reviewed by
+the architect before anything is applied.
+
+INPUTS you may read for this residual, and nothing else:
+  - residuals.json entry for this residual ID
+  - evidence/packs.json entries referenced by this residual ID
+  - evidence/unit-index.json entries for the specific unit ids involved
+  - source file:line spans explicitly listed as this residual's evidence
+    refs (bounded window; do not open any other file)
+
+HARD RULES (violating any of these means: do not draft, return
+"cannot_decide" instead):
+  1. You may only propose a decision if EVERY evidence field required by
+     this residual's Tier B class (see taxonomy) is present and
+     unambiguous. Partial evidence is not evidence.
+  2. You may never introduce a node, relationship, unit id, file path, or
+     line number that does not already appear in your inputs. If the
+     right answer requires something not in the pack, output
+     "cannot_decide: missing <what>" instead of guessing.
+  3. You may never use prior knowledge of this codebase, this framework,
+     or "codebases like this" to fill a gap the evidence doesn't cover.
+     Cite only what's in the pack.
+  4. If more than one candidate fits the evidence equally well, output
+     "cannot_decide: ambiguous between <candidates>" — do not pick one.
+  5. Every draft must cite its evidence explicitly in the Decision
+     Record's rationale field (residual id, evidence ref, one sentence).
+  6. Never blend your own confidence into x-aac-confidence. That field is
+     computed by the deterministic pipeline; you do not set it.
+  7. Output format is fixed: a Decision Record JSON + an Override JSON,
+     matching the schemas in drafts/decisions and drafts/overrides. No
+     prose outside the rationale field.
+
+For each residual you are asked to draft, respond with exactly one of:
+  - a completed Decision Record + Override pair (evidence bar met), or
+  - "cannot_decide: <reason>" (evidence bar not met — this is a correct,
+    expected, non-failure outcome, not something to avoid).
+
+You are being run on a fixed, closed set of residuals for one session.
+Do not summarize, do not suggest catalogue changes, do not comment on
+residuals outside your assigned batch.
+```
 
 ---
 
@@ -225,7 +365,7 @@ That end document is the **effective architecture IR** (name TBD in implementati
 | **`architecture.calm.json` (today)** | Machine CALM model; **includes overrides** after apply |
 | **Effective architecture IR (required end-state of this design)** | Human-readable **reviewed** model: nodes, relationships, controls/auth evidence, residual decisions — **aligned with post-override CALM**, plus decision log. This is what an architect should hand a stakeholder as “the architecture we agree on for this run.” |
 
-Implementation options (pick at Phase 2/3; product requirement is the end-state, not a particular filename):
+Implementation options (pick at RS-2/RS-3; product requirement is the end-state, not a particular filename):
 
 1. **Preferred:** regenerate IR with a first-class section **“Effective architecture (post-override)”** listing CALM nodes/relationships/controls after apply, plus applied override ids / decision refs. Keep a collapsible or trailing appendix for raw TypedFacts/silence (honesty).  
 2. **Alternative:** write `effective-architecture-ir.md` in the session pack / out-dir, generated only after residual apply.  
@@ -272,20 +412,204 @@ node dist/orchestration/run-slice.js \
 # - overrides-applied-report.json    → apply audit
 ```
 
+### 7.1 Effective Architecture IR — template (target schema)
+
+§7 committed to an effective-architecture-ir.md end-state without specifying its shape. Proposed template, so "comprehensive" is a checklist, not a feeling:
+
+```markdown
+# Effective Architecture — <system/domain name>
+
+## Provenance
+| Field | Value |
+|---|---|
+| Run id | <run-id> |
+| Generated | <date>, from run <run-id>, baseline <prior effective-ir run-id or "none — first pass"> |
+| Package roots scanned | <paths + source commit sha per root> |
+| contractVersion | <typed-facts contract version> |
+| Reviewed by | <architect id(s)>, session <session-id> |
+| Residuals resolved this run | <N Tier A, N Tier B, N left open> |
+
+## 1. System overview
+One-paragraph, evidence-only summary (node/relationship counts by kind,
+no narrative not traceable to CALM). Not hand-written prose — templated
+from counts + any architect-supplied one-line system description
+captured during the session (optional field, clearly marked as
+architect-authored, not inferred).
+
+## 2. Node inventory
+Grouped by kind (service / database / network / system / …). Per node, a
+short prose line **plus a fenced block that is the node's literal CALM
+JSON fragment** (see §7.4 — not a paraphrase, the actual object that
+belongs in `architecture.calm.json`'s `nodes[]`):
+
+  `AccountService` — HTTP entry point, JWT-authenticated. (decision: D-014)
+  ```calm-node
+  {
+    "unique-id": "svc-account-service",
+    "node-type": "service",
+    "name": "AccountService",
+    "description": "…",
+    "interfaces": [
+      { "unique-id": "…", "type": "path-interface", "path": "GET /…" }
+    ],
+    "controls": { },
+    "metadata": [
+      { "key": "x-aac-provenance", "value": [ "…" ] },
+      { "key": "x-aac-decision-ref", "value": "D-014" },
+      { "key": "x-aac-ir-checksum", "value": "sha256:1f3a…" }
+    ]
+  }
+  ```
+  (Real generator emits **complete** objects — no `...` placeholders. Namespaced
+  keys live in `metadata[]` as `{key,value}` entries, matching CALM metadata
+  shape and existing builders — not free-form top-level fields invented only for IR.)
+
+## 3. Relationship inventory
+Grouped by **`x-aac-relationship-grade`** values the pipeline actually emits
+(`structural` | `architecture` | `trust` — AREC T-A2 / relationship-builder).
+Do **not** invent alternate grade enums (e.g. bare `"R1"`/`"R2"` as CALM values).
+Story labels (S-shallow / S-layered-access / …) may appear in **prose** only unless
+a future metadata key is productized.
+
+  `AccountService` connects to `AccountsDb` (grade: architecture; decision: none — deterministic)
+  ```calm-relationship
+  {
+    "unique-id": "rel-account-service-db",
+    "description": "imports relationship (same-package, source: graphify)",
+    "relationship-type": {
+      "connects": {
+        "source": { "node": "svc-account-service" },
+        "destination": { "node": "db-accounts" }
+      }
+    },
+    "protocol": "JDBC",
+    "metadata": [
+      { "key": "x-aac-provenance", "value": "graphify" },
+      { "key": "x-aac-cross-package", "value": false },
+      { "key": "x-aac-relationship-grade", "value": "architecture" },
+      { "key": "x-aac-ir-checksum", "value": "sha256:9c2e…" }
+    ]
+  }
+  ```
+
+**Note — any `{...}` elision in this design doc is illustration-only.** The real generator must emit complete CALM objects aligned with `pipeline/src/types/calm.ts` and calm-generator builders (full `connects.source`/`destination`, `interfaces`, `controls`; metadata as `{key,value}` arrays; `x-aac-relationship-grade` not `x-aac-grade`). **RS-2** exit: round-trip a fixture through `calm validate`, not eyeball markdown.
+
+**`x-aac-ir-checksum` (found on review — nothing detected a hand-edited block before this):** a checksum of the canonical CALM fragment at generation time, stamped onto every emitted node/relationship/control both in `architecture.calm.json` and in its markdown mirror. `ir-to-calm.ts` recomputes and compares before trusting a block; a mismatch is a loud, named failure ("block for `svc-account-service` does not match its checksum — was it hand-edited?"), never a silent pass-through. This is what actually makes §7.4's "hand-editing is not a supported write path" a checked rule instead of a stated one.
+
+## 4. Controls & auth evidence
+Per node carrying control evidence: mechanism class (decorator /
+call-site / contract), requirement id, evidence ref, plus its literal
+CALM `controls` fragment. Nodes with http-entry-point evidence and NO
+control evidence are listed explicitly here too (mirrors the
+threat-signals module's own check) — silence is shown, not omitted.
+
+## 5. Persistence & messaging dependencies
+Table: unit -> {store/topic, direction (producer/consumer/owner),
+mechanism, evidence ref}.
+
+## 6. Open residuals / out-of-scope
+Every Tier A item left unanswered and every Tier C item — with reason
+("no fixture evidence", "ambiguous, deferred", "permanent OOS: command
+bus"). This section existing and being non-empty is not a defect in the
+document; a session that silently has no open items after resolving
+everything Tier A/B is the anomaly to double-check, not the goal.
+
+## 7. Decision log (this run)
+Table: decision id -> residual id -> chosen option -> reviewer
+(architect:<id> or llm-advisory:<model>) -> rationale (one line) ->
+timestamp. Full detail lives in decisions-log.md; this is the
+architect-facing summary.
+
+## 8. Revision history (cumulative — see §7.2)
+Table: run id -> date -> nodes added/changed -> relationships
+added/changed -> residuals resolved -> net open-residual count.
+```
+
+Generation is templated (deterministic string assembly from CALM +
+decisions-log + residuals.json), **not** free LLM prose, for sections
+1-7. Section headers/table shapes are fixed; only the "System overview"
+one-line architect-supplied description (explicitly marked as such) is
+free text, and only because the architect wrote it, not the model.
+
+### 7.2 A goal state reached over many scans, not one run
+
+A single scan-and-review session will not produce a "comprehensive" effective architecture IR for a real system — real systems get scanned incrementally (new packages onboarded, code changes between releases, residuals resolved a few at a time). The template above is designed to **accumulate**, not restart, across runs:
+
+- Each run's effective IR is generated **against a baseline**: the prior run's effective-architecture-ir.md / CALM (`--baseline <path>`, new CLI input, not yet built). Nodes/relationships/decisions carried forward from the baseline are preserved verbatim unless this run's facts or an explicit new Decision Record supersedes them — a node the architect already typed correctly last time is never silently re-asked.
+- **Never regress a decided item without a new Decision Record.** If this run's deterministic extract disagrees with a prior human decision (e.g. source changed shape), that's surfaced as a **new residual** ("previously decided as X, this run's evidence now suggests Y — re-confirm?"), not an automatic overwrite — matches P7 (loud residual stays loud) applied to drift, not just first-pass gaps.
+- §7.1's Revision History table (§8 of the template) is the visible trace of this accumulation — a stakeholder can see the system's reviewed-architecture picture getting more complete run over run, and exactly which run resolved which residual.
+- This directly answers your framing: the effective IR is realistically a **living document reaching comprehensiveness over multiple scans and HITL rounds**, not a single-session deliverable — the template and baseline mechanism above is what makes that incremental path concrete instead of aspirational.
+
+### 7.3 Optional: LLM rewrite of the effective IR into readable prose — strictly evidence-bound
+
+Sections 1-7 of §7.1's template are template-assembled, which is correct but reads like a report, not a document you'd hand to a stakeholder unedited. An optional, separate pass can ask an LLM to **rewrite the templated sections into connected prose**, under the same non-negotiable evidence discipline as Tier B drafting — this is a *presentation* transform, never a source of new architectural claims, and runs **after** apply, never in place of the templated version (the templated version stays as the audited source of truth; the prose version is generated from it, never the reverse).
+
+```
+You are rewriting a Weaver effective-architecture-ir.md into prose for a
+stakeholder audience. You are a formatter, not an analyst.
+
+INPUT: the fully-assembled templated effective-architecture-ir.md
+(sections 1-8) for this run, and nothing else — no source code, no
+typed-facts.json, no prior knowledge of this system.
+
+HARD RULES:
+  1. Every sentence you write must be traceable to a specific row/cell in
+     the input document. If you cannot point to which table row a
+     sentence came from, delete the sentence.
+  2. You may not add any node, relationship, control, or dependency not
+     already listed in the input. You may not infer purpose, business
+     context, or criticality unless the input explicitly states it
+     (e.g. an architect-authored system-overview line).
+  3. You may not soften or omit the "Open residuals / out-of-scope"
+     section content — reduced detail is fine, dropped items are not.
+  4. Preserve every decision ref and evidence ref as inline citations
+     (e.g. "(see D-042)") so a reader can trace prose back to the
+     templated source.
+  5. Output is a drop-in replacement for sections 1-7 only. Do not alter
+     section 8 (Revision history) — keep it as the exact table.
+  6. If the input document is internally inconsistent (a node referenced
+     in §3 not listed in §2, etc.) stop and report the inconsistency
+     instead of writing around it — that's a template-generation bug to
+     fix upstream, not something to paper over in prose.
+
+Do not use any fact, framework convention, or architectural pattern
+knowledge not present in the input document, even if you believe it to
+be true of systems like this one.
+```
+
+Positioned as an **RS-5+ nice-to-have**, not part of the RS-0–RS-3 core — the templated version alone satisfies §7's Definition of Done; this is purely about readability for a non-technical stakeholder audience, and the extra LLM call is one more thing that can go wrong (rule 6 exists specifically because a rewrite pass is also a place a template bug could get silently smoothed over instead of caught).
+
+### 7.4 Is the template CALM-compatible, and can CALM be rebuilt from it alone?
+
+Direct answer: **yes, by design, as of the `calm-node`/`calm-relationship` fenced blocks added to §7.1 above** — but only because those blocks are made to literally *be* CALM, not a paraphrase of it. Worth being precise about what that does and doesn't buy you.
+
+**Why fenced literal CALM, not a custom IR schema.** The earlier draft of §7.1 described nodes/relationships/controls in prose-table form only. Prose is lossy — reconstructing valid `architecture.calm.json` from a table description would mean writing a second, bespoke parser that has to re-derive exact CALM shapes (the `interacts` vs `connects` distinction, `interface-definition` shapes, `control-requirement`/`evidence` objects) from human-readable text, which is exactly the kind of duplicated, drift-prone logic this whole project has spent effort designing *out* (`build-calm.ts`'s catalogue-driven builders exist for this reason). Embedding the real JSON fragment inline instead means:
+
+- **A reconstruction tool (`ir-to-calm.ts`, not yet built) is nearly trivial** — it collects every `calm-node`/`calm-relationship`/`calm-control` block out of the markdown, assembles them into `{nodes, relationships, ...}`, and runs the result through `calm validate` exactly like any other Weaver output. No translation step to get wrong.
+- **It is genuinely usable without re-scanning the repo.** Once a session's effective IR is filled in, anyone with just that one markdown file — no source access, no `typed-facts.json`, no Weaver installed — can extract a real, schema-valid `architecture.calm.json` from it. That's a real, concrete answer to "can someone build a CALM json independently from the filled template": yes, mechanically, from the document alone.
+- **It stays honest about round-trip direction.** The blocks are a generated *mirror* of CALM + applied Overrides, not an independent input an architect edits by hand to change the architecture — editing a `calm-node` block directly in the markdown would be a fourth, ungoverned write path into CALM, which breaks P3 (§1: Decision Record + Override is the *only* legal write path). So: **CALM → template is round-trippable and is the supported direction; template → CALM by hand-editing the fenced blocks is explicitly not supported** — a change still has to go back through a Decision Record + Override and a regenerated template, same governance as everything else in this design. This is the same "one-way rendering, never a second source of truth" discipline `intelligence-ir.md` already committed to (design v2 §13) — extended here so the *reviewed* IR gets the same discipline, not a looser one.
+
+**What this doesn't remove: you still need one real scan to start.** The template can only contain nodes/relationships that a prior Weaver run + residual session actually produced. It's a portable, self-contained *snapshot* of an already-built architecture model, not a way to originate one from nothing — "independent of further scans" means independent of re-scanning to *use* the model downstream, not independent of ever having scanned at all.
+
+**Why this matters for your multi-purpose model plan (security, green engineering, …).** This is the part worth being deliberate about. Today's stated plan (`CLAUDE.md`, design v2) is that future modules — a threat modeller, a green analyser — consume `typed-facts.json`, the *raw, pre-residual* contract. That's fine for signals a module can re-derive itself, but a security or sustainability module built on raw facts inherits every open residual and false-positive the architect hasn't reviewed yet. Once a residual session exists, the **reviewed** artifact (post-override CALM + this template) is strictly higher-quality input for exactly those downstream modules — an architect-confirmed node/control set, not a pre-review guess. Concretely, that argues for a small addition to the module contract, not a new one: modules should be able to declare whether they consume `typed-facts.json` (raw, always available, no review dependency) or `architecture.calm.json` + effective-IR (reviewed, higher trust, only available after a residual session has run) — a real design fork worth naming now rather than discovering later when the first security/green module is actually built, but **not something to build in this round**; flagging it here as a forward-looking implication of making the IR CALM-compatible, for a future module-contract revision to pick up.
+
 ---
 
-## 8. Implementation phases (**do not start until this doc is reviewed**)
+## 8. Implementation phases — **`RS-*` only** (H2; not layered-story `L*`)
+
+**Do not start until this doc is reviewed and RS-0 is signed off.**  
+**Do not confuse with** `AGENT_TASKS_Layered_Architecture_Story.md` phases **L0–L4**.
 
 | Phase | Deliverable | Exit |
 |---|---|---|
-| **0** | This design accepted | Product owner sign-off on taxonomy + IR behaviour |
-| **1** | `tools/review-session/pack.py` + `triage.py` + schema | Pack builds on real out-dir; no network |
-| **2** | Agent playbook + `validate_drafts.py` | Drafts pass schema + endpoint checks; apply cleanly |
-| **3** | `apply.py` wrapper + apply-report | Before/after CALM validate + report |
-| **4** | Optional scripted LLM for Tier B only | Drafts only; trap: no fabricate |
-| **5** | Eval traps + pilot scorecard note | Honesty under residual session |
+| **RS-0** | This design accepted | **DONE 2026-08-08** — owner **Gowri**; go-ahead + do not skip safety; agent tasks [`AGENT_TASKS_Residual_Review_Session.md`](./AGENT_TASKS_Residual_Review_Session.md). Chat-mode no-autonomous-apply remains a **hard exit of RS-1 (T-RS1-5)**, not waived. |
+| **RS-1** | `tools/review-session/pack.py` + `triage.py` + schema, `.github/chatmodes/residual-review.chatmode.md` | Pack builds on real out-dir; no network; choice-card generator (§2.1) produces cards from a fixed template per residual class; redaction fixture test |
+| **RS-2** | Agent playbook + `validate_drafts.py` + templated effective IR (§7.1) with literal CALM fragments matching `types/calm.ts` | Drafts pass schema + endpoint checks; effective IR from real post-apply CALM; **MVP may defer** full `ir-to-calm.ts` to **B-calm-portable-ir** if pack→apply pilot is prioritized first — if deferred, say so on BACKLOG and still require valid post-override CALM |
+| **RS-3** | `apply.py` wrapper + apply-report + initial `--baseline` (§7.2) | Before/after CALM validate; second run carries forward prior decisions or surfaces re-confirm residual |
+| **RS-4** | Optional scripted LLM for Tier B only (§5.1) | Drafts only; trap: no fabricate; `cannot_decide` is a passing outcome |
+| **RS-5** | Eval traps + pilot scorecard note; optional prose rewrite (§7.3); complete B-calm-portable-ir if deferred | Honesty under residual session |
 
-**Suggested first build slice (after review):** Phase 0 sign-off → Phase 1 pack → Phase 2 validate_drafts → one manual VS Code pilot → Phase 3 apply wrapper.
+**Suggested first build slice (after RS-0):** RS-1 pack + choice cards → validate_drafts + apply (thin) → one Copilot pilot → then effective IR / baseline / portable IR as capacity allows.
 
 ---
 
@@ -294,9 +618,16 @@ node dist/orchestration/run-slice.js \
 - LLM inside `run-slice`
 - Auto-merge into `signal-catalogue.yml`
 - Free-form monorepo RAG as primary input
-- Claiming residual session replaces R2/C-call/catalogue work
+- Claiming residual session replaces R2/C-call/catalogue work **or layered-story exams** (§0.1)
+- Using residual overrides to mark **E-charge-single-L2** (or any standing exam) as “product green”
 - Requiring every S1 to clear after a session
 - Replacing `suggest-rules` (catalogue lane stays separate; session may *point* to it)
+- **v1 inventing or bulk-writing security controls** without a first-class control override path (H4)
+- Building a new CALM viewer/editor (§4.5 — reuse the existing plugin, view-only)
+- A general-purpose "chat with your whole codebase" experience (Copilot Chat is bound to the Session Pack, per §4.4 and §5's playbook rules — not free-form monorepo chat)
+- LLM-authored prose in the effective IR replacing the templated, evidence-cited version (§7.3 is presentation-only, generated from the template, never the source of record)
+- Autonomous chat-agent execution of `apply.py`/`run-slice`/`override-applier` without an explicit, confirmed architect action (§4.4 — the chat mode must not be granted unrestricted terminal tool access)
+- Multi-architect concurrent editing of one Session Pack (§4 — v1 is single-architect; `pack.py` refuses to overwrite an unapplied pack rather than silently allowing concurrent writes)
 
 ---
 
@@ -304,7 +635,8 @@ node dist/orchestration/run-slice.js \
 
 Tracked as **`B-review-session`** in [`BACKLOG.md`](./BACKLOG.md).
 
-**Gate:** **Review this document before any implementation.** Status remains `proposed / review-before-implement` until product owner unblocks Phase 1.
+**Gate:** **RS-0 signed off** — implement **RS-1+** per [`AGENT_TASKS_Residual_Review_Session.md`](./AGENT_TASKS_Residual_Review_Session.md).  
+**Also track:** **B-calm-portable-ir** for §7.1–§7.4 full portability if scheduled separately from residual UX.
 
 ---
 
@@ -316,9 +648,19 @@ Tracked as **`B-review-session`** in [`BACKLOG.md`](./BACKLOG.md).
 | All applied changes go through DR + Override | Integrity |
 | TypedFacts unchanged by session | Determinism |
 | One real residual session produces valid post-override CALM | Evidence |
-| **Effective architecture IR** lists reviewed nodes, edges, auth/controls, open residuals | Architect deliverable |
+| **Effective architecture IR** lists reviewed nodes, edges, auth/controls **evidence present in CALM**, open residuals | Architect deliverable |
 | Insufficient-evidence trap: no fabricated relationship_add | Honesty |
 | Facts-IR honesty preserved (S1/S2 still explain extract gaps) | No silent rewrite of analysis |
+| Standing exams / Claim Register R2 not redefined by residual pilot alone | Process (§0.1 / H1) |
+| Architect never faces a blank free-text prompt for a Tier A item | UX (§2.1 choice cards) |
+| v1 residual does not pretend to fully author controls | Honesty (H4) |
+| A second run against updated source carries forward prior decisions via `--baseline` | Cumulative IR (§7.2) — full bar may trail thin apply MVP |
+| Any LLM-rewritten prose (if RS-5 built) traces every sentence to a template citation | Honesty (§7.3) |
+| `ir-to-calm.ts` rebuilds a `calm validate`-clean file from the effective IR alone, no repo access | CALM compatibility (§7.4) — may live under **B-calm-portable-ir** |
+| Chat-mode tool permissions audited: no autonomous apply | Integrity (§4.4) |
+| Fixture secret redacted in `evidence/packs.json` | Data sensitivity (§4.1) |
+| Bulk-apply: one Decision Record per residual | Auditability (§2.1) |
+| Checksum rejects hand-edited fenced blocks | Drift detection (§7.1/§7.4) |
 
 ---
 
@@ -330,7 +672,7 @@ Tracked as **`B-review-session`** in [`BACKLOG.md`](./BACKLOG.md).
 |---|---|---|---|
 | **Machine model** | **Yes** — `architecture.calm.json` + `typed-facts.json` are structured JSON | Same + overrides applied; effective IR is markdown projection | — |
 | **“What services and endpoints exist?”** | **Yes** — CALM nodes + interfaces; TypedUnits with http-entry-point evidence | Same, residual-corrected | Query CLI/API over CALM |
-| **“What DB / messaging / external deps?”** | **Partial–strong** — relationships `connects` / grades; messaging partial (Kafka yes, SQS open) | Stronger after residual fills known gaps | Query by relationship kind / grade |
+| **“What DB / messaging / external deps?”** | **Partial–strong** — relationships `connects` / grades; Kafka + SQS import evidence partial; SNS still weaker | Stronger after residual fills known gaps | Query by relationship kind / grade |
 | **“What auth methods / controls on a service?”** | **Partial** — CALM `controls` from C-dec / C-call / C-contract where catalogue matched; not every call-site vocab | Residual can attach overrides or catalogue rows; still not unbounded inference | Query: list controls by node id |
 | **“Walk the request flow end-to-end”** | **Limited** — static connects/calls graph, not runtime traces; command-bus OOS | Residual can add missing static edges if evidenced | Graph query / path search over CALM edges |
 | **Conversational Q&A** | **Not productized** — architect uses IR + CALM manually (or ad-hoc IDE agent) | Session agent is residual-focused, not a general chat over whole architecture | Thin **query layer**: load reviewed CALM (+ controls) into agent or `jq`/graph tool with a fixed schema prompt |
@@ -354,5 +696,10 @@ So: **yes, a queryable model is realistic and mostly already present as CALM; fu
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | **RS-0 signed off** — owner **Gowri**, go-ahead, do not skip safety; agent tasks `AGENT_TASKS_Residual_Review_Session.md` created (RS-1…RS-5). |
+| 2026-08-08 | **H1–H4 review fixes:** §0.1 boundary with **B-layered-story** / standing exams (residual ≠ redefine E-charge-single-L2); phases renamed **RS-0…RS-5** (not L*); §7.1 CALM fragments aligned with real `types/calm.ts` / `x-aac-relationship-grade` + metadata[]; H4 v1 controls limitation; command-bus moved to Tier C OOS options; MVP may defer full ir-to-calm to **B-calm-portable-ir**. |
+| 2026-08-08 | Honest pre-mortem review (rubric reuse) fixes applied: **[blocks pilot]** §4.4 corrected — "drafts/ is inert until human apply" was false by default under Copilot Chat agent mode; now a hard Phase 0 exit condition (no autonomous terminal execution, explicit degraded-fallback path stated). Should-fix items closed: §2.1 bulk-apply now writes one Decision Record per affected item; §4.1 redaction given a concrete, testable mechanism (pattern scan + fixture test + packs not committed by default); §7.1/§7.4 given `x-aac-ir-checksum` drift detection + explicit no-elision requirement for real generator output; §4 concurrency scoped to single-architect v1 (pack.py refuses to overwrite unapplied packs); owner/timeline flagged as an open Phase 0 item. **`B-calm-portable-ir` split out of `B-review-session`** in `BACKLOG.md` — §7.1-§7.4 solve architecture-model portability, a distinct problem from residual UX, reviewable independently. |
+| 2026-08-08 | Follow-up: MCP server option dropped (§4.4 — decided chat-mode file only, guardrail is the human-run `apply.py` gate, not a server); §7.1 node/relationship/control entries now embed literal `calm-node`/`calm-relationship`/`calm-control` JSON fragments; new §7.4 answers CALM-compatibility directly — `ir-to-calm.ts` (not yet built) can rebuild a schema-valid CALM file from the filled template alone with no repo/scan access, CALM→template is the supported direction (template hand-edits are not a legal write path, same P3 discipline), and names a forward-looking module-contract fork (raw typed-facts vs. reviewed CALM+IR) relevant to future security/green-engineering modules, explicitly not built this round |
+| 2026-08-08 | UX + template round: §2.1 choice-card interaction pattern (no free-text Tier A prompts); §4.4 delivery vehicle confirmed as VS Code + GitHub Copilot Chat (chat-mode file, optional MCP server for structural write-path enforcement); §4.5 CALM viewer reused not built; §5.1 Tier B system prompt (draft); §7.1 effective-architecture-ir.md target template (8 sections); §7.2 cumulative/baseline model across scans; §7.3 optional strictly-evidence-bound LLM prose rewrite + its system prompt; phases/non-goals/success-criteria updated to match |
 | 2026-08-08 | Product end-state: **effective architecture IR** required after residual; §12 queryable model / flows / auth Q&A answered |
 | 2026-08-08 | Initial proposed design from residual-UX discussion; IR post-HITL behaviour spelled out; backlog row: review before implement |

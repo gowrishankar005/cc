@@ -11,10 +11,9 @@
 
 ## Iteration goals (this round)
 
-1. **Ship ranked product residuals** — ontology (Prisma service-vs-database) and SQS/SNS producers.  
-2. **Review then (if accepted) implement residual-session UX** — session pack + VS Code agent; end state = **semantically correct effective architecture IR** after HITL/LLM residual.  
-3. **Decide query surface** for “questioning” flows and auth methods (CALM JSON today; optional query helper later — not a second source of truth).  
-4. Keep **honesty > green** (no fabricated edges; catalogue intake for new rows).
+1. **Fidelity serverless HTTP** — **B-lambda-http** + **B-dynamo-handler-kind** (standing exam: aws-saas-boost tier-service). Do not claim Fidelity cloud complete without this.  
+2. **Residual-session UX** — RS-1 → (RS-0 already signed, Gowri); safety mandatory.  
+3. Keep **honesty > green** (no fabricated edges; catalogue intake for new rows).
 
 ---
 
@@ -23,23 +22,22 @@
 | Program | Result |
 |---|---|
 | Wave 3 A–E | Silence, grades, R1 lock, R2 mechanism, C-call/C-rich base, breadth (Kafka producers, Spring Data, Dynamo, OpenAPI dual-unit, HITL queue) |
-| Robustness R0 | Pilot scorecard, arch-cov metric, multi-root L2 protocol, OOS registry, S0 Graphify flag |
-| Robustness R1 | R2b + Java import normalize; **flagship Fineract multi-root story closed** |
-| Robustness R2 | Catalogue intake, C-call expand, C-rich `authorityRef` |
-| Robustness R3 | Discovery refresh/re-rank, trap promote 7/8, cadence policy |
-| Robustness R4 | HITL low-architecture-coverage trigger; k8s FP re-check clean |
+| Robustness R0–R4 | Full MVP; flagship multi-root Fineract access-layer story (claim triple) |
+| B-ontology / B-msg-prod-sqs | Prisma ownership + SQS merge onto dual-role units |
+| B-layered-story L0–L4 | Standing exams + dual gold + operator recipe |
 
 ---
 
 ## Recommended sequence
 
 ```text
-1. Review Architect_Residual_Review_Session.md (product owner)
-2. P1 code: B-ontology  then  B-msg-prod-sqs   (can parallel if two agents)
-3. If residual design accepted: B-review-session Phase 1 pack → validate_drafts → pilot
-4. Optional: IR “effective architecture” appendix + light query helper over reviewed CALM
-5. Hygiene: Claim Register forbidden-phrase cleanup; scope-limitations ↔ claims
+1. B-review-session RS-1… (residual UX) — may interleave with serverless design
+2. B-lambda-http + B-dynamo-handler-kind — product P1; Claim U-http-serverless
+3. Later: RS-4 LLM draft, B-calm-portable-ir, platform plugins, etc.
 ```
+
+Ontology + SQS (**B-ontology**, **B-msg-prod-sqs**) are **done** — do not re-queue.  
+Residual RS-0 is **signed off** — do not re-open design without owner.
 
 ---
 
@@ -47,9 +45,9 @@
 
 | # | Todo | Backlog ID | Exit |
 |---|---|---|---|
-| 1 | Product review of residual-session design (incl. effective IR + query Q) | B-review-session | Accept / amend / park |
-| 2 | Persist ontology code fix (ORM import ≠ always database) | B-ontology | Claim U-persist-import updated; BoA + Ghostfolio-class regression |
-| 3 | SQS/SNS producer detection | B-msg-prod-sqs | Lab fixture + claim U-msg-producer; trap T7 full |
+| 1 | Layered story **Phase L0** (standing exams + Claim Register R2 split) | B-layered-story | T-L0-1…T-L0-4; see agent task list |
+| 2 | Layered story **Phase L1** (multi gold + expected-fail harness) | B-layered-story | T-L1-1…T-L1-5 |
+| 3 | Residual session **RS-1** (pack + choice cards + chat-mode safety) | B-review-session | T-RS1-1…T-RS1-6; owner **Gowri**; **do not skip safety** |
 
 ---
 

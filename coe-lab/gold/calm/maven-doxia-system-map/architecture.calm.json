@@ -1,0 +1,123 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-maven-doxia-system-map",
+  "name": "Apache Maven Doxia — Module system map",
+  "description": "Hand-authored module-level CALM for apache/maven-doxia. Grain is Maven module boundaries (not HTTP services). Doxia is a content parsing/rendering framework (Parser → Sink), not a deployable web app. Independent of the platform generator. Source: https://github.com/apache/maven-doxia",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "apache/maven-doxia" },
+    { "key": "x-lab-grain", "value": "maven-module" },
+    { "key": "x-lab-scan-mode", "value": "single-root" },
+    { "key": "x-lab-source-root", "value": "spikes/maven-doxia/repo" },
+    { "key": "x-lab-coverage", "value": "Top-level Maven modules + format plugins under doxia-modules; key dependency connects from poms" },
+    { "key": "x-lab-out-of-scope", "value": "Class-level Parser/Sink graph; SPI/Plexus wiring; flexmark third-party graph; tests; doxia-test-docs content" },
+    { "key": "x-lab-architecture-note", "value": "No JAX-RS/Spring HTTP entry points and no JPA/SQL persistence in this codebase — fintech HTTP/DB claims are N/A; this package stresses library/module monorepo shape." }
+  ],
+  "nodes": [
+    {
+      "unique-id": "doxia-system",
+      "node-type": "system",
+      "name": "Apache Maven Doxia",
+      "description": "Multi-module content generation framework: parse document formats into a Sink event stream."
+    },
+    {
+      "unique-id": "mod-doxia-sink-api",
+      "node-type": "service",
+      "name": "doxia-sink-api",
+      "description": "Public Sink / SinkFactory API (event consumer contracts for document generation)."
+    },
+    {
+      "unique-id": "mod-doxia-core",
+      "node-type": "service",
+      "name": "doxia-core",
+      "description": "Core Doxia facade (DefaultDoxia), ParserManager, base parsers/sinks, macros. Depends on doxia-sink-api (pom)."
+    },
+    {
+      "unique-id": "mod-doxia-modules",
+      "node-type": "service",
+      "name": "doxia-modules",
+      "description": "Aggregator for format-specific parser/sink modules (apt, fml, xdoc, xhtml5, markdown)."
+    },
+    {
+      "unique-id": "mod-doxia-module-apt",
+      "node-type": "service",
+      "name": "doxia-module-apt",
+      "description": "APT format parser/sink module."
+    },
+    {
+      "unique-id": "mod-doxia-module-fml",
+      "node-type": "service",
+      "name": "doxia-module-fml",
+      "description": "FML format parser module."
+    },
+    {
+      "unique-id": "mod-doxia-module-xdoc",
+      "node-type": "service",
+      "name": "doxia-module-xdoc",
+      "description": "XDoc format parser/sink module."
+    },
+    {
+      "unique-id": "mod-doxia-module-xhtml5",
+      "node-type": "service",
+      "name": "doxia-module-xhtml5",
+      "description": "XHTML5 format parser/sink module."
+    },
+    {
+      "unique-id": "mod-doxia-module-markdown",
+      "node-type": "service",
+      "name": "doxia-module-markdown",
+      "description": "Markdown format parser/sink module (Flexmark-based). Depends on doxia-module-xhtml5 (pom)."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "doxia-composed-of-modules",
+      "description": "Doxia product is composed of sink-api, core, modules aggregator, and format modules.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "doxia-system",
+          "nodes": [
+            "mod-doxia-sink-api",
+            "mod-doxia-core",
+            "mod-doxia-modules",
+            "mod-doxia-module-apt",
+            "mod-doxia-module-fml",
+            "mod-doxia-module-xdoc",
+            "mod-doxia-module-xhtml5",
+            "mod-doxia-module-markdown"
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "core-connects-sink-api",
+      "description": "doxia-core Maven dependency on doxia-sink-api (pom artifactId doxia-sink-api).",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-doxia-core" },
+          "destination": { "node": "mod-doxia-sink-api" }
+        }
+      }
+    },
+    {
+      "unique-id": "markdown-connects-xhtml5",
+      "description": "doxia-module-markdown depends on doxia-module-xhtml5 (pom).",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-doxia-module-markdown" },
+          "destination": { "node": "mod-doxia-module-xhtml5" }
+        }
+      }
+    },
+    {
+      "unique-id": "format-modules-connects-core",
+      "description": "Format modules plug into core Parser/Sink abstractions (architectural dependency on doxia-core APIs).",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "mod-doxia-module-markdown" },
+          "destination": { "node": "mod-doxia-core" }
+        }
+      }
+    }
+  ]
+}

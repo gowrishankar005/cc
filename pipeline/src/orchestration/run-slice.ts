@@ -210,6 +210,7 @@ function runFromFacts(
     k8sManifestsStatus: 'not-provided',
     relationshipsByKind: {},
     relationshipsBySource: {},
+    relationshipsByMechanism: {},
     unresolvedByMechanism: {},
     // T-A1: real, not placeholder — facts.units/relationships are available
     // even in --from-facts mode, so S1/S2 can be computed honestly here

@@ -4,6 +4,8 @@
 
 **Isolation:** Platform-implementation agents must **not** open `gold/` or use gold contents to tune detectors. See [`ISOLATION.md`](./ISOLATION.md).
 
+**Hard-test track (wild-type, one package at a time):** [`docs/hard-test-eval-playbook.md`](./docs/hard-test-eval-playbook.md) · registry · [`docs/coe-lab-hard-test-backlog.md`](./docs/coe-lab-hard-test-backlog.md). Eval only — not the coding-agent suite.
+
 ```
 coe-lab/
   CHARTER.md                 # why this lab exists, non-goals

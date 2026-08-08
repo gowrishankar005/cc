@@ -291,6 +291,34 @@ test(
       assert.equal(flagshipRel.crossPackage, true, 'ChargesApiResource (fineract-charge) and ChargeReadPlatformServiceImpl (fineract-provider) are in different roots');
       assert.equal(flagshipRel.confidence, 10, 'expected R2 Phase 1 cross-root confidence (10) — the implementer resolved as its own store unit, not via the R2b hop');
       assert.equal(flagshipRel.grade, 'architecture');
+      assert.equal(flagshipRel.mechanism, 'r2-phase1', 'T-L2-1/AREC_Store_Terminal_Policy.md §2: the real flagship case resolves via Phase 1 short-circuit (S-layered-access), not R2b — this is the exact real-evidence claim the design note makes, now asserted, not just stated in prose');
+
+      // T-L3-2 — mechanism visibility on the real multi-root run's own
+      // coverage-report.json, the actual "visible on a multi-root sample
+      // run" exit criterion, not just a typed-facts.json field check.
+      // Real counts (checked directly, not assumed): this full real
+      // fineract-charge+fineract-provider scan resolves 126 total multi-hop
+      // edges across the whole codebase, not just the one flagship edge —
+      // 121 via Phase 1, 5 via R2b. The flagship relationship's own
+      // mechanism is already asserted above (r2-phase1); this only checks
+      // the coverage breakdown reflects real, non-trivial counts for BOTH
+      // mechanisms, which is the actual point of T-L3-2 (visibility of the
+      // real breakdown), not a specific number that would be a maintenance
+      // trap the next time Fineract's real source or the resolver changes.
+      // Real finding while writing this assertion: NOT every kind:'calls'/
+      // source:'graphify' relationship is multi-hop-derived — R0's own
+      // direct reconciler (graphify-reconciler.ts) also emits kind:'calls'
+      // whenever Graphify's raw edge.relation is itself 'calls' (a real,
+      // same-package, non-bridge call edge). Those correctly leave
+      // `mechanism` unset — a third, legitimate, non-multi-hop category —
+      // so the two mechanism buckets are NOT expected to sum to every
+      // 'calls'/'graphify' relationship. Checked directly against a real
+      // run before asserting a stricter equality that would have been
+      // wrong (126 multi-hop-mechanism edges vs 239 total calls/graphify
+      // edges in this real scan).
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      assert.ok(coverage.relationshipsByMechanism['r2-phase1'] > 0, `expected relationshipsByMechanism.r2-phase1 > 0 in the real coverage report, got ${coverage.relationshipsByMechanism['r2-phase1']}`);
+      assert.ok(coverage.relationshipsByMechanism['r2b'] > 0, `expected relationshipsByMechanism.r2b > 0 in the real coverage report (real layered chains beyond the flagship do resolve via R2b in this codebase), got ${coverage.relationshipsByMechanism['r2b']}`);
 
       const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
@@ -475,6 +503,7 @@ test('AREC T-C1 — R2 multi-hop bridge: synthetic fixture proves the mechanism 
     assert.ok(r2Rel, 'expected a resolved R2 relationship from WidgetApiResource to WidgetReadServiceImpl');
     assert.equal(relMetadata(r2Rel, 'x-aac-relationship-grade'), 'architecture');
     assert.equal(relMetadata(r2Rel, 'x-aac-confidence'), 15, 'R2 same-root confidence must be low and fixed, per the design note (below any R1 value)');
+    assert.equal(relMetadata(r2Rel, 'x-aac-mechanism'), 'r2-phase1', 'T-L2-1: Phase 1 short-circuit (implementer IS the store) must be distinguishable from R2b without decoding the confidence value');
     assert.ok(r2Rel.description.includes('calls'), 'R2 must use the calls kind, distinct from R1 imports/connects');
 
     const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
@@ -516,6 +545,7 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
     assert.equal(relMetadata(r2bRel, 'x-aac-relationship-grade'), 'architecture');
     assert.equal(relMetadata(r2bRel, 'x-aac-confidence'), 8, 'R2b same-root confidence must be below both R2 Phase 1 tiers (15/10)');
     assert.ok(r2bRel.description.includes('calls'), 'R2b must use the calls kind, same as R2 Phase 1');
+    assert.equal(relMetadata(r2bRel, 'x-aac-mechanism'), 'r2b', 'T-L2-1: R2b (implementer imports the store) must be distinguishable from Phase 1 without decoding the confidence value');
 
     // Ambiguity path: GadgetReadServiceImpl imports TWO real stores — R2b
     // must refuse to guess, same "never guess" discipline as Phase 1's own
@@ -534,6 +564,13 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
     );
     assert.ok(ambiguousItem, 'expected an honest unresolved-multi-hop ignored-item for the ambiguous Gadget case');
     assert.ok(ambiguousItem.detail.includes('2 candidate store unit'), `expected the item to name 2 candidates, got: ${ambiguousItem.detail}`);
+
+    // T-L3-2 — the R2b-side counterpart to the flagship test's r2-phase1
+    // assertion, proving relationshipsByMechanism buckets BOTH mechanism
+    // values correctly, not just the one that happens to fire on Fineract.
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    assert.equal(coverage.relationshipsByMechanism['r2b'], 1, 'expected the R2b edge counted under relationshipsByMechanism.r2b');
+    assert.equal(coverage.relationshipsByMechanism['r2-phase1'], undefined, 'no Phase 1 edges expected in this fixture — only the R2b hop fires');
 
     const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
     assert.equal(errors, 0);
@@ -1870,6 +1907,11 @@ test(
       // service-touching relationships -> S1 fires for all 3.
       assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 3);
       assert.ok(queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')));
+      // T-L3-3 — this unit has a real, named unresolved-multi-hop residual
+      // on file (T-C1); the review-queue rationale must surface that
+      // specific detail, not just a generic "see AREC R2" pointer.
+      const chargesApiItem = queue.items.find((i) => i.unitId.endsWith('ChargesApiResource.java'));
+      assert.ok(chargesApiItem.rationale.includes('unresolved-multi-hop'), `expected the specific unresolved-multi-hop detail in the rationale, got: ${chargesApiItem.rationale}`);
       // S2 must NOT fire here — ChargesApiResource has real security-rbac-002
       // call-site control evidence (T-D1), so it correctly has no S2 item.
       assert.equal(queue.items.filter((i) => i.trigger === 'S2-http-without-security-control').length, 0);

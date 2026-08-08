@@ -49,6 +49,9 @@ export function renderIntelligenceIR(
     `- k8sManifestsStatus: \`${coverage.k8sManifestsStatus}\``,
     `- relationships by kind: ${Object.entries(coverage.relationshipsByKind).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     `- relationships by source: ${Object.entries(coverage.relationshipsBySource).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
+    // T-L3-2 — resolved multi-hop edges by mechanism (r2-phase1/r2b, T-L2-1),
+    // the resolved-side counterpart to "unresolved by mechanism" below.
+    `- relationships by mechanism (multi-hop): ${Object.entries(coverage.relationshipsByMechanism).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     `- unresolved by mechanism: ${Object.entries(coverage.unresolvedByMechanism).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     ''
   );

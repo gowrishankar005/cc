@@ -13,7 +13,7 @@ From public Fidelity engineering job signals (e.g. Principal Full Stack Java rol
 | API | REST, **Spring Boot**, **Swagger/OpenAPI** | Java Spring-style + OpenAPI file package |
 | Data | **PostgreSQL**, **DynamoDB**, Elasticsearch, ElastiCache, Snowflake | SQLAlchemy/JPA-style + Dynamo SDK import package |
 | Messaging | **Kafka**, Artemis, Flink; cloud **SQS/SNS** | Kafka annotation-style package + SQS SDK import package |
-| Cloud | AWS Lambda, EKS, S3, Kinesis | k8s-style deploy manifests (EKS-like); no full AWS account |
+| Cloud | AWS Lambda, EKS, S3, Kinesis | **Historical miss (2026-08-08):** this row collapsed Lambda into **k8s-style deploy** only — EKS stood in for “cloud,” so Lambda **HTTP entry never got a lab package or claim cell**. Correct product treatment: **B-lambda-http** / Claim **U-http-serverless** (handler + API GW/CFN paths), not deploy-only. K8s trust remains separate. |
 | Frontend | Angular, Node/TS | **Out of generator Slice 1/2** — listed in gold `outOfScope` only |
 | Security | OAuth2 / security practices (Fidelity postings); JWT patterns (BoA) | Decorator control + optional shared secret k8s |
 

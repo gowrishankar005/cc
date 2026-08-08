@@ -85,4 +85,5 @@ Evidence-repo paths (e.g. `spikes/fineract/repo/fineract-charge`) belong in an *
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | T-L0-4 — linked from [`standing-disconfirming-exams.md`](./standing-disconfirming-exams.md): `E-charge-multi-story` uses this protocol's root-set-labeling discipline for its own claim triple. Any multi-root finding scored against a standing exam must still follow §4's declaration template. |
 | 2026-08-08 | T-R0-3 — initial protocol, implements Claim Register Q11 |

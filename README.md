@@ -251,7 +251,7 @@ Clones under `spikes/` are **scratch evidence**, not deliverables.
 
 | Issue (pattern class) | Impact | Tracking |
 |---|---|---|
-| **Layered multi-hop (R2)** — API → application service → store across packages | Strong L1 units; **L2 architecture story often incomplete** when implementers live outside a single root or lack catalogue persistence signals | AREC R2 (mechanism partial; enterprise residual remains) |
+| **Layered multi-hop (R2)** — API → application service → store across packages | Strong L1 units; **L2 architecture story often incomplete** when implementers live outside a single root or lack catalogue persistence signals | AREC R2 (mechanism partial; enterprise residual remains). **If you hit this, see [`docs/solution/Multi_Root_Operator_Recipe.md`](./docs/solution/Multi_Root_Operator_Recipe.md)** — a real, non-fabricated fix exists for the cross-module case (multi-root scan), but the single-root gold-scored claim genuinely stays L2 FAIL by design; see [`coe-lab/docs/standing-disconfirming-exams.md`](./coe-lab/docs/standing-disconfirming-exams.md) for both frozen exam protocols |
 | **Call-site auth (C-call)** — permission/JWT checks as method calls, not annotations | HTTP units lack security-control evidence despite real auth in source | AREC Session D |
 | **R0 entity–entity mesh** | Many `connects` edges that are structural, not service architecture | Graded R0; do not overclaim |
 | **High confidence ≠ complete** | Easy to misread unit scores as full architecture | Completeness / silence metrics; scope-limitations |

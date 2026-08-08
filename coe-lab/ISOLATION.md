@@ -36,3 +36,16 @@ You are implementing the platform (pipeline/).
 Do NOT open coe-lab/gold/ or coe-lab/docs/*scoring* gold examples to invent rules.
 Use pipeline/test fixtures and public spikes only.
 ```
+
+## Hard-test eval track (wild-type, one package at a time)
+
+Separate from lab fixture CI and from coding agents:
+
+| Doc | Role |
+|---|---|
+| [`docs/hard-test-eval-playbook.md`](./docs/hard-test-eval-playbook.md) | Tasks A (gold) → B (scan) → C (compare/backlog) |
+| [`docs/hard-test-repo-registry.md`](./docs/hard-test-repo-registry.md) | Clones + package slices + status |
+| [`docs/coe-lab-hard-test-backlog.md`](./docs/coe-lab-hard-test-backlog.md) | HT-* findings (not product BACKLOG) |
+| [`docs/AGENT_TASKS_Hard_Test_Eval.md`](./docs/AGENT_TASKS_Hard_Test_Eval.md) | Eval-only agent prompt |
+
+Hard-test sessions **must not** edit `pipeline/src` to match gold. Coding agents **must not** consume hard-test gold mid-implementation.

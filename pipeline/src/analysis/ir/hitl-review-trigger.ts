@@ -75,15 +75,34 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   const items: ReviewQueueItem[] = [];
   const silenceFlags = coverage.completeness.silenceFlags;
 
+  // T-L3-3 (AGENT_TASKS_Layered_Architecture_Story.md) — a real S1 unit
+  // often already has a SPECIFIC, named reason on file: the multi-hop
+  // detector's own honest `unresolved-multi-hop` ignored-item (bridge id,
+  // candidate count). Surfacing that specific detail instead of a generic
+  // "see AREC R2" pointer is what makes a review-queue item actually
+  // actionable without a human re-deriving it from typed-facts.json by
+  // hand — no new detection, just reading a fact this run already produced.
+  const unresolvedMultiHopByUnitId = new Map<string, string>();
+  for (const item of facts.ignoredItems) {
+    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith('unresolved-multi-hop: "')) continue;
+    const unitId = item.detail.slice('unresolved-multi-hop: "'.length).split('"')[0];
+    if (unitId && !unresolvedMultiHopByUnitId.has(unitId)) {
+      unresolvedMultiHopByUnitId.set(unitId, item.detail);
+    }
+  }
+
   if (silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships'))) {
     for (const unit of facts.units) {
       if (unit.kind !== 'service' && unit.kind !== 'database') continue;
+      const specific = unresolvedMultiHopByUnitId.get(unit.id);
       items.push({
         trigger: 'S1-zero-service-touching-relationships',
         unitId: unit.id,
         unitKind: unit.kind,
         confidence: unit.confidence,
-        rationale: `Run has service+database units but 0 relationships touch a service unit. Review whether "${unit.id}" should connect to another unit in this run (see AREC R2 for why an automatic edge wasn't produced).`,
+        rationale: specific
+          ? `Run has service+database units but 0 relationships touch a service unit. "${unit.id}" has a specific, named residual: ${specific}`
+          : `Run has service+database units but 0 relationships touch a service unit. Review whether "${unit.id}" should connect to another unit in this run (see AREC R2 for why an automatic edge wasn't produced).`,
       });
     }
   }

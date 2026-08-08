@@ -1,0 +1,66 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-aws-saas-boost-tier-service",
+  "name": "AWS SaaS Boost — Tier Service",
+  "description": "Hand-authored CALM gold for awslabs/aws-saas-boost tier-service: API Gateway–backed Lambda (RequestHandler) for /tiers CRUD, DynamoDB-backed store. Independent of the platform generator. Evidence: TierService.java, DynamoTierDataStore.java, saas-boost-public-api.yaml PathPart tiers.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "awslabs/aws-saas-boost" },
+    { "key": "x-lab-module", "value": "services/tier-service" },
+    { "key": "x-lab-scan-mode", "value": "single-root" },
+    { "key": "x-lab-source-root", "value": "spikes/aws-saas-boost/repo/services/tier-service" },
+    { "key": "x-lab-grain", "value": "class-file" },
+    { "key": "x-lab-coverage", "value": "TierService Lambda handler + DynamoTierDataStore; API paths from public API Gateway template" },
+    { "key": "x-lab-out-of-scope", "value": "Other SaaS Boost services; Cognito authorizer; CloudFormation provisioning; admin React client; EventBridge side-effects outside tier-service package" },
+    { "key": "x-lab-architecture-note", "value": "HTTP surface is API Gateway + Lambda RequestHandler (no Spring/JAX-RS annotations in Java). Persistence is AWS SDK v2 DynamoDbClient (software.amazon.awssdk.services.dynamodb)." }
+  ],
+  "nodes": [
+    {
+      "unique-id": "tier-service",
+      "node-type": "service",
+      "name": "Tier Service",
+      "description": "Lambda RequestHandler TierService — public admin API for SaaS packaging tiers (get/create/update/delete).",
+      "interfaces": [
+        { "unique-id": "tiers-list", "type": "path-interface", "path": "GET /tiers" },
+        { "unique-id": "tiers-create", "type": "path-interface", "path": "POST /tiers" },
+        { "unique-id": "tiers-get", "type": "path-interface", "path": "GET /tiers/{id}" },
+        { "unique-id": "tiers-update", "type": "path-interface", "path": "PUT /tiers/{id}" },
+        { "unique-id": "tiers-delete", "type": "path-interface", "path": "DELETE /tiers/{id}" }
+      ]
+    },
+    {
+      "unique-id": "dynamo-tier-store",
+      "node-type": "database",
+      "name": "DynamoTierDataStore",
+      "description": "DynamoDB data store for Tier entities (DynamoDbClient + TIERS_TABLE env)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "tier-service system",
+      "description": "Boundary for the tier-service package architectural units under test."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "tier-service-connects-dynamo",
+      "description": "TierService constructs DynamoTierDataStore with DynamoDbClient and reads/writes TIERS_TABLE.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "tier-service" },
+          "destination": { "node": "dynamo-tier-store" }
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System composed of tier service and Dynamo store.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": ["tier-service", "dynamo-tier-store"]
+        }
+      }
+    }
+  ]
+}

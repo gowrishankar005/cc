@@ -14,9 +14,12 @@ Full Apache Fineract ≈ 171 JAX-RS resources and ≈ 256 JPA entities across ~3
 
 | Gold package | Grain | Purpose |
 |---|---|---|
-| `fineract-charge` | Routes + entity + connects | Deep Java happy path (platform Slice 2 proof module) |
+| `fineract-charge` | Routes + entity + connects | Deep Java happy path, **single-root**, API→entity terminal (platform Slice 2 proof module). Standing exam: `E-charge-single-L2` — **expected L2 FAIL by design**, see below. |
+| `fineract-charge-provider` | Routes + access-layer implementer + connects | **Multi-root** (`fineract-charge`+`fineract-provider`), API→access-layer-JDBC-implementer terminal (S-layered-access story, T-L1-1). A **different claim triple** from `fineract-charge` above — same API, different scan mode, different terminal grain, never scored against each other. Standing exam: `E-charge-multi-story`. |
 | `fineract-core` | All module `*ApiResource` routes + RBAC service + representative entities | Controls + multi-API core; documents remaining entities as out-of-scope |
 | `fineract-system-map` | Gradle modules as nodes | Monorepo topology without inventing every class |
+
+**`fineract-charge` vs `fineract-charge-provider` — read this before citing either (T-L0/T-L1, `AGENT_TASKS_Layered_Architecture_Story.md`):** these are not two attempts at scoring the same claim, and a PASS on one must never be cited as evidence for the other. `fineract-charge` (single-root) expects `ChargesApiResource → Charge` (the JPA entity) and is **expected to fail L2** — the real source has no static one-hop chain there (`ChargesApiResource` never imports `Charge`). `fineract-charge-provider` (multi-root) expects `ChargesApiResource → ChargeReadPlatformServiceImpl` (the real JDBC access-layer implementer, in a different module) and is a genuinely different, real architecture story the platform correctly recovers under a multi-root scan. Full protocol + frozen exam IDs: `coe-lab/docs/standing-disconfirming-exams.md`.
 
 ## Method (do this; do not bootstrap from generator)
 

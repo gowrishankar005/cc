@@ -86,6 +86,9 @@ export function buildRelationships(
           // (structural) is never visually indistinguishable in the
           // generated CALM from a real service->database architecture link.
           ...(rel.grade !== undefined ? [{ key: 'x-aac-relationship-grade', value: rel.grade }] : []),
+          // T-L2-1 — only present on multi-hop-bridge-detector.ts output
+          // ('r2-phase1' | 'r2b'); every other producer leaves it unset.
+          ...(rel.mechanism !== undefined ? [{ key: 'x-aac-mechanism', value: rel.mechanism }] : []),
         ],
       };
       const protocol = rule.protocol ?? inferredProtocol(rel.to) ?? inferredProtocol(rel.from);

@@ -94,6 +94,19 @@ export interface TypedRelationship {
   // completes — absence would only mean an older typed-facts.json predating
   // this field, never a live-run gap.
   grade?: 'structural' | 'architecture' | 'trust';
+  // T-L2-1 (AGENT_TASKS_Layered_Architecture_Story.md) — additive OPTIONAL
+  // field (Contract_Evolution_Policy.md §2(b), no CONTRACT_VERSION bump).
+  // Set only by multi-hop-bridge-detector.ts's two branches, both already
+  // distinguishable by confidence value (15/10 vs 8/5) but not
+  // self-documenting — this makes "which branch produced this edge"
+  // askable directly (coverage report, IR, a future query layer) without
+  // hardcoding the confidence-value mapping. 'r2-phase1': the bridge's sole
+  // implementer IS itself a database/topic unit (S-layered-access).
+  // 'r2b': the implementer is not itself a store but imports exactly one
+  // (S-layered-domain) — one inference hop deeper. Every other relationship
+  // producer (R0/R1/k8s/env-soft-graph) leaves this unset — absence means
+  // "not multi-hop-derived," never a fake default.
+  mechanism?: 'r2-phase1' | 'r2b';
 }
 
 export interface IgnoredItem {

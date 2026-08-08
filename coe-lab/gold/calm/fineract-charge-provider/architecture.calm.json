@@ -1,0 +1,68 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-fineract-charge-provider",
+  "name": "Apache Fineract — Charge module, multi-root (charge + provider)",
+  "description": "Hand-authored CALM gold for the MULTI-ROOT scan of fineract-charge + fineract-provider together. Distinct claim triple from coe-lab-fineract-charge (single-root): this package asserts the S-layered-access story (API -> access-layer JDBC implementer), NOT the single-root package's API -> Charge entity story. Authored from source only (ChargesApiResource.java, ChargeReadPlatformServiceImpl.java), never from generator output — see AGENT_TASKS_Layered_Architecture_Story.md T-L1-1 and ISOLATION.md.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "apache/fineract" },
+    { "key": "x-lab-scan-mode", "value": "multi-root" },
+    { "key": "x-lab-root-set", "value": "fineract-charge, fineract-provider (module roots within apache/fineract; evidence paths in node/relationship descriptions below)" },
+    { "key": "x-lab-terminal-grain", "value": "access-layer" },
+    { "key": "x-lab-story", "value": "S-layered-access" },
+    { "key": "x-lab-module", "value": "fineract-charge+fineract-provider" },
+    { "key": "x-lab-source-evidence", "value": "fineract-charge/.../charge/api/ChargesApiResource.java; fineract-provider/.../charge/service/ChargeReadPlatformServiceImpl.java" },
+    { "key": "x-lab-not-scored-against", "value": "coe-lab-fineract-charge (single-root gold) — different claim triple, see standing exam E-charge-single-L2 vs E-charge-multi-story in coe-lab/docs/standing-disconfirming-exams.md" }
+  ],
+  "nodes": [
+    {
+      "unique-id": "charges-api",
+      "node-type": "service",
+      "name": "Charges API",
+      "description": "JAX-RS ChargesApiResource at /v1/charges (module: fineract-charge). Depends on the ChargeReadPlatformService interface, injected as a field — real source: fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java.",
+      "interfaces": [
+        { "unique-id": "charges-list", "type": "path-interface", "path": "GET /v1/charges" },
+        { "unique-id": "charges-get", "type": "path-interface", "path": "GET /v1/charges/{chargeId}" },
+        { "unique-id": "charges-template", "type": "path-interface", "path": "GET /v1/charges/template" },
+        { "unique-id": "charges-create", "type": "path-interface", "path": "POST /v1/charges" },
+        { "unique-id": "charges-update", "type": "path-interface", "path": "PUT /v1/charges/{chargeId}" },
+        { "unique-id": "charges-delete", "type": "path-interface", "path": "DELETE /v1/charges/{chargeId}" }
+      ]
+    },
+    {
+      "unique-id": "charge-read-platform-service-impl",
+      "node-type": "database",
+      "name": "ChargeReadPlatformServiceImpl",
+      "description": "Access-layer implementer of ChargeReadPlatformService (module: fineract-provider). Real source: `implements ChargeReadPlatformService`, injects `org.springframework.jdbc.core.JdbcTemplate` and `NamedParameterJdbcTemplate` as constructor fields, issues raw SQL via `.query(...)` — a genuine JDBC access-layer store unit, not a domain @Entity. This is the terminal this gold package expects; it is NOT the Charge JPA entity (see x-lab-not-scored-against)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "fineract-charge+provider multi-root system",
+      "description": "Composite boundary for the multi-root scan's architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "charges-api-connects-charge-read-platform-service-impl",
+      "description": "Charges API calls its injected ChargeReadPlatformService, whose sole real implementer (ChargeReadPlatformServiceImpl, in a different module) issues the actual JDBC reads. This is a real, cross-module architecture edge to the access-layer terminal, not to the domain entity — the real source has no static one-hop API-to-entity import (ChargesApiResource never imports Charge directly).",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "charges-api" },
+          "destination": { "node": "charge-read-platform-service-impl" }
+        }
+      },
+      "protocol": "JDBC"
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "Multi-root system composed of the Charges API and its access-layer implementer.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": ["charges-api", "charge-read-platform-service-impl"]
+        }
+      }
+    }
+  ]
+}

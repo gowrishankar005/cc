@@ -125,7 +125,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
 
     const implMatch = nodeToUnit.get(implementers[0]);
     if (implMatch && (implMatch.unit.kind === 'database' || implMatch.unit.kind === 'topic')) {
-      emitBridgeRelationship(fromMatch, implMatch, R2_SAME_ROOT_CONFIDENCE, R2_CROSS_ROOT_CONFIDENCE);
+      emitBridgeRelationship(fromMatch, implMatch, R2_SAME_ROOT_CONFIDENCE, R2_CROSS_ROOT_CONFIDENCE, 'r2-phase1');
       continue;
     }
 
@@ -149,7 +149,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     const uniqueStoreUnits = [...new Map(storeCandidates.map((m) => [m.unit.id, m])).values()];
 
     if (uniqueStoreUnits.length === 1) {
-      emitBridgeRelationship(fromMatch, uniqueStoreUnits[0], R2B_SAME_ROOT_CONFIDENCE, R2B_CROSS_ROOT_CONFIDENCE);
+      emitBridgeRelationship(fromMatch, uniqueStoreUnits[0], R2B_SAME_ROOT_CONFIDENCE, R2B_CROSS_ROOT_CONFIDENCE, 'r2b');
       continue;
     }
 
@@ -171,7 +171,8 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     from: NodeUnitMatch,
     to: NodeUnitMatch,
     sameRootConfidence: number,
-    crossRootConfidence: number
+    crossRootConfidence: number,
+    mechanism: 'r2-phase1' | 'r2b'
   ): void {
     if (from.unit.id === to.unit.id) return; // degenerate: bridge resolves back to the source's own unit
     const dedupeKey = `${from.unit.id}|${to.unit.id}`;
@@ -184,6 +185,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
       crossPackage: from.root !== to.root,
       source: 'graphify',
       confidence: from.root === to.root ? sameRootConfidence : crossRootConfidence,
+      mechanism, // T-L2-1 — r2-phase1 vs r2b, distinguishable without decoding the confidence value
     });
   }
 

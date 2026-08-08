@@ -37,12 +37,18 @@ const ALL_GOLD = [
   'py-multi-root',
   // Wild-type Fineract (hand-authored; generate separately against real module roots)
   'fineract-charge',
+  // T-L1-1/T-L1-5 — multi-root gold: score only against a generated CALM
+  // produced by scanning fineract-charge + fineract-provider TOGETHER (see
+  // coe-lab/docs/multi-root-l2-protocol.md). Different claim triple from
+  // 'fineract-charge' above — never interchangeable, enforced by the
+  // root-set/scan-mode guard in validateOne().
+  'fineract-charge-provider',
   'fineract-core',
   'fineract-system-map',
 ];
 
 function parseArgs(argv) {
-  const out = { strict: false, allCore: false, allGold: false, generate: false, goldOnly: false, requireL2: false };
+  const out = { strict: false, allCore: false, allGold: false, generate: false, goldOnly: false, requireL2: false, allowRootMismatch: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--package') out.pkg = argv[++i];
@@ -51,6 +57,15 @@ function parseArgs(argv) {
     else if (a === '--strict') out.strict = true;
     else if (a === '--generate-first') out.generate = true;
     else if (a === '--gold-only') out.goldOnly = true;
+    // T-L1-2 — refuse-by-default guard against scoring a generated CALM
+    // whose real scan-mode (read from its own x-aac-package-roots metadata,
+    // never a self-declared flag) doesn't match what the gold package
+    // claims via x-lab-scan-mode. This is the concrete mechanism that
+    // closes the abuse case named in AGENT_TASKS_Layered_Architecture_Story.md
+    // T-L1-2: dropping a multi-root scan's output into generated/fineract-charge/
+    // (the SINGLE-root gold's folder) must not silently score as if it were
+    // a single-root run, in either direction.
+    else if (a === '--allow-root-mismatch') out.allowRootMismatch = true;
     // AREC Wave 3 T-A3 — L2 (architecture-story/relationship-topology) is
     // the layer this project's own methodology (Fineract RCA) found weakest
     // and least built (R2 multi-hop is specified-unbuilt). Default exit code
@@ -128,6 +143,27 @@ function goldGrain(gold) {
 }
 
 /**
+ * T-L1-2 — is this gold declared multi-root (x-lab-scan-mode: multi-root)?
+ * Absence means single-root, the default/primary claim mode (Claim Register Q11).
+ */
+function goldWantsMultiRoot(gold) {
+  return gold.metadata?.find((m) => m.key === 'x-lab-scan-mode')?.value === 'multi-root';
+}
+
+/**
+ * T-L1-2 — real root count of a GENERATED CALM file, read from the field
+ * the platform itself already stamps on every run (`x-aac-package-roots`,
+ * metadata-builder.ts) — never a CLI flag the invoker could get wrong or
+ * forget. Returns undefined if the field is absent (older/manual CALM),
+ * which is treated as "unknown," not "single," so it fails loud rather than
+ * silently assuming a mode.
+ */
+function generatedRootCount(actual) {
+  const roots = actual.metadata?.find((m) => m.key === 'x-aac-package-roots')?.value;
+  return Array.isArray(roots) ? roots.length : undefined;
+}
+
+/**
  * Match gold architectural units against generated units by type + interface paths.
  * Generated may use file-based unique-ids; we match by content.
  *
@@ -157,6 +193,10 @@ function semanticCompare(gold, generated) {
   }
 
   const used = new Set();
+  // T-L1-4 — gold unique-id -> the generated node it actually matched to,
+  // built during the same L1 matching pass above (no second pass, no
+  // duplicated matching logic). Used only when x-lab-l2-mode: endpoint.
+  const gIdToMatchedAId = {};
 
   for (const g of gNodes) {
     const gPaths = pathSet(g);
@@ -203,6 +243,7 @@ function semanticCompare(gold, generated) {
     }
     used.add(best);
     const matched = aNodes[best];
+    gIdToMatchedAId[g['unique-id']] = matched['unique-id'];
 
     // Interface path coverage
     if (gPaths.size > 0) {
@@ -247,7 +288,39 @@ function semanticCompare(gold, generated) {
     return { l1, l2, l2Applicable: false, l2NotApplicableReason: 'gold has no connects-shaped relationships — L2 not asserted by this gold' };
   }
 
-  // Build type multiset for gold endpoints
+  // T-L1-4 — optional endpoint-aware L2, opt-in per gold via
+  // x-lab-l2-mode: endpoint. Default (no metadata, every existing gold
+  // package) stays the type-multiset check below — deliberately, so this
+  // does not silently tighten every existing lab-core package's L2 bar.
+  // Endpoint mode asks a stronger, more specific question: not just "is
+  // there SOME service->database pair," but "does THIS gold node's matched
+  // generated node actually connect to THAT gold node's matched generated
+  // node" — using the L1 matching already computed above, no new matching
+  // logic. A gold connects entry whose endpoint never matched an L1 node at
+  // all cannot be satisfied by definition (reported as its own L2 miss, not
+  // silently skipped).
+  const l2Mode = gold.metadata?.find((m) => m.key === 'x-lab-l2-mode')?.value;
+  if (l2Mode === 'endpoint') {
+    const genConnectPairs = new Set(
+      genConnects.map((c) => `${c.source?.node}->${c.destination?.node}`)
+    );
+    for (const c of goldConnects) {
+      const gSrc = c.source?.node;
+      const gDst = c.destination?.node;
+      const aSrc = gIdToMatchedAId[gSrc];
+      const aDst = gIdToMatchedAId[gDst];
+      if (!aSrc || !aDst) {
+        l2.push(`endpoint L2: gold connects ${gSrc}->${gDst} but one or both endpoints never matched a generated node (see L1 issues)`);
+        continue;
+      }
+      if (!genConnectPairs.has(`${aSrc}->${aDst}`)) {
+        l2.push(`endpoint L2: no generated connects edge from matched node ${aSrc} to matched node ${aDst} (gold: ${gSrc}->${gDst})`);
+      }
+    }
+    return { l1, l2, l2Applicable: true };
+  }
+
+  // Build type multiset for gold endpoints (default L2 mode)
   const gIdToType = Object.fromEntries(gNodes.map((n) => [n['unique-id'], n['node-type']]));
   const aIdToType = Object.fromEntries((generated.nodes || []).map((n) => [n['unique-id'], n['node-type']]));
 
@@ -276,7 +349,7 @@ function semanticCompare(gold, generated) {
   return { l1, l2, l2Applicable: true };
 }
 
-function validateOne(pkg, { strict, goldOnly, requireL2 }) {
+function validateOne(pkg, { strict, goldOnly, requireL2, allowRootMismatch }) {
   const goldPath = path.join(LAB, 'gold/calm', pkg, 'architecture.calm.json');
   const actualPath = path.join(LAB, 'generated', pkg, 'architecture.calm.json');
 
@@ -338,6 +411,32 @@ function validateOne(pkg, { strict, goldOnly, requireL2 }) {
     };
   }
 
+  // T-L1-2 — root-set/scan-mode guard, checked BEFORE semantic compare so a
+  // mismatch never even reaches L1/L2 scoring (refuse, don't silently N/A —
+  // this is the exam-lock program's explicit "practical minimum" choice:
+  // hard fail with a clear message, not a soft skip that could be missed).
+  if (!allowRootMismatch) {
+    const wantsMulti = goldWantsMultiRoot(gold);
+    const genRoots = generatedRootCount(actual);
+    const mismatch =
+      genRoots === undefined
+        ? `generated CALM has no x-aac-package-roots metadata — cannot confirm scan mode matches gold's x-lab-scan-mode (${wantsMulti ? 'multi-root' : 'single-root'} expected)`
+        : wantsMulti && genRoots < 2
+          ? `gold declares x-lab-scan-mode: multi-root but generated CALM's x-aac-package-roots has ${genRoots} root(s) — this looks like a single-root scan dropped into a multi-root gold's generated/ folder`
+          : !wantsMulti && genRoots > 1
+            ? `gold is single-root (no x-lab-scan-mode) but generated CALM's x-aac-package-roots has ${genRoots} roots — this looks like a multi-root scan dropped into a single-root gold's generated/ folder (the exact abuse case T-L1-2 exists to stop)`
+            : null;
+    if (mismatch) {
+      return {
+        pkg,
+        ok: false,
+        goldSchemaOk: true,
+        genSchemaOk: genSchema.ok,
+        error: `root-set/scan-mode mismatch — refusing to score (pass --allow-root-mismatch to override deliberately): ${mismatch}`,
+      };
+    }
+  }
+
   const { l1, l2, l2Applicable, l2NotApplicableReason } = semanticCompare(gold, actual);
 
   // In non-strict mode, "extra" nodes are soft (score as warning, not fail)
@@ -376,7 +475,7 @@ function main() {
   const args = parseArgs(process.argv);
   if (args.help || (!args.pkg && !args.allCore && !args.allGold)) {
     console.log(`Usage:
-  node scripts/validate-calm-pair.mjs --package <id> [--generate-first] [--strict] [--gold-only] [--require-l2]
+  node scripts/validate-calm-pair.mjs --package <id> [--generate-first] [--strict] [--gold-only] [--require-l2] [--allow-root-mismatch]
   node scripts/validate-calm-pair.mjs --all-core [--generate-first] [--strict] [--require-l2]
   node scripts/validate-calm-pair.mjs --all-gold [--gold-only]
 
@@ -388,9 +487,26 @@ see Claim_Register.md). A package whose gold has no connects-shaped
 relationships, or is module-grain (x-lab-grain metadata), reports L2 as N/A,
 never a false PASS or FAIL.
 
-This script runs single-package-root scans only (module-root claim mode).
-For multi-root scan claims and how to label them, see
-coe-lab/docs/multi-root-l2-protocol.md.`);
+Root-set / scan-mode guard (T-L1-2): a gold's x-lab-scan-mode ("multi-root"
+or absent = single-root) is checked against the GENERATED CALM's own real
+x-aac-package-roots metadata (never a self-declared flag). A mismatch in
+either direction — e.g. a multi-root scan's output dropped into a
+single-root gold's generated/ folder, or vice versa — refuses to score by
+default: "no hand-gold PASS/FAIL by accidentally comparing across scan
+modes." Pass --allow-root-mismatch only if you deliberately want the old,
+unchecked behavior.
+
+For fineract-charge (single-root) vs fineract-charge-provider (multi-root):
+these are two different claim triples about the same real API, never
+substitutable. See coe-lab/gold/calm/FINERACT_GOLD.md and
+coe-lab/docs/standing-disconfirming-exams.md.
+
+This script runs single-package-root scans only for generation
+(--generate-first). Multi-root generated CALM (e.g. for
+fineract-charge-provider) must be produced separately via a direct
+run-slice invocation against both module roots, then copied to
+generated/<pkg>/architecture.calm.json — see
+coe-lab/docs/multi-root-l2-protocol.md for the exact command template.`);
     process.exit(args.help ? 0 : 2);
   }
 

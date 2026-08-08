@@ -1,0 +1,10 @@
+{
+  "$comment": "T-L1-3 — packages whose gold L2 is EXPECTED to fail (a real, honest architectural residual, not a detector bug). Consumed by coe-lab/scripts/run-expected-fail-exams.mjs. Do not add a package here without a standing exam row in standing-disconfirming-exams.md explaining WHY the fail is expected.",
+  "packages": [
+    {
+      "pkg": "fineract-charge",
+      "examId": "E-charge-single-L2",
+      "reason": "ChargesApiResource never imports Charge — no static one-hop chain exists in the real source (layered API -> interface -> implementer-in-another-module). See coe-lab/docs/fineract-gold-vs-platform-finding.md and coe-lab/docs/standing-disconfirming-exams.md."
+    }
+  ]
+}

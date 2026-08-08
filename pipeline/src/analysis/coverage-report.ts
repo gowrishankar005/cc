@@ -53,6 +53,17 @@ export interface CoverageReport {
   relationshipsByKind: Record<string, number>;
   relationshipsBySource: Record<string, number>;
   /**
+   * T-L3-2 (AGENT_TASKS_Layered_Architecture_Story.md) — breakdown of
+   * RESOLVED multi-hop edges by `TypedRelationship.mechanism` (T-L2-1:
+   * 'r2-phase1' | 'r2b'), read generically from whatever value is present —
+   * this file never hardcodes the two mechanism names. Relationships from
+   * every other producer (R0/R1/k8s/env-soft-graph) leave `mechanism`
+   * unset and are correctly absent from this breakdown, not bucketed under
+   * a fake "other" (see `unresolvedByMechanism` above for the UNRESOLVED
+   * side of the same story — this is the resolved side).
+   */
+  relationshipsByMechanism: Record<string, number>;
+  /**
    * Cross-cutting breakdown of CROSS_DOMAIN_UNRESOLVED ignored-items by
    * their detail's own `<mechanism>: ...` prefix convention (established by
    * outbound-http-detector.ts/env-soft-graph-detector.ts/k8s-trust-detector.ts)
@@ -204,9 +215,13 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
 
   const relationshipsByKind: Record<string, number> = {};
   const relationshipsBySource: Record<string, number> = {};
+  const relationshipsByMechanism: Record<string, number> = {};
   for (const rel of ctx.relationships) {
     relationshipsByKind[rel.kind] = (relationshipsByKind[rel.kind] ?? 0) + 1;
     relationshipsBySource[rel.source] = (relationshipsBySource[rel.source] ?? 0) + 1;
+    if (rel.mechanism !== undefined) {
+      relationshipsByMechanism[rel.mechanism] = (relationshipsByMechanism[rel.mechanism] ?? 0) + 1;
+    }
   }
 
   const completeness = computeCompleteness(ctx.allUnits, ctx.relationships);
@@ -235,6 +250,7 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
     k8sManifestsStatus: ctx.k8sManifestsDir ? 'provided' : 'not-provided',
     relationshipsByKind,
     relationshipsBySource,
+    relationshipsByMechanism,
     unresolvedByMechanism,
     completeness,
   };
