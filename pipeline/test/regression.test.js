@@ -1588,6 +1588,29 @@ test(
   }
 );
 
+test(
+  'Outbound HTTP — real OkHttpClient/HttpURLConnection imports in Fineract credit-bureau integration produce unresolved-http-target, not a fabricated relationship (B-http-client, WDL rank 7)',
+  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const creditBureauRoot = path.join(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/creditbureau');
+    const { outDir, calm } = runPipeline([creditBureauRoot]);
+    try {
+      const ignored = JSON.parse(fs.readFileSync(path.join(outDir, 'ignored-items-report.json'), 'utf8'));
+      const httpUnresolved = ignored.filter((i) => i.detail?.startsWith('unresolved-http-target:'));
+      assert.ok(httpUnresolved.length >= 2, 'expected at least 2 unresolved-http-target ignored items — ExternalCreditBureauIntegrationWritePlatformServiceImpl.java genuinely imports both okhttp3.OkHttpClient and java.net.HttpURLConnection');
+      assert.ok(httpUnresolved.some((i) => i.detail.includes('okhttpclient')), 'okhttp3.OkHttpClient import, grep-verified at ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:46');
+      assert.ok(httpUnresolved.some((i) => i.detail.includes('httpurlconnection')), 'java.net.HttpURLConnection import, grep-verified at ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:33');
+      assert.ok(httpUnresolved.every((i) => i.reason === 'CROSS_DOMAIN_UNRESOLVED'));
+      // Never a fabricated relationship — no literal, statically-resolvable target exists for either import.
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+      fs.rmSync(path.join(creditBureauRoot, '.graphify-cache'), { recursive: true, force: true });
+    }
+  }
+);
+
 test('Deployable manifest detection — package.json visible in coverage even with no correlation to a specific unit (T-X8-1)', () => {
   const { outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
   try {

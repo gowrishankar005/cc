@@ -39,6 +39,8 @@ strategies:
       - { name: httpx, language: python, evidenceLevel: unverified }
       - { name: org.springframework.web.client.RestTemplate, language: java, evidenceLevel: verified } # real: spikes/fineract/repo/.../SendMessageToSmsGatewayTasklet.java
       - { name: org.springframework.web.reactive.function.client.WebClient, language: java, evidenceLevel: unverified }
+      - { name: okhttp3.OkHttpClient, language: java, evidenceLevel: verified } # real: spikes/fineract/repo/.../ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:46 — B-http-client, WDL rank 7
+      - { name: java.net.HttpURLConnection, language: java, evidenceLevel: verified } # real: same file, spikes/fineract/repo/.../ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:33 — B-http-client, WDL rank 7
       - { name: axios, language: typescript, evidenceLevel: unverified }
       - { name: node-fetch, language: typescript, evidenceLevel: unverified }
 
