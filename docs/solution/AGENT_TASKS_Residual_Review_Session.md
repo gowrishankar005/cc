@@ -165,7 +165,8 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 | **Writes** | Layout per design §4.1: `SESSION.md`, `AGENTS.md`/`manifest.json`, `residuals.json`, `evidence/`, empty `drafts/decisions|overrides` |
 | **Safety** | Refuse overwrite if session dir has unapplied drafts (fail loud); never write TypedFacts |
 | **Redaction** | All snippets through redaction before disk; fixture test with fake secret |
-| **Exit** | Pack on NestJS fixture or BoA out-dir succeeds offline |
+| **Scale (added 2026-08-09 — B-scale-oom, found the same week)** | `pack.py`'s own inputs (`typed-facts.json`, `ignored-items-report.json`) are exactly the artifacts proven to grow large enough to crash the Node pipeline on a real large repo (`fineract-provider`, 2,462 files, 133,910 ignored items). Python's `json` module may or may not hit the same wall — **untested, do not assume safe by extrapolation.** Must test `pack.py` against a real large out-dir (same `fineract-provider` scan, run with `--max-old-space-size=8192` per BACKLOG's documented mitigation) as part of this task's own exit, not discovered after RS-1 ships the way the Node-side OOM was discovered after the fact. |
+| **Exit** | Pack on NestJS fixture or BoA out-dir succeeds offline; **pack on a large out-dir (fineract-provider-scale) either succeeds or fails with a clear, actionable error — never a silent crash or a hang** |
 
 ### T-RS1-3 — `triage.py` + residual schema
 
@@ -208,6 +209,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 - [ ] S4/S8/S9 addressed  
 - [ ] No network required for pack  
 - [ ] Pipeline suite green  
+- [ ] `pack.py` tested against a large out-dir (B-scale-oom scale), not just small fixtures — result named either way (works, or fails loud with a clear error)  
 
 ---
 
@@ -416,4 +418,5 @@ Start at first incomplete RS-1 task (T-RS1-1) unless the user names a later phas
 
 | Date | Note |
 |---|---|
+| 2026-08-09 | Two findings from the post-sign-off review closed as doc updates (no code — RS-1 hasn't started): T-RS1-2's `pack.py` spec now names the real **B-scale-oom** risk explicitly and requires testing against a large out-dir as part of its own exit, not discovered after the fact; RS-1 exit checklist gained the same line. (Companion design-doc fix: `Architect_Residual_Review_Session.md` §3 Tier B taxonomy now lists `relationship_remove` as a real class — `override-applier.ts` already implements it, it just wasn't named.) Third finding from that review (RS-4's thin exit criteria) deliberately left untouched — correctly deferred until RS-3 closes and RS-4 is imminent, not worth speculating on before real residuals data exists. |
 | 2026-08-08 | Initial agent task list. RS-0 signed off: owner **Gowri**, go-ahead, **do not skip safety**. |
