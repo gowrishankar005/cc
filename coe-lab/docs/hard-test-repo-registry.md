@@ -40,7 +40,7 @@ One clone → one or more **package-ids** (scoped roots). Prefer deep slices.
 | `calm-hub-core` | TBD scoped module | single | no | **queued** | medium (Quarkus/new shape) |
 | **`maven-doxia-system-map`** | `spikes/maven-doxia/repo` (whole tree) | single-root | **yes** (module grain) | **compared** 2026-08-08 | first hard-test; empty platform CALM |
 | **`aws-saas-boost-tier-service`** | `spikes/aws-saas-boost/repo/services/tier-service` | single-root | **yes** (class grain) | **compared** 2026-08-08 | Dynamo detected; Lambda HTTP not; handler mis-kinded DB |
-| `aws-saas-boost-tenant-service` | `…/services/tenant-service` | single | no | **queued** | similar Lambda+Dynamo shape |
+| **`aws-saas-boost-tenant-service`** | `…/services/tenant-service` | single-root | **yes** | **compared** 2026-08-08 | WDL-1 confirmed; handler **invisible** (not wrong-kind); DAL OK; see finding |
 | `aws-saas-boost-services-multi` | multiple `services/*` | multi | no | **queued** | cross-service later |
 
 **Fill TBD paths** on first package kickoff (ls module dirs, pick real scan roots).
@@ -60,4 +60,5 @@ One clone → one or more **package-ids** (scoped roots). Prefer deep slices.
 
 | Date | Note |
 |---|---|
+| 2026-08-08 | Hard-test #3 **aws-saas-boost-tenant-service** compared — generalizes WDL-1; HT-ASB-002 not reproduced (handler has no Dynamo import) |
 | 2026-08-08 | Initial registry from local spikes inventory; Fineract gold already present |

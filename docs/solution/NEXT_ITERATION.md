@@ -1,19 +1,17 @@
 # Weaver — next iteration (critical todos)
 
-**Date:** 2026-08-08 (post robustness R0–R4 review)  
-**Context:** AREC Wave 3 **done**. Robustness program **R0–R4 MVP done** (55/55 tests). Product is **Weaver**.  
-**Backlog index:** [`BACKLOG.md`](./BACKLOG.md)  
-**Capability matrix:** [`STATUS.md`](./STATUS.md)  
-**Claims:** [`Claim_Register.md`](./Claim_Register.md)  
-**Residual UX design (proposed):** [`Architect_Residual_Review_Session.md`](./Architect_Residual_Review_Session.md)
+**Date:** 2026-08-08  
+**Primary navigation (if lost):** **[`WHERE_NEXT.md`](./WHERE_NEXT.md)** — Prethink vs Weaver, discovery priorities, hard-test queue.
+
+**Backlog:** [`BACKLOG.md`](./BACKLOG.md) · **Claims:** [`Claim_Register.md`](./Claim_Register.md) · **STATUS:** [`STATUS.md`](./STATUS.md)
 
 ---
 
 ## Iteration goals (this round)
 
-1. **Fidelity serverless HTTP** — **B-lambda-http** + **B-dynamo-handler-kind** (standing exam: aws-saas-boost tier-service). Do not claim Fidelity cloud complete without this.  
-2. **Residual-session UX** — RS-1 → (RS-0 already signed, Gowri); safety mandatory.  
-3. Keep **honesty > green** (no fabricated edges; catalogue intake for new rows).
+1. **Hard-tests** — continue queue after saas-boost tier-service (#3 tenant-service, then ghostfolio, …) per `WHERE_NEXT` §3. Eval only; no detector patches in-session.  
+2. **Discovery priority list** — use `WHERE_NEXT` §2 (P0 Lambda/Dynamo → P1 outbound HTTP / Spring); re-rank after each hard-test.  
+3. **Implement when you choose** — serverless Y0–Y5 (authority: [`Fidelity_Yardstick_Closeout_Matrix.md`](./Fidelity_Yardstick_Closeout_Matrix.md), agent tasks `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`, **Y0 started 2026-08-08**) or residual RS-1; not both confused with hard-tests.
 
 ---
 
@@ -21,23 +19,27 @@
 
 | Program | Result |
 |---|---|
-| Wave 3 A–E | Silence, grades, R1 lock, R2 mechanism, C-call/C-rich base, breadth (Kafka producers, Spring Data, Dynamo, OpenAPI dual-unit, HITL queue) |
-| Robustness R0–R4 | Full MVP; flagship multi-root Fineract access-layer story (claim triple) |
-| B-ontology / B-msg-prod-sqs | Prisma ownership + SQS merge onto dual-role units |
-| B-layered-story L0–L4 | Standing exams + dual gold + operator recipe |
+| Wave 3 + Robustness R0–R4 + layered story | Done |
+| B-ontology / B-msg-prod-sqs | Done |
+| Hard-tests #1–#2 | Doxia empty; saas-boost tier-service → HT-ASB / B-lambda-http |
+| Research | Prethink source split; bank dual-estate; WHERE_NEXT navigation |
 
 ---
 
-## Recommended sequence
+## Recommended sequence (default)
+
+**Named list:** **Weaver Discovery Ladder (WDL)** — [`WHERE_NEXT.md`](./WHERE_NEXT.md) §2.1.  
+**Rules:** Java → TypeScript/Node → Python; within that **cloud/K8s first**. Prethink pick-up later, not mixed into WDL.
 
 ```text
-1. B-review-session RS-1… (residual UX) — may interleave with serverless design
-2. B-lambda-http + B-dynamo-handler-kind — product P1; Claim U-http-serverless
-3. Later: RS-4 LLM draft, B-calm-portable-ir, platform plugins, etc.
+1. ✅ Hard-test #3 tenant-service (WDL-1 systematic; see finding)
+2. Implement WDL Phase I  — WDL_Implementation_Plan.md + AGENT_TASKS_Fidelity Y*
+3. Optional later hard-tests: calm-hub → ghostfolio → boa (Java then TS then Python)
+4. Phase II+ per WDL ladder
 ```
 
-Ontology + SQS (**B-ontology**, **B-msg-prod-sqs**) are **done** — do not re-queue.  
-Residual RS-0 is **signed off** — do not re-open design without owner.
+**Do not** start open-ended industry research without a package-id or a named deliverable.  
+**Owner go-ahead:** say “implement WDL Phase I” to start build.
 
 ---
 

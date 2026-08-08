@@ -1,7 +1,12 @@
 # Fintech & Fidelity-aligned stack research (lab design input)
 
-**Date:** 2026-08-07  
+**Date:** 2026-08-07 (addendum 2026-08-08)  
 **Use:** Choose lab packages and gold expectations. Not a claim that Fidelity runs this exact topology.
+
+**Superseding solutioning authority (2026-08-08):** full plane/construct/locus/mechanism/claim/sample matrix lives in  
+[`docs/solution/Fidelity_Yardstick_Closeout_Matrix.md`](../../docs/solution/Fidelity_Yardstick_Closeout_Matrix.md)  
+with implementation tasks in [`docs/solution/AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`](../../docs/solution/AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md).  
+Prefer those over this file when they disagree.
 
 ## 1. Fidelity-aligned signals (public hiring + project requirements)
 

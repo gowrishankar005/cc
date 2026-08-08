@@ -228,6 +228,19 @@ export function extractTypeReferenceFacts(cg: any, packageRoot: string, relative
  * JpaSpecificationExecutor<Charge>`) produces two `referenceKind: 'extends'`
  * entries, `referenceName: "JpaRepository<Charge, Long>"` and
  * `"JpaSpecificationExecutor<Charge>"`, at the real `extends` clause line.
+ *
+ * T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §1) — real,
+ * empirically-verified finding: a Java `implements` clause (e.g.
+ * `class TierService implements RequestHandler<...>`) produces its OWN
+ * distinct `referenceKind: 'implements'`, NOT `'extends'` — confirmed by
+ * calling `extractFromSource()` directly against a real Lambda-handler
+ * fixture before writing this, not assumed by analogy to the extends case
+ * above. Folded into the SAME extraction/evidence pipeline rather than a
+ * parallel one — both are "supertype reference on a type declaration"
+ * signals at the same abstraction level this project already treats
+ * uniformly (e.g. `imports`/`references` in multi-hop-bridge-detector.ts);
+ * a catalogue row for `RequestHandler` uses `matchSource: extends` like
+ * any other extends-shaped signal, no new matchSource value needed.
  */
 export function extractExtendsFacts(cg: any, packageRoot: string, relativeFilePath: string): ExtendsFact[] {
   const absPath = path.join(packageRoot, relativeFilePath);
@@ -241,7 +254,7 @@ export function extractExtendsFacts(cg: any, packageRoot: string, relativeFilePa
   }
 
   return result.unresolvedReferences
-    .filter((r: any) => r.referenceKind === 'extends')
+    .filter((r: any) => r.referenceKind === 'extends' || r.referenceKind === 'implements')
     .map((r: any) => ({
       referenceName: r.referenceName,
       fromNodeId: r.fromNodeId,

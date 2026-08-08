@@ -979,6 +979,58 @@ test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP
   }
 });
 
+test('T-Y2/T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md) — Lambda RequestHandler -> service (not database, not invisible); handler that owns DynamoDbClient directly still stays service; store class stays database; architecture-grade connects present', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
+  fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    // WDL-1 clean positive case: TierService has NO Dynamo import of its
+    // own — before this fix it was invisible (0 units at all), matching
+    // the real aws-saas-boost-tenant-service finding (HT-ASB-007).
+    const tierService = findNode(calm, 'TierService.java');
+    assert.ok(tierService, 'TierService.java must be a real service unit (was invisible before T-Y3-1)');
+    assert.equal(tierService['node-type'], 'service');
+    // Real bug found and fixed while building this: the raw `implements
+    // RequestHandler<...>` signal text is NOT a path — it must not become
+    // a bogus path-interface. Paths are Y4's job (CFN join), not yet built.
+    assert.equal(tierService.interfaces, undefined, 'must NOT have a bogus interface built from the type-reference signal text before CFN path join (Y4) exists');
+
+    // WDL-2 disconfirming case: LegacyTierHandler DOES own a DynamoDbClient
+    // field directly — before this fix it was mis-typed `database` solely
+    // from that import, matching the real aws-saas-boost-tier-service
+    // finding (HT-ASB-002). Real finding this session: the fix required
+    // ZERO new priority-mechanism code (T-Y2) — the existing
+    // existingServiceFilePaths exclusion (built for B-ontology) already
+    // worked correctly the moment T-Y3-1 supplied the missing
+    // http-entry-point-tier evidence.
+    const legacyHandler = findNode(calm, 'LegacyTierHandler.java');
+    assert.ok(legacyHandler, 'LegacyTierHandler.java must be a real unit');
+    assert.equal(legacyHandler['node-type'], 'service', 'a handler with real entry-point evidence must win the kind tie-break over a bare Dynamo import (D-dynamo-priority)');
+
+    const tierStore = findNode(calm, 'TierStore');
+    assert.ok(tierStore, 'TierStore must be a real database unit');
+    assert.equal(tierStore['node-type'], 'database');
+
+    const connectsRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === tierService['unique-id'] && conn.destination.node === tierStore['unique-id'];
+    });
+    assert.ok(connectsRel, 'expected a resolved TierService -> TierStore relationship');
+    assert.equal(relMetadata(connectsRel, 'x-aac-relationship-grade'), 'architecture');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
+  }
+});
+
 test(
   'Node/TS real evidence (ghostfolio/ghostfolio, NestJS+Prisma) — Graphify ref_ target normalization + Controller/database precedence (generic fixes, real bugs found by testing against a real repo)',
   { skip: !fs.existsSync(GHOSTFOLIO_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },

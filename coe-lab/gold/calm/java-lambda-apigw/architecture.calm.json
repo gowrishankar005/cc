@@ -1,0 +1,68 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-java-lambda-apigw",
+  "name": "Lab — Java Lambda + API Gateway (WDL-1/WDL-2 fixture)",
+  "description": "Hand-authored CALM gold for the java-lambda-apigw lab package. Exercises WDL-1 (Lambda RequestHandler -> service unit, CFN path join across two files) and WDL-2 (a handler that owns its own DynamoDbClient must still be typed service, not database, once http-entry-point evidence exists). Authored from Serverless_HTTP_and_Dynamo_Ownership_Design.md and the fixture source directly, never from generator output.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-module", "value": "java-lambda-apigw" },
+    { "key": "x-lab-source-evidence", "value": "src/main/java/lab/lambdaapigw/TierService.java; LegacyTierHandler.java; TierStore.java; api-gateway.yaml; lambda-functions.yaml" },
+    { "key": "x-lab-expected-until", "value": "specified-unbuilt until B-lambda-http (Y3-Y4) and B-dynamo-handler-kind (Y2) ship — see standing exam E-fidelity-lambda-lab" }
+  ],
+  "nodes": [
+    {
+      "unique-id": "tier-service",
+      "node-type": "service",
+      "name": "TierService",
+      "description": "Lambda handler (implements RequestHandler), no Dynamo import of its own — delegates to TierStore. WDL-1 clean positive case.",
+      "interfaces": [
+        { "unique-id": "tier-service-get-tiers", "type": "path-interface", "path": "GET /tiers" },
+        { "unique-id": "tier-service-get-tier-by-id", "type": "path-interface", "path": "GET /tiers/{id}" }
+      ]
+    },
+    {
+      "unique-id": "legacy-tier-handler",
+      "node-type": "service",
+      "name": "LegacyTierHandler",
+      "description": "Lambda handler that ALSO owns its own DynamoDbClient field directly. Must stay `service`, not `database`, once http-entry-point evidence exists — this is the exact WDL-2 disconfirming case (real counterpart: aws-saas-boost-tier-service HT-ASB-002).",
+      "interfaces": [
+        { "unique-id": "legacy-tier-handler-update", "type": "path-interface", "path": "PUT /tiers/{id}" }
+      ]
+    },
+    {
+      "unique-id": "tier-store",
+      "node-type": "database",
+      "name": "TierStore",
+      "description": "Real DynamoDB store — constructs and owns DynamoDbClient as its own field."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "java-lambda-apigw system",
+      "description": "Composite boundary for this lab package's architectural units."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "tier-service-connects-tier-store",
+      "description": "TierService delegates to TierStore for all Dynamo access.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "tier-service" },
+          "destination": { "node": "tier-store" }
+        }
+      },
+      "protocol": "HTTPS"
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "Lab system composed of the two handlers and the store.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": ["tier-service", "legacy-tier-handler", "tier-store"]
+        }
+      }
+    }
+  ]
+}

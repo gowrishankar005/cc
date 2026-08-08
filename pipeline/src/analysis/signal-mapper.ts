@@ -193,7 +193,15 @@ export function mapSignalsToUnits(
     // security-control-only (no http/persistence/messaging) falls through to
     // the 'service' default below — the real, proven DatatableWriteService
     // case (a pure RBAC-enforcing interface with no HTTP surface at all).
-    const kind = categories.has('http-entry-point')
+    // T-Y3-1 — 'serverless-entry-point' (Lambda `implements RequestHandler`)
+    // treated identically to 'http-entry-point' here: both are decisive,
+    // structural entry-point evidence for the kind tie-break. Kept as a
+    // DISTINCT category from 'http-entry-point' only for interface-building
+    // purposes (interface-builder.ts/node-type-mapping.yml) — the raw
+    // signal text isn't a path, so it must not win interfaceCategories the
+    // way a real route signal does. See Serverless_HTTP_and_Dynamo_Ownership_Design.md §4.
+    const hasEntryPointEvidence = categories.has('http-entry-point') || categories.has('serverless-entry-point');
+    const kind = hasEntryPointEvidence
       ? 'service'
       : categories.has('persistence')
         ? 'database'

@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Lab fixture — Lambda Function resources, split from api-gateway.yaml on
+  purpose. Handler strings bind to real classes in src/main/java/lab/lambdaapigw/.
+
+Resources:
+  TierServiceGetTiers:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-tier-get-all
+      Runtime: java11
+      Handler: lab.lambdaapigw.TierService::getTiers
+
+  TierServiceGetTierById:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-tier-get-by-id
+      Runtime: java11
+      Handler: lab.lambdaapigw.TierService::getTierById
+
+  LegacyTierHandlerFn:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: lab-tier-update-legacy
+      Runtime: java11
+      Handler: lab.lambdaapigw.LegacyTierHandler::updateTier

@@ -45,6 +45,10 @@ const ALL_GOLD = [
   'fineract-charge-provider',
   'fineract-core',
   'fineract-system-map',
+  // T-Y1-2 (Serverless_HTTP_and_Dynamo_Ownership_Design.md) — expected-fail
+  // until B-lambda-http (Y3-Y4) / B-dynamo-handler-kind (Y2) ship, same
+  // precedent as fineract-charge above. Not in CORE.
+  'java-lambda-apigw',
 ];
 
 function parseArgs(argv) {

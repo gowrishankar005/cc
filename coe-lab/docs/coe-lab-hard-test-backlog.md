@@ -24,12 +24,13 @@
 | **HT-DOX-003** | maven-doxia-system-map | medium | operator UX | **Empty CALM still calm-validate 0 errors** — L0 green without architecture | same finding §1/§6 | yes — operator/docs or non-empty check optional | open |
 | **HT-DOX-004** | maven-doxia-system-map | low | noise | 14k INSUFFICIENT_EVIDENCE / unmapped dominated by tests & HTML entity noise | same finding §3 | yes — later filter/test-code exclusion quality | open |
 | **HT-DOX-005** | maven-doxia-system-map | note | gold / grain | Module-grain gold vs class-grain pipeline: L1 compare is grain-mismatched by construction | same finding §5 | no — eval design; use grain metadata N/A in compare | noted |
-| **HT-ASB-001** | aws-saas-boost-tier-service | high | mechanism U-http / Lambda | API Gateway + `RequestHandler` / `APIGatewayProxyResponseEvent` **not** detected as HTTP service; 0 service units; gold `/tiers*` paths missing | `findings/aws-saas-boost-tier-service-gold-vs-platform.md` | **yes** — serverless SaaS shape common in fintech cloud | **promoted → product P1 `B-lambda-http`** (`docs/solution/BACKLOG.md`); Claim **U-http-serverless** `specified-unbuilt` |
-| **HT-ASB-002** | aws-saas-boost-tier-service | high | ontology U-persist-import | **TierService mis-kinded `database`** because it imports `DynamoDbClient` (handler, not store) | same | **yes** — Java Dynamo client import too coarse (Prisma ownerBaseClass-class problem) | **promoted → product P1 `B-dynamo-handler-kind`** |
-| **HT-ASB-003** | aws-saas-boost-tier-service | medium | test-code | `*Test` classes become database units via Dynamo imports | same | yes — strengthen TEST_CODE / test path exclusion for graphify persistence | open |
-| **HT-ASB-004** | aws-saas-boost-tier-service | medium | unit formation | Methods (`fromTier`/`toTier`) become database units | same | yes — contains walk should prefer types/classes | open |
-| **HT-ASB-005** | aws-saas-boost-tier-service | high | R0/R1 grade | Real TierService→DynamoTierDataStore edge is **structural** (both ends database), not architecture service→db | same | yes — follows from HT-ASB-001/002 | open |
-| **HT-ASB-006** | aws-saas-boost-tier-service | medium | completeness UX | No S1 with databases-only (no service units); missing HTTP not loud | same | yes — related HT-DOX-002 | open |
+| **HT-ASB-001** | aws-saas-boost-tier-service **+ tenant-service** | high | mechanism U-http / Lambda (WDL-1) | API Gateway + `RequestHandler` **not** HTTP service; 0 service units; gold paths missing | tier + **tenant** findings | **yes** | **promoted → B-lambda-http**; **reproduced on hard-test #3** |
+| **HT-ASB-002** | aws-saas-boost-tier-service | high | ontology U-persist-import (WDL-2) | **TierService mis-kinded `database`** (imports DynamoDbClient) | tier finding | **yes** | **promoted → B-dynamo-handler-kind**; **not** reproduced on tenant (handler has no Dynamo import) |
+| **HT-ASB-003** | tier + tenant | medium | test-code | `*Test` classes become database via Dynamo imports | both findings | yes | open — **reproduced #3** |
+| **HT-ASB-004** | aws-saas-boost-tier-service | medium | unit formation | Methods become database units | tier finding | yes | open |
+| **HT-ASB-005** | tier + tenant | high | R0/R1 grade | No architecture service→db | both | yes | open — follows WDL-1/2 |
+| **HT-ASB-006** | tier + tenant | medium | completeness UX | silenceFlags empty with 0 services | both | yes | open — **reproduced #3** |
+| **HT-ASB-007** | aws-saas-boost-tenant-service | high | unit formation / WDL-1 | Lambda handler with **no** Dynamo import is **invisible** (0 units), not wrong-kind | `findings/aws-saas-boost-tenant-service-gold-vs-platform.md` | **yes** — same fix family as HT-ASB-001 (must create service unit without persistence signal) | open; feeds B-lambda-http |
 
 ---
 
@@ -71,3 +72,4 @@
 | 2026-08-08 | **maven-doxia-system-map** first hard-test cycle complete: HT-DOX-001…005; empty CALM / no module map |
 | 2026-08-08 | **aws-saas-boost-tier-service** second hard-test: HT-ASB-001…006; Dynamo yes, Lambda HTTP no, TierService mis-kinded database |
 | 2026-08-08 | **HT-ASB-001/002 promoted to product P1** — `B-lambda-http`, `B-dynamo-handler-kind` in `docs/solution/BACKLOG.md`; Claim **U-http-serverless** |
+| 2026-08-08 | **Hard-test #3 tenant-service:** HT-ASB-001/003/005/006 reproduced; **HT-ASB-007** invisible handler; HT-ASB-002 not reproduced; WDL Phase I plan `docs/solution/WDL_Implementation_Plan.md` |

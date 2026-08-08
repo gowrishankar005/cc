@@ -333,6 +333,38 @@ rules:
     weight: 40
     calmNodeType: database
 
+  # --- T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §1/§5):
+  # AWS Lambda handler entry point (implements-based) ---
+  # Real evidence, verified via a direct extractFromSource() probe before
+  # writing this row (same discipline as spring-data-repository-extends
+  # above): a class `implements RequestHandler<I,O>` (or the streaming
+  # variant `RequestStreamHandler`) produces a real `referenceKind:
+  # 'implements'` entry — folded into the SAME extends-fact pipeline
+  # (codegraph-provider.ts's extractExtendsFacts, broadened) rather than a
+  # parallel mechanism. Weighted 40 (sufficient alone, same tier as
+  # jpa-entity/spring-data) — an `implements RequestHandler` clause is
+  # definite, structural evidence of a Lambda entry point, not weaker than
+  # a bare @Entity. Category is 'serverless-entry-point' — a DISTINCT
+  # category from 'http-entry-point', found necessary while testing: the
+  # raw signal text here is a type reference (`RequestHandler<...>`), not a
+  # path, and 'http-entry-point' is also node-type-mapping.yml's
+  # interfaceCategories trigger — reusing it built a bogus path-interface
+  # from that type reference. 'serverless-entry-point' still wins the same
+  # kind tie-break in signal-mapper.ts (treated identically to
+  # 'http-entry-point' there) but stays descriptive-only for interfaces
+  # until Y4 supplies a real path via CFN/SAM join. Real counterexample
+  # this closes: aws-saas-boost-tier-service's TierService (HT-ASB-002),
+  # mirrored in this project's own java-lambda-apigw lab fixture's
+  # LegacyTierHandler.
+  - id: lambda-request-handler-implements
+    language: java
+    framework: aws-lambda
+    matchSignal: "RequestHandler|RequestStreamHandler"
+    matchSource: extends
+    category: serverless-entry-point
+    weight: 40
+    calmNodeType: service
+
   - id: kafka-template-field
     language: java
     framework: spring-kafka

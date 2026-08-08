@@ -55,6 +55,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '7', // bumped for CONTRACT_VERSION 7.0.0 (T-E3) — filters on Evidence.category only, unaffected by the new Evidence.source: 'extends' value; re-verified, not just left stale
+  supportedMajorVersion: '8', // bumped for CONTRACT_VERSION 8.0.0 (T-Y3-1) — filters strictly on category === 'http-entry-point', re-verified this does NOT also match the new 'serverless-entry-point' category (intentional, named residual — scope-limitations.yml's serverless-http-java-only), not a silent gap
   run,
 };

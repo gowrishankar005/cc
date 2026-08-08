@@ -71,6 +71,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '7', // bumped for CONTRACT_VERSION 7.0.0 (T-E3) — control-builder.ts filters on Evidence.category only; interface-builder.ts's SOURCE_PRECEDENCE table gained an 'extends' entry in the same change, before this bump
+  supportedMajorVersion: '8', // bumped for CONTRACT_VERSION 8.0.0 (T-Y3-1) — control-builder.ts filters on 'security-control' only (unaffected); interface-builder.ts is fully catalogue-driven (node-type-mapping.yml's interfaceCategories), no hardcoded category list to update — re-verified the new 'serverless-entry-point' category is correctly excluded there, not just assumed
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

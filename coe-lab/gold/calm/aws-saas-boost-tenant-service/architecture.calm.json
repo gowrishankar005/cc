@@ -1,0 +1,69 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "coe-lab-aws-saas-boost-tenant-service",
+  "name": "AWS SaaS Boost — Tenant Service",
+  "description": "Hand-authored CALM gold for awslabs/aws-saas-boost tenant-service: API Gateway–backed Lambda (RequestHandler) for /tenants CRUD and enable/disable, DynamoDB-backed DAL. Independent of the platform generator. Evidence: TenantService.java, TenantServiceDAL.java, saas-boost-public-api.yaml PathPart tenants, saas-boost-svc-tenant.yaml Handler method bindings.",
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "awslabs/aws-saas-boost" },
+    { "key": "x-lab-module", "value": "services/tenant-service" },
+    { "key": "x-lab-scan-mode", "value": "single-root" },
+    { "key": "x-lab-source-root", "value": "spikes/aws-saas-boost/repo/services/tenant-service" },
+    { "key": "x-lab-grain", "value": "class-file" },
+    { "key": "x-lab-coverage", "value": "TenantService Lambda handler + TenantServiceDAL Dynamo store; API paths from public API Gateway template; method handlers from saas-boost-svc-tenant.yaml" },
+    { "key": "x-lab-out-of-scope", "value": "Other SaaS Boost services; EventBridge side-effects as first-class nodes; Cognito; onboarding CFN; admin React client; tenant_update_event.py" },
+    { "key": "x-lab-architecture-note", "value": "HTTP surface is API Gateway + Lambda method handlers (RequestHandler + APIGatewayProxyResponseEvent). Persistence is AWS SDK v2 DynamoDbClient on TenantServiceDAL only (handler does not import Dynamo client — cleaner ontology case than tier-service)." },
+    { "key": "x-lab-wdl", "value": "WDL-1 Lambda; WDL-2 Dynamo ownership (disconfirming: handler must stay service even if DAL is database)" }
+  ],
+  "nodes": [
+    {
+      "unique-id": "tenant-service",
+      "node-type": "service",
+      "name": "Tenant Service",
+      "description": "Lambda RequestHandler TenantService — public admin API for multi-tenant registry (list/get/create/update/delete/enable/disable).",
+      "interfaces": [
+        { "unique-id": "tenants-list", "type": "path-interface", "path": "GET /tenants" },
+        { "unique-id": "tenants-create", "type": "path-interface", "path": "POST /tenants" },
+        { "unique-id": "tenants-get", "type": "path-interface", "path": "GET /tenants/{id}" },
+        { "unique-id": "tenants-update", "type": "path-interface", "path": "PUT /tenants/{id}" },
+        { "unique-id": "tenants-delete", "type": "path-interface", "path": "DELETE /tenants/{id}" },
+        { "unique-id": "tenants-enable", "type": "path-interface", "path": "PATCH /tenants/{id}/enable" },
+        { "unique-id": "tenants-disable", "type": "path-interface", "path": "PATCH /tenants/{id}/disable" }
+      ]
+    },
+    {
+      "unique-id": "dynamo-tenant-store",
+      "node-type": "database",
+      "name": "TenantServiceDAL",
+      "description": "DynamoDB data access for Tenant entities (DynamoDbClient + TENANTS_TABLE env)."
+    },
+    {
+      "unique-id": "lab-system",
+      "node-type": "system",
+      "name": "tenant-service system",
+      "description": "Boundary for the tenant-service package architectural units under test."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "tenant-service-connects-dynamo",
+      "description": "TenantService constructs TenantServiceDAL and delegates all tenant persistence reads/writes.",
+      "relationship-type": {
+        "connects": {
+          "source": { "node": "tenant-service" },
+          "destination": { "node": "dynamo-tenant-store" }
+        }
+      }
+    },
+    {
+      "unique-id": "lab-system-composed-of",
+      "description": "System composed of tenant service and Dynamo DAL.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "lab-system",
+          "nodes": ["tenant-service", "dynamo-tenant-store"]
+        }
+      }
+    }
+  ]
+}

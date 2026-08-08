@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Lab fixture — API Gateway path/method wiring, split from lambda-functions.yaml
+  on purpose (mirrors real aws-saas-boost-private-api.yaml + saas-boost-svc-tier.yaml
+  split — the path tree and the Lambda Handler binding live in different real
+  files). Tests the multi-file, same-directory join scope decided in
+  Serverless_HTTP_and_Dynamo_Ownership_Design.md §2.
+
+Resources:
+  TiersResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref LabRestApi
+      ParentId: !GetAtt LabRestApi.RootResourceId
+      PathPart: 'tiers'
+
+  TierByIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref LabRestApi
+      ParentId: !Ref TiersResource
+      PathPart: '{id}'
+
+  GetTiersMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref LabRestApi
+      ResourceId: !Ref TiersResource
+      HttpMethod: GET
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TierServiceGetTiers.Arn}/invocations
+
+  GetTierByIdMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref LabRestApi
+      ResourceId: !Ref TierByIdResource
+      HttpMethod: GET
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${TierServiceGetTierById.Arn}/invocations
+
+  UpdateTierMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref LabRestApi
+      ResourceId: !Ref TierByIdResource
+      HttpMethod: PUT
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LegacyTierHandlerFn.Arn}/invocations

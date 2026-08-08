@@ -24,7 +24,25 @@ export interface Evidence {
   // class/interface's supertype (e.g. `extends JpaRepository<Charge, Long>`,
   // real Spring Data repository evidence), `referenceKind: 'extends'`.
   source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends';
-  category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control';
+  // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 (T-Y3-1,
+  // Serverless_HTTP_and_Dynamo_Ownership_Design.md) — a Lambda handler's
+  // `implements RequestHandler` clause. Deliberately NOT the same category
+  // as 'http-entry-point' even though it must win the same kind tie-break
+  // (signal-mapper.ts treats both as decisive over persistence): real bug
+  // found and fixed before shipping this — the raw signal TEXT here is a
+  // type reference (`RequestHandler<...>`), not a path, and 'http-entry-point'
+  // is also node-type-mapping.yml's interfaceCategories trigger for
+  // `service`, so reusing it built a bogus path-interface from that type
+  // reference. This category stays out of interfaceCategories (descriptive
+  // only) until Y4 supplies a real path via CFN/SAM join.
+  category:
+    | 'http-entry-point'
+    | 'framework-bootstrap'
+    | 'persistence'
+    | 'messaging'
+    | 'folder-convention'
+    | 'security-control'
+    | 'serverless-entry-point';
   weight: number;
   ref: string; // file:line for code-sourced evidence; "relativeFilePath:paths"-style pointer for openapi (no line numbers available from a parsed YAML/JSON document)
   /**
@@ -184,7 +202,7 @@ export interface IgnoredItem {
 // interface-builder.ts SOURCE_PRECEDENCE table gained the new key in the
 // same change, before this bump; control-builder.ts/threat-signals filter
 // on category, unaffected.
-export const CONTRACT_VERSION = '7.0.0';
+export const CONTRACT_VERSION = '8.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION
