@@ -395,6 +395,10 @@ All must be true:
 
 **Program CLOSED, 2026-08-08. All L0-L4 phases complete. `B-layered-story` → `done` in BACKLOG.md.**
 
+### Post-close genericity probe (real, honest, out-of-band — not a new phase)
+
+The program's own honest review named the biggest remaining risk: `R2b` (and `D-terminal-refine`'s prerequisite) had never been tested against a second real repo — only Fineract, which only ever exercised `r2-phase1`. Probed against a fresh full clone of real `finos/waltz` (the pre-existing `spikes/waltz/repo` sparse copy was missing `waltz-service` and couldn't answer this). **Result, real not assumed**: the mechanism's "never fabricate" discipline generalized perfectly — 28 real bridge candidates found in Waltz, 0 fabricated, all correctly refused. But it did **not** reach the R2b/domain-refine question at all — Waltz's idiomatic shape (a concrete `@Service` class referenced directly, no interface) is invisible to bridge discovery itself, which only enters through `implements` edges. This surfaced a real, generic, previously-unnamed gap class (tentatively "R2c" / direct-delegate hop) **one stage earlier** than R2b. Full write-up: `coe-lab/docs/findings/waltz-multihop-genericity-probe.md`. **Not built** — named for a future scoping decision, same discipline as `D-terminal-refine`. Tracked as **B-multihop-direct-delegate** in `BACKLOG.md`.
+
 ---
 
 ## Task ID index (quick)

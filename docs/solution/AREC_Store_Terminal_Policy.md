@@ -55,6 +55,12 @@ service unit --imports/references--> BRIDGE (zero-evidence interface/type)
 
 **This is a considered "not now," not a "no."** Named as an open, revisitable decision — same discipline as `OOS_Registry.md`'s own rule that a deferred item needs both a reason and a trigger, not just "not done yet."
 
+### 3.1 Post-close update: a real second-repo probe checked this, and found a different, earlier-stage gap first
+
+A real genericity probe against fresh, full-clone `finos/waltz` (`coe-lab/docs/findings/waltz-multihop-genericity-probe.md`) went looking for exactly the trigger named in point 3 above — a real R2b-resolved case with a domain-refine question. **It didn't find one, but not because R2b generalized cleanly and simply never needed refining**: Waltz's real layered shape (a concrete `@Service` class referenced directly, no interface, that itself directly imports its DAO) never reaches the R2/R2b bridge-implementer step at all — bridge discovery only enters through `implements` edges, and a directly-referenced concrete class is never the target of one. 28 real candidates, all correctly refused (0 or 126 implementers), zero fabricated.
+
+**This means the D-terminal-refine trigger condition (point 3) is still, honestly, unmet** — Waltz didn't supply an R2b-resolved case to refine, it supplied evidence of a gap one stage *earlier*. The decision above stands unchanged. What's new: a second, generic, real gap is now named — tentatively "R2c" / direct-delegate hop (bridge candidate with 0 `implements`-based implementers, but the candidate itself directly imports exactly one store — chase that, same never-guess discipline, no interface required). Tracked as **B-multihop-direct-delegate**, not built.
+
 ## 4. What T-L2-1 through T-L2-5 build on top of this (forward pointer, not yet done as of writing this note)
 
 - **T-L2-1**: the table in §2 above is currently only reconstructable by reading `confidence` (15/10 vs 8/5) — correct but not self-documenting. Add an explicit, additive `mechanism` field so a consumer (coverage report, IR, a future query layer) can ask "which branch produced this edge" without hardcoding the confidence-value mapping.
