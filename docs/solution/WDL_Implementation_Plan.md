@@ -3,7 +3,7 @@
 **Name:** Weaver Discovery Ladder (WDL) — implementation plan  
 **Date:** 2026-08-08  
 **Authority:** [`WHERE_NEXT.md`](./WHERE_NEXT.md) §2 (WDL ranks) · hard-tests #2–#3 (saas-boost tier + tenant)  
-**Status:** Ready to implement **Phase I (WDL-1/2)** after owner go-ahead; later ranks staged.
+**Status:** **Phase I (WDL-1/2) CLOSED, 2026-08-08** (via `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md` Y0-Y6). One goal (G6/WP I-5, test-class noise) shipped without its fix — named open residual, not silently dropped. See §6 and changelog. Later ranks (Phase II+) not started — next pick per `WHERE_NEXT.md` is rank 7 (`D-outbound-java`), not this plan's own Phase II.
 
 **Rules (locked):** Java → TS → Python; **cloud/K8s first**; hard-tests do not patch detectors in-session.
 
@@ -52,15 +52,15 @@ Do **not** start Phase III while Phase I exams fail.
 
 ### 2.2 Work packages (map to Y tasks)
 
-| WP | WDL | Work | Agent task ref | Verify |
-|---|---|---|---|---|
-| **I-0** | — | Design note + lab gold `java-lambda-apigw` (if not done) | T-Y1-* | Design answers both tier+tenant shapes |
-| **I-1** | WDL-1 | Catalogue/signals: `RequestHandler`, `APIGatewayProxyResponseEvent`, handler method surface → `service` / http-entry | T-Y3-1 | tenant: ≥1 service unit for TenantService |
-| **I-2** | WDL-2 | Kind priority: http/handler beats bare Dynamo import | T-Y2-1 | tier: TierService not database; store still is |
-| **I-3** | WDL-1 | CFN/SAM path join (minimal API GW Method+Path+Handler) | T-Y4-1 | gold paths on interfaces (tenant+tier) |
-| **I-4** | WDL-1 UX | Silence when 0 services but Dynamo-only / or infra hints | T-Y5-1 | silenceFlags non-empty on pre-fix artefact class |
-| **I-5** | noise | Test path exclusion for Dynamo import units | with I-2 | *Test not database (or low-noise) |
-| **I-6** | exam | Re-run tier + tenant hard-test protocols; update findings | T-Y5-2 | L1 service+paths improve; L2 story path |
+| WP | WDL | Work | Agent task ref | Verify | Status |
+|---|---|---|---|---|---|
+| **I-0** | — | Design note + lab gold `java-lambda-apigw` (if not done) | T-Y1-* | Design answers both tier+tenant shapes | ✅ done — `Serverless_HTTP_and_Dynamo_Ownership_Design.md`, `coe-lab/fixtures/monorepo/packages/java-lambda-apigw/` |
+| **I-1** | WDL-1 | Catalogue/signals: `RequestHandler`, `APIGatewayProxyResponseEvent`, handler method surface → `service` / http-entry | T-Y3-1 | tenant: ≥1 service unit for TenantService | ✅ done — `lambda-request-handler-implements` catalogue row, `serverless-entry-point` category |
+| **I-2** | WDL-2 | Kind priority: http/handler beats bare Dynamo import | T-Y2-1 | tier: TierService not database; store still is | ✅ done — Dynamo-priority tie-break, `signal-mapper.ts` |
+| **I-3** | WDL-1 | CFN/SAM path join (minimal API GW Method+Path+Handler) | T-Y4-1 | gold paths on interfaces (tenant+tier) | ✅ done — `cfn-manifest-provider.ts`/`cfn-route-pass.ts`, 5/5 real paths matched gold on the wild `aws-saas-boost-tier-service` repo |
+| **I-4** | WDL-1 UX | Silence when 0 services but Dynamo-only / or infra hints | T-Y5-1 | silenceFlags non-empty on pre-fix artefact class | ✅ done — S5 silence flag (`coverage-report.ts`), closes HT-ASB-006 |
+| **I-5** | noise | Test path exclusion for Dynamo import units | with I-2 | *Test not database (or low-noise) | ❌ **not built** — no test-path exclusion mechanism exists in `src/`; open as HT-ASB-003 (test noise) / HT-ASB-004 (method-as-unit noise), named not silently dropped |
+| **I-6** | exam | Re-run tier + tenant hard-test protocols; update findings | T-Y5-2 | L1 service+paths improve; L2 story path | ✅ done — both standing exams (`E-fidelity-lambda-lab`, `E-saas-boost-tier`) re-run fresh, PASS |
 
 ### 2.3 Suggested agent sessions
 
@@ -123,8 +123,8 @@ Do **not** start Phase III while Phase I exams fail.
 
 - [x] Hard-test #2 tier-service  
 - [x] Hard-test #3 tenant-service (generalizes WDL-1)  
-- [ ] Owner: **go implement Phase I** (say “implement WDL Phase I” / “run Y0–Y5”)  
-- [ ] Or: more hard-tests (calm-hub) before build  
+- [x] Owner: **go implement Phase I** — executed as Y0-Y6, CLOSED 2026-08-08  
+- [x] G1-G5, G7 shipped and regression-verified; **G6 (I-5, test-class noise) shipped without its fix** — real, named residual (HT-ASB-003/004), not a silent gap  
 
 ---
 
@@ -133,3 +133,4 @@ Do **not** start Phase III while Phase I exams fail.
 | Date | Note |
 |---|---|
 | 2026-08-08 | Plan written after hard-test #3 tenant-service; Phase I = WDL-1/2 Java cloud |
+| 2026-08-09 | **Phase I CLOSED** — verified against real code/docs, not re-asserted from this plan. WP I-0/I-1/I-2/I-3/I-4/I-6 all confirmed built with real evidence (5/5 gold-path match on the wild `aws-saas-boost-tier-service` repo, both standing exams PASS, full regression suite green). **WP I-5 confirmed NOT built** — no test-path exclusion exists in `pipeline/src/`; this is `HT-ASB-003`/`HT-ASB-004`, both already correctly named "still open" in `STATUS.md`, not a newly-found gap. Phases II-V not started, as the plan's own rule required (Phase I exams had to go green first) — but `WHERE_NEXT.md` has since converged on rank 7 (`D-outbound-java`/`B-http-client`) as the actual next pick, not this plan's own Phase II (k8s/S3/SQS). See `WHERE_NEXT.md` §2.1/§4 for current ladder state. |
