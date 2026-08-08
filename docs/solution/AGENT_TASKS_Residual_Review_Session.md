@@ -155,6 +155,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Deliverable** | `tools/review-session/` (or agreed path); `review-sessions/` in `.gitignore`; short README in tools dir |
 | **Exit** | Packs not accidentally committed; `npm test` unaffected |
+| **Status** | **done, 2026-08-09.** `tools/review-session/README.md` (S1-S12 stated up front, layout table, language decision); `.gitignore` gained `review-sessions/`. Verified: wrote a scratch pack under `review-sessions/`, confirmed `git status` shows nothing for it; `pipeline/` has zero diff from this task, so `npm test` is unaffected by construction. |
 
 ### T-RS1-2 — `pack.py` (or `pack.ts`)
 
