@@ -32,6 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from redact import redact  # noqa: E402
 from triage import build_residuals  # noqa: E402
+from cards import build_all_cards  # noqa: E402
 
 SNIPPET_CONTEXT_LINES = 3  # +/- lines around a referenced line, bounded window per design §6
 
@@ -87,13 +88,21 @@ def main() -> int:
     (session_dir / "evidence").mkdir(parents=True, exist_ok=True)
 
     residuals = build_residuals(review_queue)
-    (session_dir / "residuals.json").write_text(json.dumps({"generatedAt": _now(), "items": residuals}, indent=2))
 
     unit_index = _build_unit_index(facts)
     (session_dir / "evidence" / "unit-index.json").write_text(json.dumps(unit_index, indent=2))
 
     packs = _build_evidence_packs(residuals, unit_index, package_roots)
     (session_dir / "evidence" / "packs.json").write_text(json.dumps(packs, indent=2))
+
+    # T-RS1-4 — deterministic choice cards, generated from the fixed
+    # per-class templates in cards.py (never LLM-invented), attached
+    # directly onto each residual so the bound Copilot Chat agent (T-RS1-5)
+    # can read the card straight out of residuals.json.
+    card_markdown = build_all_cards(residuals, unit_index, packs)
+    for r in residuals:
+        r["card"] = card_markdown[r["id"]]
+    (session_dir / "residuals.json").write_text(json.dumps({"generatedAt": _now(), "items": residuals}, indent=2))
 
     manifest = {
         "generatedAt": _now(),
@@ -215,21 +224,21 @@ def _render_session_md(manifest: dict, residuals: list[dict]) -> str:
         "A residual decision here is a pilot-scoped correction, not a claim that a layered-architecture-story "
         "recovery mechanism now works — see `Architect_Residual_Review_Session.md` §0.1.",
         "- Applying is a **human step** (`apply.py`, not yet built — RS-3). Nothing here is auto-applied.",
+        "- Reply to a card with its option key (e.g. `1`) or `other: <rationale>`.",
         "",
         f"## Residuals ({len(residuals)} total: {len(tier_a)} Tier A, {len(tier_b)} Tier B, {len(tier_c)} Tier C)",
         "",
-        "### Tier A — you decide",
+        "## Tier A — you decide",
         "",
     ]
     for r in tier_a:
-        lines.append(f"- **{r['id']}** ({r['class']}): {r['rationale']}")
-    lines += ["", "### Tier B — agent may draft if evidence bar met (RS-4, not yet built)", ""]
+        lines.append(r["card"])
+    lines += ["", "## Tier B — agent may draft if evidence bar met (RS-4, not yet built — every item below is answered as Tier A for now)", ""]
     for r in tier_b:
-        lines.append(f"- **{r['id']}** ({r['class']}): {r['rationale']}")
-    lines += ["", "### Tier C — do not invent, document or leave open", ""]
+        lines.append(r["card"])
+    lines += ["", "## Tier C — do not invent, document or leave open", ""]
     for r in tier_c:
-        lines.append(f"- **{r['id']}** ({r['class']}): {r['rationale']}")
-    lines.append("")
+        lines.append(r["card"])
     return "\n".join(lines)
 
 

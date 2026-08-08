@@ -31,10 +31,12 @@ tools/review-session/
   pack.py                 (T-RS1-2, built) run-slice out-dir -> Session Pack
   triage.py               (T-RS1-3 MVP, built) builds residuals.json (Tier A/B/C) from review-queue.json
   redact.py                (built) S8 secret-redaction, used by pack.py before any snippet reaches disk
+  cards.py                 (T-RS1-4, built) deterministic choice-card generator, fixed per-class templates
   residuals-schema.json    (built) JSON Schema for residuals.json
   test_pack.py             (built) real end-to-end: run-slice -> pack.py against the checked-in NestJS fixture; refuse-overwrite; missing-input failure
   test_redact.py           (built) redaction fixture test — fake AWS key/bearer token/private key/connection-string password
   test_triage.py           (built) trigger -> tier/class mapping tests
+  test_cards.py            (built) card determinism + real-units-only candidates + Tier C never invents relationship_add
   validate_drafts.py      (T-RS2-1, not yet built) schema + integrity checks on drafts/
   apply.py                (T-RS3-1, not yet built) validate -> run-slice --overrides -> apply-report
   examples/                (T-RS2-2, not yet built) synthetic Decision Record + Override pairs
@@ -45,9 +47,9 @@ Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitig
 ## How to run
 
 ```bash
-# unit tests (redaction fixtures + triage mapping) + real end-to-end (needs pipeline/dist built)
+# unit tests (redaction fixtures + triage mapping + card generation) + real end-to-end (needs pipeline/dist built)
 cd tools/review-session
-python3 -m unittest test_redact test_triage test_pack -v
+python3 -m unittest test_redact test_triage test_cards test_pack -v
 
 # build a real pack from a real run-slice out-dir
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
