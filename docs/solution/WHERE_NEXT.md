@@ -94,13 +94,13 @@
 
 | Rank | ID | Discovery | Lang | Cloud/K8s? | Status | Backlog / next |
 |---|---|---|---|---|---|---|
-| **1** | D-lambda | Lambda handler + API GW/CFN paths → service + interfaces | **Java** first (saas-boost); TS/Python later if sample | **Cloud** | open | **B-lambda-http** · HT saas-boost |
-| **2** | D-dynamo-own | Dynamo SDK import ≠ database owner (handler vs store) | **Java** first; Node Dynamo already better | **Cloud** | open | **B-dynamo-handler-kind** |
+| **1** | D-lambda | Lambda handler + API GW/CFN paths → service + interfaces | **Java** first (saas-boost); TS/Python later if sample | **Cloud** | **done, 2026-08-08 (Y0-Y6, `partial → proven` for Java+explicit-CFN)** — real, verified on the actual `aws-saas-boost-tier-service` repo (5/5 paths exact match to gold); residual: Node/Python + SAM shorthand, no sample yet | **B-lambda-http** · HT saas-boost — **closed for evidenced shape** |
+| **2** | D-dynamo-own | Dynamo SDK import ≠ database owner (handler vs store) | **Java** first; Node Dynamo already better | **Cloud** | **done, 2026-08-08 (Y2)** — real finding: zero new code needed, existing B-ontology mechanism already generalized | **B-dynamo-handler-kind** — **closed** |
 | **3** | D-k8s | K8s trust / deploy correlation (maintain + any residual) | Polyglot manifests | **K8s** | partial | maintain R-k8s; BoA multi hard-test optional |
 | **4** | D-s3 | S3 as data-asset / integration store | Java/Node SDK | **Cloud** | nominate | catalogue when sample |
 | **5** | D-sqs-sns | SQS/SNS producers (maintain; SNS thinner) | Node lab done; Java if sample | **Cloud** | partial | maintain B-msg-prod-sqs |
 | **6** | D-spring-mvc | Spring Boot REST parity with JAX-RS | **Java** | app | partial | calm-hub / Spring hard-test |
-| **7** | D-outbound-java | Feign / WebClient / RestTemplate → service→service | **Java** | app | **gap** | **B-http-client** (Java first) |
+| **7** | D-outbound-java | Feign / WebClient / RestTemplate → service→service | **Java** | app | **partial (corrected 2026-08-08, was mislabeled `gap`)** — `outbound-http-detector.ts`/`outboundHttpPass` already built + live in `DEFAULT_PASSES`; `RestTemplate`/`WebClient` already `dispatched` in the catalogue. Real, precise, small residual verified by scan: `OkHttpClient`/`HttpURLConnection` missing from the catalogue's library list (real Fineract `ExternalCreditBureauIntegrationWritePlatformServiceImpl.java` evidence) — 2 catalogue rows, not a new detector. `@FeignClient` decorator strategy honestly `not-implemented`, no real sample yet. | **B-http-client** — catalogue-row fix, cheapest real win on the ladder right now |
 | **8** | D-kafka | Kafka consumer/producer | **Java** primary | app | partial | maintain |
 | **9** | D-oauth-java | Spring Security / OAuth2 depth | **Java** | app | partial | after OpenAPI / controls |
 | **10** | D-rabbit | RabbitMQ | **Java** | app | thin | sample first |
@@ -118,11 +118,19 @@
 
 | Band | Items |
 |---|---|
-| **P0 — ship / firm now** | 1–2 Lambda + Dynamo ownership (**Java cloud**) |
-| **P0b — cloud/k8s keep hot** | 3–5 k8s, S3, SQS/SNS |
-| **P1 — Java app core** | 6–9 Spring REST, Java outbound, Kafka, OAuth |
+| **P0 — CLOSED, 2026-08-08** | ~~1–2 Lambda + Dynamo ownership~~ (**Java cloud**) — done, see §2.1 |
+| **P0b — cloud/k8s keep hot, next real work** | 3–5 k8s, S3, SQS/SNS — mostly maintain/nominate, not fresh gaps (see §2.4 below) |
+| **P1 — Java app core, real gaps here** | 6–9 Spring REST, **Java outbound (real, unblocked gap)**, Kafka, OAuth |
 | **P2 — Java breadth + BPM** | 10–13 Rabbit, Redis, GraphQL, **Fluxnova** |
 | **P1/P2 — TS then Python** | 14–18 outbound-ts, Nest/cloud, OpenAPI; Python last |
+
+### 2.4 Real state of P0b (3–5) — not fresh gaps, don't re-open as if new
+
+Checked against the current Claim Register, not re-guessed: rank 3 (`D-k8s`) is `partial`/actively maintained (T-E6 re-watched under harder conditions, clean); rank 4 (`D-s3`) is a real, still-**unbuilt** nomination — no catalogue row exists, and no real sample has been gathered yet (own note: "catalogue when sample" — needs a hard-test first, not blind implementation); rank 5 (`D-sqs-sns`) is genuinely `partial` (SQS import-only proven, SNS still thin) and already tracked under `B-msg-prod-sqs`. None of these three are "next build" candidates the way ranks 1–2 were — they're either already maintained or blocked on a missing evidence sample.
+
+### 2.5 What actually changed after Fidelity yardstick Y0-Y6 closed
+
+§5's own rule said: *"Implement Feign because Prethink has it, before Lambda hard-test is closed or generalized"* — **forbidden**. Lambda (WDL-1/2) is now closed. That constraint is lifted. **Rank 7 (`D-outbound-java`, Feign/WebClient/RestTemplate → service→service) is the highest-ranked item on the whole ladder that is both (a) a real, explicitly-named `gap` (not `partial`/`maintain`) and (b) no longer blocked by an open higher-priority item.** Rank 6 (`D-spring-mvc`, Spring Boot REST parity) is `partial`, not a hard gap, and has a named but not-yet-run hard-test sample (`calm-hub-core`, §3.2 row #5) — evidence-gathering-first, per this doc's own §2.3 rule (`claim cell → backlog ID → hard-test or lab fail sample → implement → exam green`), not straight to code.
 
 ### 2.3 What solutioning does with this list
 
@@ -144,7 +152,7 @@ claim cell  →  backlog ID  →  hard-test or lab fail sample  →  implement  
 | **aws-saas-boost-tier-service** | Dynamo yes; Lambda no; handler→DB | **WDL-1, WDL-2** |
 | **aws-saas-boost-tenant-service** | **#3 compared** — WDL-1 systematic; handler invisible; DAL OK | **WDL-1**; WDL-2 N/A this shape |
 
-**Next build:** [`WDL_Implementation_Plan.md`](./WDL_Implementation_Plan.md) **Phase I** (hard-tests #2–#3 enough for WDL-1).
+**Phase I built and closed, 2026-08-08.** `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md` Y0-Y6 complete — WDL-1/WDL-2 both real, verified on `aws-saas-boost-tier-service` itself (5/5 real paths exact match to gold), not just synthetic. See `Fidelity_Yardstick_Closeout_Matrix.md` for the full re-scored status. **Next build candidate (per §2.5): rank 7, `D-outbound-java`** — the highest-ranked genuine `gap` no longer blocked by an open higher-priority item.
 
 ### 3.2 Suggested order for remaining hard-tests (~8)
 
@@ -174,35 +182,40 @@ Optional later: more Fineract modules only if claim cells change.
 
 ---
 
-## 4. What to do **this week** (pick a lane)
+## 4. What to do next (post Y0-Y6 close, 2026-08-08)
 
-### Option A — Eval-first (recommended if you want more evidence)
+Options A/B/C below (Fidelity serverless build vs. more hard-tests first) are **resolved** — Option B ran to completion. This section now answers the *next* fork.
 
-```text
-Today:  hard-test #3  aws-saas-boost-tenant-service   (Java cloud)
-Next:   #4 saas-boost multi or #5 calm-hub             (Java cloud / Java REST)
-Then:   ghostfolio only after Java cloud pressure      (TS)
-Then:   boa                                             (Python last)
-```
-
-Implementation (serverless Y*) waits until you say “promote HT-ASB to build.”
-
-### Option B — Build-first (if pilot needs Lambda story)
+### Option A — Eval-first (gather evidence for rank 7 before building)
 
 ```text
-Y0–Y1 serverless design + lab gold     (Java cloud P0)
-Y2–Y5 B-lambda-http + B-dynamo-handler-kind
-Then D-outbound-java / Spring — not TS first
-Hard-tests #3+ as regression
+Today:  hard-test #5  calm-hub-core          (Java Spring/Quarkus REST, rank 6)
+Next:   look for a real outbound-HTTP sample (Feign/WebClient/RestTemplate) — rank 7 has no hard-test sample cited yet, only a backlog ID (B-http-client)
+Then:   #4 saas-boost-services-multi (multi-root Lambda generalization — strengthens WDL-1's n=1-repo evidence, doesn't unblock anything new)
 ```
 
-### Option C — Parallel people
+### Option B — Build-first (if pilot needs outbound-HTTP service→service edges)
 
-| Person/session | Work |
-|---|---|
-| Eval | Hard-tests §3.2 (Java cloud first) |
-| Implement | Y0–Y1 only (no detector until Y1 done) |
-| Sync | Weekly: map findings → ranked rows §2.1 |
+```text
+Design note for D-outbound-java (same Y0/Y1-style gate: no detector code
+before a design note + lab gold exist), reusing this project's proven
+call-site/field-type extraction mechanisms (no new engine expected —
+Feign's @FeignClient is decorator-shaped, RestTemplate/WebClient calls
+are call-site-shaped, same family as C-call).
+Verify against a real sample before committing to a mechanism shape —
+rank 7 currently has ZERO real evidence gathered, unlike Lambda which
+had 2 real hard-tests before Y0 started.
+```
+
+### Option C — Strengthen what's already built (lower risk, less new capability)
+
+`aws-saas-boost-services-multi` (§3.2 #4) — the CFN join mechanism is currently proven against exactly one real repo's authoring style. A second real repo (or a multi-service scan of SaaS Boost itself) would close the "only one evidenced CFN-authoring style" residual named in `BACKLOG.md`'s `B-lambda-http` row, without opening new scope.
+
+**Second correction, this time by actually running the pipeline, not just grepping source** — WDL's own table (§2.1 rank 7) labels `D-outbound-java` a `gap`, which overstates it. Real, checked state: `outbound-http-detector.ts`/`outboundHttpPass` **already exists and is already live** in `DEFAULT_PASSES` — this is not an unbuilt mechanism. `http-client-detection-catalogue.yml` already has a `dispatched` (not `not-implemented`) strategy, `import-only-client`, covering `RestTemplate`/`requests`/`axios`/`httpx`/`node-fetch`/`WebClient` — built from real evidence (BoA's `frontend.py`, Fineract's `SendMessageToSmsGatewayTasklet.java`) already gathered in an earlier session, not new. A second strategy (`resolvable-target-decorator`, for `@FeignClient`-style literal-target detection) is honestly `not-implemented` — no real `@FeignClient` usage was found in evidence repos when that catalogue was written.
+
+**What's actually still open, verified by real scan just now** (not assumed): Fineract's real `ExternalCreditBureauIntegrationWritePlatformServiceImpl.java` uses `OkHttpClient`/`HttpURLConnection` — neither is in the catalogue's library list. Scanning the real containing module shows both fall through as generic unmapped signals (`"No signal-catalogue.yml rule matched raw signal 'OkHttpClient'"`), not even reaching the existing detector's own "unresolved-http-target" bucket. **This is a precise, small, real gap — two missing catalogue library rows on an already-built, already-dispatched mechanism — not a new detector to build.** Exactly the "new capability = new catalogue row" shape this project's whole discipline is designed for (`Catalogue_Intake.md`'s four requirements: evidence cited here, by file/line, real).
+
+**Recommendation, corrected**: WDL rank 7 should be re-ranked from `gap` to `partial` (mechanism built, 2 real libraries missing from the catalogue) — a genuinely small, cheap, well-evidenced fix, not a design-note-first program like Lambda was. If you want new capability with real leverage, this is the cheapest real win on the ladder right now.
 
 ---
 
@@ -229,12 +242,13 @@ Hard-tests #3+ as regression
 
 ---
 
-## 7. Immediate next message you can send
+## 7. Immediate next message you can send (post Y0-Y6 close, 2026-08-08)
 
 Copy one:
 
-1. **“Hard-test #3: aws-saas-boost-tenant-service”** — resume eval.  
-2. **“Start Fidelity Y0–Y1 only”** — solutioning/implement design for Lambda.  
-3. **“Expand WHERE_NEXT §1 into a slide-ready comparison”** — docs only.
+1. **“Fix B-http-client”** — cheapest real win: 2 catalogue rows on an already-built, already-dispatched mechanism, real evidence already cited (`Claim_Register.md`'s `U-outbound-http`).
+2. **“Hard-test #5: calm-hub-core”** — resume eval for rank 6 (`D-spring-mvc`, Spring Boot REST parity), the next `partial` item with a named-but-unrun sample.
+3. **“Hard-test #4: aws-saas-boost-services-multi”** — strengthen WDL-1/2's evidence base beyond one repo's CFN-authoring style (real residual named in `B-lambda-http`'s BACKLOG row).
+4. **“Expand WHERE_NEXT §1 into a slide-ready comparison”** — docs only, unchanged from before.
 
-Default recommendation: **(1)** — finish **Java cloud** SaaS Boost (#3 tenant, optional multi), then **Java** REST/controls, then **TS** ghostfolio, **Python** boa last.
+Default recommendation: **(1)** — real, cheap, already-evidenced, no design note or hard-test needed first (unlike everything else on the ladder right now).
