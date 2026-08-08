@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weaver residual review session — residuals.json",
+  "description": "T-RS1-3. Written by pack.py (via triage.py's build_residuals), read by the bound Copilot Chat agent (T-RS1-5) and, once built, draft_tier_b.py (T-RS4-1). MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape).",
+  "type": "object",
+  "required": ["generatedAt", "items"],
+  "properties": {
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/residual" }
+    }
+  },
+  "definitions": {
+    "residual": {
+      "type": "object",
+      "required": ["id", "tier", "class", "trigger", "unitIds", "evidenceRefs", "rationale", "status"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^R-[0-9]{3,}$", "description": "Stable within one Session Pack; not reused across packs." },
+        "tier": {
+          "type": "string",
+          "enum": ["A", "B", "C"],
+          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (RS-4, not yet built — every Tier B item is treated as Tier A until then). C = do not invent; document OOS or leave open."
+        },
+        "class": {
+          "type": "string",
+          "description": "One of Architect_Residual_Review_Session.md §3's taxonomy classes, e.g. multi-candidate-bridge, security-authority-policy, ontology-judgment, missing-intermediates-not-in-scan. Not a closed enum in this schema — new trigger->class mappings are additive in triage.py, same discipline as signal-catalogue.yml."
+        },
+        "trigger": {
+          "type": "string",
+          "description": "The originating review-queue.json trigger (or, for future non-review-queue sources like unmapped clusters, a distinct source tag) — always traceable to a real, computed signal, never invented."
+        },
+        "unitIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Empty for a genuinely run-level residual (e.g. S5-cfn-routes-found-but-unbound) — by definition no unit was matched, so none can be named. Never fabricated to fill this field."
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^.+:[0-9]+$" },
+          "description": "file:line refs, each expected to have a corresponding redacted snippet in evidence/packs.json."
+        },
+        "rationale": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["open", "drafted", "applied", "carried_forward"],
+          "description": "MVP only ever writes 'open' — 'drafted'/'applied'/'carried_forward' are set by later phases (RS-2 validate_drafts, RS-3 apply, RS-3 --baseline), named here so the schema doesn't need to change shape when those land."
+        }
+      }
+    }
+  }
+}

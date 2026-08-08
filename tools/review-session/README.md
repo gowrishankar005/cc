@@ -27,16 +27,35 @@ Full detail and rationale for each: `AGENT_TASKS_Residual_Review_Session.md` §0
 
 ```
 tools/review-session/
-  README.md          this file
-  pack.py             (T-RS1-2, not yet built) run-slice out-dir -> Session Pack
-  triage.py           (T-RS1-3, not yet built) builds residuals.json (Tier A/B/C)
-  validate_drafts.py  (T-RS2-1, not yet built) schema + integrity checks on drafts/
-  apply.py            (T-RS3-1, not yet built) validate -> run-slice --overrides -> apply-report
-  examples/           (T-RS2-2, not yet built) synthetic Decision Record + Override pairs
+  README.md              this file
+  pack.py                 (T-RS1-2, built) run-slice out-dir -> Session Pack
+  triage.py               (T-RS1-3 MVP, built) builds residuals.json (Tier A/B/C) from review-queue.json
+  redact.py                (built) S8 secret-redaction, used by pack.py before any snippet reaches disk
+  residuals-schema.json    (built) JSON Schema for residuals.json
+  test_pack.py             (built) real end-to-end: run-slice -> pack.py against the checked-in NestJS fixture; refuse-overwrite; missing-input failure
+  test_redact.py           (built) redaction fixture test — fake AWS key/bearer token/private key/connection-string password
+  test_triage.py           (built) trigger -> tier/class mapping tests
+  validate_drafts.py      (T-RS2-1, not yet built) schema + integrity checks on drafts/
+  apply.py                (T-RS3-1, not yet built) validate -> run-slice --overrides -> apply-report
+  examples/                (T-RS2-2, not yet built) synthetic Decision Record + Override pairs
 ```
 
 Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitignored by default — see `Architect_Residual_Review_Session.md` §4.1 for why, and the redaction/audit convention for the pieces worth checking in).
 
+## How to run
+
+```bash
+# unit tests (redaction fixtures + triage mapping) + real end-to-end (needs pipeline/dist built)
+cd tools/review-session
+python3 -m unittest test_redact test_triage test_pack -v
+
+# build a real pack from a real run-slice out-dir
+node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
+python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
+```
+
+`pack.py` refuses to overwrite a session dir that already has unapplied drafts (fails loud, exit code 1) — apply or discard first.
+
 ## Language
 
-Python (per RS-0's locked decision — `AGENT_TASKS_Residual_Review_Session.md` §0.5). Weaver's own pipeline stays TypeScript/Node; this tooling only ever calls it as a subprocess (`node dist/orchestration/run-slice.js ...`), never re-implements `override-applier.ts`'s logic in Python.
+Python (per RS-0's locked decision — `AGENT_TASKS_Residual_Review_Session.md` §0.5). No third-party dependencies — everything above uses only the standard library (`argparse`, `json`, `re`, `pathlib`, `unittest`), matching Simplicity First; add one only when a real, evidenced need shows up. Weaver's own pipeline stays TypeScript/Node; this tooling only ever calls it as a subprocess (`node dist/orchestration/run-slice.js ...` / `node dist/analysis/ir/hitl-review-trigger.js ...`), never re-implements `override-applier.ts`'s logic in Python.
