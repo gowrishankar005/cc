@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/standards/company-node-standard.json",
+  "title": "Company Node Standard",
+  "description": "Illustrative organizational Standard: every node must carry an 'ownership' block (costCenter + owner), composed via allOf against the real published core.json node schema — not a new node shape, an addition to it. See ../../README.md 'Standards enforced via Patterns' section for how this is actually exercised against architecture.calm.json.",
+  "allOf": [
+    { "$ref": "https://calm.finos.org/release/1.2/meta/core.json#/defs/node" },
+    {
+      "type": "object",
+      "properties": {
+        "ownership": {
+          "type": "object",
+          "properties": {
+            "costCenter": {
+              "type": "string",
+              "pattern": "^CC-[0-9]{4}$",
+              "description": "Company cost center code, e.g. CC-4471"
+            },
+            "owner": {
+              "type": "string",
+              "description": "Team or individual responsible for this node"
+            }
+          },
+          "required": ["costCenter", "owner"]
+        }
+      },
+      "required": ["ownership"]
+    }
+  ]
+}

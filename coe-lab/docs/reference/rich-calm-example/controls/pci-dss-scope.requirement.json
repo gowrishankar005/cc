@@ -1,0 +1,5 @@
+{
+  "control-id": "pci-dss-scope-001",
+  "name": "PCI DSS Cardholder Data Environment Scope Restriction",
+  "description": "Only components that store, process, or transmit cardholder data (or are directly connected/security-impacting) may be included in the declared Cardholder Data Environment (CDE) boundary. Segmentation controls must prevent scope creep into systems that never receive raw cardholder data."
+}

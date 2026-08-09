@@ -1,0 +1,296 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "reference-payments-platform",
+  "name": "Reference Payments Platform (hand-authored CALM construct reference)",
+  "description": "A small, internally-consistent fintech-shaped architecture, hand-authored to exercise every CALM 1.2 construct this project's research has confirmed against the real FINOS schema (see companion README.md for citations). NOT platform output — a teaching/reference document for improving pipeline/src/modules/calm-generator.",
+  "adrs": [
+    "docs/adr/0001-use-kafka-for-settlement-events.md",
+    "docs/adr/0002-managed-postgres-and-managed-kafka-not-in-cluster.md"
+  ],
+  "nodes": [
+    {
+      "unique-id": "end-user",
+      "node-type": "actor",
+      "name": "Cardholder",
+      "description": "A customer initiating a card payment via the web/mobile client."
+    },
+    {
+      "unique-id": "checkout-webapp",
+      "node-type": "webclient",
+      "name": "Checkout Web App",
+      "description": "The actual presentation layer the cardholder uses — collects card details client-side and submits them to the API gateway. Added deliberately: the earlier version of this example had 'end-user' interacting directly with 'api-gateway', which skips the presentation layer entirely and is not true of any real payment platform. Statically hosted (CDN/S3-shaped), not cluster-deployed — see k8s-deployed-in below.",
+      "interfaces": [
+        {
+          "unique-id": "checkout-webapp-url",
+          "definition-url": "https://calm.finos.org/interfaces/example/url",
+          "config": { "url": "https://pay.example.com/checkout" }
+        }
+      ]
+    },
+    {
+      "unique-id": "api-gateway",
+      "node-type": "service",
+      "name": "API Gateway",
+      "description": "Edge ingress — TLS termination and routing into the payments domain. No business logic of its own.",
+      "interfaces": [
+        {
+          "unique-id": "api-gateway-host-port",
+          "definition-url": "https://calm.finos.org/interfaces/example/tcp-host-port",
+          "config": { "host": "gateway.payments.example.internal", "port": 443 }
+        },
+        {
+          "unique-id": "api-gateway-image",
+          "definition-url": "https://calm.finos.org/interfaces/example/container-image",
+          "config": { "image": "registry.example.internal/payments/api-gateway:1.4.2" }
+        }
+      ]
+    },
+    {
+      "unique-id": "payments-service",
+      "node-type": "service",
+      "name": "Payments Service",
+      "description": "JAX-RS resource at /v1/payments (PaymentsApiResource) — creates payments, persists them, and publishes settlement events. Method-level @PreAuthorize on the write path.",
+      "interfaces": [
+        { "unique-id": "payments-list", "type": "path-interface", "path": "GET /v1/payments" },
+        { "unique-id": "payments-get", "type": "path-interface", "path": "GET /v1/payments/{paymentId}" },
+        { "unique-id": "payments-create", "type": "path-interface", "path": "POST /v1/payments" }
+      ],
+      "ownership": {
+        "costCenter": "CC-4471",
+        "owner": "payments-platform-team"
+      },
+      "controls": {
+        "security-rbac-001": {
+          "description": "Role-Based Access Control via Spring/Jakarta @PreAuthorize on the payment-creation path.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/rbac.requirement.json",
+              "config": {
+                "mechanism": "decorator",
+                "signal": "PreAuthorize",
+                "evidence": {
+                  "unique-id": "evidence-payments-create-rbac",
+                  "evidence-paths": ["src/main/java/payments/PaymentsApiResource.java:88"],
+                  "control-config-url": "https://project-owned-placeholder.invalid/controls/rbac.requirement.json"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "notification-service",
+      "node-type": "service",
+      "name": "Notification Service",
+      "description": "Consumes settlement.completed and emails a receipt. No HTTP surface of its own — pure event consumer, same shape as a real no-route control-bearing service this project has found in practice."
+    },
+    {
+      "unique-id": "payments-db",
+      "node-type": "database",
+      "name": "Payments Database",
+      "description": "Managed PostgreSQL (JPA @Entity Payment mapped to table payments). Runs outside the Kubernetes cluster as a managed cloud service — deliberately NOT deployed-in k8s-cluster below.",
+      "ownership": {
+        "costCenter": "CC-4471",
+        "owner": "payments-platform-team"
+      },
+      "interfaces": [
+        {
+          "unique-id": "payments-db-host-port",
+          "definition-url": "https://calm.finos.org/interfaces/example/tcp-host-port",
+          "config": { "host": "payments-db.rds.example.internal", "port": 5432 }
+        }
+      ]
+    },
+    {
+      "unique-id": "settlement-events",
+      "node-type": "network",
+      "name": "settlement.completed topic",
+      "description": "Kafka topic carrying settlement-completed events between the payments and notification domains."
+    },
+    {
+      "unique-id": "platform-system",
+      "node-type": "system",
+      "name": "Payments Platform",
+      "description": "Composite/boundary node for the whole logical system — the top-level node this project's own research names as the fix for 'no top-level application node' (node-type: system, composed-of below)."
+    },
+    {
+      "unique-id": "k8s-cluster",
+      "node-type": "system",
+      "name": "Payments Kubernetes Cluster",
+      "description": "Runtime placement boundary — distinct from platform-system above: this models WHERE things run, not the logical domain grouping.",
+      "controls": {
+        "security": {
+          "description": "Security requirements for the Kubernetes cluster (reused verbatim from FINOS's own real published example — see README.md).",
+          "requirements": [
+            {
+              "requirement-url": "https://calm.finos.org/getting-started/controls/micro-segmentation.requirement.json",
+              "config-url": "https://calm.finos.org/getting-started/controls/micro-segmentation.config.json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "pci-cde",
+      "node-type": "system",
+      "name": "PCI DSS Cardholder Data Environment",
+      "description": "A third, orthogonal boundary — not the logical domain (platform-system) or the runtime cluster (k8s-cluster), but the actual PCI DSS compliance scope: which nodes store, process, or transmit raw cardholder data. This is a real architectural fact for a payment platform specifically, not a generic construct-coverage addition.",
+      "controls": {
+        "pci-dss-scope-001": {
+          "description": "This node's composed-of set below IS this platform's PCI DSS scope declaration — everything else in the architecture is out of scope because it never receives raw cardholder data.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/pci-dss-scope.requirement.json",
+              "config": {
+                "in-scope-nodes": ["checkout-webapp", "api-gateway", "payments-service", "payments-db"],
+                "out-of-scope-nodes": ["notification-service", "settlement-events"],
+                "scope-rationale": "notification-service and settlement-events only ever see a post-authorization outcome event (settlement.completed), never the raw PAN — standard PCI segmentation. Note this scope is LARGER than a well-architected payment platform would want: without a tokenizing PSP/hosted-fields boundary (deliberately out of scope for this reference — see README.md), checkout-webapp and api-gateway are both in-scope because raw card data genuinely passes through them, not because of a modeling shortcut."
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "end-user-uses-webapp",
+      "description": "Cardholder opens the checkout page and submits payment details.",
+      "relationship-type": {
+        "interacts": { "actor": "end-user", "nodes": ["checkout-webapp"] }
+      }
+    },
+    {
+      "unique-id": "webapp-to-gateway",
+      "description": "Checkout web app submits the payment request to the API gateway.",
+      "protocol": "HTTPS",
+      "relationship-type": {
+        "connects": { "source": { "node": "checkout-webapp" }, "destination": { "node": "api-gateway" } }
+      }
+    },
+    {
+      "unique-id": "gateway-to-payments",
+      "description": "Gateway routes authenticated requests to the Payments Service.",
+      "protocol": "HTTPS",
+      "relationship-type": {
+        "connects": { "source": { "node": "api-gateway" }, "destination": { "node": "payments-service" } }
+      },
+      "controls": {
+        "security": {
+          "description": "Security Controls for the connection (reused verbatim from FINOS's own real published example — see README.md).",
+          "requirements": [
+            {
+              "requirement-url": "https://calm.finos.org/getting-started/controls/permitted-connection.requirement.json",
+              "config-url": "https://calm.finos.org/getting-started/controls/permitted-connection-http.config.json"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "payments-to-db",
+      "description": "Payments Service persists and reads payment records.",
+      "protocol": "JDBC",
+      "relationship-type": {
+        "connects": { "source": { "node": "payments-service" }, "destination": { "node": "payments-db" } }
+      }
+    },
+    {
+      "unique-id": "payments-publishes-settlement",
+      "description": "Payments Service publishes to settlement.completed via KafkaTemplate.send after a successful payment.",
+      "relationship-type": {
+        "connects": { "source": { "node": "payments-service" }, "destination": { "node": "settlement-events" } }
+      }
+    },
+    {
+      "unique-id": "notification-consumes-settlement",
+      "description": "Notification Service consumes settlement.completed via @KafkaListener and sends a receipt email.",
+      "relationship-type": {
+        "connects": { "source": { "node": "notification-service" }, "destination": { "node": "settlement-events" } }
+      }
+    },
+    {
+      "unique-id": "platform-composed-of",
+      "description": "Logical domain composition: the payments platform is composed of these units (excludes the actor, which is external to the system).",
+      "relationship-type": {
+        "composed-of": {
+          "container": "platform-system",
+          "nodes": ["checkout-webapp", "api-gateway", "payments-service", "notification-service", "payments-db", "settlement-events"]
+        }
+      }
+    },
+    {
+      "unique-id": "k8s-deployed-in",
+      "description": "Runtime placement: these three services run inside the Kubernetes cluster. checkout-webapp is deliberately excluded (statically hosted via CDN, not cluster-deployed — same class of exclusion as payments-db/settlement-events, now with a third, differently-shaped example: static frontend hosting rather than a managed backend service), payments-db is deliberately excluded (managed RDS, not cluster-hosted), and settlement-events is deliberately excluded (managed Kafka, not cluster-hosted) — composed-of above says what belongs to the domain, deployed-in here says only where a subset of it actually runs.",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "k8s-cluster",
+          "nodes": ["api-gateway", "payments-service", "notification-service"]
+        }
+      }
+    },
+    {
+      "unique-id": "pci-composed-of",
+      "description": "PCI DSS scope declaration: exactly the nodes that store, process, or transmit raw cardholder data. A third, independent composed-of relationship pointing at a different subset of the same node set than platform-composed-of above — proving composed-of isn't limited to one grouping per architecture.",
+      "relationship-type": {
+        "composed-of": {
+          "container": "pci-cde",
+          "nodes": ["checkout-webapp", "api-gateway", "payments-service", "payments-db"]
+        }
+      }
+    }
+  ],
+  "flows": [
+    {
+      "unique-id": "process-card-payment",
+      "name": "Process Card Payment",
+      "description": "End-to-end business flow from cardholder request through settlement notification.",
+      "transitions": [
+        { "relationship-unique-id": "end-user-uses-webapp", "sequence-number": 1, "description": "Cardholder opens checkout and submits payment details.", "direction": "source-to-destination" },
+        { "relationship-unique-id": "webapp-to-gateway", "sequence-number": 2, "description": "Web app submits the payment request to the gateway.", "direction": "source-to-destination" },
+        { "relationship-unique-id": "gateway-to-payments", "sequence-number": 3, "description": "Gateway forwards the authenticated request.", "direction": "source-to-destination" },
+        { "relationship-unique-id": "payments-to-db", "sequence-number": 4, "description": "Payment record is persisted.", "direction": "source-to-destination" },
+        { "relationship-unique-id": "payments-publishes-settlement", "sequence-number": 5, "description": "Settlement event is published.", "direction": "source-to-destination" },
+        { "relationship-unique-id": "notification-consumes-settlement", "sequence-number": 6, "description": "Notification service emails the receipt.", "direction": "source-to-destination" }
+      ],
+      "controls": {
+        "security-rbac-001": {
+          "description": "Flow-level control — the fourth control-attachment level (architecture/node/relationship/flow), confirmed by calm.finos.org's own intermediate tutorial. This flow as a whole must be traceable to an authenticated, authorized initiator end-to-end, not just at the individual gateway hop.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/rbac.requirement.json",
+              "config": { "mechanism": "flow-level-review", "scope": "end-to-end-payment-flow" }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "controls": {
+    "security": {
+      "description": "Organization-wide network segmentation control requirements applicable to the whole architecture, not scoped to a single node or relationship (document-root controls — a real, distinct CALM construct from node-level and relationship-level controls above; reuses the same real FINOS example pair for a proven-valid URL).",
+      "requirements": [
+        {
+          "requirement-url": "https://calm.finos.org/getting-started/controls/micro-segmentation.requirement.json",
+          "config-url": "https://calm.finos.org/getting-started/controls/micro-segmentation.config.json"
+        }
+      ]
+    }
+  },
+  "decorators": [
+    {
+      "unique-id": "api-gateway-deployment-decorator",
+      "type": "deployment",
+      "target": ["architecture.calm.json"],
+      "applies-to": ["api-gateway"],
+      "data": { "replicas": 3, "namespace": "payments", "rollout-strategy": "rolling-update" }
+    }
+  ],
+  "metadata": [
+    { "key": "x-reference-doc", "value": "coe-lab/docs/reference/rich-calm-example/README.md" },
+    { "key": "x-reference-purpose", "value": "Hand-authored construct-coverage reference for improving pipeline/src/modules/calm-generator — not a generated artefact, not gold for any coe-lab package." },
+    { "key": "x-aac-scope-limitations", "value": "Illustrative only: node/relationship counts, evidence file:line refs, and hostnames are invented for teaching purposes, not derived from a real scanned codebase." },
+    { "key": "x-standard-applied", "value": "nodes[].ownership on payments-service/payments-db is governed by an illustrative org standard, standards/company-node-standard.json (a JSON Schema extending core.json#/defs/node via allOf with {costCenter, owner}), enforced by patterns/company-base-pattern.json — see README.md §4.3 and §8. Actually run: `calm validate -p patterns/company-base-pattern.json -a architecture.calm.json -u url-mapping.json` correctly fails on the 8 nodes that lack ownership (end-user, checkout-webapp, api-gateway, notification-service, settlement-events, platform-system, k8s-cluster, pci-cde) and passes on these 2." }
+  ]
+}
