@@ -14,9 +14,8 @@ graphify-out/
 **/graphify-out/
 *.codegraph.db
 
-# Evidence clones (disposable; re-clone from upstream if needed)
-spikes/**/repo/
-spikes/**/node_modules/
+# Local sample-repo clones used for manual testing (never committed)
+spikes/
 
 # Python
 __pycache__/
@@ -55,8 +54,7 @@ coe-lab/generated/**
 **/.graphify-cache/
 **/graphify-out/
 
-# Residual review sessions (scratch by default — T-RS1-1,
-# Architect_Residual_Review_Session.md §4.1: session packs may contain
+# Residual review sessions (scratch by default — session packs may contain
 # redacted source snippets and are not committed unless an architect
-# deliberately archives one for audit)
+# deliberately archives one for audit; see Architect_Residual_Review_Session.md)
 review-sessions/

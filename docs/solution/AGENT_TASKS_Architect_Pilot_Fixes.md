@@ -1,6 +1,6 @@
 # Agent task list — architect pilot fixes (`B-cli-unknown-flag-validation`, `B-chatmode-host-enforcement-gap`, `B-node-name-from-path`, `B-decision-action-leave-open`)
 
-**STATUS: PLANNED, not started.** Written from a real architect dry-run of `Architect_Guide_Scan_To_Signoff.md` against Fineract and Bank of Anthos (2026-08-09) — every finding below traces to a specific, reproduced observation, not a hypothetical. Full raw log: [`Architect_Pilot_Feedback_Notes.md`](./Architect_Pilot_Feedback_Notes.md) (Entries 1-17).
+**STATUS: CLOSED, 2026-08-10.** All four phases (AP-1 through AP-5) done, real evidence per task below, 81/81 full suite green (80 pre-existing + 1 new). Written from a real architect dry-run of `Architect_Guide_Scan_To_Signoff.md` against Fineract and Bank of Anthos (2026-08-09) — every finding below traces to a specific, reproduced observation, not a hypothetical. Full raw log: [`Architect_Pilot_Feedback_Notes.md`](./Architect_Pilot_Feedback_Notes.md) (Entries 1-17).
 
 **Product:** Weaver. **Owner:** Gowri.
 
@@ -53,19 +53,21 @@ No hard dependencies between AP-1 through AP-4 — they can ship in any order or
 
 ---
 
-## Phase AP-1 — CLI rejects unrecognized flags loudly (Entry 3)
+## Phase AP-1 — CLI rejects unrecognized flags loudly (Entry 3) — **CLOSED, 2026-08-10**
 
 ### T-AP1-1 — Unknown-flag detection in `run-slice.ts`'s `main()`
 After computing `packageRoots` (the current `args.slice(0, positionalEnd)` logic), scan the **remaining** args (everything from `positionalEnd` onward, i.e. what was intended as flags) for any token starting with `-` that isn't one of the recognized flag names (`--out`, `--overrides`, `--modules`, `--strict-detect`, `--no-snippets`, `--k8s-manifests`, `--cfn-manifests`, `--strict-overrides`, `--no-system-node`, `--enable-env-soft-graph`, `--from-facts`). Any match → `console.error` a clear message and `process.exit(1)` **before** any scan work starts. Include a "did you mean" hint when the unknown flag is a single-dash near-miss of a real one (e.g. `-out` → `--out`) — a simple Levenshtein-distance-1 check against the known flag list is enough, no new dependency.
 **Verify:** re-run the exact real command from Entry 3 (`run-slice.js repo/fineract/fineract-charge -out testresults/fineract-charge01`) — must fail loudly with a message naming `-out` and suggesting `--out`, must NOT scan `-out` or the output path as package roots, must NOT silently default `outDir`.
+**Status: DONE.** `checkForUnknownFlags()` added to `run-slice.ts`, called before any flag-index parsing. Re-ran the exact real repro from `spikes/fineract/repo/fineract-charge`: `Unknown option '-out'. Did you mean '--out'?`, exit code 1, no output directory created. Valid `--out` invocations confirmed unaffected (real re-run, `architecture.calm.json` written correctly).
 
 ### T-AP1-2 — Regression fixture for the exact bug shape
 New `test/regression.test.js` case: invoke the CLI with a single-dash typo of a real flag, assert non-zero exit code and a stderr message naming the bad flag — locks Entry 3's exact failure mode as a permanent regression check, not just a manual fix.
 **Verify:** test fails against the pre-fix binary (confirm it would have caught the original bug), passes after T-AP1-1.
+**Status: DONE.** New test using the checked-in NestJS fixture (no `spikes/` dependency, always runs) — asserts both the thrown error message and that no output directory gets created. 81/81 suite green.
 
 ---
 
-## Phase AP-2 — Chat-mode safety-claim correction (Entries 9, 16)
+## Phase AP-2 — Chat-mode safety-claim correction (Entries 9, 16) — **CLOSED, 2026-08-10**
 
 ### T-AP2-1 — Correct the header comment's host-scoped claim
 `.github/chatmodes/residual-review.chatmode.md`'s header comment currently states the `tools:` allowlist means the model has "no code path... not 'won't', genuinely 'can't' through this mode" with no host qualifier. Rewrite to state plainly, with both real observations cited:
@@ -73,28 +75,33 @@ New `test/regression.test.js` case: invoke the CLI with a single-dash typo of a 
 - **Confirmed false in Claude Code chat** (Entry 9 — the model had live `Bash` access despite the same frontmatter; safety there rests on the model's own compliance plus a generic per-action permission prompt, not a structural restriction).
 - Explicit guidance for the Claude Code path: never grant a blanket "allow all edits this session" — approve each write individually.
 **Verify:** re-read the corrected file; a reviewer unfamiliar with this pilot should be able to tell, from the file alone, which host gives a structural guarantee and which gives a convention-based one.
+**Status: DONE.** Header comment's VERIFICATION STATUS section rewritten to state both real observations explicitly, per host, dated 2026-08-10, with the never-allow-all guidance embedded directly in the file (not just in this task list).
 
 ### T-AP2-2 — Same correction reflected in the design doc
 `Architect_Residual_Review_Session.md` §4.4 currently reasons about VS Code Copilot Chat only. Add a short, dated note (matching the doc's existing changelog convention) recording that this was empirically tested against a second host (Claude Code chat) and the enforcement gap was found — point at `Architect_Pilot_Feedback_Notes.md` Entries 9/16 rather than re-deriving the finding inline.
 **Verify:** changelog entry added, doesn't restate the whole finding — just links out, matching this doc's own established pattern for prior findings.
+**Status: DONE.** New changelog entry added (top of table, matching the doc's newest-first convention); §3's Tier A taxonomy also gained the AP-4 leave-open note in the same pass (see AP-4 below).
 
 **No code fix in this phase.** This is a documentation-honesty correction only — closing the structural gap itself (a pre-flight check in `apply.py`/`override-applier.ts`, or an equivalent host-side hardening) is explicitly **not** in scope here; it's a bigger design question (Entry 9's action item #2) that needs its own decision, not a same-round fix bundled in with everything else.
 
 ---
 
-## Phase AP-3 — Node `name` derived from real identifier, not raw path (Entries 10, 15)
+## Phase AP-3 — Node `name` derived from real identifier, not raw path (Entries 10, 15) — **CLOSED, 2026-08-10**
 
 ### T-AP3-1 — Fix `mapSignalsPass`'s hardcoded `name: filePath`
 `pipeline/src/analysis/signal-mapper.ts:214`. Derive a human-readable name instead: prefer a real class/decorator name if one is available from the unit's own evidence (check whether `DecoratorFact`/evidence already carries a `fromNodeKind: 'class'` name for the file — if so, use it); otherwise fall back to `path.basename(filePath).replace(/\.(java|py|ts|tsx|js)$/, '')` (language-agnostic enough for this project's current scope, matches the existing extension-based `language` derivation already in `codegraph-provider.ts`). Multi-class-per-file case (Entry 12's `ChargeConfiguration.java` shape, or any file with 2+ real classes): fall back to the basename, not a guess at which class — never fabricate a preference between multiple real candidates.
 **Verify:** re-run the exact Entry 10 case (`fineract-charge` single-root) — `ChargesApiResource.java`'s node `name` becomes `ChargesApiResource`, not the full path. Re-run Entry 15's BoA case — `userservice.py`/`contacts.py` become `userservice`/`contacts` (or a real extracted identifier if evidence supports better).
+**Status: DONE.** Real mechanism used instead of a fresh guess: `DecoratorFact` gained `fromNodeName?: string` (CodeGraph's own `Node.name`, threaded through all 4 of `codegraph-provider.ts`'s `extract*Facts()` functions alongside the existing `fromNodeKind`). `signal-mapper.ts` collects real class names per file (only where `fromNodeKind === 'class'`) across decorator/call/type-reference/extends facts, and `deriveUnitName()` uses the single unambiguous name if one exists, else `path.basename()` with the extension stripped. Both real repros re-ran and matched exactly: Fineract's 3 units named correctly (`ChargesApiResource`/`Charge`/`ChargeRepository`), BoA's service units fell back to basename (`userservice`/`contacts`, no class-level Flask marker exists) while its already-correct database units (`UserDb`/`ContactsDb`) were unaffected.
 
 ### T-AP3-2 — Confirm `unique-id` untouched
 Direct diff of `unique-id` fields before/after on both re-runs above — must be byte-identical (only `name` should change). This is the integrity rule from §0.2, checked explicitly, not assumed.
 **Verify:** diff shows zero `unique-id` changes across all nodes in both real re-runs.
+**Status: DONE.** Confirmed directly against both real re-runs — every `unique-id` (`ChargesApiResource.java`, `db.py::UserDb`, etc.) identical to the pre-fix values recorded in `Architect_Pilot_Feedback_Notes.md` Entries 10/15; `id: filePath` in `signal-mapper.ts`'s unit-push was never touched, only the adjacent `name:` field.
 
 ### T-AP3-3 — Regression fixtures
 Add/extend fixtures covering: a single, cleanly-named class (expect real class name), a file with no clean class marker (expect basename fallback), and the multi-class-per-file case (expect basename fallback, not an arbitrary pick).
 **Verify:** exact-assertion tests for all three shapes; full suite stays green, no unrelated fixture's `name` field changes unexpectedly (only ones that were previously wrong under the raw-path bug should change).
+**Status: DONE.** Three shapes covered using existing checked-in fixtures (no new fixture files needed): NestJS's `UsersController` (single real class → `node.name === 'UsersController'`), the BoA services (no class evidence → basename fallback, in the existing skip-if-absent real-repo test), and `jaxrs-multiclass-sample`'s `MultiResourceFile.java` (2 real classes, `OrdersResource`/`ProductsResource` → basename fallback `'MultiResourceFile'`, never an arbitrary pick between the two). 81/81 suite green, no unrelated fixture's `name` assertion changed.
 
 ---
 

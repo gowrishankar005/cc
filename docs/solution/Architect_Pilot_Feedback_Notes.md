@@ -168,14 +168,14 @@ No `Bash`/terminal tool is listed. The file's own header comment states this lis
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Add install-noise expectation note to guide's "Before you start" | Not yet applied |
-| 3 | `run-slice.ts` should reject unknown flags loudly instead of silently treating them as package roots | Not yet fixed — candidate `B-cli-unknown-flag-validation` |
-| 4 | Confirm whether multi-root (`fineract-charge` + `fineract-provider`) scan clears S1 | In progress |
-| 6 | Expand guide's Step 3 with concrete chat-mode activation steps | Not yet applied |
-| 7 | Update guide + chat-mode header comment: live session now confirmed working (Claude Code path); note cosmetic duplicate-"Other" artifact | Not yet applied — pending rest of session |
-| 8 | `DecisionRecord.final_decision.action` has no value meaning "reviewed, left open" — closest is `accepted`, real schema gap | Not yet fixed — candidate `B-decision-action-leave-open` |
-| 9 | **HIGH SEVERITY** — chat-mode `tools:` allowlist is not enforced by Claude Code chat; "genuinely can't apply" claim is false outside VS Code Copilot Chat | Not yet fixed — candidate `B-chatmode-host-enforcement-gap` |
-| 10 | Node `name` field is the raw file path for every unit kind (`signal-mapper.ts:214`) — real, confirmed via live output | Not yet fixed — candidate `B-node-name-from-path` |
+| 1 | Add install-noise expectation note to guide's "Before you start" | **Fixed 2026-08-10 (AP-5)** |
+| 3 | `run-slice.ts` should reject unknown flags loudly instead of silently treating them as package roots | **Fixed 2026-08-10 (AP-1)** |
+| 4 | Confirm whether multi-root (`fineract-charge` + `fineract-provider`) scan clears S1 | Resolved — see Entry 14 (self-correction, R2 multi-hop bridge did resolve it) |
+| 6 | Expand guide's Step 3 with concrete chat-mode activation steps | **Fixed 2026-08-10 (AP-5)** |
+| 7 | Update guide + chat-mode header comment: live session now confirmed working (Claude Code path); note cosmetic duplicate-"Other" artifact | **Fixed 2026-08-10 (AP-2, AP-5)** |
+| 8 | `DecisionRecord.final_decision.action` has no value meaning "reviewed, left open" — closest is `accepted`, real schema gap | **Fixed 2026-08-10 (AP-4)** |
+| 9 | **HIGH SEVERITY** — chat-mode `tools:` allowlist is not enforced by Claude Code chat; "genuinely can't apply" claim is false outside VS Code Copilot Chat | **Doc corrected 2026-08-10 (AP-2)** — underlying host gap intentionally not structurally closed, see AP-2's own scope note |
+| 10 | Node `name` field is the raw file path for every unit kind (`signal-mapper.ts:214`) — real, confirmed via live output | **Fixed 2026-08-10 (AP-3)** |
 
 ---
 
@@ -192,6 +192,8 @@ ChargeRepository.java   | database | name: src/main/java/.../ChargeRepository.ja
 All three nodes — service and both database units — have `name` set to the full raw file path. Root cause: `pipeline/src/analysis/signal-mapper.ts:214` hardcodes `name: filePath` in `mapSignalsPass`, and for Java, JPA `@Entity` detection (unlike Python/Node driver-import detection, which does use real class names via `graphify-import-strategy-detector.ts:180`) also runs through this same function — so every Java unit built this way gets a raw path as its display name, not a real, single-file coincidence. This directly hurts the "hand this to a stakeholder" usability goal the whole guide is built around.
 
 **Action item:** Derive a human-readable `name` (real class name from decorator evidence if available, else `path.basename(filePath, '.java')`/language-appropriate equivalent as a minimal fallback) instead of the raw path. Candidate: **`B-node-name-from-path`**. Not yet fixed — offered to fix immediately, awaiting architect's go-ahead.
+
+**Fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-3.** `signal-mapper.ts` now derives `name` from a real, unambiguous class name (threaded through as `DecoratorFact.fromNodeName` from CodeGraph's own `Node.name`) when exactly one exists for the file, falling back to the basename otherwise — never guesses between multiple real candidates (verified against `MultiResourceFile.java`'s 2-class shape). Re-ran the exact Fineract repro: `ChargesApiResource.java` now names `ChargesApiResource`, `Charge.java` names `Charge`, `ChargeRepository.java` names `ChargeRepository`. `unique-id` confirmed unchanged in both re-runs. `scope-limitations.yml` updated (`unit-name-derivation`), 3 new locked regression assertions.
 
 **Finding 2 — connectivity question resolved, confirms prior findings, not a new gap:**
 ```json
@@ -297,6 +299,8 @@ Both services connect directly to their own database class, no invisible layers,
 **Only 1 residual:** `S2-http-without-security-control` — expected, matches known auth-detection coverage limits.
 
 **Action item:** None new — this run is the clean baseline to compare Fineract's layered case against, and a good candidate for a short, low-friction residual-session walkthrough next.
+
+**Naming half fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-3.** Re-ran this exact scan post-fix: `userservice.py`/`contacts.py` now name `userservice`/`contacts` (basename fallback — Python has no class-level marker for these Flask app-factory files, a real, disclosed edge in `scope-limitations.yml`'s new `unit-name-derivation` entry, not a full fix to a "true" service name). `UserDb`/`ContactsDb` were already correct before this fix. Locked in `test/regression.test.js`'s existing BoA test.
 
 ---
 
