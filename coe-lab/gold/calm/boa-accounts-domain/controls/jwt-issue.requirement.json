@@ -1,0 +1,5 @@
+{
+  "control-id": "security-auth-jwt-issue-001",
+  "name": "JWT token issuance",
+  "description": "A jwt.encode call was found at this call site — evidence that this service mints signed session tokens here. Not, by itself, proof the signing key is stored/rotated securely or that token expiry is enforced elsewhere; those are separate, unverified claims."
+}

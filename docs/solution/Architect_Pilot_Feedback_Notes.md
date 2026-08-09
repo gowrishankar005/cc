@@ -1,0 +1,319 @@
+# Architect Pilot Feedback Notes
+
+Running log of real observations, confusion points, and errors hit while an architect (not the person who built the pipeline) walks through [`Architect_Guide_Scan_To_Signoff.md`](./Architect_Guide_Scan_To_Signoff.md) for the first time, using Fineract as the test repo. Each entry is raw feedback plus what it means and what (if anything) should change — this is a feedback log, not itself the fix. Action items graduate to `BACKLOG.md` when there's a concrete owner/priority decision to track.
+
+**Status:** in progress — session ongoing, entries added as feedback comes in.
+
+**⚠️ Entry 9 below is a high-severity safety finding — read before trusting the chat-mode's "cannot apply" claim in any host other than VS Code Copilot Chat.**
+
+---
+
+## Entry 1 — `npm install` deprecation warnings + vulnerability summary
+
+**Observed:**
+```
+npm warn deprecated inflight@1.0.6...
+npm warn deprecated glob@7.2.3...
+3 vulnerabilities (2 moderate, 1 high)
+```
+
+**What it means:** Normal end-of-install noise, not a failure — install succeeded (429 packages). Deprecation warnings are from transitive sub-dependencies, not Weaver's own deps. The 3 vulnerabilities all trace to `@cyclonedx/cdxgen`'s `tar`/`undici` sub-deps (checked via `npm audit`) — not exploitable in how Weaver uses cdxgen (local filesystem scan, not untrusted network input). `npm audit fix --force` would bump `cdxgen` to an untested breaking major version — should not be run.
+
+**Action item:** Add a short expectation-setting note to the guide's "Before you start" so an architect doesn't stop and second-guess a successful install. **Status: not yet applied to the guide.**
+
+---
+
+## Entry 2 — `npm run build` output
+
+**Observed:** full build output including the `tsc` compile, catalogue YAML/JSON copy steps, and `[generate-control-url-mapping] wrote 9 mapping(s)...`.
+
+**What it means:** Ran correctly, no errors. Confirmed as expected output.
+
+**Action item:** None — working as intended.
+
+---
+
+## Entry 3 — silent flag-typo swallowing (`-out` vs `--out`) — real bug
+
+**Observed:**
+```
+node pipeline/dist/orchestration/run-slice.js repo/fineract/fineract-charge -out testresults/fineract-charge01
+...
+[run-slice] .../fineract-charge: 0 native route(s), 211 decorator fact(s), 3 unit(s)
+[run-slice] .../-out: 0 native route(s), 0 decorator fact(s), 0 unit(s)
+[run-slice] .../testresults/fineract-charge01: 0 native route(s), 0 decorator fact(s), 0 unit(s)
+```
+Architect reported no final completion message and assumed the process was hung.
+
+**Root cause (confirmed by reading `run-slice.ts`'s `main()`):**
+- The CLI matches `--out` by exact string (`args.indexOf('--out')`). A single-dash `-out` is never recognized.
+- The package-root list is computed as "everything before the first recognized flag." Since **no** flag was recognized, `positionalEnd` fell back to `args.length` — every argument (`fineract-charge`, `-out`, `testresults/fineract-charge01`) got resolved as a path and scanned as its own package root. Two of those don't exist as real code, hence `0 unit(s)` for both.
+- Because `--out` was never matched, `outDir` silently defaulted to `<cwd>/calm-output` — **not** the path the architect typed. Nothing in the output says this happened.
+- Process wasn't hung — it almost certainly completed and wrote to `calm-output/`, just not where the architect expected, with no error to flag the mismatch.
+
+**Impact:** An architect can run a scan, watch it "succeed," and have no correct output anywhere near the path they specified — and no error tells them why. This is a real usability/correctness gap, not user error alone.
+
+**Action item (real, not yet fixed):** `run-slice.ts`'s arg parser should reject unrecognized flags loudly (`Unknown option '-out'. Did you mean '--out'?`) instead of silently reinterpreting them as package roots. Track as a backlog item — candidate name **`B-cli-unknown-flag-validation`** — before the guide is handed to more architects, since this is exactly the kind of first-command failure that erodes trust in the tool.
+
+**Guide fix, immediate:** none needed to the guide's own command text (it already shows `--out` correctly) — this was a transcription/typo issue on the architect's end, surfaced a real product gap.
+
+**Fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-1.** `run-slice.ts` now rejects any unrecognized flag before any scan work starts, with a "did you mean" hint for the real single-dash-typo case; re-ran the exact repro command, confirmed no output written and exit code 1. Locked in `test/regression.test.js`.
+
+---
+
+## Entry 4 — `S1-zero-service-touching-relationships` on single-root `fineract-charge` scan — expected, correctly disclosed
+
+**Observed:**
+```
+"silenceFlags": [
+  "S1-zero-service-touching-relationships: 1 service unit(s) and 2 database unit(s) present, but 0 relationships touch a service unit..."
+],
+"servicesWithArchitectureOutbound": 0,
+"architectureOutboundCoverage": 0
+```
+Architect asked whether this "looks good."
+
+**What it means:** Correct, expected behavior for this specific case — not a bug, not a regression. `fineract-charge` alone contains the HTTP resource (`ChargesApiResource`) and the JPA entity (`Charge`), but the service/repository layer that bridges them lives in a different module (`fineract-provider`). Scanning `fineract-charge` in isolation means the scanner can't see that bridge, so it correctly reports S1 instead of fabricating a relationship. This matches the project's own known, previously-documented gap (Fineract multi-hop/layered story, `Claim_Register.md` R2 — not built for a single-root scan).
+
+**Action item:** None for the tool — this is the honesty mechanism working as designed. **Follow-up test, in progress:** rescanning with both `fineract-charge` + `fineract-provider` as roots together to check whether the multi-hop bridge resolves at that scope (per the guide's Fineract example). Outcome to be logged as its own entry.
+
+---
+
+## Entry 5 — `pack.py` run against real `calm-output` — clean, as expected
+
+**Observed:**
+```
+[pack] review-queue.json missing — generating via hitl-review-trigger.js
+[hitl-review-trigger] 3 review item(s) written to .../calm-output/review-queue.json
+  - [S1-zero-service-touching-relationships] ChargesApiResource.java (service, confidence 100)
+  - [S1-zero-service-touching-relationships] Charge.java (database, confidence 50)
+  - [S1-zero-service-touching-relationships] ChargeRepository.java (database, confidence 80)
+[pack] wrote Session Pack to .../review-sessions/fineract-run (3 residual(s))
+```
+Architect clarified prior feedback was general flow/output confirmation, not a complaint.
+
+**What it means:** Correct, no issues. `review-queue.json` didn't exist yet from the prior scan (expected, since Step 1's plain `run-slice` invocation doesn't run the HITL trigger on its own) — `pack.py` generated it automatically, exactly as designed (§4.2 fallback in the design doc). All 3 residuals map 1:1 to the 3 units from the Entry 4 scan, each correctly flagged under the same S1 reason. Confidence scores (100/50/80) are real, per-unit signal carried through into the pack.
+
+**Action item:** None.
+
+---
+
+## Entry 6 — guide's Step 3 unclear on where the chat-mode file is / how to activate it — doc gap
+
+**Observed:** Architect asked "where do I find this file? is it part of the repo?" in response to the guide's Step 3 line referencing `.github/chatmodes/residual-review.chatmode.md`.
+
+**What it means:** File is real and checked in, but the guide only named the path — it never explained (a) that it's part of the repo, not an external download, or (b) the actual VS Code UI steps to activate a custom chat mode (open workspace in VS Code, find the chat-mode picker, select it by its `description`). Confirmed via the file's own header comment: this chat mode has never been exercised in a live VS Code session in this project — so this pilot run is genuinely the first real test of whether the activation flow works as documented.
+
+**Action item:** Expand the guide's Step 3 with the concrete activation steps (not just the file path), and explicitly flag that live-session behavior is unverified so the architect knows to report back what they actually see, not assume a mismatch is their own error. **Status: not yet applied to the guide — pending confirmation of what the architect actually observes in VS Code, so the doc update reflects reality rather than assumption.**
+
+---
+
+## Entry 7 — chat-mode session ran live for real, using Claude Code chat rather than VS Code + Copilot Chat
+
+**Observed:** Architect activated the chat mode and got a real, working session — two genuine choice cards (R-001, R-002) matching the design doc's mockup almost exactly (fixed options synthesized from real evidence, "None of these"/"Other" escape hatches, evidence citations with real file:line refs). Interface used was **Claude Code's own chat**, not VS Code + GitHub Copilot Chat as the guide's Step 3 describes.
+
+**What it means — three separate findings:**
+
+1. **The chat-mode file works, live, for the first time in this project.** Its own header comment says this had never been exercised in a live session before (Entry 6). Confirmed now: it correctly read `SESSION.md`/`residuals.json`, generated cards matching the fixed per-class template (not invented options), and correctly refused to auto-pick an answer.
+2. **A second, previously-undocumented valid activation path exists**: the chat-mode markdown file works when interpreted directly by Claude Code chat, not just VS Code Copilot Chat. Guide should mention this as an alternative, not imply Copilot Chat is the only way in.
+3. **Cosmetic duplicate "Other" option** on both cards — confirmed via `cards.py`: the pack's own card generator always appends one `Other…` option by design (§2.1's mandatory escape hatch); the second, plain "Other" is Claude Code's own question UI adding its own independent fallback on top of the options it was given. Two separate "always offer an escape hatch" mechanisms stacking, not a data bug. Harmless, but slightly confusing to a first-time user.
+
+**R-001 and R-002 both correctly answered "None of these," verified against real source, not guessed:**
+- `ChargesApiResource.java` injects `ChargeReadPlatformService` and `PortfolioCommandSourceWritePlatformService` only — never references `Charge.java` or `ChargeRepository.java` directly (confirmed by reading the real file). The true bridge is a service interface whose implementation isn't in this scan's roots at all.
+- `Charge.java` imports `TaxGroupData`/`TaxGroup` (real, confirmed) but has zero reference to `ChargesApiResource` — the card's own evidence text already flagged this as coincidental, not a real link.
+- Both are genuine cases for the tool's "don't fabricate, name the gap" behavior working as intended — not tool failures.
+
+**Action item:** Update guide's Step 3 to (a) mention Claude Code chat as a confirmed-working alternative activation path alongside VS Code Copilot Chat, (b) note the possible cosmetic duplicate-"Other" artifact depending on host UI, and (c) update the chat-mode file's own header comment — its "NOT been exercised in a live session" disclaimer is now stale for at least the Claude Code path. **Status: not yet applied — pending R-003 and the rest of the session, so the doc update covers the whole flow, not just the first two cards.**
+
+---
+
+## Entry 8 — R-003 confirms same pattern; real schema gap found on the "None of these" write-back path
+
+**Observed:** R-003 (`ChargeRepository.java`) resolved the same way as R-001/R-002 — verified against real source (`ChargeRepository extends JpaRepository<Charge,...>`, zero reference to `ChargesApiResource`). All 3 residuals answered "None of these." Chat agent correctly identified that only Decision Records are needed (no Overrides, since nothing changes in CALM), and asked before drafting rather than proceeding silently — good behavior, matches its own bound rules.
+
+**Real gap found while reviewing the plan before letting it draft:** `pipeline/src/types/overrides.ts`'s `DecisionRecord.final_decision.action` only accepts `'accepted' | 'overridden' | 'added' | 'removed'`. None of these cleanly means "reviewed, and the honest answer is: no real connection exists, leave it open." The closest fit is `accepted` (confirming the scan correctly found nothing), but this was never designed as an explicit "leave-open" outcome — an architect or drafting agent has to infer the mapping rather than being told it.
+
+**Action item:** Either (a) add an explicit `'left-open'` (or similar) value to `final_decision.action` so this outcome is representable without inference, or (b) if `accepted` is meant to cover this case by design, say so explicitly in `overrides.ts`'s own comments and in the design doc's Tier A taxonomy (§3), since neither currently states it. Track as **`B-decision-action-leave-open`**. Not blocking this session — recommended `accepted` with an explicit rationale as the practical workaround for now.
+
+**Fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-4 (option A — no schema change).** `overrides.ts` and `Architect_Residual_Review_Session.md` §3 now state explicitly that `"accepted"` is the designated value for this outcome, not just the closest fit. New worked example (`tools/review-session/examples/decision-D-example-002-leave-open.json`) shows the no-Override shape; validated clean via `validate_drafts.py`.
+
+---
+
+## Entry 9 — HIGH SEVERITY: chat-mode `tools:` allowlist is not enforced by Claude Code chat
+
+**Observed:** After the architect approved drafting, the agent used the **`Bash`** tool (`find`, a `python3` heredoc reading `calm-output/architecture.calm.json`, `mkdir -p`) and the **`Write`** tool to create `decision-D-R-001.json`, with a real per-file permission prompt ("Allow write to decision-D-R-001.json? [1] Yes [2] Yes, allow all edits this session [3] No").
+
+**What it means — this falsifies a specific, load-bearing safety claim.** `.github/chatmodes/residual-review.chatmode.md`'s frontmatter declares:
+```
+tools: ['codebase', 'search', 'usages', 'problems', 'editFiles']
+```
+No `Bash`/terminal tool is listed. The file's own header comment states this list is "the real enforcement mechanism, not just an instruction... A chat session bound to this mode has **no code path** to run `apply.py`, `node dist/orchestration/run-slice.js`, or `override-applier.ts` — not 'won't', genuinely 'can't' through this mode."
+
+**That claim is confirmed false when this chat-mode file is interpreted by Claude Code's own chat** (as opposed to VS Code Copilot Chat, which the design was originally built and reasoned about for). The model had live `Bash` access — the `tools:` frontmatter was not enforced as a hard capability restriction by this host at all. In principle, nothing prevented it from running `apply.py`/`run-slice`/`override-applier` directly via `Bash` in this session, other than its own adherence to the written instructions (a soft constraint) and the host's own generic per-action permission prompt (a real gate, but not something this design specifically built or can rely on being present in every host).
+
+**In practice it behaved safely this session** — it used `Bash` only for read-only inspection (`find`, reading the real CALM file to get accurate `unique-id`s) and `mkdir -p` on the correct `drafts/decisions/` path, and it did stop to ask permission before each write. But "behaved safely because it chose to, with a generic host permission prompt as backstop" is a materially weaker guarantee than "genuinely cannot, by construction" — and the chat-mode file actively asserts the stronger claim.
+
+**Action item, high priority:**
+1. Correct the chat-mode file's header comment — the "genuinely can't through this mode" claim needs a host-specific caveat: true (structurally enforced) in VS Code Copilot Chat where the `tools:` frontmatter is honored as a real capability gate; **not proven true, and directly observed false, in Claude Code chat**, where it currently relies on the model's own compliance plus a generic permission prompt.
+2. Decide whether this project wants a host-specific safety story (document the Claude Code path as "convenience only, review every write, never grant 'allow all'") or whether to close the gap structurally (e.g., a pre-flight check in `apply.py`/`override-applier.ts` refusing to run if invoked from within an active chat-agent context — needs more thought, not a same-session fix).
+3. Track as **`B-chatmode-host-enforcement-gap`** — this is exactly the "specified vs proven" failure mode this project's own `CLAUDE.md` names as the thing to catch, and it was caught by actually running the real thing in a second real host, not by re-reading the design doc.
+
+**Immediate guidance given to the architect:** always choose "Yes" per-file, never "Yes, allow all edits this session," when using this chat mode in Claude Code — the per-action prompt is the only real safety gate available in this host right now.
+
+**Doc corrected 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-2.** `.github/chatmodes/residual-review.chatmode.md`'s header comment now states the claim per-host (confirmed true in VS Code Copilot Chat — Entry 16; confirmed false in Claude Code chat — this entry), with the same "never allow-all" guidance embedded directly in the file. Design doc changelog updated too. Structurally closing the gap in non-VS-Code hosts remains open, not attempted here.
+
+---
+
+## Open action items summary
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Add install-noise expectation note to guide's "Before you start" | Not yet applied |
+| 3 | `run-slice.ts` should reject unknown flags loudly instead of silently treating them as package roots | Not yet fixed — candidate `B-cli-unknown-flag-validation` |
+| 4 | Confirm whether multi-root (`fineract-charge` + `fineract-provider`) scan clears S1 | In progress |
+| 6 | Expand guide's Step 3 with concrete chat-mode activation steps | Not yet applied |
+| 7 | Update guide + chat-mode header comment: live session now confirmed working (Claude Code path); note cosmetic duplicate-"Other" artifact | Not yet applied — pending rest of session |
+| 8 | `DecisionRecord.final_decision.action` has no value meaning "reviewed, left open" — closest is `accepted`, real schema gap | Not yet fixed — candidate `B-decision-action-leave-open` |
+| 9 | **HIGH SEVERITY** — chat-mode `tools:` allowlist is not enforced by Claude Code chat; "genuinely can't apply" claim is false outside VS Code Copilot Chat | Not yet fixed — candidate `B-chatmode-host-enforcement-gap` |
+| 10 | Node `name` field is the raw file path for every unit kind (`signal-mapper.ts:214`) — real, confirmed via live output | Not yet fixed — candidate `B-node-name-from-path` |
+
+---
+
+## Entry 10 — node `name` is the raw file path for every unit, confirmed via live output — real bug, root cause isolated
+
+**Observed:** Architect noted the CALM viewer only shows file paths as node labels, not readable names, and asked whether a diagram edge meant real DB↔API connectivity. Read the real generated `architecture.calm.json` directly (`/Users/gowri/Innovation/testbed/cc/calm-output/architecture.calm.json`) to get ground truth instead of guessing from the rendered diagram.
+
+**Finding 1 — name bug, confirmed and root-caused precisely:**
+```
+ChargesApiResource.java | service  | name: src/main/java/.../ChargesApiResource.java
+Charge.java             | database | name: src/main/java/.../Charge.java
+ChargeRepository.java   | database | name: src/main/java/.../ChargeRepository.java
+```
+All three nodes — service and both database units — have `name` set to the full raw file path. Root cause: `pipeline/src/analysis/signal-mapper.ts:214` hardcodes `name: filePath` in `mapSignalsPass`, and for Java, JPA `@Entity` detection (unlike Python/Node driver-import detection, which does use real class names via `graphify-import-strategy-detector.ts:180`) also runs through this same function — so every Java unit built this way gets a raw path as its display name, not a real, single-file coincidence. This directly hurts the "hand this to a stakeholder" usability goal the whole guide is built around.
+
+**Action item:** Derive a human-readable `name` (real class name from decorator evidence if available, else `path.basename(filePath, '.java')`/language-appropriate equivalent as a minimal fallback) instead of the raw path. Candidate: **`B-node-name-from-path`**. Not yet fixed — offered to fix immediately, awaiting architect's go-ahead.
+
+**Finding 2 — connectivity question resolved, confirms prior findings, not a new gap:**
+```json
+{ "connects": { "source": "ChargeRepository.java", "destination": "Charge.java" }, "grade": "structural" }
+{ "composed-of": { "container": "system", "nodes": [all 3] } }
+```
+Only two relationships exist: a real `ChargeRepository → Charge` structural edge (matches `extends JpaRepository<Charge,...>`, genuinely correct) and the `system` container's `composed-of` grouping (not a dependency edge — explains the outer box in the diagram). **No relationship exists between the API node and either database node** — fully consistent with S1 firing and all three "None of these" answers from Entries 7-8. The diagram's arrow was between the two database boxes; the `system` container's bounding box made it easy to misread as touching the API node.
+
+**Action item:** None for correctness — the data is right. Possible follow-up: the "system" container box visually overlapping/appearing to connect unrelated nodes in the diagram is a rendering/legibility concern for whichever CALM viewer is in use, not something this pipeline controls.
+
+---
+
+## Entry 11 — real architecture traced by hand, sharper root cause found for the S1 gap
+
+**Observed:** Architect asked to independently verify (not just trust the JSON dump) what the real relationship is between `ChargesApiResource`, `Charge`, and `ChargeRepository` by exploring the actual Fineract source.
+
+**What was found, tracing the real chain hop by hop:**
+```
+ChargesApiResource (fineract-charge)
+  ├─ readPlatformService: ChargeReadPlatformService        interface, IN-SCOPE (fineract-charge)
+  │    └─ impl ChargeReadPlatformServiceImpl (fineract-provider, out of scan)
+  │          └─ uses raw JdbcTemplate — bypasses Charge/ChargeRepository entirely for reads
+  └─ commandsSourceWritePlatformService → CreateChargeDefinitionCommandHandler (fineract-charge)
+       └─ clientWritePlatformService: ChargeWritePlatformService   interface, IN-SCOPE (fineract-charge)
+            └─ impl ChargeWritePlatformServiceJpaRepositoryImpl (fineract-provider, out of scan)
+                 └─ chargeRepository: ChargeRepository   ← the real bridge to Charge/ChargeRepository
+```
+
+**Sharper root cause than the generic S1 message:** `ChargeReadPlatformService.java` and `ChargeWritePlatformService.java` are **both physically inside the scanned root** — confirmed by reading them directly, both are plain interfaces with zero annotations (no `@Path`, `@Entity`, `@PreAuthorize`, anything the signal catalogue watches for). Because they produce no evidence, `signal-mapper.ts` never creates a `TypedUnit` for them at all — they're invisible to the pipeline even though they're in-scope, not merely unconnected. The deepest hop (the JPA repository usage) genuinely is in another module (`fineract-provider`), consistent with the known multi-root story — but the *first* hop's invisibility is a distinct, more specific mechanism: **plain, framework-marker-free interface classes are structurally undetectable by this catalogue-driven approach even when physically in-scope**, and they're often exactly the real service-boundary seam an architect needs to see.
+
+**Confirms, doesn't contradict, prior findings:** all three "None of these" answers (Entries 7-8) remain correct — there genuinely is no direct API↔DB edge in the code, by design (CQRS-style read/write split). What's new is *why* the scanner can't see the real bridge — worth more than the generic S1 disclosure text alone.
+
+**Action item:** Consider whether a future detection mechanism could flag "referenced interface with zero unit-forming evidence, in-scope" as its own distinct signal (e.g., promote a plain interface to a minimal placeholder unit purely on the basis of being a field-injected dependency of an already-typed service) — this would surface the real seam even without annotation evidence. Not scoped or committed to — flagging as a genuine, evidenced idea for a future detection catalogue row, not an immediate fix. No backlog ID assigned yet; candidate name if pursued: `B-plain-interface-bridge-detection`.
+
+---
+
+## Entry 12 — third, distinct detection gap found: Spring `@Bean`-factory ("starter") wiring is invisible too
+
+**Observed:** Architect asked whether to run a multi-root scan (`fineract-charge` + `fineract-provider`) to recover the real chain traced in Entry 11, and which repos to include. Investigated the real implementation classes in `fineract-provider` before answering, to give an honest prediction rather than assume adding the module would fix the story.
+
+**Finding:** Neither `ChargeReadPlatformServiceImpl` nor `ChargeWritePlatformServiceJpaRepositoryImpl` (the real implementations of the two plain interfaces from Entry 11) carry a class-level `@Service`/`@Component`/`@Repository` stereotype annotation. Both are wired via a third mechanism — a dedicated `@Configuration` "starter" class with `@Bean` factory methods:
+```java
+// fineract-provider/.../charge/starter/ChargeConfiguration.java
+@Configuration
+public class ChargeConfiguration {
+    @Bean
+    public ChargeReadPlatformService chargeReadPlatformService(...) { return new ChargeReadPlatformServiceImpl(...); }
+    @Bean
+    public ChargeWritePlatformService chargeWritePlatformService(...) { return new ChargeWritePlatformServiceJpaRepositoryImpl(...); }
+}
+```
+This `starter`/`@Bean`-factory pattern is a real, apparently repo-wide Fineract convention (confirmed similarly named `starter`/`SavingsConfiguration.java`, `LoanAccountConfiguration.java`, etc. exist for other modules) — not a one-off. **No detection mechanism in this pipeline's signal catalogue currently recognizes `@Bean`-factory wiring as service-forming evidence.** So even scanning `fineract-provider`, these two impl classes likely still produce zero evidence and zero units — a second, independent invisibility mechanism stacked on top of Entry 11's plain-interface gap, on the very same real story.
+
+**Action item:** A new signal-catalogue candidate — detect `@Bean`-annotated factory methods inside `@Configuration` classes as service-forming evidence for whatever type they return, sourcing the "real" class name/kind from the constructed type (e.g. `new ChargeReadPlatformServiceImpl(...)`), not just the configuration class itself. This is a materially different, well-evidenced mechanism from anything currently in the catalogue (JAX-RS/JPA/security-annotation decorators) — likely relevant repo-wide for Fineract, not Charge-specific. No backlog ID assigned yet; candidate name if pursued: `B-spring-bean-factory-detection`.
+
+**Expectation set for the upcoming multi-root scan (Entry 4's original open item):** should still be run as the real empirical test, but do not expect it to fully recover the `ChargesApiResource → ... → ChargeRepository` chain — two distinct, compounding, now-evidenced detection gaps (plain interfaces + `@Bean`-factory wiring) both sit on this exact story, independent of which roots are included.
+
+---
+
+## Entry 13 — should `fineract-core` be included too? Checked, answer is no, for a third reason
+
+**Observed:** Architect asked whether `fineract-core` should also be in the multi-root scan, since `ChargesApiResource`'s write path goes through `PortfolioCommandSourceWritePlatformService`, which lives there.
+
+**Investigated before answering:** `PortfolioCommandSourceWritePlatformService` is, itself, another plain interface (same pattern as Entry 11). Its real impl, `PortfolioCommandSourceWritePlatformServiceImpl` (in `fineract-core`), does carry `@Service` — but a direct check of `signal-catalogue.yml` confirms **there is no catalogue row for bare Spring `@Service`/`@Component` at all** — only specific things (JAX-RS routes, `@Entity`, `@PreAuthorize`, etc.) are watched for. So this impl would also produce zero evidence today. Separately, and independent of catalogue coverage: `ChargesApiResource` only imports the **interface** type — connecting that reference to a real implementation elsewhere requires resolving Spring dependency injection (interface → concrete bean), which nothing in this pipeline does; import-following alone can't make that link even if the impl were detected.
+
+**A third, distinct real gap, on top of Entries 11-12:** no generic Spring stereotype (`@Service`/`@Component`) detection exists in the catalogue at all, and DI-based interface-to-implementation resolution isn't built. Both are real, separate from the plain-interface and `@Bean`-factory gaps already logged.
+
+**Recommendation given:** skip `fineract-core` for this specific test — including it wouldn't recover a real edge back to `ChargesApiResource` (for the reasons above), and would only add scan time and a third confound to an already-two-gap story. Two-root scan (`fineract-charge` + `fineract-provider`) stays the cleanest test of Entries 11-12.
+
+**Action item:** No new backlog candidate beyond what's implied by Entry 12 (a generic Spring stereotype detection row would be a natural pairing with the `@Bean`-factory detection idea) — noting here for completeness, not assigning a new id.
+
+---
+
+## Entry 14 — self-correction: the multi-root scan actually resolved the hop Entries 12-13 predicted it wouldn't
+
+**Observed:** Architect ran the real two-root scan (`fineract-charge` + `fineract-provider`). `ChargesApiResource` came back with **3 real relationships**, including a `calls` edge straight to `ChargeReadPlatformServiceImpl.java::ChargeReadPlatformServiceImpl` (`x-aac-mechanism: "r2-phase1"`, confidence 10).
+
+**What was wrong in Entries 12-13:** the prediction assumed the impl class needed signal-catalogue-recognized evidence (a Spring stereotype or `@Bean`-factory detection) to become a unit and be connectable at all. That assumption wasn't tested before being stated. In fact, the run log's own `multi-hop bridge (R2): 116 architecture relationship(s) resolved` line (visible in every scan this session, never investigated until now) is a separate mechanism — it uses Graphify's raw structural call-graph, which resolves real method calls independent of annotation-based typing, and mints a minimal unit for the call target on the spot. It doesn't need a catalogue row at all for this case. Should have tested this before predicting three turns' worth of "this won't work" — noted as a real process lesson, not just a data point.
+
+**Two real findings in what R2 actually produced, still worth reviewing (not new detection gaps — quality/classification questions):**
+1. `ChargeReadPlatformServiceImpl` got `node-type: "database"` — debatable; it's a service running raw JDBC queries, not an owned entity like `Charge`. Low confidence (`20`) honestly reflects this. Good Tier A "ontology judgment" residual candidate.
+2. Two odd, identical edges from `ChargesApiResource` to `spm/domain/Component.java` (an unrelated Survey-domain class) — plausible Graphify id-resolution noise at wider scan scope, a known documented trade-off in this project's history. Worth treating with suspicion in the next residual session, not trusted outright.
+
+**Action item:** None beyond what's already implied — these two are real candidate residuals for whenever a Session Pack is built against this multi-root run, not new backlog items.
+
+---
+
+## Entry 15 — Bank of Anthos "happy path" scan — clean, as expected, confirms one known gap
+
+**Observed:** Architect ran a fresh scan against `spikes/boa/repo/src/accounts/{userservice,contacts}` (recommended after Fineract's layered complexity kept surfacing detection gaps rather than letting the architect exercise the rest of the workflow).
+
+**Result — clean and correct:**
+```
+userservice.py | service  | calls → db.py::UserDb
+contacts.py    | service  | calls → db.py::ContactsDb
+```
+Both services connect directly to their own database class, no invisible layers, no CQRS/interface indirection — exactly the "happy path" shape this repo was chosen for.
+
+**Two things checked, one reproduces Entry 10, one resolved as a non-issue:**
+1. **Reproduces Entry 10, partially:** the two service nodes (`userservice.py`, `contacts.py`) still show the raw file path as `name`. The two database nodes are correctly named (`ContactsDb`, `UserDb`) — confirms Entry 10's theory that only the HTTP-entry-point path (`signal-mapper.ts:214`) has the bug; the persistence-detection path (`graphify-import-strategy-detector.ts`) already gets this right.
+2. **Relationship count (2, not the ~6 an older doc entry described) — checked, not a bug.** `coverage-report.json`'s `relationshipsByKind: {"calls": 2}` confirms Graphify genuinely only found `calls` edges this run, not separate `imports`/`connects` edges too. The reconciler's dedup only collapses duplicates *within* one edge kind, so this isn't a dedup artifact — it's a real, accurate count for this run. The older "6" figure likely reflects an earlier tool/code state, not a regression.
+
+**Only 1 residual:** `S2-http-without-security-control` — expected, matches known auth-detection coverage limits.
+
+**Action item:** None new — this run is the clean baseline to compare Fineract's layered case against, and a good candidate for a short, low-friction residual-session walkthrough next.
+
+---
+
+## Entry 16 — positive confirmation: VS Code + GitHub Copilot Chat correctly enforces the `tools:` allowlist (addendum to Entry 9, not a contradiction)
+
+**Observed:** Architect ran the residual session on the BoA "happy path" run using genuine VS Code + GitHub Copilot Chat (not Claude Code chat). The chat agent wrote `drafts/decisions/R-001.json` directly via its `editFiles` tool, then **stopped** — the architect had to open the integrated terminal themselves and run `validate_drafts.py` and `apply.py` manually. The chat never invoked either script itself.
+
+**What it means:** This is the positive half of Entry 9's finding, not a contradiction of it. The chat-mode's `tools:` allowlist (no `Bash`/terminal tool) genuinely held in its originally-intended host — VS Code Copilot Chat has no code path from that declared tool list to a terminal command, so the chat-mode file's "genuinely can't, not just won't" claim is **true here**, and **false in Claude Code chat** (Entry 9). The safety story is real, just host-specific — confirmed empirically in both directions now, not asserted either way.
+
+**Action item:** Fold into Entry 9's action item #1 (correcting the chat-mode header comment) — the corrected wording should state the claim is confirmed true in VS Code Copilot Chat (this entry) and confirmed false in Claude Code chat (Entry 9), not leave either as a guess. No new backlog id — same `B-chatmode-host-enforcement-gap`.
+
+---
+
+## Entry 17 — CALM viewer shows blank "value" field for `path-interface` routes — confirmed viewer-side, explicitly out of scope
+
+**Observed:** The CALM viewer's node-editor panel showed an empty `value` input for each of `contacts.py`'s 4 real interfaces, despite the underlying `architecture.calm.json` having real route text (`{"type": "path-interface", "path": "GET /version"}`).
+
+**What it means:** Likely a field-naming mismatch — this pipeline stores route text under a `path` key (an informal per-type convention, `pipeline/src/types/calm.ts`'s `CalmInterface` allows arbitrary type-specific fields), and the viewer's generic editor form probably expects a fixed `value` key regardless of interface type. Data is confirmed correct; only the viewer's display is affected.
+
+**Architect's direction: ignore — this is a bug on the visualizer's side, not this pipeline's.** No action item, no backlog id. Logged only so this doesn't get silently rediscovered as "new" later.

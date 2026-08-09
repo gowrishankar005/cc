@@ -32,6 +32,7 @@ export interface DecoratorFact {
   line: number;
   argument?: string; // decorator's own quoted string literal, e.g. "{chargeId}" for @Path("{chargeId}")
   fromNodeKind?: 'class' | 'method' | 'other';
+  fromNodeName?: string; // AP-3 — the real class/method name (CodeGraph's own Node.name), used to derive a human-readable TypedUnit.name instead of the raw file path
   language?: string;
 }
 

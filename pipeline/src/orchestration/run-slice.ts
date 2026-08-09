@@ -252,6 +252,41 @@ function runFromFacts(
   finishRun(facts, placeholderCoverage, placeholderUnmapped, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
 }
 
+// AP-1 (Architect_Pilot_Feedback_Notes.md Entry 3) — a real, reproduced bug:
+// a single-dash typo (e.g. "-out" instead of "--out") was never recognized
+// as a flag, so it fell through to the package-root list along with its
+// intended value, produced 0-unit "roots" for both, and silently defaulted
+// --out to the CWD with no error at all. Fail loudly instead — see below.
+const KNOWN_FLAGS = [
+  '--out',
+  '--overrides',
+  '--modules',
+  '--strict-detect',
+  '--no-snippets',
+  '--k8s-manifests',
+  '--cfn-manifests',
+  '--strict-overrides',
+  '--no-system-node',
+  '--enable-env-soft-graph',
+  '--from-facts',
+];
+
+function checkForUnknownFlags(args: string[]): void {
+  for (const token of args) {
+    if (!token.startsWith('-') || KNOWN_FLAGS.includes(token)) continue;
+    // Real case this was built for: "-out" (single dash) — prepending one
+    // more dash recovers the intended flag name for a helpful suggestion.
+    const doubleDashGuess = `-${token}`;
+    const suggestion = KNOWN_FLAGS.includes(doubleDashGuess) ? ` Did you mean '${doubleDashGuess}'?` : '';
+    console.error(
+      `[run-slice] Unknown option '${token}'.${suggestion}\n` +
+        `Known flags: ${KNOWN_FLAGS.join(', ')}\n` +
+        `(a package-root path is never expected to start with '-' — if it genuinely does, this validation would need updating, not silently bypassed)`
+    );
+    process.exit(1);
+  }
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
@@ -261,6 +296,7 @@ function main() {
     );
     process.exit(1);
   }
+  checkForUnknownFlags(args);
   const outIdx = args.indexOf('--out');
   const outDir = outIdx >= 0 ? args[outIdx + 1] : path.join(process.cwd(), 'calm-output');
   const overridesIdx = args.indexOf('--overrides');

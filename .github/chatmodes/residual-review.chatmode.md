@@ -6,14 +6,12 @@ tools: ['codebase', 'search', 'usages', 'problems', 'editFiles']
 <!--
 SAFETY: no autonomous apply (S4, AGENT_TASKS_Residual_Review_Session.md §0.3).
 
-The `tools:` list above is the real enforcement mechanism, not just an
-instruction below asking the model to behave — VS Code Copilot Chat can only
-invoke a tool that is declared in this frontmatter. This list deliberately
-excludes every terminal/command/task-execution tool (no `runCommands`,
-`runInTerminal`, `runTasks`, or equivalent for whatever VS Code version is in
-use). A chat session bound to this mode has no code path to run `apply.py`,
-`node dist/orchestration/run-slice.js`, or `override-applier.ts` — not
-"won't", genuinely "can't" through this mode.
+The `tools:` list above is the real enforcement mechanism in VS Code Copilot
+Chat, not just an instruction below asking the model to behave — VS Code
+Copilot Chat can only invoke a tool that is declared in this frontmatter.
+This list deliberately excludes every terminal/command/task-execution tool
+(no `runCommands`, `runInTerminal`, `runTasks`, or equivalent for whatever
+VS Code version is in use).
 
 If you are updating this file for a newer VS Code/Copilot release: before
 adding ANY new entry to `tools:`, confirm it is not a terminal/command/task
@@ -23,20 +21,31 @@ tool. This is the one line in this file that must never be edited casually
 files when granted permission — this file's whole safety claim rests on
 never granting that permission to this mode).
 
-VERIFICATION STATUS (honest, not asserted as tested): this file is built
-against the real, documented Copilot Chat chat-mode frontmatter schema
-(`description` + `tools`), the same shape GitHub's own docs use. It has
-NOT been exercised inside a live VS Code + Copilot Chat session in this
-environment — no such environment is available here. Before RS-1 is
-called fully done, the RS-1 exit checklist's own line for this item
-("PR notes how S4 is enforced") should be satisfied by a human opening
-this chat mode in real VS Code and confirming: (a) it appears in the
-chat-mode picker, (b) no terminal/run tool is offered mid-session, (c)
-attempting to ask it to run `apply.py` fails or is refused, not silently
-executed. Track that confirmation in the task list once done — this is
-the "specified, not yet proven live" distinction this whole project
-insists on elsewhere (CLAUDE.md's own Dockerfile/.github/workflows entries
-follow the identical honesty pattern).
+VERIFICATION STATUS (updated 2026-08-10, real architect pilot — see
+Architect_Pilot_Feedback_Notes.md Entries 9 and 16; the earlier version of
+this note said this had never been exercised live anywhere, which is now
+stale for both hosts tested):
+
+- **VS Code + GitHub Copilot Chat: CONFIRMED — the safety claim is
+  structurally true here.** A real session wrote a Decision Record via its
+  `editFiles` tool, then stopped; the architect had to open the integrated
+  terminal and run `validate_drafts.py`/`apply.py` themselves. The chat
+  genuinely has no code path to a terminal command in this host — "can't",
+  not "won't".
+- **Claude Code chat: CONFIRMED FALSE — do not trust this claim in that
+  host.** A real session in Claude Code chat had live `Bash` tool access
+  despite this exact same `tools:` frontmatter, and used it (read-only
+  commands, in that particular session, but nothing in the frontmatter
+  prevented more). This chat-mode file's `tools:` allowlist is evidently a
+  VS-Code-Copilot-Chat-specific enforcement mechanism, not a universal one —
+  a different host is free to ignore it. **If you are using this chat mode
+  from Claude Code (or any host other than VS Code Copilot Chat), the only
+  real safety gate is that host's own per-action permission prompt: always
+  approve file writes individually, and NEVER grant a blanket "allow all
+  edits this session" — that removes the one thing actually protecting you.**
+- Live-model API cost/behavior for RS-4's Tier B drafting path: still
+  untested against a real key in this project's own dev environment (works
+  normally for a pilot operator with their own Copilot/API access).
 -->
 
 # Weaver residual review

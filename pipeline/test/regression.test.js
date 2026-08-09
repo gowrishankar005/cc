@@ -76,6 +76,10 @@ test('NestJS fixture — native-route-beats-decorator-fallback precedence (check
     assert.equal(calm.nodes.length, 1, 'expected exactly 1 node');
     const node = calm.nodes[0];
     assert.equal(node['node-type'], 'service');
+    // AP-3 (Architect_Pilot_Feedback_Notes.md Entries 10, 15) — real class
+    // name ("UsersController"), not the raw file path this bug used to
+    // produce ("test/fixtures/nestjs-sample/src/users.controller.ts").
+    assert.equal(node.name, 'UsersController', 'AP-3: node name should be the real class name, not the raw file path');
     // The original bug: decorator fallback ALSO firing for the same routes
     // native typing already found, producing redundant "Get"/"Post" entries.
     // Exactly 3 clean interfaces, no duplicates, is the regression check.
@@ -85,6 +89,22 @@ test('NestJS fixture — native-route-beats-decorator-fallback precedence (check
 
     const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
     assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('AP-1 (B-cli-unknown-flag-validation) — a single-dash flag typo fails loudly instead of being silently scanned as a package root', () => {
+  const outDir = path.join(os.tmpdir(), `ap1-typo-${Date.now()}`);
+  try {
+    assert.throws(
+      () => execFileSync('node', [RUN_SLICE, path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'), '-out', outDir], { stdio: 'pipe' }),
+      /Unknown option '-out'.*Did you mean '--out'/s,
+      'AP-1: a single-dash "-out" typo must fail loudly with a suggestion, not silently scan it as a package root and default the output dir'
+    );
+    // The real bug's second symptom: no output should ever be written when
+    // the flag is rejected — confirms the process exits BEFORE any scan work.
+    assert.ok(!fs.existsSync(outDir), 'AP-1: no output directory should be created when an unknown flag is rejected');
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
   }
@@ -100,12 +120,24 @@ test('Bank of Anthos — cross-package Graphify pass, real relationships, 0 erro
     assert.equal(userservice.interfaces.length, 4, 'userservice.py should have 4 routes');
     assert.equal(contacts.interfaces.length, 4, 'contacts.py should have 4 routes');
 
+    // AP-3 (Architect_Pilot_Feedback_Notes.md Entry 15) — Python has no
+    // class-level decorator evidence for these Flask app-factory files, so
+    // name falls back to the basename, not the raw file path this bug used
+    // to produce ("src/accounts/userservice/userservice.py").
+    assert.equal(userservice.name, 'userservice', 'AP-3: service node name should be the basename, not the raw file path');
+    assert.equal(contacts.name, 'contacts', 'AP-3: service node name should be the basename, not the raw file path');
+
     const userDb = findNode(calm, 'UserDb');
     const contactsDb = findNode(calm, 'ContactsDb');
     assert.ok(userDb, 'db.py::UserDb node missing — persistence-detector.ts regression');
     assert.ok(contactsDb, 'db.py::ContactsDb node missing — persistence-detector.ts regression');
     assert.equal(userDb['node-type'], 'database');
     assert.equal(contactsDb['node-type'], 'database');
+    // AP-3 — persistence-detection-path naming was already correct before
+    // this fix (graphify-import-strategy-detector.ts uses the real class
+    // name); locked here so a future refactor can't silently regress it.
+    assert.equal(userDb.name, 'UserDb');
+    assert.equal(contactsDb.name, 'ContactsDb');
 
     assert.ok(calm.relationships.length >= 1, 'expected at least 1 real relationship from the Graphify pass — 0 here means the cross-package/persistence fix regressed');
 
@@ -2616,6 +2648,12 @@ test('T-TC1-2/T-TC2-2/T-TC2-3 (B-test-code-exclusion, B-jaxrs-composer-class-sco
     assert.ok(node, 'expected the real MultiResourceFile.java service node');
     const paths = node.interfaces.map((i) => i.path).sort();
     assert.deepEqual(paths, ['GET /orders', 'GET /products'], 'each method must resolve to its OWN class\'s path, never both copies of the first class\'s path (the original bug)');
+
+    // AP-3 (Architect_Pilot_Feedback_Notes.md Entry 12) — this file has TWO
+    // real classes (OrdersResource, ProductsResource), so deriveUnitName()
+    // must NOT guess between them — falls back to the file's own basename,
+    // same as a file with zero class evidence, never an arbitrary pick.
+    assert.equal(node.name, 'MultiResourceFile', 'AP-3: ambiguous multi-class file must fall back to basename, never guess between real class names');
 
     const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
     assert.equal(errors, 0);

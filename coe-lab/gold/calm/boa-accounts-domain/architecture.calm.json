@@ -1,0 +1,229 @@
+{
+  "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
+  "unique-id": "boa-accounts-domain",
+  "name": "Bank of Anthos — Accounts Domain (frontend + userservice + contacts + accounts-db)",
+  "description": "Hand-authored gold CALM for the real, wild-type Bank of Anthos accounts bounded context (google/bank-of-anthos, local clone at spikes/boa/repo). Deliberately well-connected — authored specifically to give Weaver a real, non-trivial multi-service architecture to test against, after an earlier review found several hand-authored lab-fixture gold packages had disconnected nodes. Every node, route, relationship, and control below is grep-verified against real source and real k8s manifests, cited at file:line — none inferred from README/docs/diagrams (this repo's own gold-authoring rule, gold/calm/README.md).",
+  "nodes": [
+    {
+      "unique-id": "end-user",
+      "node-type": "actor",
+      "name": "Bank customer",
+      "description": "A customer using the web UI to log in, sign up, view contacts, and make payments/deposits."
+    },
+    {
+      "unique-id": "frontend",
+      "node-type": "service",
+      "name": "Frontend",
+      "description": "Flask BFF (backend-for-frontend) serving server-rendered HTML and orchestrating calls to userservice/contacts/ledger services on the user's behalf (src/frontend/frontend.py). Not a browser SPA — a real server-side Flask app, hence node-type service, not webclient.",
+      "interfaces": [
+        { "unique-id": "frontend-version", "type": "path-interface", "path": "GET /version" },
+        { "unique-id": "frontend-ready", "type": "path-interface", "path": "GET /ready" },
+        { "unique-id": "frontend-whereami", "type": "path-interface", "path": "GET /whereami" },
+        { "unique-id": "frontend-home-page", "type": "path-interface", "path": "GET /" },
+        { "unique-id": "frontend-home", "type": "path-interface", "path": "GET /home" },
+        { "unique-id": "frontend-payment", "type": "path-interface", "path": "POST /payment" },
+        { "unique-id": "frontend-deposit", "type": "path-interface", "path": "POST /deposit" },
+        { "unique-id": "frontend-login-page", "type": "path-interface", "path": "GET /login" },
+        { "unique-id": "frontend-login-submit", "type": "path-interface", "path": "POST /login" },
+        { "unique-id": "frontend-consent-page", "type": "path-interface", "path": "GET /consent" },
+        { "unique-id": "frontend-consent-submit", "type": "path-interface", "path": "POST /consent" },
+        { "unique-id": "frontend-signup-page", "type": "path-interface", "path": "GET /signup" },
+        { "unique-id": "frontend-signup-submit", "type": "path-interface", "path": "POST /signup" },
+        { "unique-id": "frontend-logout", "type": "path-interface", "path": "POST /logout" },
+        {
+          "unique-id": "frontend-host-port",
+          "definition-url": "https://calm.finos.org/interfaces/example/tcp-host-port",
+          "config": { "host": "frontend", "port": 80 }
+        }
+      ],
+      "controls": {
+        "security-auth-001": {
+          "description": "Token-based authentication (call-site, unverified enforcement elsewhere) — real, precise nuance: frontend.py has TWO jwt.decode call sites with genuinely different security meaning. decode_token() (L616-619) sets verify_signature: False — reads claims only, no enforcement. verify_token() (L621, jwt.decode call itself at L629-632) sets verify_signature: True with the real public key — this IS the genuine enforcement call. Citing the verifying one as the control evidence; the non-verifying one is real code but NOT security evidence, named here so it isn't confused for enforcement by a future reader or a future Weaver detection pass.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/jwt-decode-call.requirement.json",
+              "config": {
+                "mechanism": "call-based",
+                "signal": "jwt.decode(algorithms='RS256', jwt=token, key=app.config['PUBLIC_KEY'], options={'verify_signature': True})",
+                "evidence": {
+                  "unique-id": "evidence-frontend-verify-token",
+                  "evidence-paths": ["src/frontend/frontend.py:629"],
+                  "control-config-url": "https://project-owned-placeholder.invalid/controls/jwt-decode-call.requirement.json"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "userservice",
+      "node-type": "service",
+      "name": "User Service",
+      "description": "Flask service managing user account creation and login; issues signed JWTs on successful login (src/accounts/userservice/userservice.py).",
+      "interfaces": [
+        { "unique-id": "userservice-version", "type": "path-interface", "path": "GET /version" },
+        { "unique-id": "userservice-ready", "type": "path-interface", "path": "GET /ready" },
+        { "unique-id": "userservice-create", "type": "path-interface", "path": "POST /users" },
+        { "unique-id": "userservice-login", "type": "path-interface", "path": "GET /login" },
+        {
+          "unique-id": "userservice-host-port",
+          "definition-url": "https://calm.finos.org/interfaces/example/tcp-host-port",
+          "config": { "host": "userservice", "port": 8080 }
+        }
+      ],
+      "controls": {
+        "security-auth-jwt-issue-001": {
+          "description": "Issues RS256-signed session JWTs on successful login, using the private key half of the k8s Secret 'jwt-key' (mounted read-only at /tmp/.ssh/privatekey per kubernetes-manifests/userservice.yaml). No CALM-generator catalogue row exists for token-ISSUANCE specifically (only decode/verify is currently catalogued) — a real, named coverage gap surfaced by authoring this gold, not by inspecting Weaver's code.",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/jwt-issue.requirement.json",
+              "config": {
+                "mechanism": "call-based",
+                "signal": "jwt.encode(payload, app.config['PRIVATE_KEY'], algorithm='RS256')",
+                "evidence": {
+                  "unique-id": "evidence-userservice-jwt-issue",
+                  "evidence-paths": ["src/accounts/userservice/userservice.py:200"],
+                  "control-config-url": "https://project-owned-placeholder.invalid/controls/jwt-issue.requirement.json"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "contacts",
+      "node-type": "service",
+      "name": "Contacts Service",
+      "description": "Flask service managing a user's linked payee/contact accounts, gating both read and write on a verified JWT (src/accounts/contacts/contacts.py).",
+      "interfaces": [
+        { "unique-id": "contacts-version", "type": "path-interface", "path": "GET /version" },
+        { "unique-id": "contacts-ready", "type": "path-interface", "path": "GET /ready" },
+        { "unique-id": "contacts-get", "type": "path-interface", "path": "GET /contacts/{username}" },
+        { "unique-id": "contacts-add", "type": "path-interface", "path": "POST /contacts/{username}" },
+        {
+          "unique-id": "contacts-host-port",
+          "definition-url": "https://calm.finos.org/interfaces/example/tcp-host-port",
+          "config": { "host": "contacts", "port": 8080 }
+        }
+      ],
+      "controls": {
+        "security-auth-001": {
+          "description": "Token-based authentication (call-site, unverified enforcement) — both the GET and POST /contacts/{username} handlers call jwt.decode with the shared public key before touching contacts_db, and additionally check the decoded 'user' claim matches the requested :username path segment (a real authorization check layered on top of authentication, not just token validity).",
+          "requirements": [
+            {
+              "requirement-url": "https://project-owned-placeholder.invalid/controls/jwt-decode-call.requirement.json",
+              "config": {
+                "mechanism": "call-based",
+                "signal": "jwt.decode(token, key=app.config['PUBLIC_KEY'], algorithms='RS256')",
+                "evidence": {
+                  "unique-id": "evidence-contacts-jwt-verify",
+                  "evidence-paths": ["src/accounts/contacts/contacts.py:77", "src/accounts/contacts/contacts.py:112"],
+                  "control-config-url": "https://project-owned-placeholder.invalid/controls/jwt-decode-call.requirement.json"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "unique-id": "accounts-db",
+      "node-type": "database",
+      "name": "Accounts Database",
+      "description": "Real, single PostgreSQL StatefulSet shared by both userservice and contacts (kubernetes-manifests/accounts-db.yaml) — both services connect via the SAME ACCOUNTS_DB_URI (postgresql://accounts-admin:...@accounts-db:5432/accounts-db, from the shared 'accounts-db-config' ConfigMap). Deliberately modeled as ONE deployable-unit node, not two — UserDb (userservice/db.py) and ContactsDb (contacts/db.py) are application-level SQLAlchemy wrapper classes inside each service's own codebase, not separate deployable data stores; collapsing to the real physical database matches this project's own 'node = deployable unit, not class' discipline. If Weaver's own generated output shows two separate database nodes here, that is a real, meaningful grain difference worth surfacing, not a bug in this gold file.",
+      "interfaces": [
+        {
+          "unique-id": "accounts-db-host-port",
+          "definition-url": "https://calm.finos.org/interfaces/example/tcp-host-port",
+          "config": { "host": "accounts-db", "port": 5432 }
+        }
+      ]
+    },
+    {
+      "unique-id": "platform-system",
+      "node-type": "system",
+      "name": "Bank of Anthos — Accounts Domain",
+      "description": "Logical domain composition — the accounts bounded context, composed-of below."
+    },
+    {
+      "unique-id": "k8s-cluster",
+      "node-type": "system",
+      "name": "Bank of Anthos Kubernetes Cluster (accounts domain)",
+      "description": "Runtime placement boundary. In this real repo composed-of and deployed-in happen to name the same four nodes (all genuinely run in the same real cluster, per kubernetes-manifests/*.yaml) — a real case where the two questions have the same answer, not a modeling shortcut; see coe-lab/docs/reference/how-to-capture-architecture-in-calm.md Step 4 for when they diverge instead."
+    }
+  ],
+  "relationships": [
+    {
+      "unique-id": "end-user-uses-frontend",
+      "description": "Customer loads pages and submits login/signup/payment/deposit forms.",
+      "relationship-type": {
+        "interacts": { "actor": "end-user", "nodes": ["frontend"] }
+      }
+    },
+    {
+      "unique-id": "frontend-to-userservice",
+      "description": "Frontend calls userservice's /login and /users endpoints — app.config['LOGIN_URI']/['USERSERVICE_URI'] are built from the real USERSERVICE_API_ADDR env var (frontend.py:663-666), which the shared 'environment-config' ConfigMap sets to the literal value \"userservice:8080\" (kubernetes-manifests/config.yaml).",
+      "protocol": "HTTP",
+      "relationship-type": {
+        "connects": { "source": { "node": "frontend" }, "destination": { "node": "userservice" } }
+      }
+    },
+    {
+      "unique-id": "frontend-to-contacts",
+      "description": "Frontend calls contacts's /contacts/{username} endpoint — app.config['CONTACTS_URI'] is built from the real CONTACTS_API_ADDR env var (frontend.py:672-673), set to the literal value \"contacts:8080\" by the same shared ConfigMap.",
+      "protocol": "HTTP",
+      "relationship-type": {
+        "connects": { "source": { "node": "frontend" }, "destination": { "node": "contacts" } }
+      }
+    },
+    {
+      "unique-id": "userservice-to-accounts-db",
+      "description": "userservice's UserDb class opens a real SQLAlchemy engine against ACCOUNTS_DB_URI (userservice/db.py:31) to read/write the users table.",
+      "relationship-type": {
+        "connects": { "source": { "node": "userservice" }, "destination": { "node": "accounts-db" } }
+      }
+    },
+    {
+      "unique-id": "contacts-to-accounts-db",
+      "description": "contacts's ContactsDb class opens a real SQLAlchemy engine against the same ACCOUNTS_DB_URI (contacts/db.py:31) to read/write the contacts table.",
+      "relationship-type": {
+        "connects": { "source": { "node": "contacts" }, "destination": { "node": "accounts-db" } }
+      }
+    },
+    {
+      "unique-id": "platform-composed-of",
+      "description": "The accounts domain is composed of these four real deployable units (excludes the actor, external to the system).",
+      "relationship-type": {
+        "composed-of": {
+          "container": "platform-system",
+          "nodes": ["frontend", "userservice", "contacts", "accounts-db"]
+        }
+      }
+    },
+    {
+      "unique-id": "k8s-deployed-in",
+      "description": "All four are real Kubernetes workloads in kubernetes-manifests/{frontend,userservice,contacts,accounts-db}.yaml (Deployment/Deployment/Deployment/StatefulSet respectively).",
+      "relationship-type": {
+        "deployed-in": {
+          "container": "k8s-cluster",
+          "nodes": ["frontend", "userservice", "contacts", "accounts-db"]
+        }
+      }
+    }
+  ],
+  "metadata": [
+    { "key": "x-lab-gold-source", "value": "hand-authored" },
+    { "key": "x-lab-wild-repo", "value": "google/bank-of-anthos (local clone: spikes/boa/repo)" },
+    { "key": "x-lab-purpose", "value": "Solid, well-connected reference gold to test the Weaver pipeline against — authored after a review found several existing lab-fixture gold packages had disconnected nodes (missing same-package connects edges); see coe-lab/docs/findings/gold-calm-relationship-connectivity-audit.md for that finding." },
+    {
+      "key": "x-lab-real-finding-jwt-trust",
+      "value": "userservice, contacts, and frontend all mount the SAME k8s Secret 'jwt-key' (userservice mounts both jwtRS256.key + jwtRS256.key.pub; contacts and frontend mount only jwtRS256.key.pub) — kubernetes-manifests/{userservice,contacts,frontend}.yaml, secretName: jwt-key. This is a real, config-mediated trust relationship (shared signing-key material), NOT a network connects edge — no direct network call between userservice and contacts exists (confirmed: neither service's source references the other's API_ADDR). CALM has no first-class 'shares-secret'/'trust' relationship-type, so this is deliberately captured via each node's own security-auth-* control + this metadata note rather than fabricating a connects edge that would misrepresent real network traffic. This is the exact fact CLAUDE.md's own x-aac-scope-limitations names as something Weaver has never detected end-to-end."
+    },
+    {
+      "key": "x-lab-real-finding-protocol-enum-gap",
+      "value": "userservice-to-accounts-db and contacts-to-accounts-db deliberately have NO protocol value. Both connections are SQLAlchemy-over-psycopg2 talking real PostgreSQL wire protocol — CALM's protocol enum (HTTP/HTTPS/FTP/SFTP/JDBC/WebSocket/SocketIO/LDAP/AMQP/TLS/mTLS/TCP) has no honest value for this: JDBC is literally Java Database Connectivity, a Java-ecosystem-specific term, and would misrepresent a Python connection if used. Same enum-gap class already found for Kafka in coe-lab/docs/reference/rich-calm-example/README.md #2.2 — this is a second, independently-confirmed real instance of the same finding, from a real repo rather than a synthetic example."
+    }
+  ]
+}

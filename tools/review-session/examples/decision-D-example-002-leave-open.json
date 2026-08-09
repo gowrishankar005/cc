@@ -1,0 +1,17 @@
+{
+  "decision_id": "D-example-002",
+  "module": "architecture",
+  "target_type": "node",
+  "target_ref": "src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java",
+  "final_decision": {
+    "action": "accepted",
+    "new_value": null
+  },
+  "rationale": "Architect answered residual R-001 (multi-candidate-bridge) with option [none]: ChargesApiResource.java injects ChargeReadPlatformService and PortfolioCommandSourceWritePlatformService only (confirmed via source read-back) — neither Charge.java nor ChargeRepository.java is directly referenced. No real candidate in this pack is the correct connection target; the true bridge's implementation is outside this scan's roots. Confirming the scan's own finding (0 relationships touch this unit) is correct, not overriding it.",
+  "evidence_snapshot": ["src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java:70: private final ChargeReadPlatformService readPlatformService;"],
+  "reviewer": "architect:example",
+  "reviewed_at": "2026-08-09T00:00:00Z",
+  "source_run_id": "example-run-002",
+  "status": "active",
+  "supersedes": null
+}
