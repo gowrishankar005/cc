@@ -96,7 +96,7 @@ strategies:
       # line back from source at the edge's own source_location, matches the
       # qualified package against this name — see that file for the full
       # real-evidence writeup). Verified against real a reference Java/JAX-RS banking platform source:
-      # fineract-security/.../SqlInjectionPreventerServiceImpl.java (imports
+      # the reference platform's security module/.../SqlInjectionPreventerServiceImpl.java (imports
       # org.postgresql.core.Utils) now correctly becomes a real `database`
       # unit, evidence.signal = "org.postgresql.core.Utils" (the real
       # resolved import, not a guess), calm validate 0 errors.

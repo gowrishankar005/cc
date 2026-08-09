@@ -186,9 +186,9 @@ rules:
   # extractCallFacts()). Weighted 40, same tier as spring-preauthorize — this
   # IS definite evidence of an authorization check (a reference Java/JAX-RS banking platform's own security
   # API), not weaker just because it's a call instead of a decorator.
-  - id: fineract-call-site-permission
+  - id: java-call-site-permission-check
     language: java
-    framework: fineract-security
+    framework: java-security-context-api
     matchSignal: "validateHasReadPermission|validateHasPermission|validateHasCheckerPermission"
     matchSource: call
     category: security-control
@@ -207,9 +207,9 @@ rules:
   # A DIFFERENT real repo's real vocabulary, not a a reference Java/JAX-RS banking platform-shaped guess —
   # exactly the breadth this task exists to add. Weighted 40, same tier as
   # the other definite (not merely corroborating) call-site controls.
-  - id: waltz-user-role-service
+  - id: java-user-role-service-check
     language: java
-    framework: waltz-security
+    framework: java-role-based-security
     matchSignal: "hasRole"
     matchSource: call
     category: security-control
@@ -217,9 +217,9 @@ rules:
     calmNodeType: service
 
   # T-R2-2 (C-call expansion). Real evidence: a reference Java/JAX-RS banking platform's OWN
-  # PlatformSecurityContext (the same class fineract-call-site-permission
+  # PlatformSecurityContext (the same class java-call-site-permission-check
   # above already keys off) also exposes `isAuthenticated()` — confirmed via
-  # its real implementation (fineract-security/.../SpringSecurityPlatformSecurityContext.java:81):
+  # its real implementation (the reference platform's SpringSecurityPlatformSecurityContext.java:81):
   # `void isAuthenticated() { authenticatedUser(); }`, a void "assert or
   # throw" method (same shape as validateHasReadPermission), real call site
   # at fineract-provider/.../ClientSearchService.java:52. Weighted LOWER than
@@ -228,9 +228,9 @@ rules:
   # LOGGED IN, not that they're AUTHORIZED for the specific action being
   # guarded — a materially weaker claim than validateHasPermission's
   # fine-grained check, so it must not be scored as equally strong evidence.
-  - id: fineract-call-site-authenticated
+  - id: java-call-site-authenticated-check
     language: java
-    framework: fineract-security
+    framework: java-security-context-api
     matchSignal: "isAuthenticated"
     matchSource: call
     category: security-control
@@ -248,7 +248,7 @@ rules:
   # passes `verify_signature: False`, a real anti-pattern, not a definite
   # control. Detecting the CALL is real and useful (S3: category presence ≠
   # source-security-guarantee), but must not be sold as high-confidence proof
-  # of enforcement the way spring-preauthorize/fineract-call-site-permission are.
+  # of enforcement the way spring-preauthorize/java-call-site-permission-check are.
   - id: python-jwt-decode-call
     language: python
     framework: pyjwt

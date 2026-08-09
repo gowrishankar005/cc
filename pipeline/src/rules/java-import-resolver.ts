@@ -4,7 +4,7 @@ const JAVA_IMPORT_LINE = /^\s*import\s+(?:static\s+)?([\w.]+)\s*;/;
 
 /**
  * T-R1-3 (Robustness Phase R1) — real finding, re-confirmed against real
- * a reference Java/JAX-RS banking platform source before writing this (`fineract-security/.../
+ * a reference Java/JAX-RS banking platform source before writing this (`the reference platform's security module/.../
  * SqlInjectionPreventerServiceImpl.java:26`, `import org.postgresql.core.Utils;`):
  * unlike Node/TS (deterministic `ref_<name>` transform, `graphify-import-target.ts`),
  * there is NO string transform that recovers a Java import's qualified
