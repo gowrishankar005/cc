@@ -1,0 +1,37 @@
+# Spring config property vocabulary (T-PC1-0 / T-VM-1, T-VM-2)
+
+**Purpose:** the real, verified property-key vocabulary `scanner/spring-config-provider.ts` (T-PC1-1…7) extracts from — mined before writing extraction code, per `AGENT_TASKS_Phase1_Close.md`'s own integrity rule ("evidence before code... property-key vocabulary guessed from memory" is a reject condition).
+
+**How this was verified, not guessed**: every key below was confirmed against real source — either `openrewrite/rewrite-spring`'s actual property-migration recipe files (`spring-boot-*-properties.yml`, fetched via `gh api`) or `spring-projects/spring-boot`'s own `@ConfigurationProperties`-annotated source classes (`DataSourceProperties`, `RabbitProperties`, `ActiveMQProperties`, fetched the same way). Not reconstructed from memory or from Spring's prose docs alone (`docs.spring.io`'s reference page returned truncated content on fetch — used only to spot-check `server.port`/profile naming, not as the primary source).
+
+---
+
+## 1. Property keys the provider extracts (T-SC-3…6)
+
+| Key | Real source confirming it | CALM construct it feeds | Notes |
+|---|---|---|---|
+| `spring.datasource.url` | `openrewrite/rewrite-spring`'s `UseTlsJdbcConnectionString.java` — its own doc comment names `spring.datasource.url` as the recipe's default target property | `database` `TypedUnit` corroboration + `connects.protocol` (from the JDBC subprotocol, e.g. `jdbc:postgresql://...` → `postgresql`) | T-SC-3. Real example format: `jdbc:postgresql://host:5432/db` |
+| `spring.datasource.username` | Standard companion to `.url`, same `DataSourceProperties` class (`spring-projects/spring-boot`) | Corroboration only, not a separate node | |
+| `spring.kafka.bootstrap-servers` | Confirmed present in `spring-projects/spring-boot`'s own doc/test sources (`MyTest.java`/`MyTest.kt` under `documentation/spring-boot-docs/.../messaging/kafka/`) | `network` node corroboration | T-SC-4 |
+| `spring.rabbitmq.host` / `.port` / `.addresses` | Confirmed directly in `RabbitProperties.java`'s real `@ConfigurationProperties("spring.rabbitmq")` fields (`host`, `port`, `addresses`) | `network` node corroboration | T-SC-4. `.addresses` (plural, comma-separated) takes precedence over `.host`/`.port` when both are present — real field comment: "RabbitMQ host. **Ignored if an address is set.**" — the provider must honor this precedence, not just read whichever key it sees first |
+| `spring.activemq.broker-url` | Confirmed directly in `ActiveMQProperties.java`'s real `@ConfigurationProperties("spring.activemq")` class — field `brokerUrl` (Spring relaxed-binding: camelCase → kebab-case) | `network` node corroboration | T-SC-4 |
+| `spring.cache.type` | Confirmed present in `spring-projects/spring-boot`'s own `CacheCondition.java`/`caching.adoc` | Cache-shaped corroboration | T-SC-5 |
+| `spring.data.redis.host` / `.port` | Confirmed via `rewrite-spring`'s real `spring-boot-30-properties.yml` migration recipe | Cache/database-shaped corroboration | T-SC-5. **Real, non-obvious finding from mining, not assumed**: this key was `spring.redis.host`/`.port` (no `.data.` segment) before Spring Boot 3.0 — `rewrite-spring`'s own migration recipe renames `spring.redis.*` → `spring.data.redis.*` for exactly this property. See §2 below — the provider must recognize **both** forms, not just the current one, since real target repos (this project's own evidence base spans Fineract-era and older services) may predate Boot 3.0. |
+| `server.port` | Spot-checked directly on `docs.spring.io`'s fetched reference page | Formal `interface-definition` (`tcp-host-port`) | T-SC-6. Default is `8080` when absent — the provider must not treat a present-but-default-valued port as more meaningful evidence than an explicit non-default one, but must still emit it (a real fixture assertion should use a non-default port specifically, per `AGENT_TASKS_Phase1_Close.md`'s own T-PC1-6 verify step, so the test can't pass on a hardcoded 8080 default masking a parse bug) |
+
+## 2. Real version-migration finding — a genuine reason this had to be mined, not guessed
+
+`rewrite-spring`'s `spring-boot-30-properties.yml` (Spring Boot 3.0's real property-migration recipe) renames **every** `spring.redis.*` key to `spring.data.redis.*` — `host`, `port`, `password`, `database`, `ssl`, `timeout`, `url`, `username`, cluster/sentinel/lettuce sub-keys, all of them. This is exactly the kind of fact a from-memory vocabulary guess would likely have missed or gotten only half-right (recalling the current `spring.data.redis.*` form but not the pre-3.0 `spring.redis.*` form real older codebases still use).
+
+**Consequence for T-SC-5**: the provider's redis extraction must check for `spring.data.redis.host`/`.port` **and fall back to** `spring.redis.host`/`.port` when the `.data.` form is absent — not just the current-version form. Named here so T-PC1-5's implementation doesn't silently regress to the newer-only form under time pressure.
+
+## 3. Profile-resolution rule (T-VM-2)
+
+`application-{profile}.yml` (or `.properties`) overrides `application.yml`/`.properties` for whichever profile is active — spot-checked against `docs.spring.io`'s reference page (confirmed the naming convention, page fetch was otherwise truncated) and consistent with `rewrite-spring`'s own `SeparateApplicationYamlByProfile.java`/`SeparateApplicationPropertiesByProfile.java` recipes (real files that exist specifically to split a merged config back into per-profile files — their existence confirms the merge/override relationship is real, not assumed).
+
+**Consequence for T-SC-1/T-SC-2**: when both `application.yml` and `application-<profile>.yml` exist in the same package root, the provider must not simply concatenate or arbitrarily pick one — it should either (a) merge with profile values winning per-key (matching real Spring behavior), or (b) if merging is deferred as out of scope for a first pass, explicitly emit evidence from **both** files with clear provenance (which file each fact came from) rather than silently picking one and dropping the other. Given this project's own "don't fabricate, don't silently drop" discipline, **(b) is the safer default for a first implementation** — a real fixture with both a base and a profile file (T-PC1-8) must assert on this behavior explicitly, not leave it implicit.
+
+## 4. Explicitly not mined (real scope boundary, not an oversight)
+
+- Feign-client/custom outbound-URL-shaped keys (`<name>.feign.url`, `services.<name>.url`) — named in the root-cause doc as real but lower-priority; not in T-SC-1…8's scope, no vocabulary mined for them here.
+- Any property key whose value is `${PLACEHOLDER}`-shaped — out of scope by design (`AGENT_TASKS_Phase1_Close.md`'s own explicit non-scope note); no vocabulary work needed since these are never resolved, only detected-and-skipped.
