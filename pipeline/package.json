@@ -1,8 +1,8 @@
 {
-  "name": "calm-generator-pipeline",
+  "name": "weaver",
   "version": "0.1.0",
   "private": true,
-  "description": "Slice 1 Analyser/Orchestrator: CodeGraph + Graphify hybrid scanner -> typed-facts.json -> CALM 1.2 generator",
+  "description": "Deterministic Architecture-as-Code pipeline: extracts architecture signals from a polyglot Java/Python/Node monorepo and generates FINOS CALM 1.2 JSON",
   "type": "commonjs",
   "main": "dist/orchestration/run-slice.js",
   "bin": {
