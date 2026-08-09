@@ -25,8 +25,24 @@ const PROFILE_RE = /^application-([\w.]+)\.(?:ya?ml|properties)$/;
 export interface SpringConfigFile {
   filePath: string; // relative to packageRoot
   profile?: string; // undefined for the base application.yml/.properties; the "-<profile>" segment otherwise
+  /**
+   * Review finding (2026-08-09) — a real, confirmed bug: multi-document
+   * `application.yml` files scoped via Spring's own
+   * `spring.config.activate.on-profile` were previously flattened and
+   * MERGED into one map regardless of profile, silently presenting a
+   * profile-gated value (e.g. a real prod datasource URL) as if it were
+   * the file's unconditional default. Fixed: a document carrying an
+   * `on-profile` key becomes its OWN separate `SpringConfigFile` entry,
+   * never merged with the unconditional/base document — this field names
+   * which profile that entry came from (distinct from the file-NAME-derived
+   * `profile` above, since a single un-suffixed `application.yml` can still
+   * contain profile-scoped documents inside it).
+   */
+  docProfile?: string;
   properties: Map<string, string>; // flattened dot-notation key -> string value, e.g. "spring.datasource.url" -> "jdbc:postgresql://host:5432/db"
 }
+
+const ON_PROFILE_KEY = 'spring.config.activate.on-profile';
 
 function findSpringConfigFiles(packageRoot: string): string[] {
   const results: string[] = [];
@@ -89,28 +105,40 @@ export function discoverSpringConfigFiles(packageRoot: string): SpringConfigFile
     const filename = path.basename(absPath);
     const relativeFilePath = path.relative(packageRoot, absPath);
     const raw = fs.readFileSync(absPath, 'utf8');
+    const fileProfile = PROFILE_RE.exec(filename)?.[1];
 
-    let properties: Map<string, string>;
-    if (YAML_RE.test(filename)) {
-      // Spring's own multi-document application.yml convention (documents
-      // separated by `---`, each optionally scoped via
-      // spring.config.activate.on-profile) — each document flattens into
-      // this FILE's own map in order, later documents' keys winning ties
-      // within the same file (matches Spring's own last-wins behavior for
-      // a single file's own document sequence).
-      properties = new Map();
-      for (const doc of parseAllDocuments(raw)) {
-        flattenYaml(doc.toJS(), '', properties);
-      }
-    } else {
-      properties = parsePropertiesFile(raw);
+    if (!YAML_RE.test(filename)) {
+      results.push({ filePath: relativeFilePath, profile: fileProfile, properties: parsePropertiesFile(raw) });
+      continue;
     }
 
-    results.push({
-      filePath: relativeFilePath,
-      profile: PROFILE_RE.exec(filename)?.[1],
-      properties,
-    });
+    // Spring's own multi-document application.yml convention (documents
+    // separated by `---`): a document with NO spring.config.activate.on-profile
+    // key is unconditional and merges into this file's own base map
+    // (last-unconditional-document-wins, matching Spring's own behavior for
+    // a single file's own unconditional document sequence). A document WITH
+    // an on-profile key is profile-conditional — it is NEVER merged into the
+    // unconditional facts (that would silently misattribute a profile-gated
+    // value as always-active, a real bug found on review); it becomes its
+    // own separate SpringConfigFile entry instead, carrying only its own
+    // document's data.
+    const unconditional = new Map<string, string>();
+    const profiledEntries: { docProfile: string; properties: Map<string, string> }[] = [];
+    for (const doc of parseAllDocuments(raw)) {
+      const flat = new Map<string, string>();
+      flattenYaml(doc.toJS(), '', flat);
+      const onProfile = flat.get(ON_PROFILE_KEY);
+      if (onProfile) {
+        profiledEntries.push({ docProfile: onProfile, properties: flat });
+      } else {
+        for (const [k, v] of flat) unconditional.set(k, v);
+      }
+    }
+
+    results.push({ filePath: relativeFilePath, profile: fileProfile, properties: unconditional });
+    for (const entry of profiledEntries) {
+      results.push({ filePath: relativeFilePath, profile: fileProfile, docProfile: entry.docProfile, properties: entry.properties });
+    }
   }
   return results;
 }

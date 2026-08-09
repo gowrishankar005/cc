@@ -28,12 +28,27 @@ function jdbcScheme(url: string): string | undefined {
   return /^jdbc:([a-z0-9+]+):/i.exec(url)?.[1]?.toLowerCase();
 }
 
+/**
+ * Review finding (2026-08-09) — a physical file can now produce MORE THAN
+ * ONE SpringConfigFile entry (an unconditional one plus one per
+ * spring.config.activate.on-profile-scoped document it contains), all
+ * sharing the same `filePath`. Using `filePath` alone as the unit-id key
+ * would collide two real, distinct facts into one id (a real
+ * `calm validate` "duplicate unique-id" risk) — `docProfile` disambiguates
+ * them. Existing file-level-profile-only entries (docProfile unset) keep
+ * their exact original id shape, so this is additive, not a breaking
+ * rename for the already-tested case.
+ */
+function unitFileKey(file: SpringConfigFile): string {
+  return file.docProfile ? `${file.filePath}#${file.docProfile}` : file.filePath;
+}
+
 function buildUnit(file: SpringConfigFile, suffix: string, kind: TypedUnit['kind'], name: string, signal: string, key: string): TypedUnit {
   const evidence: Evidence[] = [
     { signal, source: 'structured-config', category: 'spring-config', weight: CONFIG_WEIGHT, ref: `${file.filePath}:${key}` },
   ];
   return {
-    id: `${file.filePath}::${suffix}`,
+    id: `${unitFileKey(file)}::${suffix}`,
     kind,
     name,
     filePath: file.filePath,

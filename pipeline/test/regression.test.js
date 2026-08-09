@@ -2316,3 +2316,142 @@ test('T-PC1-8 (B-spring-config) — server.port with zero or 2+ service-unit can
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   }
 });
+
+test('Review fix (2026-08-09) — spring.config.activate.on-profile documents are never merged into the unconditional facts', () => {
+  const { discoverSpringConfigFiles } = require(path.join(PIPELINE_ROOT, 'dist/scanner/spring-config-provider'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-spring-onprofile-'));
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDir, 'application.yml'),
+      [
+        'spring:',
+        '  datasource:',
+        '    url: jdbc:h2:mem:testdb',
+        '---',
+        'spring:',
+        '  config:',
+        '    activate:',
+        '      on-profile: prod',
+        '  datasource:',
+        '    url: jdbc:postgresql://prod-host:5432/realdb',
+      ].join('\n')
+    );
+
+    const files = discoverSpringConfigFiles(fixtureDir);
+    assert.equal(files.length, 2, 'the unconditional document and the on-profile document must be two separate entries, never merged');
+
+    const unconditional = files.find((f) => !f.docProfile);
+    assert.ok(unconditional, 'expected one unconditional entry');
+    assert.equal(unconditional.properties.get('spring.datasource.url'), 'jdbc:h2:mem:testdb', 'the base/unconditional value must not be overwritten by the profile-scoped document');
+
+    const profiled = files.find((f) => f.docProfile === 'prod');
+    assert.ok(profiled, 'expected one on-profile=prod entry');
+    assert.equal(profiled.properties.get('spring.datasource.url'), 'jdbc:postgresql://prod-host:5432/realdb');
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+});
+
+test('Review fix (2026-08-09) — an on-profile document never collides unit ids with the file\'s unconditional entry', () => {
+  const { springConfigPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/spring-config-pass'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-spring-onprofile-units-'));
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDir, 'application.yml'),
+      [
+        'spring:',
+        '  datasource:',
+        '    url: jdbc:h2:mem:testdb',
+        '---',
+        'spring:',
+        '  config:',
+        '    activate:',
+        '      on-profile: prod',
+        '  datasource:',
+        '    url: jdbc:postgresql://prod-host:5432/realdb',
+      ].join('\n')
+    );
+
+    const ctx = { packageRoots: [fixtureDir], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map() };
+    springConfigPass.run(ctx);
+
+    const datasourceUnits = ctx.allUnits.filter((u) => u.id.includes('spring-datasource'));
+    assert.equal(datasourceUnits.length, 2, 'both the unconditional and the on-profile datasource facts must survive as real, separate units');
+    const ids = new Set(datasourceUnits.map((u) => u.id));
+    assert.equal(ids.size, 2, 'the two units must have distinct ids, never colliding');
+    assert.ok([...ids].some((id) => id.includes('#prod')), 'the on-profile unit id must be disambiguated from the unconditional one');
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+});
+
+test('Review fix (2026-08-09) — server.port set in two files produces deterministic output regardless of evidence order (no arbitrary "first wins")', () => {
+  const { attachPortInterfaces } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/port-interface-builder'));
+  const makeUnit = (evidenceOrder) => ({
+    id: 'svc',
+    kind: 'service',
+    name: 'svc',
+    filePath: 'svc',
+    startLine: 1,
+    endLine: 1,
+    confidence: 100,
+    evidence: evidenceOrder.map(([signal, ref]) => ({ signal, source: 'structured-config', category: 'spring-config', weight: 0, ref })),
+  });
+  const forward = [
+    ['server.port=8080', 'application.yml:server.port'],
+    ['server.port=9443', 'application-prod.yml:server.port'],
+  ];
+  const reversed = [...forward].reverse();
+
+  const nodeA = { 'unique-id': 'svc', 'node-type': 'service' };
+  attachPortInterfaces([makeUnit(forward)], [nodeA]);
+  const nodeB = { 'unique-id': 'svc', 'node-type': 'service' };
+  attachPortInterfaces([makeUnit(reversed)], [nodeB]);
+
+  assert.deepEqual(nodeA.interfaces, nodeB.interfaces, 'output must not depend on evidence array order (was previously filesystem-directory-walk-order-dependent)');
+  assert.equal(nodeA.interfaces.length, 2, 'both real, distinct ports must be emitted — never an arbitrary single winner');
+  assert.deepEqual(
+    nodeA.interfaces.map((i) => i.port),
+    [9443, 8080],
+    'both ports present with deterministic, ref-sorted ordering'
+  );
+});
+
+test('Review fix (2026-08-09) — springConfigProtocolBySignal actually populates a real relationship\'s protocol via buildCalm, not just claimed reachable', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const facts = {
+    contractVersion: '10.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'OrderService.java',
+        kind: 'service',
+        name: 'OrderService',
+        filePath: 'OrderService.java',
+        startLine: 1,
+        endLine: 10,
+        evidence: [{ signal: 'GET /orders', source: 'native-route', category: 'http-entry-point', weight: 40, ref: 'OrderService.java:1' }],
+        confidence: 100,
+      },
+      {
+        id: 'application.yml::spring-datasource',
+        kind: 'database',
+        name: 'datasource',
+        filePath: 'application.yml',
+        startLine: 1,
+        endLine: 1,
+        evidence: [{ signal: 'spring.datasource.url=jdbc:postgresql://db-host:5432/orders', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:spring.datasource.url' }],
+        confidence: 40,
+      },
+    ],
+    relationships: [{ from: 'OrderService.java', to: 'application.yml::spring-datasource', kind: 'connects', crossPackage: false, source: 'codegraph' }],
+    ignoredItems: [],
+  };
+
+  const calm = buildCalm(facts);
+  const rel = calm.relationships.find((r) => r['relationship-type']?.connects?.destination?.node === 'application.yml::spring-datasource');
+  assert.ok(rel, 'expected a real relationship pointing at the spring-config-derived unit');
+  assert.equal(rel.protocol, 'JDBC', 'protocol must be populated from the spring-config datasource evidence, end-to-end through build-calm.ts');
+});

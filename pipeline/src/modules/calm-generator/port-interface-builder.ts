@@ -19,17 +19,33 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
   for (const unit of units) {
     const node = nodesById.get(unit.id);
     if (!node) continue;
-    const portEvidence = unit.evidence.find((e) => e.category === 'spring-config' && e.signal.startsWith('server.port='));
-    if (!portEvidence) continue;
-    const port = Number(portEvidence.signal.slice('server.port='.length));
-    if (!Number.isFinite(port)) continue;
 
-    const iface: CalmInterface = {
-      'unique-id': `${unit.id}::iface-port`,
+    const portFacts = unit.evidence
+      .filter((e) => e.category === 'spring-config' && e.signal.startsWith('server.port='))
+      .map((e) => ({ port: Number(e.signal.slice('server.port='.length)), ref: e.ref }))
+      .filter((p) => Number.isFinite(p.port));
+    if (portFacts.length === 0) continue;
+
+    // Review finding (2026-08-09) — a real, confirmed non-determinism bug:
+    // server.port can legitimately be set in more than one config file for
+    // the same root (e.g. base 8080, prod-profile 9443) — Weaver has no
+    // runtime profile-activation context, so it can never know which one
+    // actually applies. Picking "whichever evidence entry came first" was
+    // silently deciding this via fs.readdirSync's filesystem-dependent
+    // directory-walk order, not a real rule — confirmed to differ by run.
+    // Fixed: emit one real port-interface PER DISTINCT port (never guess a
+    // winner, same "cite both real facts" discipline the datasource
+    // extraction already uses for multi-file overrides), deduped by port
+    // value and sorted by the evidence's own `ref` string so output order
+    // is stable regardless of directory-walk order.
+    const distinctPorts = [...new Map(portFacts.map((p) => [p.port, p])).values()].sort((a, b) => a.ref.localeCompare(b.ref));
+
+    const newInterfaces: CalmInterface[] = distinctPorts.map((p, i) => ({
+      'unique-id': `${unit.id}::iface-port-${i}`,
       type: 'port-interface',
-      port,
-    };
-    node.interfaces = [...(node.interfaces ?? []), iface];
+      port: p.port,
+    }));
+    node.interfaces = [...(node.interfaces ?? []), ...newInterfaces];
   }
 }
 
@@ -48,12 +64,17 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
  * `protocol` field when a real `TypedRelationship` happens to point at or
  * from the spring-config-derived unit carrying this signal. Since these
  * units are synthetic (not backed by a real Graphify graph node id), no
- * structural reconciler edge can ever link to them — in practice this
- * mechanism is proven reachable (regression-tested directly against
- * `buildRelationships`), not proven to fire on every real repo's own
- * generated relationships. Same honest "mechanism proven, not
- * guaranteed-to-fire" framing this project already uses for
- * `org.postgresql`'s own protocol row.
+ * structural reconciler edge can ever link to them in a real Weaver run
+ * today — in practice this mechanism is proven reachable via a direct unit
+ * test (`test/regression.test.js`'s "protocol population" test constructs a
+ * synthetic `TypedRelationship` pointing at a spring-config unit and
+ * asserts `buildRelationships` returns `protocol: 'JDBC'`), not proven to
+ * fire on any real repo's own generated relationships. Same honest
+ * "mechanism proven, not guaranteed-to-fire" framing this project already
+ * uses for `org.postgresql`'s own protocol row. (Review correction,
+ * 2026-08-09: this comment previously claimed the mechanism was already
+ * regression-tested — it was not; the test named above was added to make
+ * that claim true rather than just softening the wording.)
  */
 export function springConfigProtocolBySignal(units: TypedUnit[]): Map<string, string> {
   const map = new Map<string, string>();
