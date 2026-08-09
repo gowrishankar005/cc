@@ -44,7 +44,7 @@ tools/review-session/
   effective_ir.py          (T-RS2-3 MVP, built) provenance + node/relationship counts + open residuals + decision log — full 8-section §7.1 template deferred to B-calm-portable-ir
   test_effective_ir.py     (built) non-empty output, MVP-scope-note present, never touches intelligence-ir.md
   apply.py                (T-RS3-1/T-RS3-2, built) the ONLY place that invokes run-slice/override-applier — validate -> confirm -> merge drafts -> apply -> apply-report.md/decisions-log.md
-  test_apply.py            (built, 4 real end-to-end tests) real type_change applies, calm validate 0 errors, refuses without confirmation, refuses on validation failure
+  test_apply.py            (built, 5 real end-to-end tests) real type_change applies, calm validate 0 errors, refuses without confirmation, refuses on validation failure, decision+override filename collision handled correctly (regression test for a real bug found+fixed on review)
 ```
 
 `triage.py`'s `apply_baseline()` (T-RS3-3) is real too — `pack.py --baseline <prior-session-dir>` carries forward already-decided residuals (never re-asked) and flags real drift as `reconfirm` (never silently overwritten). See `test_triage.py`'s `TestApplyBaseline` for the unit tests, and the T-RS3-3 changelog entry in `AGENT_TASKS_Residual_Review_Session.md` for the real two-pack proof.

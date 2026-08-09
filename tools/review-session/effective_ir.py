@@ -79,15 +79,27 @@ def build_effective_ir(calm: dict, residuals: list[dict], decisions: list[dict],
         lines.append("_No relationships in this run._")
     lines.append("")
 
+    # Real fix (found on review): status tracking WAS built in RS-3
+    # (triage.py's apply_baseline, T-RS3-3, carried_forward) — this section
+    # used to claim otherwise and list every residual as "open" regardless
+    # of real status, which became actively wrong the moment a Session Pack
+    # could legitimately carry non-open residuals.
+    open_residuals = [r for r in residuals if r.get("status") not in ("carried_forward",)]
+    carried_residuals = [r for r in residuals if r.get("status") == "carried_forward"]
+
     lines += ["## 3. Open residuals", ""]
-    if residuals:
-        lines.append(f"_{len(residuals)} residual(s) — status tracking not yet built (RS-3), so every residual below is listed as open regardless of whether a draft exists for it._")
-        lines.append("")
-        for r in residuals:
-            lines.append(f"- **{r['id']}** (Tier {r['tier']}, {r['class']}): {r['rationale']}")
-    else:
+    if open_residuals:
+        for r in open_residuals:
+            reconfirm_note = " **(re-confirm — evidence shape changed since a prior decision)**" if r.get("reconfirm") else ""
+            lines.append(f"- **{r['id']}** (Tier {r['tier']}, {r['class']}){reconfirm_note}: {r['rationale']}")
+    elif not residuals:
         lines.append("_None — no S1/S2/S5/low-architecture-coverage residuals fired for this run._")
+    else:
+        lines.append("_None open — every residual this run was already carried forward from a prior session (see below)._")
     lines.append("")
+    if carried_residuals:
+        lines.append(f"_{len(carried_residuals)} additional residual(s) carried forward from a prior session (`--baseline`, T-RS3-3) — already decided, not re-asked: {', '.join(r['id'] for r in carried_residuals)}._")
+        lines.append("")
 
     lines += ["## 4. Decision log (this pack's drafts/decisions/)", ""]
     if decisions:

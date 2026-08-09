@@ -52,6 +52,31 @@ class TestEffectiveIR(unittest.TestCase):
         md = build_effective_ir(calm, [], [], {"generatedAt": "2026-08-09T00:00:00Z"})
         self.assertIn("overridden", md)
 
+    def test_carried_forward_residuals_excluded_from_open_section(self):
+        """Real bug found on review: this section used to claim 'status
+        tracking not yet built (RS-3)' and list every residual as open
+        regardless — stale the moment T-RS3-3 built real carried_forward
+        status. A carried-forward residual must not appear as if it were
+        still open."""
+        open_r = {"id": "R-001", "tier": "A", "class": "security-authority-policy", "rationale": "still open", "status": "open"}
+        carried_r = {"id": "R-002", "tier": "A", "class": "ontology-judgment", "rationale": "already decided", "status": "carried_forward"}
+        md = build_effective_ir({"nodes": [], "relationships": []}, [open_r, carried_r], [], {"generatedAt": "2026-08-09T00:00:00Z"})
+        self.assertIn("- **R-001**", md, "the genuinely open residual must be listed as a real bullet item")
+        self.assertNotIn("- **R-002**", md, "a carried_forward residual must never be listed as if it were an open bullet item")
+        self.assertIn("carried forward", md.lower())
+        self.assertIn("R-002", md, "must still be mentioned somewhere (the footnote), just not as an open item")
+
+    def test_all_carried_forward_shows_correct_empty_message(self):
+        carried_r = {"id": "R-001", "tier": "A", "class": "ontology-judgment", "rationale": "already decided", "status": "carried_forward"}
+        md = build_effective_ir({"nodes": [], "relationships": []}, [carried_r], [], {"generatedAt": "2026-08-09T00:00:00Z"})
+        self.assertIn("None open", md)
+        self.assertNotIn("no S1/S2/S5/low-architecture-coverage residuals fired", md, "must not claim nothing fired when something did, just already carried forward")
+
+    def test_reconfirm_flag_annotated_in_open_section(self):
+        reconfirm_r = {"id": "R-001", "tier": "A", "class": "security-authority-policy", "rationale": "evidence changed", "status": "open", "reconfirm": True}
+        md = build_effective_ir({"nodes": [], "relationships": []}, [reconfirm_r], [], {"generatedAt": "2026-08-09T00:00:00Z"})
+        self.assertIn("re-confirm", md.lower())
+
     def test_mvp_scope_note_present(self):
         """Must never silently claim to be the full §7.1 8-section template."""
         md = build_effective_ir({"nodes": [], "relationships": []}, [], [], {"generatedAt": "2026-08-09T00:00:00Z"})

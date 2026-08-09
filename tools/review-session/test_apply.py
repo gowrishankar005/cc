@@ -70,6 +70,48 @@ class TestApplyEndToEnd(unittest.TestCase):
         (self.session_dir / "drafts" / "decisions" / "D-test-001.json").write_text(json.dumps(decision))
         (self.session_dir / "drafts" / "overrides" / "O-test-001.json").write_text(json.dumps(override))
 
+    def _write_draft_with_colliding_filenames(self):
+        """Real bug found on review: a decision and its override sharing a
+        filename (a natural convention — naming both after their shared
+        residual id, e.g. R-001.json in each directory) used to silently
+        drop one of them during the merge step, AFTER validate_drafts had
+        already said the pair was fine. This writes exactly that shape."""
+        decision = {
+            "decision_id": "D-test-001",
+            "module": "architecture",
+            "target_type": "node",
+            "target_ref": self.target_node_id,
+            "final_decision": {"action": "overridden", "new_value": "database"},
+            "rationale": "Real filename-collision regression test.",
+            "reviewer": "architect:test",
+            "reviewed_at": "2026-08-09T00:00:00Z",
+            "status": "active",
+        }
+        override = {
+            "override_id": "O-test-001",
+            "module": "architecture",
+            "target_ref": self.target_node_id,
+            "override_type": "type_change",
+            "new_value": "database",
+            "decision_record_ref": "D-test-001",
+            "status": "active",
+            "created_by": "architect:test",
+            "created_at": "2026-08-09T00:00:00Z",
+        }
+        (self.session_dir / "drafts" / "decisions" / "R-001.json").write_text(json.dumps(decision))
+        (self.session_dir / "drafts" / "overrides" / "R-001.json").write_text(json.dumps(override))
+
+    def test_apply_handles_decision_and_override_sharing_a_filename(self):
+        self._write_draft_with_colliding_filenames()
+        run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir), "--i-confirm-apply"])
+        self.assertEqual(run.returncode, 0, run.stderr)
+        calm = json.loads((self.applied_dir / "architecture.calm.json").read_text())
+        node = next(n for n in calm["nodes"] if n["unique-id"] == self.target_node_id)
+        self.assertEqual(node["node-type"], "database", "must apply correctly even when decision/override files share a filename")
+        overrides_result = json.loads((self.applied_dir / "modules" / "calm-generator" / "overrides-applied-report.json").read_text())
+        self.assertEqual(len(overrides_result["applied"]), 1)
+        self.assertEqual(overrides_result["applied"][0]["override_id"], "O-test-001")
+
     def test_apply_confirmed_applies_a_real_type_change(self):
         self._write_draft()
         run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir), "--i-confirm-apply"])

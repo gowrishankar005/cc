@@ -80,12 +80,22 @@ def _confirm(i_confirm_apply: bool) -> bool:
 
 
 def _merge_drafts(session_dir: Path, tmp_dir: Path) -> None:
+    """Real bug found on review: copying by bare filename silently drops a
+    file whenever drafts/decisions/ and drafts/overrides/ contain a file
+    with the same name (a natural convention — pairing a decision and its
+    override by their shared residual id, e.g. R-001.json in both dirs).
+    validate_drafts.py reads the two directories separately, so it would
+    have already said the pair is valid — the data loss happens ONLY here,
+    after validation, so re-validation can't catch it. Fixed by namespacing
+    each copy with its source subdirectory; override-applier.ts dispatches
+    by JSON content (decision_id vs override_id key), never by filename, so
+    this is a safe, zero-behavior-change fix."""
     for sub in ("decisions", "overrides"):
         src = session_dir / "drafts" / sub
         if not src.exists():
             continue
         for f in src.glob("*.json"):
-            shutil.copy2(f, tmp_dir / f.name)
+            shutil.copy2(f, tmp_dir / f"{sub}-{f.name}")
 
 
 def _write_apply_report(session_dir: Path, entry: dict) -> None:
@@ -151,6 +161,9 @@ def main() -> int:
     run_slice_path = Path(args.run_slice)
     if not run_slice_path.exists():
         print(f"[apply] {run_slice_path} not found — is the pipeline built (npm run build)?", file=sys.stderr)
+        return 1
+    if not manifest.get("outDir"):
+        print(f"[apply] {manifest_path} has no 'outDir' field — is this a real manifest.json written by pack.py?", file=sys.stderr)
         return 1
     facts_path = Path(manifest["outDir"]) / "typed-facts.json"
     if not facts_path.exists():
