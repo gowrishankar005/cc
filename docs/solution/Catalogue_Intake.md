@@ -22,8 +22,8 @@ A new catalogue row is not mergeable without all four:
 
 ## Worked example (retroactive, not hypothetical)
 
-`persistence-detection-catalogue.yml`'s `org.jooq` row (T-R1-3): (1) evidence — real Waltz `waltz-data/GenericSelector.java`, exact import lines grep-verified; (2) claim — `Claim_Register.md`'s R2 row updated to note the real 229-unit result, not silently marked "proven" off one class; (3) test — `regression.test.js`'s gated Waltz test asserts the exact unit count and evidence signal text; (4) scope note — the row's own catalogue comment states it's Java-only and depends on the shared `java-import-resolver.ts` fix, not a claim about jOOQ support in any other language.
+`persistence-detection-catalogue.yml`'s `org.jooq` row (T-R1-3): (1) evidence — real the reference Java governance platform `waltz-data/GenericSelector.java`, exact import lines grep-verified; (2) claim — `Claim_Register.md`'s R2 row updated to note the real 229-unit result, not silently marked "proven" off one class; (3) test — `regression.test.js`'s gated the reference Java governance platform test asserts the exact unit count and evidence signal text; (4) scope note — the row's own catalogue comment states it's Java-only and depends on the shared `java-import-resolver.ts` fix, not a claim about jOOQ support in any other language.
 
 ## Where this is enforced
 
-Not by tooling today — by PR review, per this file, same as the rest of this project's integrity rules (`AGENT_TASKS_Weaver_Robustness.md` §0.3). A future CI check that greps a diff for new catalogue rows and fails if the matching test/claim-cell/scope-limitations diff isn't present is a reasonable escalation if drift is ever observed in practice — not built ahead of that need.
+Not by tooling today — by PR review, per this file, same as the rest of this project's integrity rules (AGENT TASKS Weaver Robustness §0.3). A future CI check that greps a diff for new catalogue rows and fails if the matching test/claim-cell/scope-limitations diff isn't present is a reasonable escalation if drift is ever observed in practice — not built ahead of that need.

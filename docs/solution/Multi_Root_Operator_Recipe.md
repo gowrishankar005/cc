@@ -1,6 +1,6 @@
 # Multi-root operator recipe (T-L3-1)
 
-**Audience:** whoever runs Weaver against a real monorepo and hits an S1 silence flag. This is a short, practical "what do I do" doc — it does not re-derive the RCA history behind it (that's `coe-lab/docs/fineract-gold-vs-platform-finding.md` and `AGENT_TASKS_Layered_Architecture_Story.md`, linked below if you want the full story).
+**Audience:** whoever runs Weaver against a real monorepo and hits an S1 silence flag. This is a short, practical "what do I do" doc — it does not re-derive the RCA history behind it (that's `coe-lab/docs/fineract-gold-vs-platform-finding.md` and AGENT TASKS Layered Architecture Story, linked below if you want the full story).
 
 ---
 
@@ -34,7 +34,7 @@ Passing 2+ roots to one `run-slice` invocation runs **one combined structural pa
 
 Re-running combined, look at `typed-facts.json`'s relationships for `crossPackage: true` entries with `kind: 'calls'`, or the new `x-aac-mechanism` metadata on the generated CALM relationship (T-L2-1):
 
-| `mechanism` value | Story ID (`AGENT_TASKS_Layered_Architecture_Story.md` §0.4) | What it means |
+| `mechanism` value | Story ID (AGENT TASKS Layered Architecture Story §0.4) | What it means |
 |---|---|---|
 | `r2-phase1` | **S-layered-access** | The bridge's sole implementer (in the other root) IS itself a real database/topic unit — you get an edge straight to the access-layer class. |
 | `r2b` | **S-layered-domain** | The implementer isn't itself a store, but imports exactly one — you get an edge to whatever it imports (often an entity/repository). |
@@ -42,7 +42,7 @@ Re-running combined, look at `typed-facts.json`'s relationships for `crossPackag
 
 Also visible in `coverage-report.json`'s new `relationshipsByMechanism` field (T-L3-2) and `intelligence-ir.md`'s coverage appendix — a run-level count, not just per-relationship metadata.
 
-**Say the claim triple, always** (`AGENT_TASKS_Layered_Architecture_Story.md` §0.2, the exact drift this whole program exists to prevent):
+**Say the claim triple, always** (AGENT TASKS Layered Architecture Story §0.2, the exact drift this whole program exists to prevent):
 
 > ✅ "Recovers S-layered-access on multi-root `<api-module>`+`<provider-module>` (root set named)."
 > ❌ "Fixed" / "closed" / "works now" with no root set and no terminal grain named — this reads as if the SINGLE-root gold-scored claim passed, which it didn't and structurally can't (the source has no static one-hop chain — that's not a bug to fix).
@@ -63,8 +63,8 @@ None of these are bugs to work around by adding a third root speculatively or ha
 
 - Full mechanism/root-set mechanics: `coe-lab/docs/multi-root-l2-protocol.md`
 - Frozen exam pair for the canonical example: `coe-lab/docs/standing-disconfirming-exams.md` (`E-charge-single-L2` / `E-charge-multi-story`)
-- Story-ID vocabulary + program rules: `AGENT_TASKS_Layered_Architecture_Story.md` §0.2-§0.4
-- Detector mechanism detail (why 2 hops, why it stops there): `AREC_Store_Terminal_Policy.md`
+- Story-ID vocabulary + program rules: AGENT TASKS Layered Architecture Story §0.2-§0.4
+- Detector mechanism detail (why 2 hops, why it stops there): AREC Store Terminal Policy
 - Original finding this all traces back to: `coe-lab/docs/fineract-gold-vs-platform-finding.md`
 
 ---

@@ -10,12 +10,12 @@
 |---|---|
 | **Product name** | **Weaver** |
 | **Primary code** | [`pipeline/`](./pipeline/) |
-| **Living status** | [`docs/solution/STATUS.md`](./docs/solution/STATUS.md) |
+| **Living status** | [`docs/solution/Capabilities.md`](./docs/solution/Capabilities.md) |
 | **Product backlog (thin index)** | [`docs/solution/BACKLOG.md`](./docs/solution/BACKLOG.md) |
-| **Next iteration plan** | [`docs/solution/NEXT_ITERATION.md`](./docs/solution/NEXT_ITERATION.md) |
-| **Robustness program (phased)** | [`docs/solution/AGENT_TASKS_Weaver_Robustness.md`](./docs/solution/AGENT_TASKS_Weaver_Robustness.md) |
+| **Next iteration plan** | `docs/solution/NEXT ITERATION` |
+| **Robustness program (phased)** | `docs/solution/AGENT TASKS Weaver Robustness` |
 | **What you may claim is “built”** | [`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md) |
-| **Pilot-ready scorecard** | [`docs/solution/Pilot_Ready_Scorecard.md`](./docs/solution/Pilot_Ready_Scorecard.md) |
+| **Pilot-ready scorecard** | `docs/solution/Pilot Ready Scorecard` |
 | **Eval benchmark (CoE lab)** | [`coe-lab/`](./coe-lab/) |
 | **Solution design** | [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](./docs/solution/Architecture_as_Code_Solution_Design_v2.md) |
 
@@ -76,7 +76,7 @@ Repo directory may still be named `codescanner` on disk; the platform name is **
 
 **Design rule:** new capability = **catalogue row + thin pass/provider**, not a special-case in `build-calm.ts`.
 
-**AREC (Architecture Relation & Evidence Completeness)** is the pillar for relation strategies (R0–R2), control strategies (decorator / call-site / contract), and silence/completeness — see [`Architecture_Relation_Evidence_Completeness.md`](./docs/solution/Architecture_Relation_Evidence_Completeness.md). Wave 3 implementation: [`AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md).
+**AREC (Architecture Relation & Evidence Completeness)** is the pillar for relation strategies (R0–R2), control strategies (decorator / call-site / contract), and silence/completeness — see Architecture Relation Evidence Completeness. Wave 3 implementation: AGENT TASKS AREC Wave3 Implementation.
 
 ---
 
@@ -280,15 +280,15 @@ Clones under `spikes/` are **scratch evidence**, not deliverables.
 | CoE lab core eval | L0+L1 strong; stretch packages mixed |
 | Wild-type / multi-module L2 stories | Still the hard bar — incomplete by design honesty, not “one repo left to finish” |
 
-Authoritative detail: **[`docs/solution/STATUS.md`](./docs/solution/STATUS.md)** and **[`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md)**.
+Authoritative detail: **[`docs/solution/Capabilities.md`](./docs/solution/Capabilities.md)** and **[`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md)**.
 
 ---
 
 ## Backlog (high level)
 
 **Canonical thin index:** [`docs/solution/BACKLOG.md`](./docs/solution/BACKLOG.md)  
-**Next iteration (critical todos):** [`docs/solution/NEXT_ITERATION.md`](./docs/solution/NEXT_ITERATION.md)  
-**Active agent tasks (Session E next):** [`docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md)
+**Next iteration (critical todos):** `docs/solution/NEXT ITERATION`  
+**Active agent tasks (Session E next):** `docs/solution/AGENT TASKS AREC Wave3 Implementation`
 
 | Priority | Theme | Examples |
 |---|---|---|
@@ -388,12 +388,12 @@ Lab core green is typically **L0+L1**. **Wild-type multi-module L2** (layered se
 
 | Doc | Use when |
 |---|---|
-| [`docs/solution/STATUS.md`](./docs/solution/STATUS.md) | Built vs partial vs backlog |
+| [`docs/solution/Capabilities.md`](./docs/solution/Capabilities.md) | Built vs partial vs backlog |
 | [`docs/solution/Claim_Register.md`](./docs/solution/Claim_Register.md) | Allowed product claims |
 | [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](./docs/solution/Architecture_as_Code_Solution_Design_v2.md) | Platform + CALM construction design |
 | [`docs/solution/language/java.md`](./docs/solution/language/java.md) | Java / Slice 2 sequencing |
-| [`docs/solution/Architecture_Relation_Evidence_Completeness.md`](./docs/solution/Architecture_Relation_Evidence_Completeness.md) | AREC pillar |
-| [`docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md`](./docs/solution/AGENT_TASKS_AREC_Wave3_Implementation.md) | Implementation sessions A–E |
+| `docs/solution/Architecture Relation Evidence Completeness` | AREC pillar |
+| `docs/solution/AGENT TASKS AREC Wave3 Implementation` | Implementation sessions A–E |
 | [`docs/solution/Module_Authoring_Guide.md`](./docs/solution/Module_Authoring_Guide.md) | Adding a module |
 | [`docs/solution/Contract_Evolution_Policy.md`](./docs/solution/Contract_Evolution_Policy.md) | TypedFacts versioning |
 | [`CLAUDE.md`](./CLAUDE.md) | Deep working memory for agents |
