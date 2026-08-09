@@ -154,6 +154,58 @@ class TestValidateDrafts(unittest.TestCase):
         self.assertTrue(report.valid)
         self.assertTrue(any("nothing to apply" in w for w in report.warnings), report.warnings)
 
+    def test_boundary_change_with_dangling_decision_ref_still_fails(self):
+        """Real bug found on review: check order must match override-applier.ts
+        exactly (status -> decision_record_ref resolution -> decision.status ->
+        THEN dispatch on override_type). Checking override_type/not-implemented
+        first let a boundary_change override with a totally dangling
+        decision_record_ref pass as valid, when the real applier checks the
+        ref BEFORE it would ever reach the boundary_change skip case and
+        would genuinely reject this."""
+        override = {"override_id": "O-bad", "module": "architecture", "target_ref": "x", "override_type": "boundary_change", "new_value": None, "decision_record_ref": "D-does-not-exist", "status": "active", "created_by": "x", "created_at": "x"}
+        report = validate({}, [override], calm_node_ids=set())
+        self.assertFalse(report.valid, "must be rejected — decision_record_ref check happens before override_type dispatch in the real applier")
+        self.assertTrue(any("does not resolve" in e for e in report.errors), report.errors)
+
+    def test_relationship_add_referencing_a_node_add_that_will_be_rejected_still_fails(self):
+        """Real bug found on review: the same-batch node_add exception (design
+        §6) must only count node_add overrides that will ACTUALLY apply, not
+        any override merely labeled node_add with a parseable shape. A
+        node_add with a dangling decision_record_ref will be rejected at real
+        apply time, so a relationship_add referencing its unique-id is a
+        genuine dangling endpoint, not a valid same-batch reference."""
+        node_add = dict(GOOD_NODE_ADD_OVERRIDE, override_id="O-nodeadd", target_ref="db-new", new_value={"unique-id": "db-new", "node-type": "database", "name": "X", "description": "x"}, decision_record_ref="D-does-not-exist")
+        rel_add = {
+            "override_id": "O-reladd",
+            "module": "architecture",
+            "target_ref": "rel-1",
+            "override_type": "relationship_add",
+            "new_value": {"unique-id": "rel-1", "description": "x", "relationship-type": {"connects": {"source": {"node": "svc-1"}, "destination": {"node": "db-new"}}}},
+            "decision_record_ref": "D-001",
+            "status": "active",
+            "created_by": "x",
+            "created_at": "x",
+        }
+        report = validate({"D-001": GOOD_DECISION}, [node_add, rel_add], calm_node_ids={"svc-1"})
+        self.assertFalse(report.valid)
+        self.assertEqual(len(report.errors), 2, f"expected both the node_add's own rejection AND the relationship_add's dangling endpoint to be reported, got: {report.errors}")
+        self.assertTrue(any("dangling endpoint" in e for e in report.errors), report.errors)
+
+    def test_relationship_remove_orphan_target_fails(self):
+        """Real bug found on review: relationship_remove never checked target
+        existence against real CALM relationships at all — a nonexistent
+        target silently passed as valid, when the real applier rejects it as
+        an orphan (same class of check type_change/node_remove already get)."""
+        override = {"override_id": "O-relremove", "module": "architecture", "target_ref": "rel-does-not-exist", "override_type": "relationship_remove", "decision_record_ref": "D-001", "status": "active", "created_by": "x", "created_at": "x"}
+        report = validate({"D-001": GOOD_DECISION}, [override], calm_node_ids=set(), calm_relationship_ids=set())
+        self.assertFalse(report.valid)
+        self.assertTrue(any("orphan" in e for e in report.errors), report.errors)
+
+    def test_relationship_remove_on_real_existing_relationship_passes(self):
+        override = {"override_id": "O-relremove", "module": "architecture", "target_ref": "rel-real", "override_type": "relationship_remove", "decision_record_ref": "D-001", "status": "active", "created_by": "x", "created_at": "x"}
+        report = validate({"D-001": GOOD_DECISION}, [override], calm_node_ids=set(), calm_relationship_ids={"rel-real"})
+        self.assertTrue(report.valid, report.errors)
+
 
 if __name__ == "__main__":
     unittest.main()

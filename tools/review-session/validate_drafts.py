@@ -114,17 +114,50 @@ def _is_valid_connects_relationship(value) -> bool:
     return isinstance(source, dict) and isinstance(source.get("node"), str) and isinstance(destination, dict) and isinstance(destination.get("node"), str)
 
 
-def _validate_override(override: dict, decisions: dict[str, dict], calm_node_ids: set[str] | None, added_node_ids: set[str], report: ValidationReport) -> None:
+def _node_add_will_actually_apply(override: dict, decisions: dict[str, dict], calm_node_ids: set[str] | None) -> str | None:
+    """Real gating logic a node_add override must pass to actually land in
+    CALM at apply time — used to build the 'same batch' endpoint-existence
+    exception (design §6). A real bug found on review: the original pre-scan
+    counted ANY node_add override with a parseable shape as a future
+    endpoint, even one that would itself be REJECTED (e.g. a dangling
+    decision_record_ref) — masking a real dangling-endpoint problem in a
+    relationship_add that referenced it. Returns the new node's unique-id if
+    it will actually apply, else None."""
+    if override.get("override_type") != "node_add" or override.get("status") != "active":
+        return None
+    decision = decisions.get(override.get("decision_record_ref"))
+    if decision is None or decision.get("status") != "active":
+        return None
+    new_value = override.get("new_value")
+    if not _is_valid_calm_node(new_value):
+        return None
+    uid = new_value["unique-id"]
+    if uid != override.get("target_ref"):
+        return None
+    if calm_node_ids is not None and uid in calm_node_ids:
+        return None
+    return uid
+
+
+def _validate_override(override: dict, decisions: dict[str, dict], calm_node_ids: set[str] | None, calm_relationship_ids: set[str] | None, added_node_ids: set[str], report: ValidationReport) -> None:
     label = f"override '{override.get('override_id', '<missing id>')}'"
     if not _check_required_fields(override, REQUIRED_OVERRIDE_FIELDS, label, report):
         return
 
+    # Order matters and must match override-applier.ts's REAL order exactly
+    # (status -> decision_record_ref resolution -> decision.status -> THEN
+    # dispatch on override_type) — a real bug found on review: checking
+    # override_type/not-implemented BEFORE status/decision_record_ref let a
+    # boundary_change override with a completely dangling decision_record_ref
+    # pass as "valid" here, when the real applier checks the ref first and
+    # would REJECT it. The only exception is the unknown-override_type check
+    # below, which stays first deliberately — it catches a class of error
+    # (schema-invalid input) the real applier doesn't even report at all (an
+    # unrecognized override_type silently falls through its switch with no
+    # default case, never appearing in applied/rejected/skipped/orphans).
     override_type = override["override_type"]
     if override_type not in VALID_OVERRIDE_TYPES:
         report.errors.append(f"{label}: override_type '{override_type}' not one of {sorted(VALID_OVERRIDE_TYPES)}")
-        return
-    if override_type in NOT_YET_IMPLEMENTED_OVERRIDE_TYPES:
-        report.warnings.append(f"{label}: override_type '{override_type}' is recognized but not yet implemented in override-applier.ts — will be skipped, not applied, at apply time")
         return
 
     if override["status"] != "active":
@@ -137,6 +170,10 @@ def _validate_override(override: dict, decisions: dict[str, dict], calm_node_ids
         return
     if decision.get("status") != "active":
         report.errors.append(f"{label}: decision_record_ref '{override['decision_record_ref']}' resolves to a Decision Record with status '{decision.get('status')}', not 'active'")
+        return
+
+    if override_type in NOT_YET_IMPLEMENTED_OVERRIDE_TYPES:
+        report.warnings.append(f"{label}: override_type '{override_type}' is recognized but not yet implemented in override-applier.ts — will be skipped, not applied, at apply time")
         return
 
     target_ref = override["target_ref"]
@@ -178,10 +215,11 @@ def _validate_override(override: dict, decisions: dict[str, dict], calm_node_ids
                 report.errors.append(f"{label}: relationship_add {role} node '{node_id}' does not exist in CALM and is not node_add'd in this same draft batch — would create a dangling endpoint")
 
     elif override_type == "relationship_remove":
-        pass  # no shape requirement beyond target_ref existing; relationship existence in CALM not checked here (CalmDocument relationships not currently loaded — see module docstring's scope note)
+        if calm_relationship_ids is not None and target_ref not in calm_relationship_ids:
+            report.errors.append(f"{label}: relationship_remove target_ref '{target_ref}' not found among CALM relationships (orphan)")
 
 
-def validate(decisions_by_id: dict[str, dict], overrides: list[dict], calm_node_ids: set[str] | None) -> ValidationReport:
+def validate(decisions_by_id: dict[str, dict], overrides: list[dict], calm_node_ids: set[str] | None, calm_relationship_ids: set[str] | None = None) -> ValidationReport:
     report = ValidationReport()
     for decision in decisions_by_id.values():
         _validate_decision(decision, report)
@@ -192,15 +230,17 @@ def validate(decisions_by_id: dict[str, dict], overrides: list[dict], calm_node_
     # validate() call, matching override-applier.ts's own two-pass-safe
     # behavior (it processes overrides in file order but node_add always
     # extends the working `nodes` array before later overrides are checked).
+    # Real bug fixed on review: only overrides that will ACTUALLY apply
+    # (status active, decision resolves+active, valid shape) count here —
+    # see _node_add_will_actually_apply's own docstring.
     added_node_ids: set[str] = set()
     for override in overrides:
-        if override.get("override_type") == "node_add" and isinstance(override.get("new_value"), dict):
-            uid = override["new_value"].get("unique-id")
-            if isinstance(uid, str):
-                added_node_ids.add(uid)
+        uid = _node_add_will_actually_apply(override, decisions_by_id, calm_node_ids)
+        if uid is not None:
+            added_node_ids.add(uid)
 
     for override in overrides:
-        _validate_override(override, decisions_by_id, calm_node_ids, added_node_ids, report)
+        _validate_override(override, decisions_by_id, calm_node_ids, calm_relationship_ids, added_node_ids, report)
 
     referenced_ids = {o.get("override_id") for o in overrides if o.get("status") == "active" and o.get("override_type") not in NOT_YET_IMPLEMENTED_OVERRIDE_TYPES}
     if not overrides:
@@ -235,6 +275,7 @@ def main() -> int:
     decisions_by_id = {d["decision_id"]: d for d in decisions_list if isinstance(d, dict) and "decision_id" in d}
 
     calm_node_ids = None
+    calm_relationship_ids = None
     if args.calm:
         calm_path = Path(args.calm)
         if not calm_path.exists():
@@ -242,8 +283,9 @@ def main() -> int:
             return 1
         calm = json.loads(calm_path.read_text())
         calm_node_ids = {n["unique-id"] for n in calm.get("nodes", [])}
+        calm_relationship_ids = {r["unique-id"] for r in calm.get("relationships", [])}
 
-    report = validate(decisions_by_id, overrides_list, calm_node_ids)
+    report = validate(decisions_by_id, overrides_list, calm_node_ids, calm_relationship_ids)
 
     if calm_node_ids is None:
         report.warnings.insert(0, "no --calm given — node/relationship endpoint existence was NOT checked (pass --calm to check for real)")

@@ -39,7 +39,7 @@ tools/review-session/
   test_cards.py            (built) card determinism + real-units-only candidates + Tier C never invents relationship_add
   test_chatmode_safety.py  (built) static proof the chat-mode's tools: allowlist excludes every known terminal tool
   validate_drafts.py      (T-RS2-1, built) schema + integrity checks on drafts/, mirrors override-applier.ts's real validation logic
-  test_validate_drafts.py (built) good fixture passes; bad fixtures (dangling DR ref, superseded decision, dangling relationship endpoint, orphaned target_ref, unknown override_type) fail with clear reasons
+  test_validate_drafts.py (built, 16 tests) good fixture passes; bad fixtures (dangling DR ref, superseded decision, dangling relationship endpoint, orphaned target_ref, unknown override_type, relationship_remove orphan) fail with clear reasons — includes 3 regression tests for real bugs found+fixed on self-review (check-order mismatch, same-batch node_add over-trusting, missing relationship_remove existence check)
   examples/                (T-RS2-2, built) worked Decision Record + Override pair (synthetic), README explaining the manual draft path — no LLM required
   effective_ir.py          (T-RS2-3 MVP, built) provenance + node/relationship counts + open residuals + decision log — full 8-section §7.1 template deferred to B-calm-portable-ir
   test_effective_ir.py     (built) non-empty output, MVP-scope-note present, never touches intelligence-ir.md
