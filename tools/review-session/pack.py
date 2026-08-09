@@ -244,10 +244,12 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "3. Open this pack in VS Code and start a chat using the `residual-review` chat mode "
         "(`.github/chatmodes/residual-review.chatmode.md`) — or, if that chat mode's tools are disabled by "
         "your org's Copilot policy, just read this file and `residuals.json` directly (the degraded path — see below).",
-        "4. The agenda below is already split into Tier A (you decide), Tier B (agent may draft — RS-4, not yet built), "
-        "and Tier C (never invented, document or leave open).",
+        "4. The agenda below is already split into Tier A (you decide), Tier B (offline LLM drafting via "
+        "`draft_tier_b.py`, RS-4 — run it yourself, never from the chat), and Tier C (never invented, document or leave open).",
         "5. Answer every Tier A card with its option key or `other: <rationale>`.",
-        "6. (RS-4, not yet built) The agent drafts Decision Records + Overrides for Tier B items whose evidence bar is met.",
+        "6. Run `python3 tools/review-session/draft_tier_b.py --session-dir <this pack>` yourself (needs "
+        "`ANTHROPIC_API_KEY`; without it, it reports what it would attempt and writes nothing) for any Tier B "
+        "residual, then review each draft as Accept/Reject/Edit — never treat a draft existing as approval.",
         "7. Review whatever lands under `drafts/decisions/` and `drafts/overrides/` before applying anything — "
         "run `validate_drafts.py` yourself first if you want to check before `apply.py` does it again automatically.",
         "8. Apply (a **human step** — `apply.py` refuses without an explicit confirmation, S4): "
@@ -282,7 +284,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
     lines += ["## Tier A — you decide", ""]
     for r in askable_a:
         lines.append(r["card"])
-    lines += ["", "## Tier B — agent may draft if evidence bar met (RS-4, not yet built — every item below is answered as Tier A for now)", ""]
+    lines += ["", "## Tier B — offline LLM drafting if evidence bar met (`draft_tier_b.py`, RS-4 — run yourself, review each draft as Accept/Reject/Edit)", ""]
     for r in askable_b:
         lines.append(r["card"])
     lines += ["", "## Tier C — do not invent, document or leave open", ""]
@@ -307,14 +309,19 @@ def _render_agents_md() -> str:
         "`.github/chatmodes/residual-review.chatmode.md` (T-RS1-5) — read that file's "
         "`tools:` frontmatter for how autonomous apply is structurally prevented, not just instructed against.\n\n"
         "**Mode: Guided (v1's only mode — design §5)** — ask all Tier A items as choice cards; "
-        "draft Tier B only when RS-4 ships; the architect approves every apply.\n\n"
+        "Tier B drafts (when any exist — offline, via draft_tier_b.py, RS-4) are shown as "
+        "Accept / Reject / Edit rationale, never auto-accepted; the architect approves every apply.\n\n"
         "1. Read SESSION.md + residuals.json first — do not scan the whole repo.\n"
         "2. For each open item: use listed evidence; if needed open only the file:line already in evidence/packs.json.\n"
         "3. Never edit typed-facts.json.\n"
         "4. Write proposals only under drafts/.\n"
         "5. Every override must reference an active Decision Record with rationale.\n"
         "6. Tier A is the architect's decision — offer choices, never decide alone.\n"
-        "7. Tier B drafting (RS-4) is not yet built in this pack — treat every Tier B item as Tier A for now.\n"
+        "7. Tier B drafts (RS-4, draft_tier_b.py) are run offline by the architect, never by this chat mode "
+        "(no terminal tool available). If drafts already exist under drafts/decisions|overrides for a Tier B "
+        "residual, present each as Accept / Reject / Edit rationale — a draft existing is not the same as "
+        "it being approved. No trigger currently classifies any residual as Tier B, so in practice this "
+        "won't happen yet, but the rule holds the moment one does.\n"
         "8. Weak/ambiguous evidence -> cannot_decide / leave open, never fabricate.\n"
         "9. Never run apply.py / run-slice / override-applier from this chat — applying is a human step (RS-3).\n"
     )

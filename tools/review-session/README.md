@@ -4,7 +4,7 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
 **Task list:** [`docs/solution/AGENT_TASKS_Residual_Review_Session.md`](../../docs/solution/AGENT_TASKS_Residual_Review_Session.md)
-**Status:** RS-1, RS-2, RS-3 CLOSED. The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. RS-4 (optional Tier B LLM drafting) is next. See the task list for what's built vs. not yet.
+**Status:** RS-1 through RS-4 CLOSED. The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. RS-4 (optional Tier B LLM drafting) is real code with 2 honestly-named open gaps: `triage.py` never classifies anything Tier B yet, and the live-model call path has never run against a real API in this environment. RS-5 (hardening/portability) is next. See the task list for what's built vs. not yet.
 
 ## Non-negotiable rules (S1–S12 — do not violate, do not skip)
 
@@ -45,6 +45,8 @@ tools/review-session/
   test_effective_ir.py     (built) non-empty output, MVP-scope-note present, never touches intelligence-ir.md
   apply.py                (T-RS3-1/T-RS3-2, built) the ONLY place that invokes run-slice/override-applier — validate -> confirm -> merge drafts -> apply -> apply-report.md/decisions-log.md
   test_apply.py            (built, 5 real end-to-end tests) real type_change applies, calm validate 0 errors, refuses without confirmation, refuses on validation failure, decision+override filename collision handled correctly (regression test for a real bug found+fixed on review)
+  draft_tier_b.py          (T-RS4-1/T-RS4-2, built) optional Tier B LLM drafting — §5.1 system prompt, stdlib-only network call, a fully-testable guardrail. No key -> reports what it would attempt, writes nothing. Real, named gap: no trigger in triage.py produces Tier B yet, so this has zero real production input today; live-model path never run against a real API here (no key set)
+  test_draft_tier_b.py     (built, 14 tests) all 6 named trap fixtures (100% on refusal cases) + 6 more guardrail tests, all against synthetic responses (no live model call) + real CLI no-key-path tests
 ```
 
 `triage.py`'s `apply_baseline()` (T-RS3-3) is real too — `pack.py --baseline <prior-session-dir>` carries forward already-decided residuals (never re-asked) and flags real drift as `reconfirm` (never silently overwritten). See `test_triage.py`'s `TestApplyBaseline` for the unit tests, and the T-RS3-3 changelog entry in `AGENT_TASKS_Residual_Review_Session.md` for the real two-pack proof.
@@ -56,7 +58,7 @@ Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitig
 ```bash
 # all unit tests + real end-to-end (needs pipeline/dist built)
 cd tools/review-session
-python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety test_validate_drafts test_effective_ir test_apply -v
+python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety test_validate_drafts test_effective_ir test_apply test_draft_tier_b -v
 
 # build a real pack from a real run-slice out-dir
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
@@ -74,6 +76,9 @@ python3 pack.py --out-dir /tmp/my-run-2 --session-dir ../../review-sessions/my-r
 # effective architecture summary (MVP)
 python3 effective_ir.py --calm /tmp/my-run-reviewed/architecture.calm.json --session-dir ../../review-sessions/my-run \
   --out ../../review-sessions/my-run/effective-architecture-ir.md
+
+# optional Tier B LLM drafting (needs ANTHROPIC_API_KEY; no real Tier B residuals exist in this pipeline's output yet)
+python3 draft_tier_b.py --session-dir ../../review-sessions/my-run
 ```
 
 `pack.py` refuses to overwrite a session dir that already has unapplied drafts (fails loud, exit code 1) — apply or discard first.

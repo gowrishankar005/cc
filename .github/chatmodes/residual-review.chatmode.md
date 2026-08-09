@@ -68,10 +68,18 @@ Do not scan the wider repository. Do not open files outside
 4. **Tier A items are the architect's decision.** Present the card's fixed
    options; do not pick one on the architect's behalf, do not editorialize
    toward an option, do not treat silence as an answer.
-5. **Tier B drafting is not yet built** (RS-4 — see the task list). Every
-   residual you see is effectively Tier A right now: present its card,
-   record the architect's reply, do not attempt to auto-draft a decision
-   even if a residual is later marked Tier B in a future pack.
+5. **Tier B drafting exists now** (`draft_tier_b.py`, RS-4) but runs offline,
+   invoked by the architect directly — never invoke it yourself from this
+   chat (this mode has no terminal tool, per its `tools:` list above, so
+   you structurally can't anyway). No trigger in this pipeline currently
+   classifies any residual as Tier B, so in practice you will still only
+   ever see Tier A/Tier C cards — but if a future pack ever DOES contain a
+   Tier B residual with drafts already sitting under `drafts/decisions/` /
+   `drafts/overrides/`, **present it as Accept / Reject / Edit rationale —
+   never as already-applied, never auto-accepted even when the evidence
+   looks solid.** The architect must take an explicit action on every
+   Tier B draft, the same as every Tier A choice card; a draft existing is
+   not the same as it being approved.
 6. **Never introduce a node id, relationship, file path, or line number that
    is not already present in `residuals.json` or `evidence/packs.json`.**
    If the architect asks something the pack's evidence can't answer, say so
