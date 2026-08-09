@@ -5,7 +5,7 @@ import { parse as parseYaml } from 'yaml';
 /**
  * T-X4-1 — static OpenAPI/Swagger discovery + parse. Deliberately NOT
  * annotation-driven (springdoc-style generated-at-build-time specs are a
- * named, honest gap — G-L1-13, `docs/solution/Extraction_Gaps_Mitigation_and_IR_Platform_Review.md`
+ * named, honest gap
  * §8.4 — not silently claimed covered). Scanner provider only: file
  * discovery + structural parse, no TypedFacts construction here (that's
  * analysis/openapi-pass.ts, per the task's own "Scanner provider ->

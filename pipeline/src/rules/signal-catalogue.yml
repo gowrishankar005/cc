@@ -1,8 +1,7 @@
 # Signal Catalogue — the deterministic rule table the pipeline's core
-# generation path reads. Hand-owned, checked in, versioned. This IS
-# docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md §4's signal-catalogue.yml,
-# concretely implemented. Never written to by suggest-rules.ts directly —
-# that tool only ever writes proposed-updates.json for human review.
+# generation path reads. Hand-owned, checked in, versioned. Never written to
+# by suggest-rules.ts directly — that tool only ever writes
+# proposed-updates.json for human review.
 #
 # Seeded from requirements v0.6 §3's Slice-1 table (Python/Node only;
 # Java stays Slice 2 backlog).
@@ -109,7 +108,7 @@ rules:
   # resolution/frameworks/index.js) — the composer joins class-level +
   # method-level @Path into one full route string ("GET /v1/charges/{id}"),
   # emitted as a synthetic decorator fact matched here. Verified 19/19 real
-  # routes across 3 real a reference Java/JAX-RS banking platform resource files (docs/spikes/fineract-route-assembly-spike/).
+  # routes across 3 real resource files from a reference Java/JAX-RS banking platform.
   # `language: java` matters here specifically because this matchSignal shape
   # ("GET|POST|...") would otherwise ambiguously match nestjs-verb-decorator's
   # alternation too — findRule() now disambiguates by language (rule-schema.ts).
@@ -333,8 +332,7 @@ rules:
     weight: 40
     calmNodeType: database
 
-  # --- T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §1/§5):
-  # AWS Lambda handler entry point (implements-based) ---
+  # --- AWS Lambda handler entry point (implements-based) ---
   # Real evidence, verified via a direct extractFromSource() probe before
   # writing this row (same discipline as spring-data-repository-extends
   # above): a class `implements RequestHandler<I,O>` (or the streaming

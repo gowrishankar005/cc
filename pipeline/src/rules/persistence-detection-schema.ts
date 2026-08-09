@@ -53,8 +53,8 @@ export function loadPersistenceDetectionCatalogue(catalogueDir: string = __dirna
  * The one strategy persistence-detector.ts actually dispatches — its
  * library set, as a lookup Set. Expanded with each library's Graphify
  * `ref_`-transformed form (graphify-import-target.ts) — real finding from
- * testing against ghostfolio/ghostfolio (a real NestJS+Prisma fintech
- * repo): Graphify never uses the literal `@prisma/client` as an edge
+ * testing against a reference Node/NestJS+Prisma fintech wealth-management
+ * app: Graphify never uses the literal `@prisma/client` as an edge
  * target, only `ref_prisma_client`. Without this, every Node/TS entry here
  * was unreachable, not just unverified.
  */

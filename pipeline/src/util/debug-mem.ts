@@ -1,11 +1,11 @@
 /**
- * B-scale-oom (T-SP0-1) — opt-in stage-by-stage memory logging, zero cost
- * when WEAVER_DEBUG_MEM is unset. This is what actually found the real
- * dominant OOM cause on the fineract-provider repro (evidence-packs volume,
- * not the combined Graphify graph or the ignoredItems double-serialization
- * originally suspected from code-reading alone) — kept as a permanent,
- * cheap diagnostic for the next scale investigation, same convention as
- * ANTHROPIC_API_KEY gating suggest-rules.ts's optional path.
+ * Opt-in stage-by-stage memory logging, zero cost when WEAVER_DEBUG_MEM is
+ * unset. This is what actually found the real dominant OOM cause on a
+ * large-scale Java repro (evidence-packs volume, not the combined Graphify
+ * graph or the ignoredItems double-serialization originally suspected from
+ * code-reading alone) — kept as a permanent, cheap diagnostic for the next
+ * scale investigation, same convention as ANTHROPIC_API_KEY gating
+ * suggest-rules.ts's optional path.
  */
 export function logMem(label: string): void {
   if (!process.env.WEAVER_DEBUG_MEM) return;

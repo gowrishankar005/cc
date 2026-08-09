@@ -14,7 +14,7 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 4. **Apply requires an explicit, confirmed human action.** A VS Code Copilot Chat mode bound to a Session Pack must never be granted unrestricted terminal access — see `.github/chatmodes/` (T-RS1-5) for the enforcement mechanism.
 5. **Every draft is evidence-first.** No node, relationship, unit id, file path, or line number may be introduced that isn't already in the pack's own evidence.
 6. **Insufficient evidence → `cannot_decide`, never a guess.** This is a correct, expected outcome, not a failure.
-7. **No sample-repo hardcodes.** Residual logic is generic across languages/frameworks — no Fineract/BoA/etc. class names baked into detection.
+7. **No sample-repo hardcodes.** Residual logic is generic across languages/frameworks — no third-party class names baked into detection.
 8. **Redact secrets before any snippet reaches disk.** Every redaction path needs a fixture test with a known fake secret.
 9. **Bulk-apply still writes one Decision Record per residual**, never one blanket record for a batch.
 10. **Never claim a residual session closed a standing exam** (e.g. `E-charge-single-L2`) — that's the layered-architecture-story program's domain, not this one's.

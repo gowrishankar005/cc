@@ -66,10 +66,10 @@ strategies:
       producer capability (weight 40, same tier as jpa-entity), and pairing
       it with a call-site check would need cross-referencing two different
       referenceKind extractions within one file, a real mechanism this
-      pipeline hasn't built. Real evidence: a reference Java/JAX-RS banking platform's
-      KafkaExternalEventProducer.java (`fineract-provider`) — verified via
-      run-slice.js, real `topic`/`network` node at the grep-verified field
-      declaration line (48), calm validate 0 errors.
+      pipeline hasn't built. Real evidence: a reference Java/JAX-RS banking
+      platform's KafkaExternalEventProducer.java — verified via run-slice.js,
+      real `topic`/`network` node at the grep-verified field declaration
+      line (48), calm validate 0 errors.
     status: dispatched
     mechanism: field-type reference (codegraph-provider.ts's extractTypeReferenceFacts, signal-mapper.ts field-type loop)
 

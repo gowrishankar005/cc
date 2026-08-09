@@ -7,14 +7,13 @@ import { CatalogueRule } from './rule-schema';
 /**
  * OFFLINE ONLY. Never imported by orchestration/run-slice.ts or anything in
  * its call graph — that boundary is what keeps the core generation path
- * free of LLM calls (requirements v0.1-v0.6, restated every version: "no
- * LLM in the core generation path"). A human runs this deliberately, after
- * a scan, over the unknown-signal entries signal-mapper.ts logged.
+ * free of LLM calls ("no LLM in the core generation path"). A human runs
+ * this deliberately, after a scan, over the unknown-signal entries
+ * signal-mapper.ts logged.
  *
  * Writes rules/proposed-updates.json ONLY. Never writes signal-catalogue.yml.
  * Promotion (merging an accepted proposal into signal-catalogue.yml) is a
- * manual, human step — mirrors the Decision Record schema already drafted
- * in docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md §6.
+ * manual, human step — mirrors the Decision Record schema.
  */
 
 interface ProposedRule extends Omit<CatalogueRule, 'id'> {

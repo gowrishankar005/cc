@@ -80,7 +80,7 @@ export async function runPasses(passes: AnalysisPass[], ctx: AnalysisContext): P
  * Real files already established as a `service` unit (route/decorator
  * evidence) — passed to the import-based detectors (persistence/messaging)
  * so a Controller importing an ORM's generated TYPES for its own DTOs
- * (real finding, ghostfolio/ghostfolio's `@prisma/client` type imports)
+ * (real finding, a reference Node/NestJS wealth-management app's `@prisma/client` type imports)
  * doesn't also become a competing database/topic unit for the same file.
  * Lives here (not in passes.ts) so both passes.ts and messaging-pass.ts can
  * import it without a circular dependency between the two.
@@ -90,7 +90,7 @@ export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
 }
 
 /**
- * AREC Wave 3 T-E3 — real bug found by testing the lab `ts-orders-dynamo`
+ * Real bug found by testing the lab `ts-orders-dynamo`
  * fixture (imports BOTH `@aws-sdk/client-dynamodb` and `@aws-sdk/client-sqs`
  * in one file): detectPersistencePass and detectMessagingPass each
  * independently walk file->contains->class over the SAME Graphify run —
@@ -111,12 +111,12 @@ export function existingUnitFilePaths(ctx: AnalysisContext): Set<string> {
 }
 
 /**
- * Real crash found running the pipeline against `fineract-provider` (2733
- * real Java files, single root, no multi-root involved): `target.push(...items)`
+ * Real crash found running the pipeline against a large Java module (2733
+ * real files, single root, no multi-root involved): `target.push(...items)`
  * throws `RangeError: Maximum call stack size exceeded` once `items` is large
- * enough to exceed V8's call-argument limit — `fineract-core` (823 files)
+ * enough to exceed V8's call-argument limit — a smaller module (823 files)
  * already produced 25,283 ignored-items, well within range of tripping this
- * at `fineract-provider`'s scale. Every pass in this directory pushes a
+ * at the larger module's scale. Every pass in this directory pushes a
  * per-root/per-file result array onto a run-wide accumulator (ignoredItems,
  * units, relationships) — the same latent crash risk existed at all 13 call
  * sites, just not yet triggered by a small enough array. Loop-based, not

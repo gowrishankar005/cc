@@ -91,8 +91,7 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   const items: ReviewQueueItem[] = [];
   const silenceFlags = coverage.completeness.silenceFlags;
 
-  // T-L3-3 (AGENT_TASKS_Layered_Architecture_Story.md) — a real S1 unit
-  // often already has a SPECIFIC, named reason on file: the multi-hop
+  // A real S1 unit often already has a SPECIFIC, named reason on file: the multi-hop
   // detector's own honest `unresolved-multi-hop` ignored-item (bridge id,
   // candidate count). Surfacing that specific detail instead of a generic
   // "see AREC R2" pointer is what makes a review-queue item actually

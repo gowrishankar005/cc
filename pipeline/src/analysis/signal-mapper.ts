@@ -5,7 +5,7 @@ import { Evidence, TypedUnit, IgnoredItem } from '../types/typed-facts';
 import { ignoreUnknownSignal } from './ignored-items';
 import { scoreConfidence } from './confidence-scorer';
 
-// AP-3 (Architect_Pilot_Feedback_Notes.md Entries 10, 15) — mapSignalsPass
+// mapSignalsPass
 // used to hardcode every unit's `name` to its raw file path. Real fix: prefer
 // the actual class name CodeGraph already extracted (DecoratorFact.fromNodeName,
 // only trusted when fromNodeKind === 'class'), falling back to the file's own
@@ -229,7 +229,7 @@ export function mapSignalsToUnits(
     // DISTINCT category from 'http-entry-point' only for interface-building
     // purposes (interface-builder.ts/node-type-mapping.yml) — the raw
     // signal text isn't a path, so it must not win interfaceCategories the
-    // way a real route signal does. See Serverless_HTTP_and_Dynamo_Ownership_Design.md §4.
+    // way a real route signal does.
     const hasEntryPointEvidence = categories.has('http-entry-point') || categories.has('serverless-entry-point');
     const kind = hasEntryPointEvidence
       ? 'service'

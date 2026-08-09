@@ -1,6 +1,6 @@
 import { IgnoredItem } from '../types/typed-facts';
 
-/** Taxonomy: docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md §5. Language-agnostic, used as-is. */
+/** Ignored-item taxonomy. Language-agnostic, used as-is. */
 export function ignoreUnknownSignal(ref: string, rawSignal: string): IgnoredItem {
   return {
     ref,

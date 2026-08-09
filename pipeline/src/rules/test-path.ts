@@ -1,13 +1,11 @@
 /**
- * T-TC1-1 (B-test-code-exclusion) — real, generic test-file detection.
- * `IgnoredItem.reason` has carried a `'TEST_CODE'` value since this
- * project's earliest taxonomy design (`docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md`
- * §5) but no code path ever assigned it — confirmed by grep before writing
- * this file. Found the hard way: a real a reference Java/JAX-RS banking platform scan typed a genuine
- * JUnit test (`FineractOperationIdReaderTest.java`) as a `service` node at
- * confidence 100 with a fabricated route, and 17 more `/test/`-path files
- * as real `database` units (Graphify-driven side, same root cause) — see
- * `AGENT_TASKS_Test_Code_Contamination_Fix.md`.
+ * Real, generic test-file detection. `IgnoredItem.reason` has carried a
+ * `'TEST_CODE'` value since this project's earliest taxonomy design but no
+ * code path ever assigned it — confirmed by grep before writing this file.
+ * Found the hard way: a real scan of a reference Java/JAX-RS banking platform
+ * typed a genuine JUnit test (`OperationIdReaderTest.java`) as a `service`
+ * node at confidence 100 with a fabricated route, and 17 more `/test/`-path
+ * files as real `database` units (Graphify-driven side, same root cause).
  *
  * Generic across this project's polyglot scope (Java/Python/TypeScript),
  * matching real conventions each ecosystem's own tooling uses — not a

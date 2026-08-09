@@ -1,13 +1,13 @@
 name: pipeline test
 
 # Runs the real regression suite (pipeline/test/regression.test.js) on every
-# push/PR touching pipeline/. Note: spikes/boa and spikes/fineract are
-# disposable scratch clones (see CLAUDE.md) and are NOT cloned here — those
-# regression cases SKIP by design (test/regression.test.js's own skip
-# logic), so this gives a real but partial signal: the checked-in NestJS
-# fixture and the module-registry checks always run; the BoA/Fineract cases
-# only run locally where those clones already exist. Honest partial
-# coverage, not silently overclaiming full coverage in CI.
+# push/PR touching pipeline/. Note: spikes/ holds disposable scratch clones
+# (see CLAUDE.md) and is NOT cloned here — those regression cases SKIP by
+# design (test/regression.test.js's own skip logic), so this gives a real
+# but partial signal: the checked-in NestJS fixture and the module-registry
+# checks always run; the scratch-clone-dependent cases only run locally
+# where those clones already exist. Honest partial coverage, not silently
+# overclaiming full coverage in CI.
 on:
   push:
     paths:

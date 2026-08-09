@@ -39,7 +39,7 @@ strategies:
       # detection (the ref_ transform is now correctly applied to all of
       # them, but no real fixture has exercised typeorm/mongoose/etc yet).
       #
-      # Q13 ontology fix (Open_Questions_Validation.md, Robustness) —
+      # Ontology fix —
       # ownerBaseClass: PrismaClient. Real evidence: a plain import-only
       # count of 87 units on a reference Node/NestJS wealth-management app's apps/api was a KNOWN, DISCLOSED
       # false-positive risk (Q13) — most of those 87 were classes (e.g.
@@ -62,8 +62,8 @@ strategies:
       - { name: pg, language: typescript, evidenceLevel: unverified }
       - { name: mysql2, language: typescript, evidenceLevel: unverified }
       - { name: ioredis, language: typescript, evidenceLevel: unverified }
-      # T-X2-2 (AGENT_TASKS_Extraction_Enrichment.md, G-L2-02) — Node/AWS
-      # cloud-native persistence, a large financial-services organization-evidenced (requirements v0.14).
+      # Node/AWS cloud-native persistence, evidenced from a large
+      # financial-services organization's public technology footprint.
       # DynamoDB genuinely IS a database, so it's correct to type via this
       # strategy (unlike SQS/SNS below, which are messaging, not persistence
       # — see the cloud-messaging strategy entry for why those are NOT here).
@@ -185,12 +185,10 @@ strategies:
       aws-sdk). Deliberately NOT added as driver-import libraries: SQS/SNS are
       messaging, not persistence — the driver-import strategy always emits
       `kind: 'database'`, so adding a queue/topic client here would mistype a
-      message queue as a database (the exact "force everything into the wrong
-      kind" anti-pattern named in Extraction_Gaps_Mitigation_and_IR_Platform_Review.md
-      §2.2). Correct home is Wave X7 (messaging/`network`|`topic` kind),
-      explicitly out of scope for this MVP pass (AGENT_TASKS_Extraction_Enrichment.md
-      §0.1) — named here for strategy-inventory completeness only, per T-X2-2's
-      own instruction ("SQS/SNS → defer to X7... never silent high-confidence service").
+      message queue as a database (the "force everything into the wrong
+      kind" anti-pattern). Correct home is the messaging detection catalogue
+      (messaging/`network`|`topic` kind), explicitly out of scope for this
+      strategy — named here for strategy-inventory completeness only
+      ("SQS/SNS → defer to messaging detection... never silent high-confidence service").
     status: not-implemented
-    deferredTo: X7
     mechanism: would-need a new TypedUnit.kind ('topic'/'network') + contract bump, per Contract_Evolution_Policy.md §2(c)

@@ -1,7 +1,7 @@
 /**
- * Minimal CALM 1.2 TS types, scoped to what requirements v0.6 §2 puts in scope
- * for V1: nodes, relationships, interfaces, metadata. Field names and enums
- * verified against calm.finos.org (see docs/requirements/CALM_Generator_Requirements_v0_6.md §2).
+ * Minimal CALM 1.2 TS types, scoped to what Weaver's requirements put in
+ * scope for V1: nodes, relationships, interfaces, metadata. Field names and
+ * enums verified directly against calm.finos.org and the authoritative schema.
  */
 
 export type CalmNodeType =

@@ -47,9 +47,8 @@ export interface Evidence {
   // weight-10 (corroboration tier), and only ever attached when exactly one
   // candidate unit exists in the root (never guessed under ambiguity).
   source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest';
-  // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 (T-Y3-1,
-  // Serverless_HTTP_and_Dynamo_Ownership_Design.md) — a Lambda handler's
-  // `implements RequestHandler` clause. Deliberately NOT the same category
+  // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 — a Lambda
+  // handler's `implements RequestHandler` clause. Deliberately NOT the same category
   // as 'http-entry-point' even though it must win the same kind tie-break
   // (signal-mapper.ts treats both as decisive over persistence): real bug
   // found and fixed before shipping this — the raw signal TEXT here is a
@@ -113,8 +112,7 @@ export interface TypedRelationship {
   // (implicit trust via a shared credential, not a network call or a static
   // import), so it gets its own named kind rather than being silently
   // folded into 'connects' — the exact "relationship vocabulary thin"
-  // complaint (G-L3-02, Extraction_Gaps_Mitigation_and_IR_Platform_Review.md)
-  // this was named to fix, not perpetuate.
+  // complaint this was named to fix, not perpetuate.
   kind: 'calls' | 'imports' | 'connects' | 'shares-secret';
   crossPackage: boolean;
   // 'k8s' added alongside 'shares-secret' in the same 3.0.0 bump — the k8s
@@ -144,8 +142,7 @@ export interface TypedRelationship {
   // completes — absence would only mean an older typed-facts.json predating
   // this field, never a live-run gap.
   grade?: 'structural' | 'architecture' | 'trust';
-  // T-L2-1 (AGENT_TASKS_Layered_Architecture_Story.md) — additive OPTIONAL
-  // field (Contract_Evolution_Policy.md §2(b), no CONTRACT_VERSION bump).
+  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no CONTRACT_VERSION bump).
   // Set only by multi-hop-bridge-detector.ts's two branches, both already
   // distinguishable by confidence value (15/10 vs 8/5) but not
   // self-documenting — this makes "which branch produced this edge"

@@ -5,10 +5,10 @@ import { logMem } from '../util/debug-mem';
 
 /**
  * Real shape of graphify extract --code-only --no-cluster's graph.json,
- * confirmed by actually running it against spikes/boa/repo/src/accounts/userservice
- * (66 nodes, 151 edges) — not assumed from the original tool comparison doc.
- * Notably: no `kind` field on nodes (confirms docs/spikes/CodeGraph_vs_Graphify_Comparison.md §5),
- * and source_location is a single-line string like "L19", not a start/end range.
+ * confirmed by actually running it against a reference Python microservices
+ * banking app's userservice package (66 nodes, 151 edges) — not assumed
+ * from tool documentation. Notably: no `kind` field on nodes, and
+ * source_location is a single-line string like "L19", not a start/end range.
  */
 export interface GraphifyNode {
   id: string;
@@ -45,8 +45,8 @@ export function parseSourceLocation(loc: string): number | undefined {
  * A single Graphify extraction plus enough information to attribute each
  * node/edge back to which of the ORIGINAL package roots it came from.
  *
- * REAL FINDING, not assumed (docs/spikes/... — verified this session against
- * real a reference Java/JAX-RS banking platform fineract-charge + fineract-core): running `graphify extract`
+ * REAL FINDING, not assumed — verified against a real reference
+ * Java/JAX-RS banking platform (two modules within the same repo): running `graphify extract`
  * once PER ROOT, separately, structurally cannot produce a cross-root edge —
  * each invocation never sees the other root's files, so Graphify has nothing
  * to resolve a cross-module reference against (confirmed empirically: 0
@@ -56,9 +56,9 @@ export function parseSourceLocation(loc: string): number | undefined {
  * given roots — the ORIGINAL design rationale for choosing Graphify at all
  * ("a single whole-repo pass sidesteps the cross-root partitioning problem
  * structurally") — actually resolves it: verified 265 real cross-module
- * edges between fineract-charge and fineract-core in one combined pass,
- * including the exact evidenced case (`ChargesApiResource` -references->
- * `PlatformSecurityContext`, at the correct source line).
+ * edges between two modules of the same reference platform in one combined
+ * pass, including the exact evidenced case (`ChargesApiResource`
+ * -references-> `PlatformSecurityContext`, at the correct source line).
  */
 export interface GraphifyRun {
   graph: GraphifyGraph;

@@ -1,6 +1,6 @@
 /**
- * Decision Record / Override schema — docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md §6,
- * scoped for implementation in docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.4.
+ * Decision Record / Override schema, scoped for implementation in
+ * docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.4.
  * This is the mechanism that turns "an architect or LLM can correct an
  * ambiguous/wrong classification" from a design claim into something real:
  * a human (or the bounded LLM advisory layer, once built) edits/creates a
@@ -23,7 +23,7 @@ export interface DecisionRecord {
     evidence_refs?: string[];
   };
   final_decision: {
-    // AP-4 (Architect_Pilot_Feedback_Notes.md Entry 8) — 'accepted' is the
+    // 'accepted' is the
     // DESIGNATED value for a reviewed "leave open" outcome: the architect
     // (or Tier B drafting agent) confirmed the scan correctly found no real
     // node/relationship to add or change here, not an inferred best-fit.

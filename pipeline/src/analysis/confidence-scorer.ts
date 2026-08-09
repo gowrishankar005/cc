@@ -1,8 +1,8 @@
 import { Evidence } from '../types/typed-facts';
 
 /**
- * Weighted model, docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md §7.
- * Bands: >=70 auto-include; 40-69 auto-include but flagged; <40 review queue.
+ * Weighted confidence model. Bands: >=70 auto-include; 40-69 auto-include
+ * but flagged; <40 review queue.
  */
 export function scoreConfidence(evidence: Evidence[]): number {
   const total = evidence.reduce((sum, e) => sum + e.weight, 0);

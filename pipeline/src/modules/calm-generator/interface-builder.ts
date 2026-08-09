@@ -8,13 +8,12 @@ import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapp
  * `category === 'http-entry-point'` literal check. Which evidence categories
  * become interfaces is a node-type-mapping.yml property now, not code.
  *
- * T-X4-2 (AGENT_TASKS_Extraction_Enrichment.md, G-L3-08) — generalizes the
- * original binary "native-route beats decorator" check (found via the
- * NestJS fixture: native route typing AND the extractFromSource() decorator
- * fallback both firing for the same routes, producing a redundant,
- * lower-quality duplicate interface) into a real authority-tier table, now
- * that a genuine third source exists (openapi, T-X4-1) — this IS the
- * Contract_Evolution_Policy.md §3 reopen trigger firing, done as the policy
+ * Generalizes the original binary "native-route beats decorator" check
+ * (found via the NestJS fixture: native route typing AND the
+ * extractFromSource() decorator fallback both firing for the same routes,
+ * producing a redundant, lower-quality duplicate interface) into a real
+ * authority-tier table, now that a genuine third source exists (openapi) —
+ * this IS the Contract_Evolution_Policy.md §3 reopen trigger firing, done as the policy
  * itself specified: "at that point there will be a real second data point
  * to design the tiers against, not a guess." Lower number wins; only the
  * lowest tier PRESENT on a unit contributes interfaces, deduped by signal

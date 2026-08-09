@@ -53,6 +53,6 @@ export function buildUnmappedSignalsReport(ignoredItems: IgnoredItem[]): Unmappe
     truncated: allClusters.length > MAX_CLUSTERS,
     clusters: allClusters.slice(0, MAX_CLUSTERS),
     footer:
-      'T-XI-5 (docs/solution/STATUS.md): a signal clustered 5+ times is a catalogue-promotion candidate (rules/suggest-rules.ts or a manual signal-catalogue.yml row) — not a per-node override target.',
+      'A signal clustered 5+ times is a catalogue-promotion candidate (rules/suggest-rules.ts or a manual signal-catalogue.yml row) — not a per-node override target.',
   };
 }

@@ -46,18 +46,18 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
   const ignoredItems: IgnoredItem[] = [];
   const seen = new Set<string>(); // dedupe: a service can reference the same bridge from multiple AST sites/methods
 
-  // Real finding while building this against real a reference Java/JAX-RS banking platform: Graphify emits a
-  // node with `source_file: ""` for EVERY unresolved external symbol a file
-  // references — framework annotation types (`Operation`, `Schema`,
-  // `Parameter` — Swagger), and genuinely external project types
-  // (`PlatformSecurityContext`, defined outside fineract-charge) alike. A
-  // bridge candidate (§2.1) must resolve to a REAL scanned-root file — only
-  // then can its `implements`-ing class even theoretically be found within
-  // scanned roots. Without this check, every Swagger annotation import
-  // flooded ignoredItems as a bogus "unresolved-multi-hop" candidate (34 of
-  // them on fineract-charge alone, only ~2 of which were real architectural
-  // bridges) — caught by running this against real a reference Java/JAX-RS banking platform before trusting
-  // it, not assumed safe.
+  // Real finding while building this against a reference Java/JAX-RS banking
+  // platform: Graphify emits a node with `source_file: ""` for EVERY
+  // unresolved external symbol a file references — framework annotation
+  // types (`Operation`, `Schema`, `Parameter` — Swagger), and genuinely
+  // external project types (`PlatformSecurityContext`, defined outside the
+  // scanned module) alike. A bridge candidate (§2.1) must resolve to a REAL
+  // scanned-root file — only then can its `implements`-ing class even
+  // theoretically be found within scanned roots. Without this check, every
+  // Swagger annotation import flooded ignoredItems as a bogus
+  // "unresolved-multi-hop" candidate (34 of them on a single module alone,
+  // only ~2 of which were real architectural bridges) — caught by running
+  // this against the real platform before trusting it, not assumed safe.
   const nodeById = new Map(run.graph.nodes.map((n) => [n.id, n]));
   const isRealBridgeCandidate = (nodeId: string): boolean => {
     const node = nodeById.get(nodeId);
@@ -69,12 +69,12 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
   // bridge's implementer count is a single lookup, not an O(edges) scan per
   // bridge candidate.
   const implementersByTarget = new Map<string, string[]>();
-  // AREC R2b — same imports/references edges bridge-discovery already reads
+  // Same imports/references edges bridge-discovery already reads
   // (line ~98 below), re-indexed by SOURCE this time: given an implementer
   // node, what does it itself import/reference? Reused, not re-derived, so
-  // R2b's "does the implementer import a store" test is the exact same
-  // relation vocabulary as R2 Phase 1's "does the service import a bridge"
-  // test — one mechanism, two hops, not two mechanisms.
+  // the second-hop "does the implementer import a store" test is the exact
+  // same relation vocabulary as the first-hop "does the service import a
+  // bridge" test — one mechanism, two hops, not two mechanisms.
   const importsBySource = new Map<string, string[]>();
   for (const edge of run.graph.edges) {
     if (edge.relation === 'implements') {
@@ -87,15 +87,16 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
   }
 
   for (const edge of run.graph.edges) {
-    // Real finding while proving this against a synthetic fixture (real
-    // a reference Java/JAX-RS banking platform's ChargesApiResource happens to import ChargeReadPlatformService
-    // from a DIFFERENT Java package, which masked this): Java does NOT
-    // require (or emit) an `import` statement for a same-package type —
-    // Graphify correctly represents same-package usage as a `references`
-    // edge instead, targeting the exact same class-level node id an
-    // `implements` edge would target. Restricting to `imports` alone would
-    // silently miss the very common same-package controller+interface shape
-    // (arguably MORE common than a reference Java/JAX-RS banking platform's cross-package one). Both
+    // Real finding while proving this against a synthetic fixture (a
+    // reference Java/JAX-RS banking platform's ChargesApiResource happens to
+    // import ChargeReadPlatformService from a DIFFERENT Java package, which
+    // masked this): Java does NOT require (or emit) an `import` statement
+    // for a same-package type — Graphify correctly represents same-package
+    // usage as a `references` edge instead, targeting the exact same
+    // class-level node id an `implements` edge would target. Restricting to
+    // `imports` alone would silently miss the very common same-package
+    // controller+interface shape (arguably MORE common than the
+    // cross-package one seen in that reference platform). Both
     // relations are accepted as bridge-discovery signals; `isRealBridgeCandidate`
     // below is what keeps this from re-admitting the earlier annotation-type
     // noise (Operation/Schema/Parameter etc. have empty source_file either way).
@@ -109,8 +110,9 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
 
     const implementers = implementersByTarget.get(bridgeNodeId) ?? [];
     if (implementers.length !== 1) {
-      // 0 (no implementer in scanned roots — the real a reference Java/JAX-RS banking platform fineract-charge-alone
-      // case per the design note) or 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
+      // 0 (no implementer in scanned roots — the real single-module case
+      // seen in a reference Java/JAX-RS banking platform, per the design
+      // note) or 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);

@@ -252,7 +252,7 @@ function runFromFacts(
   finishRun(facts, placeholderCoverage, placeholderUnmapped, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
 }
 
-// AP-1 (Architect_Pilot_Feedback_Notes.md Entry 3) — a real, reproduced bug:
+// A real, reproduced bug:
 // a single-dash typo (e.g. "-out" instead of "--out") was never recognized
 // as a flag, so it fell through to the package-root list along with its
 // intended value, produced 0-unit "roots" for both, and silently defaulted

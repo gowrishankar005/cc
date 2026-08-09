@@ -87,8 +87,8 @@ export interface ImportStrategyUnitConfig {
  * build one TypedUnit per contained class, spanning from the class's own
  * line to its furthest method's line.
  *
- * `existingServiceFilePaths` — real bug found testing against
- * ghostfolio/ghostfolio (NestJS + Prisma): a Controller class importing
+ * `existingServiceFilePaths` — real bug found testing against a reference
+ * Node/NestJS + Prisma fintech app: a Controller class importing
  * Prisma's generated TYPES purely for its own DTO typing (extremely common
  * in Prisma-based TypeScript, `import { Access as AccessModel } from
  * '@prisma/client'`) was being classified `database`, duplicating the

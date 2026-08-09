@@ -3,15 +3,14 @@ import * as path from 'path';
 import { parseAllDocuments } from 'yaml';
 
 /**
- * T-X5-1 — flat/pre-rendered Kubernetes manifest discovery + parse.
- * Deliberately scoped to already-rendered YAML on disk (confirmed real
- * shape against spikes/boa/repo/kubernetes-manifests/*.yaml — the
- * repo-root, pre-rendered artifact, not the per-package `k8s/base/`
- * Kustomize sources, which differ and are NOT resolved here). Kustomize/Helm
- * template resolution is explicit backlog (T-X10-1), not silently assumed
- * to work against a templated source.
+ * Flat/pre-rendered Kubernetes manifest discovery + parse. Deliberately
+ * scoped to already-rendered YAML on disk (confirmed real shape against a
+ * reference Python microservices banking app's repo-root, pre-rendered
+ * manifests — not the per-package `k8s/base/` Kustomize sources, which
+ * differ and are NOT resolved here). Kustomize/Helm template resolution is
+ * explicit backlog, not silently assumed to work against a templated source.
  *
- * Only `Deployment` objects are read for trust detection (T-X5-0's scope).
+ * Only `Deployment` objects are read for trust detection.
  * Names only for Secret/ConfigMap references — this file never reads a
  * real `Secret`/`ConfigMap` object's `data`/`stringData`, only which OTHER
  * object's `metadata.name` a Deployment references by name. No secret

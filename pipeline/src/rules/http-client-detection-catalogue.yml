@@ -29,18 +29,18 @@ strategies:
       edge is the ONLY signal — there is no literal target URL/service-name
       available from a bare import, so this strategy NEVER resolves a
       target. Every detection becomes an `unresolved-http-target`
-      CROSS_DOMAIN_UNRESOLVED ignored-item (real evidence for HITL to
-      complete via the already-real relationship_add override, T-X6-1) —
+      CROSS_DOMAIN_UNRESOLVED ignored-item (real evidence for a human
+      reviewer to complete via the already-real relationship_add override) —
       never a fabricated connects relationship. This is the strategy
       actually dispatched by outbound-http-detector.ts.
     status: dispatched
     libraries:
-      - { name: requests, language: python, evidenceLevel: verified } # real: spikes/boa/repo/src/frontend/frontend.py
+      - { name: requests, language: python, evidenceLevel: verified } # real: a reference Python microservices banking app's frontend service
       - { name: httpx, language: python, evidenceLevel: unverified }
-      - { name: org.springframework.web.client.RestTemplate, language: java, evidenceLevel: verified } # real: spikes/fineract/repo/.../SendMessageToSmsGatewayTasklet.java
+      - { name: org.springframework.web.client.RestTemplate, language: java, evidenceLevel: verified } # real: a reference Java/JAX-RS banking platform's SMS gateway tasklet
       - { name: org.springframework.web.reactive.function.client.WebClient, language: java, evidenceLevel: unverified }
-      - { name: okhttp3.OkHttpClient, language: java, evidenceLevel: verified } # real: spikes/fineract/repo/.../ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:46 — B-http-client, WDL rank 7
-      - { name: java.net.HttpURLConnection, language: java, evidenceLevel: verified } # real: same file, spikes/fineract/repo/.../ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:33 — B-http-client, WDL rank 7
+      - { name: okhttp3.OkHttpClient, language: java, evidenceLevel: verified } # real: a reference Java/JAX-RS banking platform's credit-bureau integration service
+      - { name: java.net.HttpURLConnection, language: java, evidenceLevel: verified } # real: same file, a reference Java/JAX-RS banking platform's credit-bureau integration service
       - { name: axios, language: typescript, evidenceLevel: unverified }
       - { name: node-fetch, language: typescript, evidenceLevel: unverified }
 

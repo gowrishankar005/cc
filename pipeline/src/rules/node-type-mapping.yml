@@ -10,12 +10,11 @@ mappings:
   - unitKind: service
     calmNodeType: service
     interfaceCategories: [http-entry-point]
-    # T-Y3-1 — 'serverless-entry-point' (Lambda implements RequestHandler)
-    # is deliberately descriptive-only, not in interfaceCategories: its raw
+    # 'serverless-entry-point' (Lambda implements RequestHandler) is
+    # deliberately descriptive-only, not in interfaceCategories: its raw
     # signal text is a type reference, not a path. Real paths for these
-    # units come from Y4's CFN/SAM join (a different source, category
-    # http-entry-point) once built — see
-    # Serverless_HTTP_and_Dynamo_Ownership_Design.md §2/§4.
+    # units come from the CFN/SAM join (a different source, category
+    # http-entry-point) once built.
     descriptiveCategories: [framework-bootstrap, persistence, messaging, folder-convention, serverless-entry-point, spring-config]
 
   - unitKind: database

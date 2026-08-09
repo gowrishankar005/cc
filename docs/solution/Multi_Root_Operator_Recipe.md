@@ -1,6 +1,6 @@
 # Multi-root operator recipe (T-L3-1)
 
-**Audience:** whoever runs Weaver against a real monorepo and hits an S1 silence flag. This is a short, practical "what do I do" doc — it does not re-derive the RCA history behind it (that's `coe-lab/docs/fineract-gold-vs-platform-finding.md` and AGENT TASKS Layered Architecture Story, linked below if you want the full story).
+**Audience:** whoever runs Weaver against a real monorepo and hits an S1 silence flag. This is a short, practical "what do I do" doc — it does not re-derive the root-cause history behind it (that's `coe-lab/docs/fineract-gold-vs-platform-finding.md`, linked below if you want the full story).
 
 ---
 

@@ -46,7 +46,7 @@ function runPipeline(roots, extraArgs = [], nodeArgs = []) {
 // Real finding, not assumed: calm-cli truncates its own stdout at exactly
 // 8192 bytes when piped (not a TTY) — a classic Node CLI bug (process exits
 // before a large piped write finishes flushing). Confirmed by testing
-// against real a reference Java/JAX-RS banking platform fineract-core output (44 nodes, ~11KB of validation
+// against a real reference Java/JAX-RS banking platform (fineract-core module) output (44 nodes, ~11KB of validation
 // JSON — well past the 8192-byte cutoff). Not a maxBuffer issue (raising it
 // didn't help) and not npx-specific (the same truncation happens invoking
 // the calm binary directly). The robust fix, using calm-cli's own supported
@@ -76,7 +76,7 @@ test('NestJS fixture — native-route-beats-decorator-fallback precedence (check
     assert.equal(calm.nodes.length, 1, 'expected exactly 1 node');
     const node = calm.nodes[0];
     assert.equal(node['node-type'], 'service');
-    // AP-3 (Architect_Pilot_Feedback_Notes.md Entries 10, 15) — real class
+    // Real class
     // name ("UsersController"), not the raw file path this bug used to
     // produce ("test/fixtures/nestjs-sample/src/users.controller.ts").
     assert.equal(node.name, 'UsersController', 'AP-3: node name should be the real class name, not the raw file path');
@@ -138,7 +138,7 @@ test('a reference Python microservices banking app — cross-package Graphify pa
     assert.equal(userservice.interfaces.length, 4, 'userservice.py should have 4 routes');
     assert.equal(contacts.interfaces.length, 4, 'contacts.py should have 4 routes');
 
-    // AP-3 (Architect_Pilot_Feedback_Notes.md Entry 15) — Python has no
+    // Python has no
     // class-level decorator evidence for these Flask app-factory files, so
     // name falls back to the basename, not the raw file path this bug used
     // to produce ("src/accounts/userservice/userservice.py").
@@ -206,7 +206,7 @@ test('a reference Python microservices banking app — cross-package Graphify pa
 });
 
 test(
-  'a reference Java/JAX-RS banking platform fineract-charge — JAX-RS route composition + JPA persistence typing',
+  'a reference Java/JAX-RS banking platform (fineract-charge module) — JAX-RS route composition + JPA persistence typing',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
@@ -214,8 +214,8 @@ test(
       const chargesResource = findNode(calm, 'ChargesApiResource.java');
       assert.ok(chargesResource, 'ChargesApiResource.java node missing');
       assert.equal(chargesResource['node-type'], 'service');
-      // Grep-verified ground truth (docs/spikes/fineract-route-assembly-spike/) —
-      // exact set, not just a count, so a regex/attribution regression is caught.
+      // Grep-verified ground truth — exact set, not just a count, so a
+      // regex/attribution regression is caught.
       const routes = chargesResource.interfaces.map((i) => i.path).sort();
       assert.deepEqual(routes, [
         'DELETE /v1/charges/{chargeId}',
@@ -255,7 +255,7 @@ test(
 );
 
 test(
-  'a reference Java/JAX-RS banking platform fineract-core — control-builder finds real @PreAuthorize evidence on a route-less service',
+  'a reference Java/JAX-RS banking platform (fineract-core module) — control-builder finds real @PreAuthorize evidence on a route-less service',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-core')]);
@@ -345,7 +345,7 @@ test(
       assert.equal(flagshipRel.crossPackage, true, 'ChargesApiResource (fineract-charge) and ChargeReadPlatformServiceImpl (fineract-provider) are in different roots');
       assert.equal(flagshipRel.confidence, 10, 'expected R2 Phase 1 cross-root confidence (10) — the implementer resolved as its own store unit, not via the R2b hop');
       assert.equal(flagshipRel.grade, 'architecture');
-      assert.equal(flagshipRel.mechanism, 'r2-phase1', 'T-L2-1/AREC_Store_Terminal_Policy.md §2: the real flagship case resolves via Phase 1 short-circuit (S-layered-access), not R2b — this is the exact real-evidence claim the design note makes, now asserted, not just stated in prose');
+      assert.equal(flagshipRel.mechanism, 'r2-phase1', 'The real flagship case resolves via Phase 1 short-circuit (S-layered-access), not R2b — this is the exact real-evidence claim the design note makes, now asserted, not just stated in prose');
 
       // T-L3-2 — mechanism visibility on the real multi-root run's own
       // coverage-report.json, the actual "visible on a multi-root sample
@@ -384,7 +384,7 @@ test(
 );
 
 test(
-  'AREC T-D1/T-D2 — call-site control detection: real a reference Java/JAX-RS banking platform fineract-charge ChargesApiResource gets security-rbac-002 with expression, at grep-verified lines',
+  'call-site control detection: a real reference Java/JAX-RS banking platform (fineract-charge module) ChargesApiResource gets security-rbac-002 with expression, at grep-verified lines',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
@@ -416,7 +416,7 @@ test(
   }
 );
 
-test('AREC T-D1/T-D2 — call-site control detection: lab py-jwt-gateway fixture gets security-auth-001 (low weight, honest "token handling" wording), calm validate 0 errors', () => {
+test('call-site control detection: lab py-jwt-gateway fixture gets security-auth-001 (low weight, honest "token handling" wording), calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/py-jwt-gateway');
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
@@ -436,7 +436,7 @@ test('AREC T-D1/T-D2 — call-site control detection: lab py-jwt-gateway fixture
 });
 
 test(
-  'Robustness T-R2-2 (C-call expansion) — real a reference Java governance platform waltz-web: 4 real call sites get security-rbac-003 (UserRoleService.hasRole, a DIFFERENT real repo\'s own RBAC vocabulary), calm validate 0 errors',
+  'Robustness — real a reference Java governance platform (waltz-web module): 4 real call sites get security-rbac-003 (UserRoleService.hasRole, a DIFFERENT real repo\'s own RBAC vocabulary), calm validate 0 errors',
   { skip: !fs.existsSync(JAVA_SAMPLE2_WEB_ROOT) && 'spikes/waltz/repo/waltz-web not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([JAVA_SAMPLE2_WEB_ROOT]);
@@ -472,7 +472,7 @@ test(
   }
 );
 
-test('Robustness T-R2-2 (C-call expansion) — a reference Java/JAX-RS banking platform isAuthenticated() call-site: weighted 30 (below the fine-grained RBAC tier, a real stated distinction — authentication proves login, not authorization), synthetic buildCalm check since the signal alone sits below the unit confidence floor when isolated (same as jwt.decode\'s tier, by design)', () => {
+test('Robustness — a reference Java/JAX-RS banking platform isAuthenticated() call-site: weighted 30 (below the fine-grained RBAC tier, a real stated distinction — authentication proves login, not authorization), synthetic buildCalm check since the signal alone sits below the unit confidence floor when isolated (same as jwt.decode\'s tier, by design)', () => {
   const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
   const facts = {
     contractVersion: '7.0.0',
@@ -527,7 +527,7 @@ test('AREC T-D1 — TypeScript decorator/call dedup: NestJS fixture produces ZER
   }
 });
 
-test('AREC T-C1 — R2 multi-hop bridge: synthetic fixture proves the mechanism (service -> zero-evidence interface -> sole @Entity implementer)', () => {
+test('R2 multi-hop bridge: synthetic fixture proves the mechanism (service -> zero-evidence interface -> sole @Entity implementer)', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2-bridge-sample');
   // Real finding while building this: graphify's persistent per-root cache
   // (.graphify-cache) can retain a stale node-id assignment across repeated
@@ -636,7 +636,7 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
 });
 
 test(
-  'AREC T-C1 — R2 multi-hop bridge: real a reference Java/JAX-RS banking platform fineract-charge produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
+  'R2 multi-hop bridge: a real reference Java/JAX-RS banking platform (fineract-charge module) produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
@@ -665,7 +665,7 @@ test(
 );
 
 test(
-  'AREC T-A2/R2b — R0 grading: a reference Java/JAX-RS banking platform fineract-core direct-reconciler edges stay structural; R2b now resolves 3 real service->repository chains, graded architecture',
+  'R0 grading: a reference Java/JAX-RS banking platform (fineract-core module) direct-reconciler edges stay structural; R2b now resolves 3 real service->repository chains, graded architecture',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-core')]);
@@ -728,7 +728,7 @@ test(
 );
 
 test(
-  'AREC T-A1 — silence metrics: a reference Java/JAX-RS banking platform fineract-charge flags S1 (service+db present, 0 service-touching relationships)',
+  'silence metrics: a reference Java/JAX-RS banking platform (fineract-charge module) flags S1 (service+db present, 0 service-touching relationships)',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
@@ -754,7 +754,7 @@ test(
 );
 
 test(
-  'AREC T-A1 — silence metrics: S1 does NOT fire when a real service-touching relationship exists (a reference Python microservices banking app, false-positive guard)',
+  'silence metrics: S1 does NOT fire when a real service-touching relationship exists (a reference Python microservices banking app, false-positive guard)',
   { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
@@ -772,7 +772,7 @@ test(
 );
 
 test(
-  'Robustness T-R0-2 — architecture coverage metric: real the reference Python app shows 100% (2/2 services), real a reference Java/JAX-RS banking platform-charge shows 0% (0/1) — shapes differ sensibly',
+  'Robustness T-R0-2 — architecture coverage metric: the reference Python microservices banking app shows 100% (2/2 services), a real reference Java/JAX-RS banking platform-charge shows 0% (0/1) — shapes differ sensibly',
   { skip: (!fs.existsSync(PYTHON_SAMPLE_ROOT) || !fs.existsSync(JAVA_SAMPLE_ROOT)) && 'spikes/boa or spikes/fineract not present (scratch clone, see CLAUDE.md)' },
   () => {
     const boa = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
@@ -925,7 +925,7 @@ test('SQS/SNS import-only messaging detection — low confidence, topic kind, di
 });
 
 test(
-  'Kafka consumer — @KafkaListener detected as a real topic/network node (T-X7-1/T-X7-2, real a reference Java/JAX-RS banking platform evidence)',
+  'Kafka consumer — @KafkaListener detected as a real topic/network node (T-X7-1/T-X7-2, a real reference Java/JAX-RS banking platform evidence)',
   { skip: !fs.existsSync(JAVA_SAMPLE_KAFKA_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([JAVA_SAMPLE_KAFKA_ROOT]);
@@ -946,7 +946,7 @@ test(
 );
 
 test(
-  'AREC T-E1 — messaging PRODUCER: real a reference Java/JAX-RS banking platform KafkaExternalEventProducer.java (KafkaTemplate-typed field) detected as a real topic/network node',
+  'AREC T-E1 — messaging PRODUCER: a real reference Java/JAX-RS banking platform KafkaExternalEventProducer.java (KafkaTemplate-typed field) detected as a real topic/network node',
   { skip: !fs.existsSync(JAVA_SAMPLE_KAFKA_PRODUCER_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([JAVA_SAMPLE_KAFKA_PRODUCER_ROOT]);
@@ -1040,7 +1040,7 @@ test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP
   }
 });
 
-test('T-Y2/T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md) — Lambda RequestHandler -> service (not database, not invisible); handler that owns DynamoDbClient directly still stays service; store class stays database; architecture-grade connects present', () => {
+test('Lambda RequestHandler -> service (not database, not invisible); handler that owns DynamoDbClient directly still stays service; store class stays database; architecture-grade connects present', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
   fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -1092,7 +1092,7 @@ test('T-Y2/T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md) — Lambda Re
   }
 });
 
-test('T-Y4-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §2) — CFN/SAM path join: real path/method/handler binding resolved across TWO separate template files, attached to the real scanned units as real path-interfaces, calm validate + gold L0/L1/L2 all PASS', () => {
+test('CFN/SAM path join: real path/method/handler binding resolved across TWO separate template files, attached to the real scanned units as real path-interfaces, calm validate + gold L0/L1/L2 all PASS', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
   fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -1124,7 +1124,7 @@ test('T-Y4-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §2) — CFN/SAM pa
   }
 });
 
-test('T-Y5-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md, HT-ASB-006 class) — S5 completeness flag: 0 service units with a real store present, AND real CFN routes found but unbound, both fire; neither fires on the healthy java-lambda-apigw fixture', () => {
+test('S5 completeness flag: 0 service units with a real store present, AND real CFN routes found but unbound, both fire; neither fires on the healthy java-lambda-apigw fixture', () => {
   const orphanRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-orphan-store');
   fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
   fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -1742,7 +1742,7 @@ test('OpenAPI absent — coverage reports openapiStatus: absent, run completes n
 });
 
 test(
-  'System node + composed-of — real the reference Python app output, disableable via --no-system-node (T-X7-3)',
+  'System node + composed-of — the reference Python microservices banking app output, disableable via --no-system-node (T-X7-3)',
   { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
@@ -1894,7 +1894,7 @@ test('Platform artefacts — coverage-report.json and unmapped-signals-report.js
 
     const unmapped = JSON.parse(fs.readFileSync(path.join(outDir, 'unmapped-signals-report.json'), 'utf8'));
     assert.equal(unmapped.clusterCount, 0, 'NestJS fixture has no unmapped signals — every decorator matches a catalogue rule');
-    assert.ok(unmapped.footer.includes('T-XI-5'));
+    assert.ok(unmapped.footer.includes('catalogue-promotion candidate'));
 
     // Generic cross-cutting fields exist and are real objects even when empty (post-review fix).
     assert.deepEqual(coverage.relationshipsByKind, {});
@@ -1936,7 +1936,7 @@ test('Module registry — version-incompatible module is skipped, a throwing mod
   assert.equal(goodRan, true, 'a module after a throwing one must still run');
 });
 
-// T-B3 (docs/solution/AGENT_TASKS_Solution_Cleanup_and_Prioritized_Actions.md) —
+//
 // a real gap: no fixture in this suite has ever produced a genuine
 // service->service TypedRelationship (the reference Python app/a reference Java/JAX-RS banking platform only ever exercise
 // service->database). The interacts/connects fix (v0.9 §1, Solution Design
@@ -1992,7 +1992,7 @@ test('Protocol population — JDBC inferred from real evidence (org.postgresql),
 });
 
 test(
-  'Robustness T-R1-3 — Java Graphify import target normalization: real a reference Java/JAX-RS banking platform org.postgresql import now correctly becomes a database unit (was silently unreachable before this fix)',
+  'Robustness — Java Graphify import target normalization: a real reference Java/JAX-RS banking platform org.postgresql import now correctly becomes a database unit (was silently unreachable before this fix)',
   { skip: !fs.existsSync(JAVA_SAMPLE_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([JAVA_SAMPLE_SECURITY_ROOT]);
@@ -2026,7 +2026,7 @@ test(
 );
 
 test(
-  'Robustness T-R1-3 — jOOQ strategy dispatched (was not-implemented): real a reference Java governance platform waltz-data produces 229 real database units, evidence names the real org.jooq.* import',
+  'Robustness — jOOQ strategy dispatched (was not-implemented): real a reference Java governance platform (waltz-data module) produces 229 real database units, evidence names the real org.jooq.* import',
   { skip: !fs.existsSync(JAVA_SAMPLE2_DATA_ROOT) && 'spikes/waltz/repo/waltz-data not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir } = runPipeline([JAVA_SAMPLE2_DATA_ROOT]);
@@ -2079,7 +2079,7 @@ test('shares-secret relationship kind maps to connects with a distinct descripti
 });
 
 test(
-  'Env soft-graph — OFF by default, real the reference Python app name-correlation when enabled, red-team: no ConfigMap VALUES ever leak (T-X9-0/T-X9-1)',
+  'Env soft-graph — OFF by default, the reference Python microservices banking app name-correlation when enabled, red-team: no ConfigMap VALUES ever leak (T-X9-0/T-X9-1)',
   { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const k8sManifestsDir = path.resolve(PYTHON_SAMPLE_ROOT, '..', '..', 'kubernetes-manifests');
@@ -2096,7 +2096,7 @@ test(
       }
     }
 
-    // 2. --enable-env-soft-graph — real the reference Python app name correlation.
+    // 2. --enable-env-soft-graph — the reference Python microservices banking app name correlation.
     {
       const { outDir, calm } = runPipeline(roots, ['--k8s-manifests', k8sManifestsDir, '--enable-env-soft-graph']);
       try {
@@ -2187,7 +2187,7 @@ test(
 );
 
 test(
-  'AREC T-E5 — HITL review trigger: real a reference Java/JAX-RS banking platform fineract-charge (S1) lists the actual units, real the reference Python app (S2 only, S1 does not fire) lists only the flagged unit — offline, deterministic, no LLM',
+  'HITL review trigger: a real reference Java/JAX-RS banking platform (fineract-charge module) (S1) lists the actual units, the reference Python microservices banking app (S2 only, S1 does not fire) lists only the flagged unit — offline, deterministic, no LLM',
   { skip: (!fs.existsSync(JAVA_SAMPLE_ROOT) || !fs.existsSync(PYTHON_SAMPLE_ROOT)) && 'spikes/fineract or spikes/boa not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
@@ -2230,7 +2230,7 @@ test(
 );
 
 test(
-  'Robustness T-R4-1 — HITL review trigger: low-architecture-coverage fires on real a reference Java/JAX-RS banking platform fineract-security (17% coverage, S1 does NOT fire), mutually exclusive with S1',
+  'Robustness — HITL review trigger: low-architecture-coverage fires on a real reference Java/JAX-RS banking platform (fineract-security module) (17% coverage, S1 does NOT fire), mutually exclusive with S1',
   { skip: !fs.existsSync(JAVA_SAMPLE_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
@@ -2256,7 +2256,7 @@ test(
   }
 );
 
-test('AREC T-E5 — HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
+test('HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
   const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
   const facts = {
     contractVersion: '7.0.0',
@@ -2519,7 +2519,7 @@ test('T-CDX-2/3 (B-cdxgen-reuse) — real cdxgen dependency corroboration raises
   const { execFileSync: execSync } = require('node:child_process');
   const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
   if (!fs.existsSync(cdxgenBin)) {
-    // Real, disclosed optional-tool degradation (AGENT_TASKS_Cdxgen_Reuse.md
+    // Real, disclosed optional-tool degradation (
     // integrity table) — this test still needs the real binary to prove
     // the real end-to-end mechanism; skip rather than fail if a checkout
     // somehow lacks the devDependency (npm ci should always install it).
@@ -2629,7 +2629,7 @@ test('Review fix (2026-08-09) — cdxgen-provider scans every matching ecosystem
 test('T-TC1-1 (B-test-code-exclusion) — isTestPath() real positive/negative cases across languages', () => {
   const { isTestPath } = require(path.join(PIPELINE_ROOT, 'dist/rules/test-path'));
 
-  // Real positives, including the actual real a reference Java/JAX-RS banking platform path that found this bug.
+  // Real positives, including the actual a real reference Java/JAX-RS banking platform path that found this bug.
   assert.ok(isTestPath('src/test/java/com/example/app/infrastructure/openapi/OperationIdReaderTest.java'));
   assert.ok(isTestPath('src/test/java/example/Foo.java'), 'a /test/ directory segment must match regardless of filename');
   assert.ok(isTestPath('tests/foo.py'));
@@ -2667,7 +2667,7 @@ test('T-TC1-2/T-TC2-2/T-TC2-3 (B-test-code-exclusion, B-jaxrs-composer-class-sco
     const paths = node.interfaces.map((i) => i.path).sort();
     assert.deepEqual(paths, ['GET /orders', 'GET /products'], 'each method must resolve to its OWN class\'s path, never both copies of the first class\'s path (the original bug)');
 
-    // AP-3 (Architect_Pilot_Feedback_Notes.md Entry 12) — this file has TWO
+    // This file has TWO
     // real classes (OrdersResource, ProductsResource), so deriveUnitName()
     // must NOT guess between them — falls back to the file's own basename,
     // same as a file with zero class evidence, never an arbitrary pick.
@@ -2692,7 +2692,7 @@ test('T-TC1-3 (B-test-code-exclusion) — Graphify-driven persistence detection 
   }
 });
 
-test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact real a reference Java/JAX-RS banking platform shape) each resolve to their own real, distinct path', () => {
+test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact a real reference Java/JAX-RS banking platform shape) each resolve to their own real, distinct path', () => {
   const { composeJaxRsRoutes } = require(path.join(PIPELINE_ROOT, 'dist/analysis/jaxrs-route-composer'));
   // Mirrors OperationIdReaderTest.java's real shape: 5 nested
   // classes, each with its own class-level @Path immediately followed by

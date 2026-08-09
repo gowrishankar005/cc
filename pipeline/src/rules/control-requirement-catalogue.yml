@@ -1,13 +1,12 @@
 # Catalogue 2c (docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.5).
 # Maps a matched security-control signal to a control-id/name/description +
-# requirement-url, per the real, confirmed control-requirement.json schema
-# (docs/spikes/CALM_Construct_Reference_Deep_Dive_Spike.md §2).
+# requirement-url, per the real, confirmed control-requirement.json schema.
 #
-# requirement-url values are PROVISIONAL placeholders (v0.10 §0) — FINOS's
-# own calm/controls/ catalog is confirmed empty (README only, checked via
-# `gh api` in a prior session), so this project must author its own, and
-# these are not yet real, dereferenceable schemas. Labeled honestly as such
-# in the generated CALM output's x-aac-* metadata, not presented as settled.
+# requirement-url values are PROVISIONAL placeholders — FINOS's own
+# calm/controls/ catalog is confirmed empty (README only), so this project
+# must author its own, and these are not yet real, dereferenceable schemas.
+# Labeled honestly as such in the generated CALM output's x-aac-* metadata,
+# not presented as settled.
 
 version: "0.1.0"
 

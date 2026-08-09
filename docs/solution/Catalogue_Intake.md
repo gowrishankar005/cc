@@ -22,7 +22,7 @@ A new catalogue row is not mergeable without all four:
 
 ## Worked example (retroactive, not hypothetical)
 
-`persistence-detection-catalogue.yml`'s `org.jooq` row (T-R1-3): (1) evidence — real the reference Java governance platform `waltz-data/GenericSelector.java`, exact import lines grep-verified; (2) claim — `Claim_Register.md`'s R2 row updated to note the real 229-unit result, not silently marked "proven" off one class; (3) test — `regression.test.js`'s gated the reference Java governance platform test asserts the exact unit count and evidence signal text; (4) scope note — the row's own catalogue comment states it's Java-only and depends on the shared `java-import-resolver.ts` fix, not a claim about jOOQ support in any other language.
+`persistence-detection-catalogue.yml`'s `org.jooq` row: (1) evidence — a real `GenericSelector.java` from a reference Java governance platform, exact import lines grep-verified; (2) claim — `Claim_Register.md`'s relationship row updated to note the real 229-unit result, not silently marked "proven" off one class; (3) test — `regression.test.js`'s gated test against that platform asserts the exact unit count and evidence signal text; (4) scope note — the row's own catalogue comment states it's Java-only and depends on the shared `java-import-resolver.ts` fix, not a claim about jOOQ support in any other language.
 
 ## Where this is enforced
 

@@ -4,14 +4,13 @@ import * as os from 'os';
 import * as path from 'path';
 
 /**
- * T-CDX-1/T-CDX-2 (B-cdxgen-reuse) — real, deterministic dependency-name
- * corroboration via `@cyclonedx/cdxgen` (OWASP, npm), shelled out the same
- * way `graphify-provider.ts` already shells out to Graphify — a structured
- * EXTERNAL TOOL OUTPUT provider, not a new mechanism class.
+ * Real, deterministic dependency-name corroboration via `@cyclonedx/cdxgen`
+ * (OWASP, npm), shelled out the same way `graphify-provider.ts` already
+ * shells out to Graphify — a structured EXTERNAL TOOL OUTPUT provider, not
+ * a new mechanism class.
  *
- * Real findings from verifying the tool before writing this (see
- * `AGENT_TASKS_Cdxgen_Reuse.md` §0, not assumed from the reuse-check doc
- * alone): (1) the real npm package is `@cyclonedx/cdxgen` — bare `cdxgen`
+ * Real findings from verifying the tool before writing this, not assumed:
+ * (1) the real npm package is `@cyclonedx/cdxgen` — bare `cdxgen`
  * is a 404 on the real registry, the source docs' informal name was wrong;
  * (2) `cdxgen` only produces real components when the target already has a
  * committed lockfile (`uv.lock`/`package-lock.json`/etc) — confirmed via a

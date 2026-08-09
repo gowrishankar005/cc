@@ -2,10 +2,9 @@ import { AnalysisContext } from './pass-registry';
 import { TypedUnit, TypedRelationship } from '../types/typed-facts';
 
 /**
- * T-X0-1 (AGENT_TASKS_Extraction_Enrichment.md) — without counts, a high
- * confidence score reads as "complete" and a zero-route package reads as
- * "no architecture here" instead of "detect() gate silently failed"
- * (requirements v0.6 §4, detect-gate-smoketest.ts). This is the per-run
+ * Without counts, a high confidence score reads as "complete" and a
+ * zero-route package reads as "no architecture here" instead of "detect()
+ * gate silently failed" (see detect-gate-smoketest.ts). This is the per-run
  * antidote: a real count of what was looked at vs. what became a unit,
  * per package root.
  *
@@ -53,9 +52,8 @@ export interface CoverageReport {
   relationshipsByKind: Record<string, number>;
   relationshipsBySource: Record<string, number>;
   /**
-   * T-L3-2 (AGENT_TASKS_Layered_Architecture_Story.md) — breakdown of
-   * RESOLVED multi-hop edges by `TypedRelationship.mechanism` (T-L2-1:
-   * 'r2-phase1' | 'r2b'), read generically from whatever value is present —
+   * Breakdown of RESOLVED multi-hop edges by `TypedRelationship.mechanism`
+   * ('r2-phase1' | 'r2b'), read generically from whatever value is present —
    * this file never hardcodes the two mechanism names. Relationships from
    * every other producer (R0/R1/k8s/env-soft-graph) leave `mechanism`
    * unset and are correctly absent from this breakdown, not bucketed under
@@ -142,19 +140,18 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
       `S2-http-without-security-control: ${httpUnitsWithoutSecurityControlCount} HTTP-entry-point unit(s) have no security-control evidence — may reflect a missing detection mechanism (see AREC C-call), not necessarily "no auth in source"`
     );
   }
-  // T-Y5-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md, HT-ASB-006
-  // class) — the original, still-real gap S1 structurally cannot catch:
-  // S1 requires >=1 service unit to even look at relationship count, so a
-  // run with ZERO service units (real pre-Y3 a reference AWS SaaS sample-tier-service:
-  // 0 services, N Dynamo-import database units, silenceFlags: []) passes
-  // through S1 completely silent — the degenerate, LOUDEST-should-be case
-  // was the one this project's own silence invariants missed. Real,
-  // generic condition (no framework/language name): 0 service units but
-  // >=1 database/topic unit exists — that persistence signal proves real
-  // architectural code exists, so an entirely absent service surface is
-  // suspicious, not "nothing here." Still fires post-Y3/Y4 for Node/Python
-  // handlers (deferred, no sample yet) or any handler shape this
-  // pipeline's catalogue doesn't recognize.
+  // The original, still-real gap S1 structurally cannot catch: S1 requires
+  // >=1 service unit to even look at relationship count, so a run with ZERO
+  // service units (a real serverless-tier-service before Lambda handler
+  // detection shipped: 0 services, N Dynamo-import database units,
+  // silenceFlags: []) passes through S1 completely silent — the degenerate,
+  // LOUDEST-should-be case was the one this project's own silence
+  // invariants missed. Real, generic condition (no framework/language
+  // name): 0 service units but >=1 database/topic unit exists — that
+  // persistence signal proves real architectural code exists, so an
+  // entirely absent service surface is suspicious, not "nothing here."
+  // Still fires for Node/Python Lambda handlers (deferred, no sample yet)
+  // or any handler shape this pipeline's catalogue doesn't recognize.
   if (serviceUnitIds.size === 0 && databaseUnitCount + topicUnitCount >= 1) {
     silenceFlags.push(
       `S5-zero-service-units-with-store-present: 0 service units but ${databaseUnitCount} database + ${topicUnitCount} topic unit(s) present — real persistence/messaging code exists with no discovered HTTP/entry-point surface at all; may be a real gap in entry-point detection for this language/framework (e.g. Node/Python Lambda handlers, not yet built) rather than a service-free codebase`

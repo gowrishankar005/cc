@@ -3,8 +3,7 @@ import * as fs from 'fs';
 const MAX_HEADER_LINES = 10; // bounded scan — real class headers (even multi-line, extends+implements split across lines) fit well within this; never scan the whole file
 
 /**
- * Q13 (Open_Questions_Validation.md) / T-ontology (Robustness) — real finding
- * that falsifies the decision doc's OWN proposed fix before it was ever
+ * Real finding that falsifies the decision doc's OWN proposed fix before it was ever
  * implemented: "require an inherits/extends edge, not just an import edge."
  * Verified directly against real a reference Node/NestJS wealth-management app source + a real Graphify
  * extraction: `class PrismaService extends PrismaClient` produces ZERO

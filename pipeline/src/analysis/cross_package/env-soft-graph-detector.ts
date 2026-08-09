@@ -4,14 +4,14 @@ import { EnvRelationshipAllowlist, allowlistedBasename } from '../../rules/env-r
 import { findUnitForDeployment } from './deployment-correlation';
 
 /**
- * T-X9-1 (G-L1-06) — real evidence: spikes/boa/repo/kubernetes-manifests/config.yaml's
+ * Real evidence: a reference Python microservices banking app's
  * `service-api-config` ConfigMap has KEY NAMES (never read: its values)
  * like `USERSERVICE_API_ADDR`/`CONTACTS_API_ADDR` that, after stripping an
  * allowlisted suffix (env-relationship-allowlist.yml), match OTHER real
  * deployment names in the same manifest set almost exactly
  * ("USERSERVICE_API_ADDR" -> "userservice", an EXACT match against the
  * real `userservice` Deployment). This is a soft, low-confidence signal —
- * unlike T-X5-1's shares-secret (a structural fact: two deployments
+ * unlike the shares-secret detector (a structural fact: two deployments
  * literally mount the same secret), this is a NAME-CORRELATION GUESS
  * (the key name strongly suggests, but doesn't prove, the referencing
  * deployment talks to that target) — hence fixed low confidence (20,

@@ -6,7 +6,7 @@ import { Evidence } from '../types/typed-facts';
 const ROUTE_WEIGHT = 40; // matches openApiPass's ROUTE_WEIGHT convention — a resolved CFN path/method/handler binding is as decisive as a native-typed route
 
 /**
- * T-Y4-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §2/§4) — binds
+ * Binds
  * cfn-manifest-provider.ts's raw path/method/handler bindings to real
  * scanned units. Opt-in: only runs when --cfn-manifests <dir> was passed.
  * Runs AFTER mapSignalsPass (needs ctx.allUnits populated — this pass

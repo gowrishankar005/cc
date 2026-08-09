@@ -82,11 +82,10 @@ function isValidConnectsRelationship(value: unknown): value is CalmRelationship 
  * misconfigured correction.
  *
  * Supports node_add / type_change / node_remove / node_rename /
- * relationship_add / relationship_remove (T-X6-1, AGENT_TASKS_Extraction_Enrichment.md
- * — the hard predecessor for X5/X8/X9's HITL-completed edges; those
- * mitigations were false claims until this shipped). `boundary_change` is
- * still recognized (won't crash) but reported as skipped, not
- * pretended-complete — no evidenced use case yet.
+ * relationship_add / relationship_remove — the hard predecessor for
+ * human-in-the-loop-completed edges; those mitigations were false claims
+ * until this shipped. `boundary_change` is still recognized (won't crash)
+ * but reported as skipped, not pretended-complete — no evidenced use case yet.
  */
 export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm: CalmDocument; result: OverrideApplicationResult } {
   const result: OverrideApplicationResult = { applied: [], rejected: [], skipped: [], orphans: [] };

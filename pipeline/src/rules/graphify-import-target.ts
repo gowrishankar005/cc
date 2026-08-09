@@ -1,6 +1,6 @@
 /**
  * Real finding from testing against a real Node/NestJS fintech repo
- * (ghostfolio/ghostfolio — the first Node/TS codebase with actual
+ * (a reference wealth-management app — the first Node/TS codebase with actual
  * persistence/queue dependencies ever run through this pipeline): Graphify
  * does NOT use the literal npm package name as an `imports_from`/`imports`
  * edge target for EXTERNAL packages — it normalizes to `ref_<sanitized>`

@@ -19,8 +19,8 @@ const SNIPPET_CONTEXT_LINES = 3;
 const REVIEW_WORTHY_REASONS: IgnoredItem['reason'][] = ['AMBIGUOUS_BOUNDARY', 'INSUFFICIENT_EVIDENCE'];
 
 /**
- * B-scale-oom (T-SP0-1/T-SP1-1) — real, measured root cause of the OOM
- * crash on `fineract-provider` (2,462 files): 133,911 of 134,250 ignoredItems
+ * Real, measured root cause of the OOM
+ * crash on a large Java module (2,462 files): 133,911 of 134,250 ignoredItems
  * were review-worthy (INSUFFICIENT_EVIDENCE), each one previously triggered
  * its own full `fs.readFileSync(...).split('\n')` with zero caching (average
  * 57 ignored items per file among only 2,361 unique files), and
@@ -79,7 +79,7 @@ function resolveRefPath(ref: string, packageRoots: string[]): { absPath: string;
 
 export function buildEvidencePacks(ignoredItems: IgnoredItem[], packageRoots: string[], includeSnippets: boolean): EvidencePack[] {
   // Real files are re-read for MANY items each at scale (avg 57 ignored
-  // items per file on the fineract-provider repro) — cache per absPath so
+  // items per file on the large-module repro) — cache per absPath so
   // each file is read+split at most once per call, regardless of how many
   // ignored items land in it. Applies even under the cap below: still a
   // real win on any run smaller than MAX_EVIDENCE_PACKS.

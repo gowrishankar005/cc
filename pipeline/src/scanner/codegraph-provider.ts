@@ -47,14 +47,14 @@ export async function indexPackage(packageRoot: string): Promise<{ cg: any; nati
 /**
  * extractFromSource()'s UnresolvedReference has NO field for a decorator's own
  * argument (confirmed by reading node_modules/@colbymchenry/codegraph/dist/types.d.ts
- * directly, then verified empirically — docs/spikes/fineract-route-assembly-spike/).
- * It gives the annotation NAME and its exact line, never the string inside the
- * parens. For JAX-RS-style path assembly (class-level @Path + method-level
- * @Path composing into one route), that argument is exactly the missing piece
- * — so it's read back from the source line itself, scoped to that one line,
- * not a general annotation parser. Verified 19/19 real routes across 3 real
- * a reference Java/JAX-RS banking platform resource files (ChargesApiResource, SchedulerApiResource,
- * DelinquencyApiResource) using exactly this mechanism.
+ * directly, then verified empirically). It gives the annotation NAME and its
+ * exact line, never the string inside the parens. For JAX-RS-style path
+ * assembly (class-level @Path + method-level @Path composing into one route),
+ * that argument is exactly the missing piece — so it's read back from the
+ * source line itself, scoped to that one line, not a general annotation
+ * parser. Verified 19/19 real routes across 3 real resource files
+ * (ChargesApiResource, SchedulerApiResource, DelinquencyApiResource) from a
+ * reference Java/JAX-RS banking platform, using exactly this mechanism.
  */
 function extractLiteralArgument(sourceLines: string[], line: number, annotationName: string): string | undefined {
   const lineText = sourceLines[line - 1] ?? '';
@@ -63,16 +63,15 @@ function extractLiteralArgument(sourceLines: string[], line: number, annotationN
 }
 
 /**
- * AREC Wave 3 T-D1/T-D2 (C-rich) — the call-site sibling of
- * extractLiteralArgument: extracts a call's raw parenthesized TEXT, e.g.
- * "RESOURCE_NAME_FOR_PERMISSIONS" for
+ * The call-site sibling of extractLiteralArgument: extracts a call's raw
+ * parenthesized TEXT, e.g. "RESOURCE_NAME_FOR_PERMISSIONS" for
  * `validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS)`. Deliberately
  * the last-open-paren-to-last-close-paren span on the line (not a full
  * balanced-parens parser) — same-line-only scoping, same honest limit
  * extractLiteralArgument already holds; never resolves an identifier to its
  * constant VALUE (would need cross-file/whole-file resolution this
- * mechanism doesn't do) — the raw source text itself is the "expression"
- * C-rich asks for, not an inferred value.
+ * mechanism doesn't do) — the raw source text itself is the expression
+ * being captured, not an inferred value.
  */
 function extractCallArgumentText(sourceLines: string[], line: number, calledMethodName: string): string | undefined {
   const lineText = sourceLines[line - 1] ?? '';
@@ -86,7 +85,7 @@ function extractCallArgumentText(sourceLines: string[], line: number, calledMeth
 }
 
 /**
- * The RESOLVED mechanism (requirements v0.6 §5 / docs/spikes/CodeGraph_Annotation_Extraction_Reconciliation_Spike.md).
+ * The resolved decorator-fact extraction mechanism.
  * Do NOT use node.decorators or persisted decorates edges — both were falsified.
  * extractFromSource() is file-scoped, gate-free, and independent of indexing/resolution.
  */
@@ -238,7 +237,7 @@ export function extractTypeReferenceFacts(cg: any, packageRoot: string, relative
  * entries, `referenceName: "JpaRepository<Charge, Long>"` and
  * `"JpaSpecificationExecutor<Charge>"`, at the real `extends` clause line.
  *
- * T-Y3-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §1) — real,
+ * Real,
  * empirically-verified finding: a Java `implements` clause (e.g.
  * `class TierService implements RequestHandler<...>`) produces its OWN
  * distinct `referenceKind: 'implements'`, NOT `'extends'` — confirmed by

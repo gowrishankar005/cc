@@ -34,8 +34,8 @@ function extractAuthorityRef(expression: string | undefined): string | undefined
  * THAT this evidence means "a control exists here"; control-requirement-catalogue.yml
  * decides WHICH control-id/description/requirement-url it maps to.
  *
- * Real evidence this was built against: spikes/fineract/repo/fineract-core/
- * .../DatatableWriteService.java — a Java `interface` with @PreAuthorize on
+ * Real evidence this was built against: a reference Java/JAX-RS banking
+ * platform's DatatableWriteService.java — a Java `interface` with @PreAuthorize on
  * every method and no HTTP route annotation anywhere, i.e. a genuinely new
  * class of previously-invisible node (an RBAC-enforcing service layer, not
  * discoverable by any mechanism this pipeline had before this).

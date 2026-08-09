@@ -6,7 +6,7 @@ import { UnmappedSignalsReport } from '../unmapped-signals';
 import { EvidencePack, countReviewWorthyIgnoredItems } from './evidence-packs';
 
 /**
- * T-X3-2 — Platform IR, per Extraction_Gaps_Mitigation_and_IR_Platform_Review.md
+ * Platform IR.
  * §3: NOT a CALM draft, NOT calm-generator-owned. Deterministically rendered
  * from TypedFacts + coverage + unmapped + evidence packs — the same
  * intelligence every module reads, in a human/LLM-legible view. Module

@@ -6,9 +6,9 @@ import { DecoratorFact } from '../scanner/structural-engine';
  * JAX-RS (@Path/@GET/etc.) has no native `route` typing at all, so unlike
  * Spring MVC there is no ready-made full-path string anywhere — it has to be
  * composed from class-level + method-level @Path decorator facts, using the
- * literal-argument extraction added to codegraph-provider.ts this session.
+ * literal-argument extraction added to codegraph-provider.ts.
  *
- * Verified against 3 real a reference Java/JAX-RS banking platform JAX-RS resources (docs/spikes/fineract-route-assembly-spike/):
+ * Verified against 3 real JAX-RS resources from a reference Java/JAX-RS banking platform:
  * 19/19 real routes correctly assembled, including the hardest case found —
  * a method-level @Path literal ("buckets/{delinquencyBucketId}") reused
  * verbatim across 3 different HTTP-verb methods in the same class, correctly
