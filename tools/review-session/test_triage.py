@@ -3,7 +3,7 @@ review-queue input, no real repo needed (S7: no sample hardcodes)."""
 
 import unittest
 
-from triage import build_residuals
+from triage import build_residuals, apply_baseline
 
 
 class TestBuildResiduals(unittest.TestCase):
@@ -46,6 +46,50 @@ class TestBuildResiduals(unittest.TestCase):
         }
         residuals = build_residuals(rq)
         self.assertEqual([r["id"] for r in residuals], ["R-001", "R-002"])
+
+
+class TestApplyBaseline(unittest.TestCase):
+    def test_matching_residual_with_active_decision_carried_forward(self):
+        residuals = [{"id": "R-001", "tier": "A", "class": "ontology-judgment", "trigger": "S5-zero-service-units-with-store-present", "unitIds": ["db.py"], "evidenceRefs": [], "rationale": "r", "status": "open"}]
+        baseline_residuals = [{"id": "R-old-001", "tier": "A", "class": "ontology-judgment", "trigger": "S5-zero-service-units-with-store-present", "unitIds": ["db.py"], "evidenceRefs": [], "rationale": "old r", "status": "open"}]
+        baseline_decisions = [{"decision_id": "D-001", "target_ref": "db.py", "status": "active"}]
+        out = apply_baseline(residuals, baseline_residuals, baseline_decisions)
+        self.assertEqual(out[0]["status"], "carried_forward")
+        self.assertIn("R-old-001", out[0]["rationale"])
+
+    def test_no_baseline_match_stays_open(self):
+        residuals = [{"id": "R-001", "tier": "A", "class": "ontology-judgment", "trigger": "S5-zero-service-units-with-store-present", "unitIds": ["db.py"], "evidenceRefs": [], "rationale": "r", "status": "open"}]
+        out = apply_baseline(residuals, [], [])
+        self.assertEqual(out[0]["status"], "open")
+        self.assertNotIn("reconfirm", out[0])
+
+    def test_matching_unit_but_inactive_decision_not_carried_forward(self):
+        residuals = [{"id": "R-001", "tier": "A", "class": "ontology-judgment", "trigger": "S5-zero-service-units-with-store-present", "unitIds": ["db.py"], "evidenceRefs": [], "rationale": "r", "status": "open"}]
+        baseline_residuals = [{"id": "R-old-001", "tier": "A", "class": "ontology-judgment", "trigger": "S5-zero-service-units-with-store-present", "unitIds": ["db.py"], "evidenceRefs": [], "rationale": "old r", "status": "open"}]
+        baseline_decisions = [{"decision_id": "D-001", "target_ref": "db.py", "status": "superseded"}]  # not active
+        out = apply_baseline(residuals, baseline_residuals, baseline_decisions)
+        self.assertEqual(out[0]["status"], "open", "an inactive/superseded decision must not silently carry forward")
+
+    def test_changed_trigger_class_flagged_reconfirm_not_silently_carried_or_overwritten(self):
+        """Design §7.2 (P7 applied to drift): a real contradiction between
+        the baseline's recorded decision and this run's fresh evidence must
+        surface as a new residual, never silently carried forward and never
+        silently discarded."""
+        residuals = [{"id": "R-001", "tier": "A", "class": "security-authority-policy", "trigger": "S2-http-without-security-control", "unitIds": ["svc.py"], "evidenceRefs": [], "rationale": "now has http-without-control", "status": "open"}]
+        baseline_residuals = [{"id": "R-old-001", "tier": "A", "class": "ontology-judgment", "trigger": "S5-zero-service-units-with-store-present", "unitIds": ["svc.py"], "evidenceRefs": [], "rationale": "was ontology", "status": "open"}]
+        baseline_decisions = [{"decision_id": "D-001", "target_ref": "svc.py", "status": "active"}]
+        out = apply_baseline(residuals, baseline_residuals, baseline_decisions)
+        self.assertEqual(out[0]["status"], "open", "must still be asked, not silently carried forward")
+        self.assertTrue(out[0].get("reconfirm"))
+        self.assertIn("R-old-001", out[0]["rationale"])
+        self.assertEqual(out[0]["class"], "security-authority-policy", "real current class must be preserved, not overwritten with a sentinel")
+
+    def test_carry_forward_preserves_real_tier_and_class(self):
+        residuals = [{"id": "R-001", "tier": "C", "class": "missing-intermediates-not-in-scan", "trigger": "S5-cfn-routes-found-but-unbound", "unitIds": [], "evidenceRefs": [], "rationale": "r", "status": "open"}]
+        # run-level residual, no unitIds -- baseline matching by unit can never fire; stays open.
+        out = apply_baseline(residuals, [], [])
+        self.assertEqual(out[0]["tier"], "C")
+        self.assertEqual(out[0]["class"], "missing-intermediates-not-in-scan")
 
 
 if __name__ == "__main__":

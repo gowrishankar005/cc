@@ -44,7 +44,11 @@
         "status": {
           "type": "string",
           "enum": ["open", "drafted", "applied", "carried_forward"],
-          "description": "MVP only ever writes 'open' — 'drafted'/'applied'/'carried_forward' are set by later phases (RS-2 validate_drafts, RS-3 apply, RS-3 --baseline), named here so the schema doesn't need to change shape when those land."
+          "description": "'carried_forward' is set by pack.py --baseline (T-RS3-3) when a prior session already decided this exact residual — never re-carded. 'drafted'/'applied' are not yet set by any built tool (no code path marks a residual resolved after apply — see the effective_ir.py MVP's own honest note about this)."
+        },
+        "reconfirm": {
+          "type": "boolean",
+          "description": "T-RS3-3 (--baseline). True when a prior session's decision exists for this residual's unit, but THIS run's (trigger, class) differs from what the baseline recorded — the underlying source/facts likely changed shape since the decision was made. Never silently carried forward or silently overwritten; still gets a real, fresh choice card. Absent (not false) when no baseline was given or no prior decision matched."
         }
       }
     }

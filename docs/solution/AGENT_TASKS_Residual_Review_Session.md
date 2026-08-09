@@ -20,7 +20,7 @@
 RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
   → RS-1  Session pack + triage + choice-card templates + chat-mode (no LLM draft required) ── DONE (2026-08-09)
   → RS-2  validate_drafts + effective IR (MVP)  [ir-to-calm may defer to B-calm-portable-ir] ── DONE (2026-08-09, MVP scope)
-  → RS-3  apply.py + apply-report + initial --baseline
+  → RS-3  apply.py + apply-report + initial --baseline ── DONE (2026-08-09)
   → RS-4  Optional Tier B LLM drafting (system prompt §5.1) + fabricate traps
   → RS-5  Eval traps, pilot scorecard note, optional prose rewrite, portable IR if deferred
 ```
@@ -280,6 +280,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 | **Flow** | validate_drafts → copy/point overrides dir → `node …/run-slice.js --from-facts <facts> --overrides <drafts/overrides> --out <new-out> [--strict-overrides]` |
 | **Safety** | Refuse if validate fails; refuse if chat-invoked without `--i-confirm-apply` flag **or** interactive confirm; log command line to apply-report |
 | **Exit** | Nest/BoA-style run: override type_change or relationship_add applies; calm validate 0 errors on reviewed out |
+| **Status** | **done, 2026-08-09.** `tools/review-session/apply.py` — the one place in this whole tool suite that ever invokes `run-slice.js`/`override-applier.ts` (a deliberate, narrow chokepoint). Flow exactly as specified: re-runs `validate_drafts` in-process (never trusts a stale prior validation) → refuses on any error → requires explicit confirmation (a real TTY prompt, or `--i-confirm-apply`; non-interactive without the flag is refused, never silently proceeds) → **merges `drafts/decisions/` + `drafts/overrides/` into one directory** (the real integration gap found and named during T-RS2-1's review, now actually handled) → `node dist/orchestration/run-slice.js --from-facts --overrides --out` → reads back the real `overrides-applied-report.json`. Command line logged to `apply-report.md` BEFORE running, so even a crash leaves a real record. **Exit bar proven for real, not just asserted**: 4 end-to-end tests (`test_apply.py`) — a real `type_change` override genuinely changes a real CALM node's type; `npm run validate` (the same command used throughout this whole session) reports `Errors: no (0)` on the reviewed out-dir; refuses cleanly (no out-dir written) both when validation fails and when not confirmed. |
 
 ### T-RS3-2 — `apply-report.md` / overrides-applied-report
 
@@ -287,6 +288,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Deliverable** | Summarize applied/rejected/orphans from platform report; decisions-log append |
 | **Exit** | Architect can see what applied |
+| **Status** | **done, 2026-08-09 — built alongside T-RS3-1, same commit.** `apply.py` writes a real, cumulative `apply-report.md` (every attempt appended, not overwritten — a refused attempt is on record too, not just successful ones) with the exact command run and applied/rejected/skipped/orphans override ids from the real `overrides-applied-report.json`; `decisions-log.md` gets a matching entry. Verified against real rendered output, readable, override ids traceable back to `drafts/decisions/`/`drafts/overrides/`. |
 
 ### T-RS3-3 — Initial `--baseline` (thin)
 
@@ -295,12 +297,15 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 | **Minimum** | Document + optional flag: if baseline session dir provided, mark residuals already decided as `carried_forward` and do not re-card them unless facts contradict (contradiction → new residual “re-confirm”) |
 | **Full multi-scan polish** | May continue in RS-5  
 | **Exit** | At least documented behaviour; code preferred |
+| **Status** | **done (code, not just documented), 2026-08-09.** `triage.py`'s `apply_baseline()` — matches by (unit id, whether that unit has an ACTIVE decision in the baseline pack); if this run's fresh `(trigger, class)` for that unit matches what the baseline recorded, the residual is marked `carried_forward` and gets a short note instead of a full choice card (never re-asked, per design §7.2's "a node the architect already typed correctly last time is never silently re-asked"). If it DIFFERS (the underlying source/facts changed shape since the decision), the residual is flagged `reconfirm: true` with its real, current tier/class/card preserved — **never silently carried forward and never silently overwritten**, matching P7 applied to drift. Wired into `pack.py --baseline <prior-session-dir>`, `SESSION.md` gets a dedicated "Carried forward" section. **Real, honestly-named limitation**: matching is by unit id, not a stable residual id (T-RS1-3's ids are positional/regenerated per run) — full multi-scan polish stays RS-5 as this task's own spec allows. **Verified end-to-end for real**: packed the NestJS fixture twice, hand-authored a decision in the first pack, built the second pack with `--baseline` pointing at the first — confirmed the real S2 residual came back `carried_forward`, not re-asked. 5 new unit tests in `test_triage.py`. |
 
-**RS-3 exit checklist**
+**RS-3 exit checklist — ALL DONE, 2026-08-09. Phase RS-3 CLOSED.**
 
-- [ ] Human apply path works end-to-end  
-- [ ] S4: apply not silent from agent  
-- [ ] Pipeline tests green  
+- [x] Human apply path works end-to-end — proven with a real applied override + `calm validate` 0 errors, not just unit-tested  
+- [x] S4: apply not silent from agent — the chat-mode has no terminal tool at all (T-RS1-5); `apply.py` itself additionally refuses any non-interactive invocation without `--i-confirm-apply`, a second independent layer  
+- [x] Pipeline tests green — zero `pipeline/` diff across the whole RS-3 program, confirmed by `git status --short pipeline/` at every step  
+
+**64 real tests total across `tools/review-session/`** (up from 55 — `test_apply.py` ×4 real end-to-end subprocess runs, `test_triage.py` gained 5 `apply_baseline` tests). Next: RS-4 (optional Tier B LLM drafting) — **do not start until this phase's own human-apply-works bar was met**, which it now is.
 
 ---
 
@@ -444,6 +449,7 @@ Start at first incomplete RS-1 task (T-RS1-1) unless the user names a later phas
 
 | Date | Note |
 |---|---|
+| 2026-08-09 | **Phase RS-3 CLOSED — apply.py, apply-report, --baseline all real, all proven end-to-end.** `apply.py` is the sole real chokepoint for invoking `run-slice.js`/`override-applier.ts` — re-validates in-process, requires explicit confirmation (never silent, S4), merges `drafts/decisions/`+`drafts/overrides/` (the integration gap T-RS2-1 found and named, now handled for real). Proven: a real `type_change` override genuinely applied, `npm run validate` reported `Errors: no (0)` on the result. `apply-report.md`/`decisions-log.md` get real, cumulative, readable entries. `--baseline` (T-RS3-3) is real code, not just documented — `apply_baseline()` carries forward already-decided residuals and flags real drift as `reconfirm` rather than silently overwriting or silently re-asking; proven by packing the same fixture twice and confirming the second pack correctly skipped the already-decided residual. 64 tests total (up from 55), zero `pipeline/` diff throughout. Next: RS-4, gated on this phase's own bar (human apply works without LLM) — now met. |
 | 2026-08-09 | **RS-2 self-review found and fixed 3 real correctness bugs in `validate_drafts.py`**, same day it was built, before anyone relied on it. All three were found by writing new edge-case reproductions, not by re-reading the code: (1) check-order mismatch let a `boundary_change` override with a dangling `decision_record_ref` pass as valid when the real applier would reject it; (2) the same-batch `node_add` exception counted overrides that would themselves be rejected, masking real dangling `relationship_add` endpoints; (3) `relationship_remove` never checked target existence at all. All three fixed, all three now have dedicated regression tests (16 tests total, up from 12; 55 across the whole tool suite, up from 51). Also surfaced (not fixed, out of scope for this tooling): `override-applier.ts`'s own `switch` has no `default` case for an unrecognized `override_type` — real, minor, platform-level gap named for BACKLOG. |
 | 2026-08-09 | **Phase RS-2 CLOSED (MVP scope) — T-RS2-1/2/3 done, T-RS2-4 explicitly deferred to B-calm-portable-ir.** `validate_drafts.py` mirrors `override-applier.ts`'s real integrity checks; found and named a real (not yet fixed) integration gap along the way — the Session Pack's split `drafts/decisions/`+`drafts/overrides/` layout doesn't match `override-applier.ts`'s single-flat-directory scan, so RS-3's `apply.py` will need to merge them. `examples/` proves the manual (no-LLM) draft path end-to-end for real — a hand-authored override genuinely changed a real CALM node's type via the existing `run-slice --overrides` mechanism, `calm validate` still 0 errors. `effective_ir.py` (MVP) generates a real, non-empty effective-architecture summary from real applied CALM, confirmed (by hash, not assumption) to never touch `intelligence-ir.md`. 51 real tests total across the tool suite. Next: RS-3. |
 | 2026-08-09 | **Phase RS-1 CLOSED — T-RS1-6 done, all 6 RS-1 tasks complete.** `pack.py`'s `SESSION.md` gained the numbered 1-9 walkthrough (design §2), a real copy-pasteable apply command (caught and fixed a first-draft placeholder-phrase bug by reading actual rendered output), and a CALM-viewer section (design §4.5). `AGENTS.md` now references the real chat-mode file and names Guided mode. RS-1 exit checklist fully closed: 33 real tests, zero pipeline/ diff across the whole program, no network anywhere in the tool, B-scale-oom-scale test passed. S9 (bulk-apply one-DR-per-residual) honestly noted as *addressed* at this phase (never violated by RS-1's own tooling) but not yet *mechanically enforced* — that's `validate_drafts.py`'s job, correctly scoped to RS-2. Next: RS-2. |

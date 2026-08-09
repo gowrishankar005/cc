@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from redact import redact  # noqa: E402
-from triage import build_residuals  # noqa: E402
+from triage import build_residuals, apply_baseline  # noqa: E402
 from cards import build_all_cards  # noqa: E402
 
 SNIPPET_CONTEXT_LINES = 3  # +/- lines around a referenced line, bounded window per design §6
@@ -42,6 +42,7 @@ def main() -> int:
     parser.add_argument("--out-dir", required=True, help="run-slice output directory (must contain typed-facts.json + coverage-report.json)")
     parser.add_argument("--session-dir", required=True, help="where to write the Session Pack (typically review-sessions/<run-id>)")
     parser.add_argument("--roots", nargs="*", default=None, help="override package roots for source snippet reads (defaults to typed-facts.json's own packageRoots)")
+    parser.add_argument("--baseline", help="T-RS3-3: a prior Session Pack dir — residuals already decided there are carried forward, not re-asked; residuals whose evidence shape changed since are flagged re-confirm")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir).resolve()
@@ -89,6 +90,21 @@ def main() -> int:
 
     residuals = build_residuals(review_queue)
 
+    if args.baseline:
+        baseline_dir = Path(args.baseline).resolve()
+        baseline_residuals_path = baseline_dir / "residuals.json"
+        baseline_decisions_dir = baseline_dir / "drafts" / "decisions"
+        if not baseline_residuals_path.exists():
+            print(f"[pack] --baseline {baseline_dir} has no residuals.json — ignoring, treating this as a first pass", file=sys.stderr)
+        else:
+            baseline_residuals = json.loads(baseline_residuals_path.read_text()).get("items", [])
+            baseline_decisions = [json.loads(f.read_text()) for f in sorted(baseline_decisions_dir.glob("*.json"))] if baseline_decisions_dir.exists() else []
+            before = len(residuals)
+            residuals = apply_baseline(residuals, baseline_residuals, baseline_decisions)
+            carried = sum(1 for r in residuals if r.get("status") == "carried_forward")
+            reconfirm = sum(1 for r in residuals if r.get("reconfirm"))
+            print(f"[pack] --baseline applied: {carried}/{before} residual(s) carried forward (not re-asked), {reconfirm} flagged re-confirm (evidence shape changed since baseline)")
+
     unit_index = _build_unit_index(facts)
     (session_dir / "evidence" / "unit-index.json").write_text(json.dumps(unit_index, indent=2))
 
@@ -98,10 +114,13 @@ def main() -> int:
     # T-RS1-4 — deterministic choice cards, generated from the fixed
     # per-class templates in cards.py (never LLM-invented), attached
     # directly onto each residual so the bound Copilot Chat agent (T-RS1-5)
-    # can read the card straight out of residuals.json.
-    card_markdown = build_all_cards(residuals, unit_index, packs)
+    # can read the card straight out of residuals.json. carried_forward
+    # residuals (T-RS3-3) never get a full choice card — they're not being
+    # asked again — just a short note.
+    askable = [r for r in residuals if r.get("status") != "carried_forward"]
+    card_markdown = build_all_cards(askable, unit_index, packs)
     for r in residuals:
-        r["card"] = card_markdown[r["id"]]
+        r["card"] = card_markdown.get(r["id"], f"### {r['id']} (carried forward)\n\n{r['rationale']}\n")
     (session_dir / "residuals.json").write_text(json.dumps({"generatedAt": _now(), "items": residuals}, indent=2))
 
     manifest = {
@@ -213,7 +232,6 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
     tier_a = [r for r in residuals if r["tier"] == "A"]
     tier_b = [r for r in residuals if r["tier"] == "B"]
     tier_c = [r for r in residuals if r["tier"] == "C"]
-    overrides_dir = session_dir / "drafts" / "overrides"
     lines = [
         "# Residual review session",
         "",
@@ -230,9 +248,10 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "and Tier C (never invented, document or leave open).",
         "5. Answer every Tier A card with its option key or `other: <rationale>`.",
         "6. (RS-4, not yet built) The agent drafts Decision Records + Overrides for Tier B items whose evidence bar is met.",
-        "7. Review whatever lands under `drafts/decisions/` and `drafts/overrides/` before applying anything.",
-        "8. Apply (a **human step**, `apply.py` not yet built — RS-3): "
-        f"`node dist/orchestration/run-slice.js --from-facts {manifest['outDir']}/typed-facts.json --overrides {overrides_dir} --out <new-out-dir>`.",
+        "7. Review whatever lands under `drafts/decisions/` and `drafts/overrides/` before applying anything — "
+        "run `validate_drafts.py` yourself first if you want to check before `apply.py` does it again automatically.",
+        "8. Apply (a **human step** — `apply.py` refuses without an explicit confirmation, S4): "
+        f"`python3 tools/review-session/apply.py --session-dir {session_dir} --out <new-out-dir>`.",
         "9. Validate the new `architecture.calm.json` (`npm run validate`) and re-open it in your CALM viewer "
         "(see below) to confirm the reviewed architecture looks right.",
         "",
@@ -241,21 +260,33 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "- This session does **not** redefine any standing exam (e.g. `E-charge-single-L2`). "
         "A residual decision here is a pilot-scoped correction, not a claim that a layered-architecture-story "
         "recovery mechanism now works — see `Architect_Residual_Review_Session.md` §0.1.",
-        "- Applying is a **human step** (`apply.py`, not yet built — RS-3). Nothing here is auto-applied.",
+        "- Applying is a **human step** — `apply.py` re-validates everything and requires explicit confirmation "
+        "(a real terminal prompt, or `--i-confirm-apply`). Nothing here is auto-applied, ever.",
         "- Reply to a card with its option key (e.g. `1`) or `other: <rationale>`.",
         "",
-        f"## Residuals ({len(residuals)} total: {len(tier_a)} Tier A, {len(tier_b)} Tier B, {len(tier_c)} Tier C)",
-        "",
-        "## Tier A — you decide",
-        "",
     ]
-    for r in tier_a:
+
+    carried = [r for r in residuals if r.get("status") == "carried_forward"]
+    askable_a = [r for r in tier_a if r.get("status") != "carried_forward"]
+    askable_b = [r for r in tier_b if r.get("status") != "carried_forward"]
+    askable_c = [r for r in tier_c if r.get("status") != "carried_forward"]
+
+    lines += [f"## Residuals ({len(residuals)} total: {len(askable_a)} Tier A, {len(askable_b)} Tier B, {len(askable_c)} Tier C, {len(carried)} carried forward)", ""]
+
+    if carried:
+        lines += ["## Carried forward from a prior session (not re-asked — T-RS3-3)", ""]
+        for r in carried:
+            lines.append(f"- **{r['id']}**: {r['rationale']}")
+        lines.append("")
+
+    lines += ["## Tier A — you decide", ""]
+    for r in askable_a:
         lines.append(r["card"])
     lines += ["", "## Tier B — agent may draft if evidence bar met (RS-4, not yet built — every item below is answered as Tier A for now)", ""]
-    for r in tier_b:
+    for r in askable_b:
         lines.append(r["card"])
     lines += ["", "## Tier C — do not invent, document or leave open", ""]
-    for r in tier_c:
+    for r in askable_c:
         lines.append(r["card"])
 
     lines += ["", "## After you're done (step 9)", ""]
@@ -264,7 +295,8 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
     else:
         lines.append(f"- No `architecture.calm.json` was found in `{manifest['outDir']}` at pack time — it will exist after step 8's apply run; open that new out-dir's copy in your CALM viewer then.")
     lines.append("- Most static-file CALM viewers do not auto-reload — **manually reload after step 8's apply**, per design §4.5.")
-    lines.append("- This pack's `decisions-log.md` and `apply-report.md` (written by `apply.py`, RS-3) are the audit trail — check those in if you want to keep a record; the rest of this pack is scratch by default (gitignored).")
+    lines.append("- This pack's `decisions-log.md` and `apply-report.md` (written by `apply.py`) are the audit trail — check those in if you want to keep a record; the rest of this pack is scratch by default (gitignored).")
+    lines.append("- Starting a NEW scan later? Pass `--baseline " + str(session_dir) + "` to `pack.py` so residuals already decided here aren't re-asked (T-RS3-3).")
     return "\n".join(lines)
 
 

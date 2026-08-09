@@ -70,3 +70,62 @@ def _evidence_refs_for(item: dict) -> list[str]:
     ignored-item details verbatim, per hitl-review-trigger.ts). Falls back to
     no refs rather than guessing -- consistent with S5 (evidence-first)."""
     return []
+
+
+def apply_baseline(residuals: list[dict], baseline_residuals: list[dict], baseline_decisions: list[dict]) -> list[dict]:
+    """T-RS3-3 (thin --baseline). A prior Session Pack's residuals.json +
+    drafts/decisions/ define what's already been decided. For each of THIS
+    run's residuals:
+      - If a baseline residual with the SAME (trigger, unitIds) signature
+        has an ACTIVE decision referencing one of its unit ids, AND this
+        run's (trigger, class) for that unit matches the baseline's own
+        recorded (trigger, class) -> mark 'carried_forward', never re-card
+        it (design §7.2: "a node the architect already typed correctly
+        last time is never silently re-asked").
+      - If a matching unit has a baseline decision but THIS run's
+        (trigger, class) DIFFERS from what the baseline recorded for it ->
+        the underlying source/facts changed shape since the decision was
+        made. Per §7.2 (P7 applied to drift): never silently overwrite a
+        prior human decision — surface it as a NEW 're-confirm' residual
+        instead of silently carrying forward or silently re-asking as if
+        nothing happened.
+    Real limitation, stated not hidden: matching is by (trigger, unitIds)
+    signature, not a stable residual id (T-RS1-3's residual ids are
+    positional/regenerated per run, not stable across runs) — this is a
+    real MVP scope narrowing, full multi-scan polish is deferred to RS-5
+    per this task's own spec.
+    """
+    baseline_by_unit: dict[str, dict] = {}
+    for r in baseline_residuals:
+        for uid in r.get("unitIds", []):
+            baseline_by_unit[uid] = r
+
+    active_decision_targets: set[str] = {d["target_ref"] for d in baseline_decisions if d.get("status") == "active"}
+
+    out = []
+    for r in residuals:
+        matched_baseline = None
+        for uid in r.get("unitIds", []):
+            if uid in baseline_by_unit and uid in active_decision_targets:
+                matched_baseline = baseline_by_unit[uid]
+                break
+
+        if matched_baseline is None:
+            out.append(r)
+            continue
+
+        if matched_baseline.get("trigger") == r.get("trigger") and matched_baseline.get("class") == r.get("class"):
+            r = dict(r, status="carried_forward", rationale=f"Already decided in a prior session (baseline residual {matched_baseline.get('id')}) — not re-asked.")
+        else:
+            # Real tier/class stay as freshly computed from THIS run's real
+            # evidence (still gets a real, correct choice card) — only the
+            # rationale is enriched and a reconfirm flag added, never a
+            # silent overwrite of what changed.
+            r = dict(
+                r,
+                reconfirm=True,
+                rationale=f"Previously decided (baseline residual {matched_baseline.get('id')}, was {matched_baseline.get('trigger')}/{matched_baseline.get('class')}) but this run's evidence now shows {r.get('trigger')}/{r.get('class')} — source may have changed shape since the prior decision. Re-confirm: {r.get('rationale')}",
+            )
+        out.append(r)
+
+    return out

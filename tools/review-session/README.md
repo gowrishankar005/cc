@@ -4,7 +4,7 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
 **Task list:** [`docs/solution/AGENT_TASKS_Residual_Review_Session.md`](../../docs/solution/AGENT_TASKS_Residual_Review_Session.md)
-**Status:** RS-1 CLOSED. RS-2 in progress. See the task list for what's built vs. not yet.
+**Status:** RS-1, RS-2, RS-3 CLOSED. The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. RS-4 (optional Tier B LLM drafting) is next. See the task list for what's built vs. not yet.
 
 ## Non-negotiable rules (S1–S12 — do not violate, do not skip)
 
@@ -43,8 +43,11 @@ tools/review-session/
   examples/                (T-RS2-2, built) worked Decision Record + Override pair (synthetic), README explaining the manual draft path — no LLM required
   effective_ir.py          (T-RS2-3 MVP, built) provenance + node/relationship counts + open residuals + decision log — full 8-section §7.1 template deferred to B-calm-portable-ir
   test_effective_ir.py     (built) non-empty output, MVP-scope-note present, never touches intelligence-ir.md
-  apply.py                (T-RS3-1, not yet built) validate -> run-slice --overrides -> apply-report
+  apply.py                (T-RS3-1/T-RS3-2, built) the ONLY place that invokes run-slice/override-applier — validate -> confirm -> merge drafts -> apply -> apply-report.md/decisions-log.md
+  test_apply.py            (built, 4 real end-to-end tests) real type_change applies, calm validate 0 errors, refuses without confirmation, refuses on validation failure
 ```
+
+`triage.py`'s `apply_baseline()` (T-RS3-3) is real too — `pack.py --baseline <prior-session-dir>` carries forward already-decided residuals (never re-asked) and flags real drift as `reconfirm` (never silently overwritten). See `test_triage.py`'s `TestApplyBaseline` for the unit tests, and the T-RS3-3 changelog entry in `AGENT_TASKS_Residual_Review_Session.md` for the real two-pack proof.
 
 Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitignored by default — see `Architect_Residual_Review_Session.md` §4.1 for why, and the redaction/audit convention for the pieces worth checking in).
 
@@ -53,7 +56,7 @@ Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitig
 ```bash
 # all unit tests + real end-to-end (needs pipeline/dist built)
 cd tools/review-session
-python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety test_validate_drafts test_effective_ir -v
+python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety test_validate_drafts test_effective_ir test_apply -v
 
 # build a real pack from a real run-slice out-dir
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
@@ -62,9 +65,11 @@ python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
 # hand-author drafts (see examples/README.md), then validate before applying
 python3 validate_drafts.py --session-dir ../../review-sessions/my-run --calm /tmp/my-run/architecture.calm.json
 
-# apply today, before apply.py exists (RS-3) — merge decisions+overrides into one dir first, see examples/README.md
-node ../../pipeline/dist/orchestration/run-slice.js --from-facts /tmp/my-run/typed-facts.json \
-  --overrides <merged decisions+overrides dir> --out /tmp/my-run-reviewed
+# apply (the only command that ever calls run-slice/override-applier) — re-validates itself, requires confirmation
+python3 apply.py --session-dir ../../review-sessions/my-run --out /tmp/my-run-reviewed
+
+# a later rescan: carry forward what's already been decided instead of re-asking
+python3 pack.py --out-dir /tmp/my-run-2 --session-dir ../../review-sessions/my-run-2 --baseline ../../review-sessions/my-run
 
 # effective architecture summary (MVP)
 python3 effective_ir.py --calm /tmp/my-run-reviewed/architecture.calm.json --session-dir ../../review-sessions/my-run \

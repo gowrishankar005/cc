@@ -61,20 +61,31 @@ real, not just asserted; see the T-RS2-1/T-RS2-2 changelog entries in
 `AGENT_TASKS_Residual_Review_Session.md` for the exact commands run.
 
 Applying (turning a validated draft into a new `architecture.calm.json`) is
-still a human step run from the command line — `apply.py` (T-RS3-1) isn't
-built yet. Until it is, the same effect is available today via the
-already-real, already-tested platform mechanism this whole design sits on
-top of:
+a real, human-confirmed step — `apply.py` (T-RS3-1, built):
+
+```bash
+python3 ../apply.py --session-dir <your-session-dir> --out <new-out-dir>
+```
+
+`apply.py` re-validates in-process (never trusts a stale prior run of
+`validate_drafts.py`), then requires an explicit confirmation — a real
+terminal prompt (type `apply`), or `--i-confirm-apply` for a non-interactive
+invocation. It handles the directory merge itself: `override-applier.ts`
+scans ONE flat directory for both Decision Records and Overrides (dispatched
+by which field each JSON file has), not the Session Pack's own split
+`drafts/decisions/` + `drafts/overrides/` layout — `apply.py` merges both
+into a temp directory before calling `run-slice.js`, so you never have to
+do that by hand. Proven for real against this exact example pair: the
+target node's `node-type` genuinely changed, `calm validate` reported 0
+errors — see the T-RS3-1 changelog entry in
+`AGENT_TASKS_Residual_Review_Session.md`.
+
+If you ever need to apply without `apply.py` (e.g. debugging it), the
+underlying mechanism is still the plain platform command, with the merge
+done by hand:
 
 ```bash
 node pipeline/dist/orchestration/run-slice.js --from-facts <out-dir>/typed-facts.json \
   --overrides <a directory containing BOTH this decision and this override> \
   --out <new-out-dir>
 ```
-
-Note the merged directory — `override-applier.ts` scans one flat directory
-for both Decision Records and Overrides (dispatched by which field each
-JSON file has), not the Session Pack's own split `drafts/decisions/` +
-`drafts/overrides/` layout. `apply.py` will handle that merge; until it
-exists, copy both files into one directory yourself before running the
-command above.
