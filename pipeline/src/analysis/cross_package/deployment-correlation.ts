@@ -10,7 +10,7 @@ import { TypedUnit } from '../../types/typed-facts';
  * k8s-trust-detector.ts as if it were trust-specific).
  *
  * GENERIC FIX, not a per-repo patch: upgraded from exact-match-only to
- * normalize-then-substring, found by tracing a REAL gap — BoA's Java
+ * normalize-then-substring, found by tracing a REAL gap — the reference Python app's Java
  * services never correlated because k8s names them by role
  * ("balance-reader") while the source uses verbose Spring controller class
  * names ("BalanceReaderController.java"). Verified against all three real
@@ -21,7 +21,7 @@ import { TypedUnit } from '../../types/typed-facts';
  * Same pattern holds for ledger-writer/LedgerWriterController and
  * transaction-history/TransactionHistoryController. This is a general
  * "deployment name is a substring of the unit's normalized basename" rule,
- * not a hardcoded BoA name list — it generalizes to any repo following the
+ * not a hardcoded the reference Python app name list — it generalizes to any repo following the
  * same "deployment named by role, class named role+suffix" convention,
  * which is extremely common (Controller/Service/Handler/Listener suffixes).
  *
@@ -30,8 +30,8 @@ import { TypedUnit } from '../../types/typed-facts';
  * accident — a real false-positive risk substring matching alone would
  * otherwise carry uncontrolled.
  *
- * REAL BUG CAUGHT BY TESTING THIS AGAINST FULL BoA (not assumed safe):
- * substring matching alone matched BoA's `ledger-writer`/`transaction-history`
+ * REAL BUG CAUGHT BY TESTING THIS AGAINST FULL the reference Python app (not assumed safe):
+ * substring matching alone matched the reference Python app's `ledger-writer`/`transaction-history`
  * deployments to `Transaction.java` — a JPA @Entity class, not the actual
  * TransactionHistoryController service — because "transaction" is a
  * substring of "transactionhistory". Fixed with a principled, generic
@@ -51,7 +51,7 @@ export function findUnitForDeployment(units: TypedUnit[], deploymentName: string
   const normDeployment = normalizeIdentifier(deploymentName);
 
   // Exact match first (case-insensitive, unnormalized) — the strong,
-  // zero-ambiguity case (e.g. BoA's Python services: "userservice" deployment
+  // zero-ambiguity case (e.g. the reference Python app's Python services: "userservice" deployment
   // <-> userservice.py), preferred over any substring match.
   const exact = serviceUnits.find((u) => path.basename(u.filePath, path.extname(u.filePath)).toLowerCase() === deploymentName.toLowerCase());
   if (exact) return exact;

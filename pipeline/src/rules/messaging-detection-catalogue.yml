@@ -26,7 +26,7 @@ strategies:
       evidence: lab fixture `ts-orders-dynamo`'s `OrdersDynamoStore` class
       genuinely imports both `@aws-sdk/client-dynamodb` (persistence) and
       `@aws-sdk/client-sqs` (messaging) — a real, evidenced, single-class
-      dual-role shape (Fidelity-aligned AWS pattern), not a hypothetical
+      dual-role shape (a large financial-services organization-aligned AWS pattern), not a hypothetical
       edge case. Previously this class's messaging evidence was silently
       DROPPED (T-E3's own fix excluded any file already claimed by an
       earlier pass, to avoid a duplicate-unique-id error, at the cost of
@@ -66,7 +66,7 @@ strategies:
       producer capability (weight 40, same tier as jpa-entity), and pairing
       it with a call-site check would need cross-referencing two different
       referenceKind extractions within one file, a real mechanism this
-      pipeline hasn't built. Real evidence: Fineract's
+      pipeline hasn't built. Real evidence: a reference Java/JAX-RS banking platform's
       KafkaExternalEventProducer.java (`fineract-provider`) — verified via
       run-slice.js, real `topic`/`network` node at the grep-verified field
       declaration line (48), calm validate 0 errors.

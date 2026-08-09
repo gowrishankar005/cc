@@ -1,5 +1,5 @@
 {
   "control-id": "security-auth-002",
-  "name": "Authentication check (call-site, Fineract)",
-  "description": "A call-site authentication check was found (Fineract's PlatformSecurityContext.isAuthenticated(), a real assert-or-throw method) — proves a user is authenticated, NOT that they are authorized for the specific action being guarded (see security-rbac-002 for the stronger, fine-grained claim)"
+  "name": "Authentication check (call-site, a reference Java/JAX-RS banking platform)",
+  "description": "A call-site authentication check was found (a reference Java/JAX-RS banking platform's PlatformSecurityContext.isAuthenticated(), a real assert-or-throw method) — proves a user is authenticated, NOT that they are authorized for the specific action being guarded (see security-rbac-002 for the stronger, fine-grained claim)"
 }

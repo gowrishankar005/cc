@@ -75,10 +75,10 @@ export interface CoverageReport {
   /**
    * AREC Wave 3 T-A1 (S1/S2, validation-approach-vnext.md §L3) — completeness
    * signals, distinct from confidence. A package can have high-confidence
-   * units and still be an architecturally silent/incomplete run (Fineract
+   * units and still be an architecturally silent/incomplete run (a reference Java/JAX-RS banking platform
    * charge/core: 64 relationships, 0 touching a service unit). These fields
    * make that visible without a hand audit, using dimensions every
-   * TypedUnit/TypedRelationship already carries — no Fineract-specific or
+   * TypedUnit/TypedRelationship already carries — no a reference Java/JAX-RS banking platform-specific or
    * any other repo-specific logic here.
    */
   completeness: {
@@ -145,7 +145,7 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
   // T-Y5-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md, HT-ASB-006
   // class) — the original, still-real gap S1 structurally cannot catch:
   // S1 requires >=1 service unit to even look at relationship count, so a
-  // run with ZERO service units (real pre-Y3 aws-saas-boost-tier-service:
+  // run with ZERO service units (real pre-Y3 a reference AWS SaaS sample-tier-service:
   // 0 services, N Dynamo-import database units, silenceFlags: []) passes
   // through S1 completely silent — the degenerate, LOUDEST-should-be case
   // was the one this project's own silence invariants missed. Real,
@@ -263,7 +263,7 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   // bound to any unit this scan found — e.g. the handler's Java source
   // lives in a package root not passed to this scan (the real, honest
   // 21-of-26-unresolved case found in T-Y4-2's own wild exam against
-  // aws-saas-boost's shared resources/ directory). Only meaningful when
+  // a reference AWS SaaS sample's shared resources/ directory). Only meaningful when
   // --cfn-manifests was actually passed (undefined, not 0, when it wasn't
   // — same "don't fake a 0" precondition discipline as every other rate
   // in this file).

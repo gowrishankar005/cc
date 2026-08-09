@@ -135,7 +135,7 @@ export interface TypedRelationship {
   // gradeRelationshipsPass (last pass in DEFAULT_PASSES, after every
   // relationship producer) from rel.kind + endpoint TypedUnit.kind — never
   // from a repo-specific name. 'structural': Graphify dual-unit edge with
-  // neither endpoint a service (e.g. Fineract's entity<->entity mesh — real,
+  // neither endpoint a service (e.g. a reference Java/JAX-RS banking platform's entity<->entity mesh — real,
   // but not an "architecture" claim on its own, per the Claim Register's
   // dual-unit decision). 'architecture': at least one endpoint is a service
   // unit (R1 one-hop service->database/topic, or a real service->service

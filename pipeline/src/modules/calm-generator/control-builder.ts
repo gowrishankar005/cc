@@ -8,8 +8,8 @@ import { ControlRequirementCatalogue, findControlRequirement } from '../../rules
  * within it: a Java constant-style authority reference — either a qualified
  * enum member (`SystemRole.ADMIN`) or a bare ALL_CAPS constant
  * (`RESOURCE_NAME_FOR_PERMISSIONS`) — real, grep-verified shapes from both
- * evidence repos this catalogue is built against (Waltz's
- * `SystemRole.LICENCE_ADMIN`/`SystemRole.ADMIN`, Fineract's
+ * evidence repos this catalogue is built against (a reference Java governance platform's
+ * `SystemRole.LICENCE_ADMIN`/`SystemRole.ADMIN`, a reference Java/JAX-RS banking platform's
  * `RESOURCE_NAME_FOR_PERMISSIONS`). Deliberately NEVER resolves what the
  * constant equals (that's cross-file/whole-program resolution this
  * mechanism has never done and explicitly won't — see `extractCallArgumentText`'s

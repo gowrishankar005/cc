@@ -56,7 +56,7 @@ export type CallFact = DecoratorFact;
  * AREC Wave 3 T-E1 — a field/variable TYPE reference (e.g. `private
  * KafkaTemplate<Long, byte[]> externalEventsKafkaTemplate;`), from the same
  * extractFromSource() API, filtered on referenceKind: 'references' instead
- * of 'decorates'/'calls'. Real evidence this was built for: Fineract's
+ * of 'decorates'/'calls'. Real evidence this was built for: a reference Java/JAX-RS banking platform's
  * KafkaExternalEventProducer.java — messaging-detection-catalogue.yml's own
  * "typed-field-producer" strategy was named `not-implemented` because no
  * mechanism to detect a class's field TYPE (as opposed to a decorator or a

@@ -5,7 +5,7 @@
 #
 # THIS IS THE interacts/connects BUG FIX: every row this pipeline can
 # currently produce resolves to `connects` — confirmed against the
-# authoritative schema (calm-hub-detail.architecture.json uses `connects`
+# authoritative schema (a real published FINOS example architecture file uses `connects`
 # even for in-process, non-network delegation, so it's the real default for
 # node-to-node relationships generally, not strictly "network connections").
 # `interacts` is actor-centric fan-out (actor -> nodes[]) and is never emitted

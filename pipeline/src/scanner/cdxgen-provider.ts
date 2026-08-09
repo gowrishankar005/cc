@@ -15,7 +15,7 @@ import * as path from 'path';
  * is a 404 on the real registry, the source docs' informal name was wrong;
  * (2) `cdxgen` only produces real components when the target already has a
  * committed lockfile (`uv.lock`/`package-lock.json`/etc) — confirmed via a
- * real run against BoA's `userservice` (75 real components from its real
+ * real run against the reference Python app's `userservice` (75 real components from its real
  * `uv.lock`) vs. the checked-in NestJS fixture (0 components, no
  * lockfile — honest, not a bug); (3) `--no-install-deps` is ALWAYS passed —
  * cdxgen's own default installs real packages (npm/mvn/gradle) as a side

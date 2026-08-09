@@ -6,11 +6,11 @@ const MAX_HEADER_LINES = 10; // bounded scan — real class headers (even multi-
  * Q13 (Open_Questions_Validation.md) / T-ontology (Robustness) — real finding
  * that falsifies the decision doc's OWN proposed fix before it was ever
  * implemented: "require an inherits/extends edge, not just an import edge."
- * Verified directly against real Ghostfolio source + a real Graphify
+ * Verified directly against real a reference Node/NestJS wealth-management app source + a real Graphify
  * extraction: `class PrismaService extends PrismaClient` produces ZERO
  * `inherits` edge at all — Graphify's inherits detection only fires when the
  * base class resolves to a real IN-REPO node (confirmed: all 31 real
- * `inherits` edges in Ghostfolio's own graph target real in-repo class ids;
+ * `inherits` edges in a reference Node/NestJS wealth-management app's own graph target real in-repo class ids;
  * none target an external `ref_*` package symbol). `PrismaClient` is
  * imported from `@prisma/client`, external — so even the ONE class that
  * genuinely owns the Prisma connection would produce zero database units

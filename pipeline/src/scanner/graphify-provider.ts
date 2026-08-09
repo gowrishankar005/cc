@@ -46,7 +46,7 @@ export function parseSourceLocation(loc: string): number | undefined {
  * node/edge back to which of the ORIGINAL package roots it came from.
  *
  * REAL FINDING, not assumed (docs/spikes/... — verified this session against
- * real Fineract fineract-charge + fineract-core): running `graphify extract`
+ * real a reference Java/JAX-RS banking platform fineract-charge + fineract-core): running `graphify extract`
  * once PER ROOT, separately, structurally cannot produce a cross-root edge —
  * each invocation never sees the other root's files, so Graphify has nothing
  * to resolve a cross-module reference against (confirmed empirically: 0
@@ -109,7 +109,7 @@ function computeCommonAncestor(roots: string[]): string {
  * N unchanged" in ~0.1s, using `graphify-out/cache/` it writes itself). The
  * earlier `fs.mkdtempSync`/`fs.rmSync` pattern discarded that cache every
  * single run for no reason — this was a real, avoidable cost this whole
- * session paid on every Fineract/BoA run without needing to. Mirrors
+ * session paid on every a reference Java/JAX-RS banking platform/the reference Python app run without needing to. Mirrors
  * CodeGraph's own per-package-root `.codegraph/` persistent-cache
  * convention (same directory-inside-the-scanned-tree pattern, already
  * accepted in this codebase) rather than inventing a different convention

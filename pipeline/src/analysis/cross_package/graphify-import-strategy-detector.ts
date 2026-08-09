@@ -125,7 +125,7 @@ export function detectUnitsByImportStrategy(
     const resolved = run.resolveRoot(file);
     if (!resolved) continue; // outside every given package root
     // T-TC1-3 (B-test-code-exclusion) — real, confirmed contamination: 17
-    // real /test/-path files in one Fineract scan were typed as database
+    // real /test/-path files in one a reference Java/JAX-RS banking platform scan were typed as database
     // units purely because they happened to import a real catalogued
     // driver library (test setup/fixture code, not real persistence).
     // Excluded here, not silently — the caller reports each one as a real
@@ -166,7 +166,7 @@ export function detectUnitsByImportStrategy(
       // (e.g. @prisma/client), a plain import is no longer sufficient: THIS
       // class must itself declare `extends <ownerBaseClass>` (read back
       // from its own real source, multi-line-aware — class-ownership-resolver.ts).
-      // A file importing the driver for its own TYPES only (real Ghostfolio
+      // A file importing the driver for its own TYPES only (real a reference Node/NestJS wealth-management app
       // AccessService shape) correctly produces no unit for that class here.
       const requiredBaseClass = matchedLibrary ? ownerBaseClasses.get(matchedLibrary) : undefined;
       if (requiredBaseClass) {

@@ -19,7 +19,7 @@ import { findUnitForDeployment } from './deployment-correlation';
  * pipeline) and OFF BY DEFAULT (env-soft-graph-pass.ts only runs when
  * explicitly enabled).
  *
- * Real, checked limitation: 2 of 5 real BoA keys do NOT correlate this way
+ * Real, checked limitation: 2 of 5 real the reference Python app keys do NOT correlate this way
  * (BALANCES_API_ADDR -> "balances" vs. the real deployment name
  * "balance-reader"; TRANSACTIONS_API_ADDR -> "transactions" vs. the real
  * deployment name "ledger-writer" — no naming relationship at all) — both

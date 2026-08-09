@@ -6,7 +6,7 @@ import { parseAllDocuments } from 'yaml';
  * T-Y4-1 (Serverless_HTTP_and_Dynamo_Ownership_Design.md §2) — minimal
  * CloudFormation/SAM API Gateway + Lambda path/method/handler join.
  *
- * Real shape, confirmed against real `aws-saas-boost` CFN templates before
+ * Real shape, confirmed against real `a reference AWS SaaS sample` CFN templates before
  * writing this (not assumed from AWS docs): the binding is a three-way
  * join across up to three separate resources, OFTEN IN SEPARATE FILES —
  *   AWS::ApiGateway::Resource (PathPart, chained via ParentId)

@@ -8,7 +8,7 @@ import { DecoratorFact } from '../scanner/structural-engine';
  * composed from class-level + method-level @Path decorator facts, using the
  * literal-argument extraction added to codegraph-provider.ts this session.
  *
- * Verified against 3 real Fineract JAX-RS resources (docs/spikes/fineract-route-assembly-spike/):
+ * Verified against 3 real a reference Java/JAX-RS banking platform JAX-RS resources (docs/spikes/fineract-route-assembly-spike/):
  * 19/19 real routes correctly assembled, including the hardest case found —
  * a method-level @Path literal ("buckets/{delinquencyBucketId}") reused
  * verbatim across 3 different HTTP-verb methods in the same class, correctly
@@ -43,10 +43,10 @@ export function composeJaxRsRoutes(fileDecoratorFacts: DecoratorFact[]): JaxRsCo
   // Previously took the FIRST class-level @Path found anywhere in the file
   // and applied it, unconditionally, to every method in the file — correct
   // only for the real, common "one resource class per file" production
-  // shape this was originally proven against (19/19 real Fineract routes),
+  // shape this was originally proven against (19/19 real a reference Java/JAX-RS banking platform routes),
   // but silently wrong the moment a file has 2+ classes each carrying their
   // own @Path (rare in production JAX-RS, common in test-fixture files —
-  // confirmed via a real Fineract test with 5 nested resource classes, all
+  // confirmed via a real a reference Java/JAX-RS banking platform test with 5 nested resource classes, all
   // 5 methods wrongly composed to the first class's path, at confidence
   // 100). Fixed: each method resolves to the NEAREST PRECEDING class-level
   // @Path by source line, not the file's first one — correct for standard

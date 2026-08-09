@@ -29,7 +29,7 @@ controls:
   # control was found).
   - controlId: security-rbac-002
     name: "Role-Based Access Control (call-site)"
-    description: "Method or endpoint access restricted by role/authority, enforced via an explicit call-site permission check (e.g. Fineract's validateHasReadPermission) rather than a decorator/annotation"
+    description: "Method or endpoint access restricted by role/authority, enforced via an explicit call-site permission check (e.g. a reference Java/JAX-RS banking platform's validateHasReadPermission) rather than a decorator/annotation"
     detectionMechanism: call
     language: java
     matchSignal: "validateHasReadPermission|validateHasPermission|validateHasCheckerPermission"
@@ -38,13 +38,13 @@ controls:
   # T-R2-2 (C-call expansion) — same real-world control family as
   # security-rbac-002 (fine-grained role/permission enforcement, confirmed
   # via WebUtilities.requireRole()'s real NotAuthorizedException throw), a
-  # DIFFERENT real repo's own vocabulary (Waltz, not Fineract). Own
+  # DIFFERENT real repo's own vocabulary (a reference Java governance platform, not a reference Java/JAX-RS banking platform). Own
   # controlId, not folded into security-rbac-002, for the same reason
   # security-rbac-002 itself isn't folded into security-rbac-001 — S3
   # narrative honesty about which real framework's own API was matched.
   - controlId: security-rbac-003
-    name: "Role-Based Access Control (call-site, Waltz)"
-    description: "Method or endpoint access restricted by role, enforced via an explicit call-site role check (Waltz's UserRoleService.hasRole, which throws NotAuthorizedException on failure) rather than a decorator/annotation"
+    name: "Role-Based Access Control (call-site, a reference Java governance platform)"
+    description: "Method or endpoint access restricted by role, enforced via an explicit call-site role check (a reference Java governance platform's UserRoleService.hasRole, which throws NotAuthorizedException on failure) rather than a decorator/annotation"
     detectionMechanism: call
     language: java
     matchSignal: "hasRole"
@@ -53,7 +53,7 @@ controls:
   # T-R2-2 (C-call expansion) — a DIFFERENT, WEAKER claim than
   # security-rbac-002, kept as its own controlId deliberately: this is
   # authentication (is a user logged in), not authorization (is this user
-  # allowed to do this specific thing). Real evidence: Fineract's
+  # allowed to do this specific thing). Real evidence: a reference Java/JAX-RS banking platform's
   # PlatformSecurityContext.isAuthenticated() is a genuine void assert-or-throw
   # method (confirmed via its real implementation,
   # SpringSecurityPlatformSecurityContext.java:81 — `authenticatedUser()`
@@ -63,8 +63,8 @@ controls:
   # distinct, INTERMEDIATE strength: a definite check, but of a narrower
   # claim than RBAC.
   - controlId: security-auth-002
-    name: "Authentication check (call-site, Fineract)"
-    description: "A call-site authentication check was found (Fineract's PlatformSecurityContext.isAuthenticated(), a real assert-or-throw method) — proves a user is authenticated, NOT that they are authorized for the specific action being guarded (see security-rbac-002 for the stronger, fine-grained claim)"
+    name: "Authentication check (call-site, a reference Java/JAX-RS banking platform)"
+    description: "A call-site authentication check was found (a reference Java/JAX-RS banking platform's PlatformSecurityContext.isAuthenticated(), a real assert-or-throw method) — proves a user is authenticated, NOT that they are authorized for the specific action being guarded (see security-rbac-002 for the stronger, fine-grained claim)"
     detectionMechanism: call
     language: java
     matchSignal: "isAuthenticated"

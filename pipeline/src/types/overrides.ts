@@ -30,7 +30,7 @@ export interface DecisionRecord {
     // No dedicated 'target_ref' Override is written for this case (nothing
     // in CALM changes) — the Decision Record alone is the audit trail. This
     // was, empirically, the single most common Tier A outcome across two
-    // real pilot sessions (3/3 residuals in both the Fineract and Bank of
+    // real pilot sessions (3/3 residuals in both the a reference Java/JAX-RS banking platform and Bank of
     // Anthos runs) — worth stating explicitly rather than leaving an
     // architect or drafting agent to infer the mapping each time.
     action: 'accepted' | 'overridden' | 'added' | 'removed';

@@ -5,7 +5,7 @@ import { findUnitForDeployment } from './deployment-correlation';
 /**
  * T-X5-1 (requirements v0.7 §3.1) — groups Deployments by shared Secret
  * name, infers issuer/verifier role ONLY from the manifest's own
- * `items[].key` naming (a real, grep-verified pattern in Bank of Anthos:
+ * `items[].key` naming (a real, grep-verified pattern in a reference Python microservices banking app:
  * `userservice` mounts BOTH `jwtRS256.key` (private) and `jwtRS256.key.pub`
  * (public) under `secretName: jwt-key`; `contacts`/`frontend`/
  * `balance-reader`/`ledger-writer`/`transaction-history` mount ONLY the
@@ -17,7 +17,7 @@ import { findUnitForDeployment } from './deployment-correlation';
  * generically (not here) to also resolve Java's verbose controller-class
  * naming (BalanceReaderController.java <-> "balance-reader" deployment).
  */
-// Grep-verified against the real manifests, not assumed: BoA's convention
+// Grep-verified against the real manifests, not assumed: the reference Python app's convention
 // names the PUBLIC half with a ".pub" suffix (`jwtRS256.key.pub`) and the
 // PRIVATE half with none (`jwtRS256.key`) — a naive "look for the word
 // 'private'" heuristic finds nothing, since the private key's name doesn't

@@ -13,8 +13,8 @@ import { isTestPath } from '../../rules/test-path';
  * describes an EXISTING unit's outbound capability with an unknown target.
  * Per the task's own instruction ("resolvable target -> low/medium
  * connects; else ignored unresolved-http-target with evidence for HITL")
- * and this catalogue's own real-evidence finding (neither BoA's Python
- * `requests` calls nor Fineract's Java `RestTemplate` calls have a literal,
+ * and this catalogue's own real-evidence finding (neither the reference Python app's Python
+ * `requests` calls nor a reference Java/JAX-RS banking platform's Java `RestTemplate` calls have a literal,
  * statically-resolvable target — both are runtime-constructed), every
  * detection here is the "else" branch: a CROSS_DOMAIN_UNRESOLVED
  * IgnoredItem, real evidence for a human to complete via the already-real

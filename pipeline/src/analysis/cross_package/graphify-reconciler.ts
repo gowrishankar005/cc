@@ -14,7 +14,7 @@ import { TypedUnit, TypedRelationship } from '../../types/typed-facts';
  * Map<root, graph> — the earlier per-root-Map design could only ever look up
  * both endpoints of an edge under the SAME root prefix, which made
  * `crossPackage: true` structurally unreachable regardless of what Graphify
- * actually found (confirmed: real cross-module Fineract edges existed in a
+ * actually found (confirmed: real cross-module a reference Java/JAX-RS banking platform edges existed in a
  * combined extraction but were invisible to per-root buckets). Node ids
  * within one GraphifyRun's graph are already globally unique (one extraction
  * pass), so no root-prefixing is needed for the lookup itself — only
@@ -52,7 +52,7 @@ export function buildNodeToUnitMap(run: GraphifyRun, unitsByRoot: Map<string, Ty
     // Prefer a unit whose recorded span contains this line (disambiguates
     // when a file legitimately holds >1 unit, e.g. a route unit AND a
     // persistence unit in the same file). Bug found by actually running
-    // this against real Bank of Anthos code: userservice.py's route unit
+    // this against real a reference Python microservices banking app code: userservice.py's route unit
     // only spans its decorator lines (52-162), but Graphify's
     // userservice_create_app node sits at L42 (the wrapping factory
     // function's def line) — outside that span. Slice 1's granularity is

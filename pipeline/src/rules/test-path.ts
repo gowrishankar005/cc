@@ -3,7 +3,7 @@
  * `IgnoredItem.reason` has carried a `'TEST_CODE'` value since this
  * project's earliest taxonomy design (`docs/spikes/Gap_Closure_Build_Ready_Specs_v0.1.md`
  * §5) but no code path ever assigned it — confirmed by grep before writing
- * this file. Found the hard way: a real Fineract scan typed a genuine
+ * this file. Found the hard way: a real a reference Java/JAX-RS banking platform scan typed a genuine
  * JUnit test (`FineractOperationIdReaderTest.java`) as a `service` node at
  * confidence 100 with a fabricated route, and 17 more `/test/`-path files
  * as real `database` units (Graphify-driven side, same root cause) — see

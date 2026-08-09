@@ -20,7 +20,7 @@ strategies:
       the prior hardcoded PERSISTENCE_LIBRARIES set into data.
     status: dispatched
     libraries:
-      # Python — verified against real Bank of Anthos code (both db.py files import sqlalchemy)
+      # Python — verified against real a reference Python microservices banking app code (both db.py files import sqlalchemy)
       - { name: sqlalchemy, language: python, evidenceLevel: verified }
       - { name: psycopg2, language: python, evidenceLevel: verified }
       - { name: pymongo, language: python, evidenceLevel: verified }
@@ -41,7 +41,7 @@ strategies:
       #
       # Q13 ontology fix (Open_Questions_Validation.md, Robustness) —
       # ownerBaseClass: PrismaClient. Real evidence: a plain import-only
-      # count of 87 units on Ghostfolio's apps/api was a KNOWN, DISCLOSED
+      # count of 87 units on a reference Node/NestJS wealth-management app's apps/api was a KNOWN, DISCLOSED
       # false-positive risk (Q13) — most of those 87 were classes (e.g.
       # AccessService) importing Prisma's generated TYPES for their own
       # method signatures, not owning a database connection. The class that
@@ -53,7 +53,7 @@ strategies:
       # verified via a bounded, multi-line-aware source read-back instead of
       # a graph edge. Every other catalogue library's plain-import behavior
       # is UNCHANGED — this fix is scoped to @prisma/client only, per Q13's
-      # own explicit "not re-verified against BoA/Fineract" deferral.
+      # own explicit "not re-verified against the reference Python app/a reference Java/JAX-RS banking platform" deferral.
       - { name: typeorm, language: typescript, evidenceLevel: unverified }
       - { name: prisma, language: typescript, evidenceLevel: unverified }
       - { name: "@prisma/client", language: typescript, evidenceLevel: verified, ownerBaseClass: PrismaClient }
@@ -63,7 +63,7 @@ strategies:
       - { name: mysql2, language: typescript, evidenceLevel: unverified }
       - { name: ioredis, language: typescript, evidenceLevel: unverified }
       # T-X2-2 (AGENT_TASKS_Extraction_Enrichment.md, G-L2-02) — Node/AWS
-      # cloud-native persistence, Fidelity-evidenced (requirements v0.14).
+      # cloud-native persistence, a large financial-services organization-evidenced (requirements v0.14).
       # DynamoDB genuinely IS a database, so it's correct to type via this
       # strategy (unlike SQS/SNS below, which are messaging, not persistence
       # — see the cloud-messaging strategy entry for why those are NOT here).
@@ -75,7 +75,7 @@ strategies:
       # existingUnitFilePaths, pass-registry.ts).
       - { name: "@aws-sdk/client-dynamodb", language: typescript, evidenceLevel: verified }
       - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — covers DynamoDB use but also other AWS services, so a real false-positive risk this catalogue row doesn't hide
-      # Java — Fidelity-evidenced (v0.14), not yet added to real Graphify
+      # Java — a large financial-services organization-evidenced (v0.14), not yet added to real Graphify
       # import-edge matching — named here as the concrete next catalogue
       # addition, not yet dispatched (Graphify's actual edge-target naming
       # for these hasn't been verified against real Java source).
@@ -95,7 +95,7 @@ strategies:
       # unreachable is fixed (java-import-resolver.ts: reads the real import
       # line back from source at the edge's own source_location, matches the
       # qualified package against this name — see that file for the full
-      # real-evidence writeup). Verified against real Fineract source:
+      # real-evidence writeup). Verified against real a reference Java/JAX-RS banking platform source:
       # fineract-security/.../SqlInjectionPreventerServiceImpl.java (imports
       # org.postgresql.core.Utils) now correctly becomes a real `database`
       # unit, evidence.signal = "org.postgresql.core.Utils" (the real
@@ -107,7 +107,7 @@ strategies:
       - { name: org.jooq, language: java, evidenceLevel: verified }
       # T-R1-3 follow-up (B-charge-jdbc-driver) — Spring's raw JDBC helper
       # package (JdbcTemplate/RowMapper/NamedParameterJdbcTemplate). REAL,
-      # VERIFIED CLOSURE of the flagship Fineract-charge residual named since
+      # VERIFIED CLOSURE of the flagship a reference Java/JAX-RS banking platform-charge residual named since
       # requirements v0.9: ChargeReadPlatformServiceImpl (the real bridge
       # implementer for ChargesApiResource's read path, previously "imports 0
       # candidate store units") imports THIS package directly — with this row
@@ -136,7 +136,7 @@ strategies:
       CrudRepository/JpaRepository/PagingAndSortingRepository/JpaSpecificationExecutor,
       from CodeGraph's extractFromSource() `referenceKind: 'extends'` entries
       (signal-catalogue.yml's spring-data-repository-extends row, matchSource:
-      extends). Real evidence: Fineract's ChargeRepository.java (`interface
+      extends). Real evidence: a reference Java/JAX-RS banking platform's ChargeRepository.java (`interface
       ChargeRepository extends JpaRepository<Charge, Long>,
       JpaSpecificationExecutor<Charge>`) — verified via run-slice.js, real
       `database` node, plus a genuine knock-on win: ChargeRepository is now a
@@ -154,7 +154,7 @@ strategies:
       a jOOQ-specific patch) — org.jooq is now a real `driver-import` library
       row (no separate mechanism needed; plain import detection was always
       sufficient, "typed-field usage" was never actually required). Real
-      re-verification against real Waltz source (spikes/waltz/repo,
+      re-verification against real a reference Java governance platform source (spikes/waltz/repo,
       waltz-data module, 241 files): 229 real `database` units detected,
       evidence.signal correctly shows the real resolved import (e.g.
       "org.jooq.Record1", "org.jooq.impl.DSL", "org.jooq.DSLContext"),

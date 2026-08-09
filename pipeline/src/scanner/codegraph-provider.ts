@@ -53,7 +53,7 @@ export async function indexPackage(packageRoot: string): Promise<{ cg: any; nati
  * @Path composing into one route), that argument is exactly the missing piece
  * — so it's read back from the source line itself, scoped to that one line,
  * not a general annotation parser. Verified 19/19 real routes across 3 real
- * Fineract resource files (ChargesApiResource, SchedulerApiResource,
+ * a reference Java/JAX-RS banking platform resource files (ChargesApiResource, SchedulerApiResource,
  * DelinquencyApiResource) using exactly this mechanism.
  */
 function extractLiteralArgument(sourceLines: string[], line: number, annotationName: string): string | undefined {
@@ -122,7 +122,7 @@ export function extractDecoratorFacts(cg: any, packageRoot: string, relativeFile
  * AREC Wave 3 T-D1 — the call-site sibling of extractDecoratorFacts(),
  * filtering the SAME extractFromSource() result for `referenceKind ===
  * 'calls'` instead of 'decorates'. Verified real (not assumed) against two
- * fixtures before building the catalogue rows: Fineract's
+ * fixtures before building the catalogue rows: a reference Java/JAX-RS banking platform's
  * ChargesApiResource.java produces
  * "context.authenticatedUser().validateHasReadPermission" at the correct
  * lines (84/101/129); the lab py-jwt-gateway fixture's auth_gateway.py
@@ -190,11 +190,11 @@ export function extractCallFacts(cg: any, packageRoot: string, relativeFilePath:
  * "typed-field-producer" gap (previously `status: not-implemented`,
  * honestly named as needing "call-based typed-field usage detection, a
  * mechanism this pipeline has never built"). Real evidence, verified via a
- * direct probe before writing the catalogue row: Fineract's
+ * direct probe before writing the catalogue row: a reference Java/JAX-RS banking platform's
  * KafkaExternalEventProducer.java's `private KafkaTemplate<Long, byte[]>
  * externalEventsKafkaTemplate;` field produces a `referenceKind:
  * 'references'` entry with `referenceName: "KafkaTemplate"` — the field's
- * declared TYPE, not the field's own name (which is Fineract-specific,
+ * declared TYPE, not the field's own name (which is a reference Java/JAX-RS banking platform-specific,
  * "externalEventsKafkaTemplate" — matching on the TYPE name instead is what
  * keeps this catalogue-generic rather than tied to one variable-naming
  * convention). Deliberately does NOT also require finding a paired
@@ -232,7 +232,7 @@ export function extractTypeReferenceFacts(cg: any, packageRoot: string, relative
 /**
  * AREC Wave 3 T-E3 — closes persistence-detection-catalogue.yml's
  * `spring-data-repository` gap. Real evidence, verified via a direct probe
- * before writing the catalogue row: Fineract's `ChargeRepository.java`
+ * before writing the catalogue row: a reference Java/JAX-RS banking platform's `ChargeRepository.java`
  * (`interface ChargeRepository extends JpaRepository<Charge, Long>,
  * JpaSpecificationExecutor<Charge>`) produces two `referenceKind: 'extends'`
  * entries, `referenceName: "JpaRepository<Charge, Long>"` and

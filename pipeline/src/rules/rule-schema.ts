@@ -45,15 +45,15 @@ export function loadSignalCatalogue(catalogueDir: string = __dirname): SignalCat
  * decorator/route names vary in casing across frameworks.
  *
  * Matches on WORD BOUNDARIES, not raw substring — a real bug, not a
- * theoretical one, found by actually running this against real Fineract
+ * theoretical one, found by actually running this against real a reference Java/JAX-RS banking platform
  * source (not assumed from reading the code): plain `.includes()` matched
  * Lombok's `@Getter` annotation against the JAX-RS composed-route rule's
  * "GET" alternative (`"getter".includes("get")` is true), mis-typing a JPA
  * entity's fields as 6+ bogus HTTP-entry-point interfaces. `\bget\b` doesn't
  * match "getter" (no boundary after "get" — "tter" continues the word) but
  * does match a composed route like "GET /v1/charges/{chargeId}" (space is a
- * real boundary) — verified against the same 3 real Fineract files plus the
- * BoA/NestJS regression fixtures, all still matching identically.
+ * real boundary) — verified against the same 3 real a reference Java/JAX-RS banking platform files plus the
+ * the reference Python app/NestJS regression fixtures, all still matching identically.
  *
  * `language`, when given, disambiguates when more than one rule's
  * matchSignal alternation matches the same raw signal shape — a second real

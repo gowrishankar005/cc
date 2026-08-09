@@ -80,7 +80,7 @@ export const cfnRoutePass: AnalysisPass = {
     // of an HTTP surface, invisible code-side) — still a real possibility
     // even after Y3/Y4, e.g. the handler's code lives in a root not passed
     // to this scan (the real 21/26-unresolved case found in T-Y4-2's own
-    // wild exam, where SaaS Boost's other services' routes were correctly
+    // wild exam, where a reference AWS SaaS sample's other services' routes were correctly
     // left unresolved).
     ctx.cfnRouteBindingsFound = bindings.length;
     ctx.cfnRouteBindingsBound = boundCount;

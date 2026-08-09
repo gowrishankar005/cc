@@ -7,13 +7,13 @@ import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
  * design note this implements). Produces architecture-grade relationships
  * for the layered shape R0/R1 structurally cannot see: a `service` unit
  * references a BRIDGE (an interface/type with zero TypedUnits of its own —
- * no HTTP/persistence/messaging/security-control evidence, e.g. Fineract's
+ * no HTTP/persistence/messaging/security-control evidence, e.g. a reference Java/JAX-RS banking platform's
  * `ChargeReadPlatformService`), and that bridge is `implements`-ed by
  * EXACTLY ONE class within the scanned root set which is itself a real
  * `database`/`topic` unit.
  *
  * Deliberately NOT a name-suffix strategy (`*PlatformService`/`*Repository`)
- * — the design note found Fineract alone uses 3+ different suffixes for
+ * — the design note found a reference Java/JAX-RS banking platform alone uses 3+ different suffixes for
  * this same architectural role, so a name list would be exactly the
  * per-repo patching this task forbids. The only test is structural: does
  * the target of a service's `imports` edge produce zero TypedUnits, and is
@@ -46,7 +46,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
   const ignoredItems: IgnoredItem[] = [];
   const seen = new Set<string>(); // dedupe: a service can reference the same bridge from multiple AST sites/methods
 
-  // Real finding while building this against real Fineract: Graphify emits a
+  // Real finding while building this against real a reference Java/JAX-RS banking platform: Graphify emits a
   // node with `source_file: ""` for EVERY unresolved external symbol a file
   // references — framework annotation types (`Operation`, `Schema`,
   // `Parameter` — Swagger), and genuinely external project types
@@ -56,7 +56,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
   // scanned roots. Without this check, every Swagger annotation import
   // flooded ignoredItems as a bogus "unresolved-multi-hop" candidate (34 of
   // them on fineract-charge alone, only ~2 of which were real architectural
-  // bridges) — caught by running this against real Fineract before trusting
+  // bridges) — caught by running this against real a reference Java/JAX-RS banking platform before trusting
   // it, not assumed safe.
   const nodeById = new Map(run.graph.nodes.map((n) => [n.id, n]));
   const isRealBridgeCandidate = (nodeId: string): boolean => {
@@ -88,14 +88,14 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
 
   for (const edge of run.graph.edges) {
     // Real finding while proving this against a synthetic fixture (real
-    // Fineract's ChargesApiResource happens to import ChargeReadPlatformService
+    // a reference Java/JAX-RS banking platform's ChargesApiResource happens to import ChargeReadPlatformService
     // from a DIFFERENT Java package, which masked this): Java does NOT
     // require (or emit) an `import` statement for a same-package type —
     // Graphify correctly represents same-package usage as a `references`
     // edge instead, targeting the exact same class-level node id an
     // `implements` edge would target. Restricting to `imports` alone would
     // silently miss the very common same-package controller+interface shape
-    // (arguably MORE common than Fineract's cross-package one). Both
+    // (arguably MORE common than a reference Java/JAX-RS banking platform's cross-package one). Both
     // relations are accepted as bridge-discovery signals; `isRealBridgeCandidate`
     // below is what keeps this from re-admitting the earlier annotation-type
     // noise (Operation/Schema/Parameter etc. have empty source_file either way).
@@ -109,7 +109,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
 
     const implementers = implementersByTarget.get(bridgeNodeId) ?? [];
     if (implementers.length !== 1) {
-      // 0 (no implementer in scanned roots — the real Fineract fineract-charge-alone
+      // 0 (no implementer in scanned roots — the real a reference Java/JAX-RS banking platform fineract-charge-alone
       // case per the design note) or 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
@@ -131,7 +131,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
 
     // AREC R2b (docs/solution/AREC_R2b_Implementer_Store_Hop.md §2) —
     // Phase 1's terminal check just failed (implementer is absent, or exists
-    // but isn't itself a database/topic unit — the real Fineract
+    // but isn't itself a database/topic unit — the real a reference Java/JAX-RS banking platform
     // JDBC-RowMapper/plain-service-layer shape). Before giving up, chase ONE
     // more hop through what the implementer itself imports/references,
     // filtered to targets that are ALREADY a database/topic TypedUnit (no

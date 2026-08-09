@@ -4,7 +4,7 @@ import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportO
 import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
 
 /**
- * Real gap found by auditing pipeline output against Bank of Anthos source
+ * Real gap found by auditing pipeline output against a reference Python microservices banking app source
  * (userservice/db.py, contacts/db.py): CodeGraph gives no persistence signal
  * at all (confirmed repeatedly across this project — Java JPA and now Python
  * SQLAlchemy). Graphify's raw `imports_from` edges already carry this signal

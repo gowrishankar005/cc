@@ -22,7 +22,7 @@ import { CoverageReport } from '../coverage-report';
  * Turns "S1/S2 fired" (a boolean-ish flag buried in coverage-report.json,
  * easy to miss) into a concrete, actionable list: WHICH units triggered it,
  * so a human reviewing a run doesn't have to re-derive that from
- * typed-facts.json by hand — exactly the "Fineract miss was exactly false
+ * typed-facts.json by hand — exactly the "a reference Java/JAX-RS banking platform miss was exactly false
  * confidence without a flag" rationale review-flow-capability-map.md names.
  *
  * Robustness T-R4-1 added a THIRD trigger, `low-architecture-coverage`

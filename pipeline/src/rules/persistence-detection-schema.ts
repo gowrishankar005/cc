@@ -17,8 +17,8 @@ export interface PersistenceLibraryEntry {
    * class only becomes a database unit if THAT class's own source declares
    * `extends <ownerBaseClass>` (class-ownership-resolver.ts) — plain import
    * alone is no longer sufficient for this library. Absent for every other
-   * library: their existing plain-import behavior is UNCHANGED (BoA
-   * SQLAlchemy, Fineract driver-import rows never re-verified against this
+   * library: their existing plain-import behavior is UNCHANGED (the reference Python app
+   * SQLAlchemy, a reference Java/JAX-RS banking platform driver-import rows never re-verified against this
    * rule, per Q13's own explicit deferral — scoped narrowly, not applied
    * blanket).
    */

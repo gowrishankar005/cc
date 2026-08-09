@@ -59,7 +59,7 @@ export function mapSignalsToUnits(
   // from a per-evidence rule.calmNodeType vote collected here. AREC Wave 3
   // T-D1 found the old per-evidence-vote design gave a wrong answer the
   // moment a real file had BOTH persistence AND security-control evidence
-  // (Fineract's AppUser.java: a real @Entity that also calls
+  // (a reference Java/JAX-RS banking platform's AppUser.java: a real @Entity that also calls
   // validateHasPermission() internally) — "service wins any tie" silently
   // discarded its persistence identity. `rule.calmNodeType` is no longer
   // read here as a result; still a valid catalogue field (not removed —
@@ -207,7 +207,7 @@ export function mapSignalsToUnits(
     //
     // AREC Wave 3 T-D1 — real bug found and fixed the moment call-site
     // evidence made the previously-untested combination actually happen:
-    // Fineract's AppUser.java is a genuine @Entity that ALSO calls
+    // a reference Java/JAX-RS banking platform's AppUser.java is a genuine @Entity that ALSO calls
     // validateHasPermission() internally. The OLD rule ("service wins any
     // tie") typed it 'service', silently discarding its persistence
     // identity — the original comment for that rule even flagged this

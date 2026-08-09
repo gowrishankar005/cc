@@ -109,7 +109,7 @@ rules:
   # resolution/frameworks/index.js) — the composer joins class-level +
   # method-level @Path into one full route string ("GET /v1/charges/{id}"),
   # emitted as a synthetic decorator fact matched here. Verified 19/19 real
-  # routes across 3 real Fineract resource files (docs/spikes/fineract-route-assembly-spike/).
+  # routes across 3 real a reference Java/JAX-RS banking platform resource files (docs/spikes/fineract-route-assembly-spike/).
   # `language: java` matters here specifically because this matchSignal shape
   # ("GET|POST|...") would otherwise ambiguously match nestjs-verb-decorator's
   # alternation too — findRule() now disambiguates by language (rule-schema.ts).
@@ -176,7 +176,7 @@ rules:
   # v0.10 §0 specified TWO control-detection mechanisms: decorator (built
   # above, spring-preauthorize) and call-based (never built until now).
   # Real evidence, verified via a direct extractFromSource() probe before
-  # writing this row (not assumed): Fineract's ChargesApiResource.java calls
+  # writing this row (not assumed): a reference Java/JAX-RS banking platform's ChargesApiResource.java calls
   # `context.authenticatedUser().validateHasReadPermission(RESOURCE_NAME_FOR_PERMISSIONS)`
   # at lines 84/101/129 — CodeGraph's extractFromSource() reports this as a
   # `referenceKind: 'calls'` entry with `referenceName:
@@ -184,7 +184,7 @@ rules:
   # mechanism family as the `decorates` refs every other Java row here uses,
   # just a different reference kind (see codegraph-provider.ts's new
   # extractCallFacts()). Weighted 40, same tier as spring-preauthorize — this
-  # IS definite evidence of an authorization check (Fineract's own security
+  # IS definite evidence of an authorization check (a reference Java/JAX-RS banking platform's own security
   # API), not weaker just because it's a call instead of a decorator.
   - id: fineract-call-site-permission
     language: java
@@ -196,15 +196,15 @@ rules:
     calmNodeType: service
 
   # T-R2-2 (C-call expansion, Catalogue_Intake.md). Real evidence, verified
-  # directly against real Waltz source (spikes/waltz/repo), not assumed:
+  # directly against real a reference Java governance platform source (spikes/waltz/repo), not assumed:
   # `WebUtilities.requireRole()` (waltz-web/.../WebUtilities.java:127-150)
   # calls `userRoleService.hasRole(user, requiredRoles)` and THROWS
   # `NotAuthorizedException()` when it returns false — a genuine, definite
-  # fine-grained role-authorization gate, same strength as Fineract's
+  # fine-grained role-authorization gate, same strength as a reference Java/JAX-RS banking platform's
   # validateHasPermission family, just a different framework's own vocabulary
   # (confirmed real call sites beyond the helper itself: SettingsEndpoint.java:100,
   # LicenceEndpoint.java:119, BulkUploadLegalEntityRelationshipEndpoint.java:98).
-  # A DIFFERENT real repo's real vocabulary, not a Fineract-shaped guess —
+  # A DIFFERENT real repo's real vocabulary, not a a reference Java/JAX-RS banking platform-shaped guess —
   # exactly the breadth this task exists to add. Weighted 40, same tier as
   # the other definite (not merely corroborating) call-site controls.
   - id: waltz-user-role-service
@@ -216,7 +216,7 @@ rules:
     weight: 40
     calmNodeType: service
 
-  # T-R2-2 (C-call expansion). Real evidence: Fineract's OWN
+  # T-R2-2 (C-call expansion). Real evidence: a reference Java/JAX-RS banking platform's OWN
   # PlatformSecurityContext (the same class fineract-call-site-permission
   # above already keys off) also exposes `isAuthenticated()` — confirmed via
   # its real implementation (fineract-security/.../SpringSecurityPlatformSecurityContext.java:81):
@@ -294,11 +294,11 @@ rules:
   # --- AREC Wave 3 T-E1: messaging PRODUCER (typed-field-producer strategy) ---
   # Closes messaging-detection-catalogue.yml's own "typed-field-producer"
   # gap, previously status: not-implemented. Real evidence, verified via a
-  # direct extractFromSource() probe before writing this row: Fineract's
+  # direct extractFromSource() probe before writing this row: a reference Java/JAX-RS banking platform's
   # KafkaExternalEventProducer.java has `private KafkaTemplate<Long, byte[]>
   # externalEventsKafkaTemplate;` — CodeGraph reports a `referenceKind:
   # 'references'` entry with `referenceName: "KafkaTemplate"` (the field's
-  # declared TYPE, not the Fineract-specific field NAME). Weighted 40
+  # declared TYPE, not the a reference Java/JAX-RS banking platform-specific field NAME). Weighted 40
   # (sufficient alone, same tier as jpa-entity/kafka-listener) — real
   # finding while verifying this against KafkaExternalEventProducer.java
   # itself: an initial weight-20 "import-only tier" guess (matching SQS/SNS's
@@ -315,7 +315,7 @@ rules:
   # --- AREC Wave 3 T-E3: Spring Data repository (persistence, extends-based) ---
   # Closes persistence-detection-catalogue.yml's own "spring-data-repository"
   # gap, previously status: not-implemented. Real evidence, verified via a
-  # direct extractFromSource() probe before writing this row: Fineract's
+  # direct extractFromSource() probe before writing this row: a reference Java/JAX-RS banking platform's
   # ChargeRepository.java (`interface ChargeRepository extends
   # JpaRepository<Charge, Long>, JpaSpecificationExecutor<Charge>`) — the
   # word-boundary matcher matches "JpaRepository" correctly against the
@@ -353,7 +353,7 @@ rules:
   # kind tie-break in signal-mapper.ts (treated identically to
   # 'http-entry-point' there) but stays descriptive-only for interfaces
   # until Y4 supplies a real path via CFN/SAM join. Real counterexample
-  # this closes: aws-saas-boost-tier-service's TierService (HT-ASB-002),
+  # this closes: a reference AWS SaaS sample-tier-service's TierService (HT-ASB-002),
   # mirrored in this project's own java-lambda-apigw lab fixture's
   # LegacyTierHandler.
   - id: lambda-request-handler-implements
