@@ -1766,6 +1766,38 @@ test('Evidence packs redact secret-looking lines, --no-snippets suppresses snipp
   }
 });
 
+test('B-scale-oom (T-SP0-1/T-SP1-1): evidence packs cap at MAX_EVIDENCE_PACKS, file reads are cached, truncation is honestly reported', () => {
+  const { buildEvidencePacks, countReviewWorthyIgnoredItems, MAX_EVIDENCE_PACKS } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/evidence-packs'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-evidence-cap-'));
+  try {
+    // One real file, many ignored items pointing at different lines within it —
+    // mirrors the real fineract-provider shape (avg 57 ignored items per file)
+    // that made the pre-fix per-item, uncached fs.readFileSync a real cost.
+    const filePath = path.join(fixtureDir, 'big.py');
+    const fileLines = Array.from({ length: 20 }, (_, i) => `line_${i}`);
+    fs.writeFileSync(filePath, fileLines.join('\n'));
+
+    const ignoredItemCount = MAX_EVIDENCE_PACKS + 50;
+    const ignoredItems = Array.from({ length: ignoredItemCount }, (_, i) => ({
+      ref: `big.py:${(i % 20) + 1}`,
+      reason: 'INSUFFICIENT_EVIDENCE',
+      detail: `No signal-catalogue.yml rule matched raw signal "sig_${i}"`,
+    }));
+
+    assert.equal(countReviewWorthyIgnoredItems(ignoredItems), ignoredItemCount, 'the honest total must count every review-worthy item, not the capped subset');
+
+    const packs = buildEvidencePacks(ignoredItems, [fixtureDir], true);
+    assert.equal(packs.length, MAX_EVIDENCE_PACKS, 'buildEvidencePacks must cap output at MAX_EVIDENCE_PACKS regardless of how many review-worthy items exist');
+    assert.ok(packs.every((p) => p.snippet && p.snippet.length > 0), 'every kept pack (within the cap) must still get a real snippet');
+
+    // Not review-worthy -> excluded from both the cap and the honest count.
+    const mixedItems = [...ignoredItems.slice(0, 5), { ref: 'big.py:1', reason: 'TEST_CODE', detail: 'irrelevant' }];
+    assert.equal(countReviewWorthyIgnoredItems(mixedItems), 5, 'a non-review-worthy reason must not be counted');
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+});
+
 test('--strict-detect exits non-zero on a suspected detect()-gate silent failure, default stays warn-only (T-X1-2)', () => {
   const STRICT_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/strict-detect-sample');
   const codegraphCache = path.join(STRICT_ROOT, '.codegraph');

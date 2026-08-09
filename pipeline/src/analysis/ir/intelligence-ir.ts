@@ -3,7 +3,7 @@ import * as path from 'path';
 import { TypedFacts } from '../../types/typed-facts';
 import { CoverageReport } from '../coverage-report';
 import { UnmappedSignalsReport } from '../unmapped-signals';
-import { EvidencePack } from './evidence-packs';
+import { EvidencePack, countReviewWorthyIgnoredItems } from './evidence-packs';
 
 /**
  * T-X3-2 — Platform IR, per Extraction_Gaps_Mitigation_and_IR_Platform_Review.md
@@ -103,7 +103,15 @@ export function renderIntelligenceIR(
   }
   lines.push('');
 
-  h(`## Ignored / ambiguous (evidence packs, ${evidencePacks.length})`);
+  // B-scale-oom (T-SP1-1) — evidencePacks is capped (MAX_EVIDENCE_PACKS) by
+  // buildEvidencePacks itself; report the real total honestly rather than
+  // silently showing a partial count as if it were complete, same
+  // truncated-but-disclosed convention as the unmapped-signals section below.
+  const totalReviewWorthy = countReviewWorthyIgnoredItems(facts.ignoredItems);
+  const evidenceTruncated = totalReviewWorthy > evidencePacks.length;
+  h(
+    `## Ignored / ambiguous (evidence packs: ${evidencePacks.length}${evidenceTruncated ? ` of ${totalReviewWorthy} review-worthy item(s), truncated — see ignored-items-report.json for the full list` : ''})`
+  );
   for (const pack of evidencePacks) {
     lines.push(`### \`${pack.ref}\` — ${pack.reason}`);
     if (pack.detail) lines.push(`> ${pack.detail}`);

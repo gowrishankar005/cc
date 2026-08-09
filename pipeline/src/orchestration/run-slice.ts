@@ -16,6 +16,7 @@ import { renderIntelligenceIR } from '../analysis/ir/intelligence-ir';
 import { CoverageReport, computeCompleteness } from '../analysis/coverage-report';
 import { UnmappedSignalsReport } from '../analysis/unmapped-signals';
 import { TypedFacts, CONTRACT_VERSION } from '../types/typed-facts';
+import { logMem } from '../util/debug-mem';
 
 /**
  * Shared by both a normal scan-and-build run and --from-facts reconstruct-only
@@ -37,6 +38,7 @@ function finishRun(
   includeSystemNode: boolean
 ): void {
   runModules(resolveModules(moduleNames), facts, { outDir, overridesDir, includeSystemNode });
+  logMem('after runModules');
 
   // T-X6-2 — --strict-overrides reads back calm-generator's own
   // overrides-applied-report.json (already written by runModules above) the
@@ -141,7 +143,9 @@ async function runSlice(
     cfnManifestsDir,
   };
   await runPasses(DEFAULT_PASSES, ctx);
+  logMem('after runPasses');
   const { coverage, unmapped } = writePlatformArtefacts(ctx, outDir);
+  logMem('after writePlatformArtefacts');
 
   const facts: TypedFacts = {
     contractVersion: CONTRACT_VERSION,
@@ -158,7 +162,9 @@ async function runSlice(
   // than silently dropping it, and the default list preserves the exact
   // behavior this pipeline has always had (calm-generator + threat-signals)
   // when --modules isn't passed.
+  logMem('before finishRun');
   finishRun(facts, coverage, unmapped, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
+  logMem('after finishRun');
 }
 
 /**

@@ -4,6 +4,7 @@ import { NativeRouteFact, DecoratorFact } from '../scanner/structural-engine';
 import { GraphifyRun } from '../scanner/graphify-provider';
 import { OpenApiDocument } from '../scanner/openapi-provider';
 import { DeployableManifest } from '../scanner/deployable-manifest-provider';
+import { logMem } from '../util/debug-mem';
 
 /**
  * Wave M T-M7 (Modularity_and_Integration_Assessment.md friction F1 — "the
@@ -69,6 +70,7 @@ export interface AnalysisPass {
 export async function runPasses(passes: AnalysisPass[], ctx: AnalysisContext): Promise<void> {
   for (const pass of passes) {
     await pass.run(ctx);
+    logMem(`after ${pass.name}`);
   }
 }
 

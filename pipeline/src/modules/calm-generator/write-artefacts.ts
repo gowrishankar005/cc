@@ -5,6 +5,7 @@ import { CalmDocument } from '../../types/calm';
 import { Module } from '../registry';
 import { buildCalm } from './build-calm';
 import { applyOverrides } from './override-applier';
+import { logMem } from '../../util/debug-mem';
 
 /**
  * Output layout (Wave M T-M2 — namespaced module outputs, so a second/third
@@ -29,6 +30,7 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
   fs.mkdirSync(moduleDir, { recursive: true });
 
   let calm: CalmDocument = buildCalm(facts, includeSystemNode);
+  logMem('write-artefacts after buildCalm');
 
   // Solution Design v2 §5.4 / Gap_Closure_Build_Ready_Specs_v0.1.md §6: a
   // final, auditable pass over the DETERMINISTIC output above — never
@@ -49,10 +51,13 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
   }
 
   const calmJson = JSON.stringify(calm, null, 2);
+  logMem('write-artefacts after calm stringify');
   fs.writeFileSync(path.join(outDir, 'architecture.calm.json'), calmJson); // back-compat top-level
   fs.writeFileSync(path.join(moduleDir, 'architecture.calm.json'), calmJson); // namespaced
 
-  fs.writeFileSync(path.join(outDir, 'ignored-items-report.json'), JSON.stringify(facts.ignoredItems, null, 2));
+  const ignoredItemsJson = JSON.stringify(facts.ignoredItems, null, 2);
+  logMem('write-artefacts after ignoredItems stringify (1st)');
+  fs.writeFileSync(path.join(outDir, 'ignored-items-report.json'), ignoredItemsJson);
 
   const provenance = {
     runVersion: facts.runVersion,
@@ -65,7 +70,10 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
   fs.writeFileSync(path.join(outDir, 'provenance.json'), JSON.stringify(provenance, null, 2));
 
   // typed-facts.json itself, for auditability (the module contract, not just its output)
-  fs.writeFileSync(path.join(outDir, 'typed-facts.json'), JSON.stringify(facts, null, 2));
+  const typedFactsJson = JSON.stringify(facts, null, 2);
+  logMem('write-artefacts after typed-facts stringify (2nd, includes ignoredItems again)');
+  fs.writeFileSync(path.join(outDir, 'typed-facts.json'), typedFactsJson);
+  logMem('write-artefacts after all writes');
 }
 
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */

@@ -1,6 +1,7 @@
 import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { logMem } from '../util/debug-mem';
 
 /**
  * Real shape of graphify extract --code-only --no-cluster's graph.json,
@@ -123,6 +124,9 @@ export function runGraphifyPass(packageRoots: string[], graphifyBin = 'graphify'
   execFileSync(graphifyBin, ['extract', scanRoot, '--code-only', '--no-cluster', '--out', cacheDir], { stdio: 'pipe' });
   const graphPath = path.join(cacheDir, 'graphify-out', 'graph.json');
   const graph: GraphifyGraph = JSON.parse(fs.readFileSync(graphPath, 'utf8'));
+  if (process.env.WEAVER_DEBUG_MEM) {
+    logMem(`after graph.json parse (${(fs.statSync(graphPath).size / 1e6).toFixed(1)}MB on disk, ${graph.nodes.length} nodes, ${graph.edges.length} edges)`);
+  }
   // Deliberately NOT removed — kept for the next run's incremental benefit.
 
   const resolveRoot = (sourceFile: string): { root: string; relativeFilePath: string } | undefined => {
