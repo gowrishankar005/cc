@@ -116,7 +116,7 @@ def main() -> int:
     }
     (session_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
-    (session_dir / "SESSION.md").write_text(_render_session_md(manifest, residuals))
+    (session_dir / "SESSION.md").write_text(_render_session_md(manifest, residuals, session_dir))
     (session_dir / "AGENTS.md").write_text(_render_agents_md())
     (session_dir / "decisions-log.md").write_text("# Decisions log\n\n_No decisions recorded yet — this file is appended to as Decision Records are drafted/applied._\n")
 
@@ -209,14 +209,32 @@ def _read_snippet(ref: str, resolved_roots: list[Path]) -> str | None:
     return None
 
 
-def _render_session_md(manifest: dict, residuals: list[dict]) -> str:
+def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path) -> str:
     tier_a = [r for r in residuals if r["tier"] == "A"]
     tier_b = [r for r in residuals if r["tier"] == "B"]
     tier_c = [r for r in residuals if r["tier"] == "C"]
+    overrides_dir = session_dir / "drafts" / "overrides"
     lines = [
         "# Residual review session",
         "",
         f"Generated {manifest['generatedAt']} from `{manifest['outDir']}`.",
+        "",
+        "## How this session works (T-RS1-6, design §2 target experience)",
+        "",
+        "1. You already ran a Weaver scan → `architecture.calm.json` (unchanged, upstream of this pack).",
+        "2. `pack.py` built this Session Pack from that scan's out-dir — the step you just did.",
+        "3. Open this pack in VS Code and start a chat using the `residual-review` chat mode "
+        "(`.github/chatmodes/residual-review.chatmode.md`) — or, if that chat mode's tools are disabled by "
+        "your org's Copilot policy, just read this file and `residuals.json` directly (the degraded path — see below).",
+        "4. The agenda below is already split into Tier A (you decide), Tier B (agent may draft — RS-4, not yet built), "
+        "and Tier C (never invented, document or leave open).",
+        "5. Answer every Tier A card with its option key or `other: <rationale>`.",
+        "6. (RS-4, not yet built) The agent drafts Decision Records + Overrides for Tier B items whose evidence bar is met.",
+        "7. Review whatever lands under `drafts/decisions/` and `drafts/overrides/` before applying anything.",
+        "8. Apply (a **human step**, `apply.py` not yet built — RS-3): "
+        f"`node dist/orchestration/run-slice.js --from-facts {manifest['outDir']}/typed-facts.json --overrides {overrides_dir} --out <new-out-dir>`.",
+        "9. Validate the new `architecture.calm.json` (`npm run validate`) and re-open it in your CALM viewer "
+        "(see below) to confirm the reviewed architecture looks right.",
         "",
         "## Before you start",
         "",
@@ -239,12 +257,25 @@ def _render_session_md(manifest: dict, residuals: list[dict]) -> str:
     lines += ["", "## Tier C — do not invent, document or leave open", ""]
     for r in tier_c:
         lines.append(r["card"])
+
+    lines += ["", "## After you're done (step 9)", ""]
+    if manifest.get("hasCalm"):
+        lines.append(f"- Open `{manifest['outDir']}/architecture.calm.json` in your CALM viewer (design §4.5 — the existing FINOS CALM Studio / draw.io↔CALM plugin, no new viewer built for this session).")
+    else:
+        lines.append(f"- No `architecture.calm.json` was found in `{manifest['outDir']}` at pack time — it will exist after step 8's apply run; open that new out-dir's copy in your CALM viewer then.")
+    lines.append("- Most static-file CALM viewers do not auto-reload — **manually reload after step 8's apply**, per design §4.5.")
+    lines.append("- This pack's `decisions-log.md` and `apply-report.md` (written by `apply.py`, RS-3) are the audit trail — check those in if you want to keep a record; the rest of this pack is scratch by default (gitignored).")
     return "\n".join(lines)
 
 
 def _render_agents_md() -> str:
     return (
         "# Bound agent playbook for this Session Pack\n\n"
+        "This is the per-pack copy of the rules already enforced repo-wide by "
+        "`.github/chatmodes/residual-review.chatmode.md` (T-RS1-5) — read that file's "
+        "`tools:` frontmatter for how autonomous apply is structurally prevented, not just instructed against.\n\n"
+        "**Mode: Guided (v1's only mode — design §5)** — ask all Tier A items as choice cards; "
+        "draft Tier B only when RS-4 ships; the architect approves every apply.\n\n"
         "1. Read SESSION.md + residuals.json first — do not scan the whole repo.\n"
         "2. For each open item: use listed evidence; if needed open only the file:line already in evidence/packs.json.\n"
         "3. Never edit typed-facts.json.\n"
@@ -253,6 +284,7 @@ def _render_agents_md() -> str:
         "6. Tier A is the architect's decision — offer choices, never decide alone.\n"
         "7. Tier B drafting (RS-4) is not yet built in this pack — treat every Tier B item as Tier A for now.\n"
         "8. Weak/ambiguous evidence -> cannot_decide / leave open, never fabricate.\n"
+        "9. Never run apply.py / run-slice / override-applier from this chat — applying is a human step (RS-3).\n"
     )
 
 

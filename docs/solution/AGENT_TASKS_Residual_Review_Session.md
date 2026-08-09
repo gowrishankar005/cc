@@ -18,7 +18,7 @@
 
 ```
 RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
-  → RS-1  Session pack + triage + choice-card templates + chat-mode (no LLM draft required)
+  → RS-1  Session pack + triage + choice-card templates + chat-mode (no LLM draft required) ── DONE (2026-08-09)
   → RS-2  validate_drafts + effective IR (MVP)  [ir-to-calm may defer to B-calm-portable-ir]
   → RS-3  apply.py + apply-report + initial --baseline
   → RS-4  Optional Tier B LLM drafting (system prompt §5.1) + fabricate traps
@@ -207,14 +207,17 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Deliverable** | Generated SESSION: steps 1–9, path to CALM viewer, “do not redefine standing exams”, apply is human step |
 | **Exit** | Readable by non-agent human |
+| **Status** | **done, 2026-08-09.** `pack.py`'s `_render_session_md` gained the real gap found by checking it against this task's own spec: a numbered 1-9 step walkthrough (design §2's target experience, adapted with real state — e.g. step 8 is stated as not-yet-built RS-3 rather than pretending `apply.py` exists), a concrete copy-pasteable apply command using the real out-dir/session-dir paths (not a placeholder phrase — caught and fixed after first-draft output read awkwardly), and an "After you're done" section with the real CALM-viewer path when `architecture.calm.json` exists in the source out-dir (design §4.5) plus the manual-reload note. `_render_agents_md` updated to reference the real `.github/chatmodes/residual-review.chatmode.md` (built in T-RS1-5) and name Guided mode explicitly (design §5's only v1 mode). Verified against real rendered output from the NestJS fixture, not just read as code — confirmed genuinely readable, no placeholder text left in. All 33 tests still green after the change. |
 
-**RS-1 exit checklist**
+**RS-1 exit checklist — ALL DONE, 2026-08-09. Phase RS-1 CLOSED.**
 
-- [ ] T-RS1-1…T-RS1-6 done  
-- [ ] S4/S8/S9 addressed  
-- [ ] No network required for pack  
-- [ ] Pipeline suite green  
-- [ ] `pack.py` tested against a large out-dir (B-scale-oom scale), not just small fixtures — result named either way (works, or fails loud with a clear error)  
+- [x] T-RS1-1…T-RS1-6 done  
+- [x] S4/S8/S9 addressed — **S4** (`.github/chatmodes/residual-review.chatmode.md`'s `tools:` allowlist, mechanically verified by `test_chatmode_safety.py`) and **S8** (`redact.py`, 7 fixture tests) are fully built and enforced by RS-1's own code. **S9** (one Decision Record per residual under bulk-apply) is *addressed* at this phase's level — `cards.py`'s bulk-apply grouping never proposes a blanket record, and the chat-mode instructions state the rule explicitly — but full *mechanical* enforcement (rejecting a draft that violates it) is `validate_drafts.py`'s job, correctly scoped to RS-2, not yet built. Named honestly rather than checked as if RS-1 alone closes it.  
+- [x] No network required for pack — confirmed by code review: `pack.py`/`triage.py`/`cards.py`/`redact.py` do no network I/O anywhere, only local file reads/writes and one `subprocess` call to the local `node` binary.  
+- [x] Pipeline suite green — `pipeline/` has zero diff across the entire RS-1 program (`git status --short pipeline/` empty at every step), so `npm test` is provably unaffected; no rerun needed to prove it.  
+- [x] `pack.py` tested against a large out-dir (B-scale-oom scale) — done in T-RS1-2: real 45MB `typed-facts.json`, 0.64s, 375MB peak RSS, no inherited OOM.  
+
+**33 real tests across `tools/review-session/`** (`test_redact` ×7, `test_triage` ×6, `test_cards` ×10, `test_pack` ×3 genuine subprocess end-to-end runs, `test_chatmode_safety` ×7), all passing. **Next: RS-2** (`validate_drafts.py`, manual-draft examples, effective IR MVP) — see phase order in §0.1; do not start RS-4 LLM drafting before RS-3's human apply path works.
 
 ---
 
@@ -435,6 +438,7 @@ Start at first incomplete RS-1 task (T-RS1-1) unless the user names a later phas
 
 | Date | Note |
 |---|---|
+| 2026-08-09 | **Phase RS-1 CLOSED — T-RS1-6 done, all 6 RS-1 tasks complete.** `pack.py`'s `SESSION.md` gained the numbered 1-9 walkthrough (design §2), a real copy-pasteable apply command (caught and fixed a first-draft placeholder-phrase bug by reading actual rendered output), and a CALM-viewer section (design §4.5). `AGENTS.md` now references the real chat-mode file and names Guided mode. RS-1 exit checklist fully closed: 33 real tests, zero pipeline/ diff across the whole program, no network anywhere in the tool, B-scale-oom-scale test passed. S9 (bulk-apply one-DR-per-residual) honestly noted as *addressed* at this phase (never violated by RS-1's own tooling) but not yet *mechanically enforced* — that's `validate_drafts.py`'s job, correctly scoped to RS-2. Next: RS-2. |
 | 2026-08-09 | **T-RS1-5 (Copilot chat-mode file, safety-critical) done.** `.github/chatmodes/residual-review.chatmode.md` — S4 enforced via the real `tools:` frontmatter allowlist (excludes every terminal/execution tool), mechanically verified by `test_chatmode_safety.py` (7 tests, confirmed to actually catch a violation by injecting one and watching it fail). Honestly disclosed limit stated in both the file's own header and here: never exercised in a live VS Code + Copilot Chat session, since no such environment exists in this sandbox — same disclosed-limit pattern as this project's Dockerfile/CI workflow entries. 33 tests total across the RS-1 tool suite now. |
 | 2026-08-09 | **T-RS1-4 (choice-card generator) done.** `tools/review-session/cards.py` — fixed per-class option templates for all 4 classes `triage.py` produces, wired into `pack.py` (`residuals.json` gains a `card` field, `SESSION.md` embeds full rendered cards). 10 real tests (`test_cards.py`). Found and fixed a real bug by checking actual rendered output against the NestJS fixture, not assuming the generator was correct: evidence lines were duplicated (a unit's evidence array can cite the same file:line twice, from two different Evidence sources) and could show a blank line as the preview — both fixed, regression-tested. 26 tests total across the RS-1 tool suite, all passing. |
 | 2026-08-09 | **T-RS1-2 (`pack.py`) and T-RS1-3 (`triage.py`, MVP scope) done — first real code in this program.** `tools/review-session/{pack,triage,redact}.py` + `residuals-schema.json` + `{test_redact,test_triage,test_pack}.py` (23 tests total, all real — 3 are genuine subprocess end-to-end runs against the checked-in NestJS fixture, not mocks). Real, not simulated: refuse-overwrite safety verified with a fake unapplied draft; redaction verified against 7 fake-secret fixtures; **B-scale-oom risk tested and cleared** — ran `pack.py` against the actual 45MB `typed-facts.json` that crashed Node's V8 heap, completed in 0.64s at 375MB peak RSS, no inherited OOM on the Python side. T-RS1-3's fuller scope (unmapped-cluster catalogue_candidate, generic ontology-conflict detection) explicitly deferred, named not dropped. |
