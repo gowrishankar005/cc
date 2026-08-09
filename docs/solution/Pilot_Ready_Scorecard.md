@@ -66,10 +66,19 @@ Format: cell ID → **minimum status required for pilot** → what "pilot-ready"
 
 1. Run Weaver against the pilot repo (module-root scans; multi-root only if the pilot's own layering needs it — see `coe-lab/docs/multi-root-l2-protocol.md`).
 2. Read `coverage-report.json`'s `completeness` block for the pilot's own run. If `silenceFlags` includes S1, the architecture story is genuinely incomplete for THIS repo — this must be disclosed to the pilot stakeholder before any "architecture recovered" claim, not smoothed over because the cell table above says R2 is `partial`.
-3. Run `hitl-review-trigger.js` against the pilot's own output and hand the resulting `review-queue.json` to a human reviewer — this is the residual-completion step, not optional polish.
+3. Run the pilot's output through the real residual review session (`tools/review-session/pack.py` → choice cards in VS Code Copilot Chat or `SESSION.md` directly → `validate_drafts.py` → `apply.py`) and hand the resulting Session Pack to a human reviewer — this is the residual-completion step, not optional polish. (`hitl-review-trigger.js` alone, without the Session Pack around it, is the pre-`B-review-session` fallback — still valid, just the harder-to-use path §4.4's own "degraded path" describes.)
 4. Only after 1–3 does a "Weaver ran against `<pilot>`, here is what it found AND did not find" report become honest.
 
 **A pilot readiness claim without step 2 having actually been performed against the pilot's own repo is not a valid claim, regardless of what this table says about lab/sample-repo cell statuses.**
+
+### 3.1 What the residual session is and isn't (T-RS5-1, RS-1–4 real and closed — `AGENT_TASKS_Residual_Review_Session.md`)
+
+The residual session (`B-review-session`) is an **L5 finishing step**: it completes a delivered artefact (post-override CALM + effective IR) for *this specific run*, through human choice cards and, optionally, evidence-gated LLM drafting — never a substitute for step 2's own architecture-recovery mechanisms (R1/R2/R2b). Concretely:
+
+- **It may not be used to claim a cell status moved.** Answering a residual (e.g. confirming `PrismaService` is `database` not `service`) is a pilot-scoped correction for this run's CALM, not evidence that R2's own multi-hop mechanism now recovers that shape automatically. If `coverage-report.json`'s S1 fires for the pilot repo, that stays a real, disclosed R2 gap (step 2) — a residual session that lets an architect manually connect the same two units does **not** clear S1 for future runs or move R2 to `proven`.
+- **It does not redefine any standing exam** (`E-charge-single-L2`, or any other Claim Register–backed exam) — same rule the tool's own chat-mode/`SESSION.md` state to the architect every session.
+- **What it DOES add to pilot readiness**: a real, tested, human-in-the-loop path for an architect to correct known-ambiguous residuals (S1/S2/S5/low-architecture-coverage) into a usable, reviewed CALM document for *this* pilot run — proven end-to-end (a real hand-authored override changes a real CALM node's type, `calm validate` reports 0 errors). This closes the "residual-completion step, not optional polish" bar in step 3 above with a real, usable tool instead of raw JSON hand-editing.
+- **Two honestly-named open gaps, neither blocking pilot use of steps 1–3**: no detector in this pipeline currently classifies a residual as Tier B (`B-tier-b-detector`), so Tier B/LLM-assisted drafting has no real production input yet — pilot use today is Tier A/C only, which is the fully-proven path regardless; and the live-LLM Tier B path (both `draft_tier_b.py` and in-chat Copilot drafting) has never been exercised against a real model in this project's own dev environment (works the same either way for a pilot operator with their own Copilot/API access — this is a development-environment limitation, not a product one).
 
 ---
 
@@ -83,4 +92,5 @@ Every real-repo path cited anywhere in this project (Bank of Anthos, Fineract, G
 
 | Date | Note |
 |---|---|
+| 2026-08-09 | T-RS5-1 — §3 step 3 updated to point at the real, now-closed residual review session (`tools/review-session/`, RS-1–4) instead of the raw `hitl-review-trigger.js` CLI it predated. New §3.1 states plainly what the residual session is (an L5 finishing step, real and proven end-to-end) and isn't (never moves a Claim Register cell status, never redefines a standing exam) — the exact overclaim boundary `Architect_Residual_Review_Session.md` §0.1 already enforces at the tool level, now also stated where a pilot-readiness reviewer would actually look for it. |
 | 2026-08-08 | T-R0-1 — initial scorecard, derived from Claim_Register.md's real cell statuses at the time of writing |

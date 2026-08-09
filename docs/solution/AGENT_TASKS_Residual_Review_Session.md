@@ -22,7 +22,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
   → RS-2  validate_drafts + effective IR (MVP)  [ir-to-calm may defer to B-calm-portable-ir] ── DONE (2026-08-09, MVP scope)
   → RS-3  apply.py + apply-report + initial --baseline ── DONE (2026-08-09)
   → RS-4  Optional Tier B LLM drafting (system prompt §5.1) + fabricate traps ── DONE (2026-08-09; no real Tier B input exists yet, no live model tested — see task status)
-  → RS-5  Eval traps, pilot scorecard note, optional prose rewrite, portable IR if deferred
+  → RS-5  Eval traps, pilot scorecard note, optional prose rewrite, portable IR if deferred ── CLOSED (2026-08-09; T-RS5-1/T-RS5-4 done, T-RS5-2/T-RS5-3 explicitly deferred — owner decision, tracked separately)
 ```
 
 | Rule | |
@@ -370,6 +370,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Deliverable** | Pilot_Ready_Scorecard or residual section: residual is L5; does not replace E-charge-single-L2  
 | **Exit** | Linked from design or BACKLOG  
+| **Status** | **done, 2026-08-09.** `Pilot_Ready_Scorecard.md` §3 step 3 updated to point at the real, closed residual session instead of the raw `hitl-review-trigger.js` CLI it predated; new §3.1 states plainly what the residual session is (L5 finishing step, proven end-to-end) and isn't (never moves a Claim Register cell status, never redefines a standing exam), plus the 2 real open gaps (`B-tier-b-detector`, live-API-never-tested-here) named where a pilot-readiness reviewer would actually look. Linked from `BACKLOG.md`'s `B-review-session` row. |
 
 ### T-RS5-2 — Optional prose rewrite
 
@@ -377,6 +378,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Per** | design §7.3 — presentation only  
 | **Exit** | Or explicitly OOS  
+| **Status** | **Explicitly deferred, 2026-08-09 — owner decision, not silently dropped.** Design §7.3 itself frames this as presentation-only (the templated MVP already satisfies the effective-IR Definition of Done) — deferring adds no functional gap. Also would add a *second* live-LLM dependency (same never-tested-here limitation as `draft_tier_b.py`/in-chat Tier B drafting) for a benefit that's purely readability. Revisit if a real stakeholder-facing need for prose output shows up; no trigger condition currently exists. |
 
 ### T-RS5-3 — Complete B-calm-portable-ir if deferred
 
@@ -384,19 +386,22 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Deliverable** | ir-to-calm + checksum + BACKLOG flip  
 | **Exit** | calm validate from markdown alone  
+| **Status** | **Explicitly deferred, 2026-08-09 — owner decision, not silently dropped.** Real, substantive work (`ir-to-calm.ts`, checksum drift detection per design §7.4) — already tracked as its own backlog item, **`B-calm-portable-ir`**, split out from `B-review-session` on its very first review specifically so it could be scheduled independently. Value is speculative until a real need shows up (e.g. "reconstruct a valid CALM file from just this markdown, offline, no repo access") — no such need has been stated. `BACKLOG.md`'s `B-calm-portable-ir` row remains the tracking point; revisit there, not here, when/if that need appears. |
 
 ### T-RS5-4 — Program DoD
 
-All true:
+**Closed, 2026-08-09 — every item checked against real code/tests, not memory.**
 
-- [ ] Pack → choice → (optional LLM draft) → validate → **human** apply → valid CALM  
-- [ ] TypedFacts unchanged by session tools  
-- [ ] Chat-mode cannot silently apply  
-- [ ] Secrets redacted in pack tests  
-- [ ] Bulk-apply = one DR per residual  
-- [ ] No standing-exam product claim via residual  
-- [ ] Controls v1 limitation still stated if control_add not built  
-- [ ] B-review-session status updated honestly (`partial` OK if portable IR deferred)  
+- [x] Pack → choice → (optional LLM draft) → validate → **human** apply → valid CALM — proven, not just built: `test_apply.py`'s real subprocess chain (run-slice → pack.py → hand-authored draft → `apply.py`) genuinely changes a real CALM node's type, `npm run validate` reports `Errors: no (0)`.
+- [x] TypedFacts unchanged by session tools — structurally true (grepped every `tools/review-session/*.py`: `typed-facts.json` is only ever read or referenced in a "never edit" instruction string, never opened for writing) and empirically confirmed (`intelligence-ir.md` hash-checked identical before/after an `effective_ir.py` run).
+- [x] Chat-mode cannot silently apply — S4 enforced by the `tools:` allowlist (no terminal tool declared), mechanically verified by `test_chatmode_safety.py`, including proving the test isn't vacuous by injecting `runInTerminal` and watching it fail before restoring the real file.
+- [x] Secrets redacted in pack tests — `test_redact.py`, 7 fixtures (fake AWS key, bearer token, private-key header, connection-string password, plain assignment), all confirmed redacted with the raw value never appearing in output.
+- [x] Bulk-apply = one DR per residual — true for every drafting surface this program actually generates from (`cards.py`'s bulk-apply grouping never proposes a blanket record; the chat-mode file's rule 7 and `draft_tier_b.py`'s own per-residual write both hold this). **Honest caveat, not hidden**: this is enforced by every real generation path, not yet by a hard mechanical check in `validate_drafts.py` against a hand-crafted violation (a human could still write one DR referenced by two different overrides' `decision_record_ref` and it would currently validate) — same class of gap already named for S9 in the RS-1 exit checklist, not newly discovered here.
+- [x] No standing-exam product claim via residual — stated explicitly in `SESSION.md`, the chat-mode file, and `AGENTS.md` (§0.1 boundary with `E-charge-single-L2`/`B-layered-story`).
+- [x] Controls v1 limitation still stated if `control_add` not built — `control_add` was never built (H4); `cards.py`'s `security-authority-policy` template explicitly says "v1 residual cannot author a `control_add` (H4)" in its own rendered option text, and `draft_tier_b.py`'s `TIER_B_ALLOWED_OVERRIDE_TYPES` structurally excludes anything control-related.
+- [x] `B-review-session` status updated honestly (`partial` OK if portable IR deferred) — `BACKLOG.md` reflects RS-1 through RS-4 closed, `doing` overall (not `done`) precisely because `T-RS5-3`/portable IR is deferred with a stated reason, not silently dropped.
+
+**Real, named residuals this checklist does NOT close** (RS-5's own scope, not new): `B-tier-b-detector` (no detector produces real Tier B input yet) and the live-model API path (`draft_tier_b.py`/in-chat drafting never run against a real key in this environment) — both already tracked, neither silently assumed solved by closing this checklist.
 
 ---
 
@@ -456,6 +461,7 @@ Start at first incomplete RS-1 task (T-RS1-1) unless the user names a later phas
 
 | Date | Note |
 |---|---|
+| 2026-08-09 | **Phase RS-5 CLOSED — program `B-review-session` reaches its RS-0…RS-5 finish line.** Owner prioritized the 4 remaining tasks and chose to defer 2: `T-RS5-4` (Program DoD) done first — every checklist item re-verified against real code/tests, not assumed from memory, including one honest caveat (bulk-apply's one-DR-per-residual rule is enforced by every real generation path today, not yet by a hard mechanical check against a hand-crafted violation — same class of gap already named for S9). `T-RS5-1` (pilot scorecard note) done — `Pilot_Ready_Scorecard.md` §3 now points at the real Session Pack flow instead of the raw `hitl-review-trigger.js` CLI it predated, and new §3.1 states plainly what the residual session is (L5 finishing step) and isn't (never moves a Claim Register cell, never redefines a standing exam). `T-RS5-2` (optional prose rewrite) and `T-RS5-3` (full portable IR/`B-calm-portable-ir`) both explicitly deferred, owner-approved, real reasons stated, tracked at their own backlog rows — not silently dropped. |
 | 2026-08-09 | **Real correction to T-RS4-3, same day as RS-4 close, after owner feedback.** First draft had the Tier B drafting path backwards — told the chat mode to never draft, routing everyone to a standalone `draft_tier_b.py` CLI with its own API key. Owner clarified the real usage: the whole session runs inside VS Code Copilot Chat, so the chat agent's OWN bound model, using its already-allowlisted `editFiles` tool, is the real primary Tier B drafting path — no separate script or API key needed for normal use. Embedded the actual §5.1 hard rules verbatim into `.github/chatmodes/residual-review.chatmode.md` (in-chat drafting: cite evidence, `llm-advisory:` reviewer, never invent ids, present as Accept/Reject/Edit); demoted `draft_tier_b.py` to an explicitly secondary, headless/scripted alternative in every doc that referenced it. New mechanical test confirms the real rule markers are present in the chat-mode file, not just claimed. |
 | 2026-08-09 | **Phase RS-4 CLOSED — optional Tier B LLM drafting built, with 2 real limits named up front rather than discovered later.** `draft_tier_b.py` — §5.1 system prompt verbatim, `build_user_prompt()` (tested to leak nothing beyond the residual's own permitted inputs), a single isolated `_call_llm()` network boundary, `parse_and_validate_response()` (the real guardrail, 12 unit tests: all 6 named trap fixtures + 6 more, 100% on refusal cases). Confirmed by grep before writing any code that `triage.py` never classifies anything Tier B today — verified against a real pack (0 Tier B residuals) and a synthetic one (correct "would attempt, writing nothing" report, no key set). Live-model path is real code, never live-tested (no `ANTHROPIC_API_KEY` here) — same disclosed-limit pattern as the chat-mode file and CI workflow. T-RS4-3: chat-mode/`AGENTS.md`/`SESSION.md` all updated so a future Tier B draft is presented Accept/Reject/Edit, never pre-approved. 14 new tests, 82 total. This phase's real completion needs a future Tier B classifier in `triage.py` PLUS a live API run — both named, neither silently assumed done. |
 | 2026-08-09 | **RS-3 bugs/efficiency review found and fixed 2 real correctness bugs, same day RS-3 shipped, before anyone relied on it.** (1) `apply.py`'s `_merge_drafts` copied decisions/overrides into one temp directory by bare filename — a decision and override sharing a filename (natural: naming both after their shared residual id) silently dropped one. This happened AFTER `validate_drafts.py` had already said the pair was fine, so re-validation couldn't catch it — the exact class of bug this whole apply-path exists to prevent. Fixed by namespacing copies with their source subdirectory; confirmed with a failing repro before fixing, now has a dedicated regression test proving a real apply still succeeds with colliding filenames. Also fixed a `manifest["outDir"]` KeyError-vs-`.get()` inconsistency. (2) `effective_ir.py`'s §3 still claimed "status tracking not yet built (RS-3)" and listed every residual as open — stale the moment T-RS3-3 shipped real `carried_forward` status; fixed to correctly exclude carried-forward residuals from the open list and annotate `reconfirm` ones. 68 tests total (up from 64: `test_apply.py` +1, `test_effective_ir.py` +3). No efficiency issues found rose above negligible at this tool's real scale (dozens of residuals/drafts per pack) — none fixed, none needed. |
