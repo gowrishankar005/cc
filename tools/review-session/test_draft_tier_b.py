@@ -25,7 +25,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from draft_tier_b import build_user_prompt, parse_and_validate_response
+from draft_tier_b import build_user_prompt, parse_and_validate_response, process_tier_b_batch
 
 TOOLS_DIR = Path(__file__).resolve().parent
 
@@ -192,6 +192,65 @@ class TestBuildUserPrompt(unittest.TestCase):
         self.assertIn("db.py", prompt)
         self.assertNotIn("unrelated.py", prompt)
         self.assertNotIn("Unrelated", prompt)
+
+
+class TestCrossResidualCollision(unittest.TestCase):
+    """Real bug found on review: nothing checked whether a model returned
+    the same decision_id/override_id for two DIFFERENT residuals in one
+    batch — the second write silently overwrote the first, same class of
+    bug already found and fixed in apply.py's _merge_drafts. Confirmed
+    with a failing repro before fixing (see the commit that adds this
+    test)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="draft-batch-test-"))
+        self.decisions_dir = self.tmp / "decisions"
+        self.overrides_dir = self.tmp / "overrides"
+        self.decisions_dir.mkdir()
+        self.overrides_dir.mkdir()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_colliding_ids_across_residuals_second_one_refused_not_overwritten(self):
+        residual1 = dict(RESIDUAL, id="R-001", unitIds=["svc.py"])
+        residual2 = dict(RESIDUAL, id="R-002", unitIds=["other.py"])
+
+        # Both "model responses" reuse the SAME decision_id/override_id —
+        # a real, plausible failure mode (a model defaulting to generic ids).
+        def fake_draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key):
+            decision = dict(GOOD_DECISION, target_ref=residual["unitIds"][0])
+            override = dict(GOOD_RELATIONSHIP_ADD_OVERRIDE, override_type="type_change", target_ref=residual["unitIds"][0], new_value="database", decision_record_ref="D-001")
+            return {"outcome": "drafted", "decision": decision, "override": override}
+
+        results = process_tier_b_batch([residual1, residual2], {}, {}, {"svc.py", "other.py"}, set(), "fake-key", self.decisions_dir, self.overrides_dir, draft_fn=fake_draft_fn)
+
+        outcomes = {r[0]: r[1] for r in results}
+        self.assertEqual(outcomes["R-001"], "drafted")
+        self.assertEqual(outcomes["R-002"], "collision")
+
+        decision_files = list(self.decisions_dir.glob("*.json"))
+        self.assertEqual(len(decision_files), 1, "only the FIRST residual's draft should be written — the second must be refused, not silently overwrite it")
+        written = json.loads(decision_files[0].read_text())
+        self.assertEqual(written["target_ref"], "svc.py", "the surviving file must be R-001's draft, not R-002's silently overwriting it")
+
+    def test_non_colliding_ids_both_written(self):
+        residual1 = dict(RESIDUAL, id="R-001", unitIds=["svc.py"])
+        residual2 = dict(RESIDUAL, id="R-002", unitIds=["other.py"])
+
+        counter = {"n": 0}
+
+        def fake_draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key):
+            counter["n"] += 1
+            decision = dict(GOOD_DECISION, decision_id=f"D-{counter['n']:03d}", target_ref=residual["unitIds"][0])
+            override = dict(GOOD_RELATIONSHIP_ADD_OVERRIDE, override_id=f"O-{counter['n']:03d}", override_type="type_change", target_ref=residual["unitIds"][0], new_value="database", decision_record_ref=f"D-{counter['n']:03d}")
+            return {"outcome": "drafted", "decision": decision, "override": override}
+
+        results = process_tier_b_batch([residual1, residual2], {}, {}, {"svc.py", "other.py"}, set(), "fake-key", self.decisions_dir, self.overrides_dir, draft_fn=fake_draft_fn)
+
+        self.assertTrue(all(r[1] == "drafted" for r in results))
+        self.assertEqual(len(list(self.decisions_dir.glob("*.json"))), 2)
+        self.assertEqual(len(list(self.overrides_dir.glob("*.json"))), 2)
 
 
 class TestNoKeyCliPath(unittest.TestCase):

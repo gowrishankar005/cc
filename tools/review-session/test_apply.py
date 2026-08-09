@@ -166,6 +166,24 @@ class TestApplyEndToEnd(unittest.TestCase):
         combined = validate_run.stdout + validate_run.stderr
         self.assertIn("Errors: no (0)", combined, f"expected 0 validation errors, got:\n{combined}")
 
+    def test_missing_source_calm_warns_but_does_not_silently_skip(self):
+        """Real gap found on review: if the source scan's architecture.calm.json
+        goes missing (moved/deleted since the pack was built), endpoint
+        checks used to silently degrade to "not checked" with no warning at
+        all. override-applier.ts still catches a real dangling endpoint at
+        real apply time regardless (this isn't a safety hole), but the
+        pre-flight pass silently skipping a meaningful check with zero
+        explanation was a real observability gap."""
+        self._write_draft()
+        (self.out_dir / "architecture.calm.json").unlink()  # simulate it going missing
+        run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir), "--i-confirm-apply"])
+        self.assertIn("endpoint existence was NOT checked", run.stderr)
+        # The apply itself should still succeed (override-applier.ts is the
+        # real backstop) and the warning should be recorded in the audit trail.
+        self.assertEqual(run.returncode, 0, run.stderr)
+        report = (self.session_dir / "apply-report.md").read_text()
+        self.assertIn("endpoint existence was NOT checked", report)
+
 
 if __name__ == "__main__":
     unittest.main()

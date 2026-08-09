@@ -230,16 +230,67 @@ def main() -> int:
 
     decisions_dir = session_dir / "drafts" / "decisions"
     overrides_dir = session_dir / "drafts" / "overrides"
-    for residual in tier_b:
-        result = draft_for_residual(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key)
-        if result["outcome"] == "drafted":
-            (decisions_dir / f"{result['decision']['decision_id']}.json").write_text(json.dumps(result["decision"], indent=2))
-            (overrides_dir / f"{result['override']['override_id']}.json").write_text(json.dumps(result["override"], indent=2))
-            print(f"[draft_tier_b] {residual['id']}: drafted {result['decision']['decision_id']} / {result['override']['override_id']}")
+    results = process_tier_b_batch(tier_b, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key, decisions_dir, overrides_dir)
+    for residual_id, outcome, detail in results:
+        if outcome == "drafted":
+            print(f"[draft_tier_b] {residual_id}: drafted {detail}")
+        elif outcome == "collision":
+            print(f"[draft_tier_b] {residual_id}: REFUSING — {detail}")
         else:
-            print(f"[draft_tier_b] {residual['id']}: {result['outcome']} — {result['reason']}")
+            print(f"[draft_tier_b] {residual_id}: {outcome} — {detail}")
 
     return 0
+
+
+def process_tier_b_batch(
+    tier_b: list[dict],
+    unit_index: dict,
+    packs: dict,
+    calm_node_ids: set[str] | None,
+    calm_relationship_ids: set[str] | None,
+    api_key: str,
+    decisions_dir: Path,
+    overrides_dir: Path,
+    draft_fn=draft_for_residual,
+) -> list[tuple[str, str, str]]:
+    """Drafts every residual in the batch, writing to disk on success.
+    `draft_fn` is injectable (defaults to the real draft_for_residual) so
+    this can be tested without a live network call — see
+    test_draft_tier_b.py's TestCrossResidualCollision.
+
+    Real bug found on review: nothing previously checked whether a model
+    returned the same decision_id/override_id for two DIFFERENT residuals
+    in this batch (e.g. a model defaulting to generic ids) — the second
+    write would silently overwrite the first, the exact same class of bug
+    already found and fixed in apply.py's _merge_drafts. Track what this
+    run has already written and refuse a collision rather than silently
+    clobber. Returns a list of (residual_id, outcome, detail) tuples,
+    where outcome is one of "drafted" | "collision" | whatever
+    draft_for_residual's own outcome was (cannot_decide/invalid_response/no_key).
+    """
+    written_decision_ids: dict[str, str] = {}  # decision_id -> residual id that claimed it
+    written_override_ids: dict[str, str] = {}
+    results: list[tuple[str, str, str]] = []
+    for residual in tier_b:
+        result = draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key)
+        if result["outcome"] != "drafted":
+            results.append((residual["id"], result["outcome"], result["reason"]))
+            continue
+
+        decision_id = result["decision"]["decision_id"]
+        override_id = result["override"]["override_id"]
+        if decision_id in written_decision_ids or override_id in written_override_ids:
+            claimant = written_decision_ids.get(decision_id) or written_override_ids.get(override_id)
+            results.append((residual["id"], "collision", f"decision/override id collides with residual {claimant}'s draft in this same batch ({decision_id}/{override_id}) — not written, would silently overwrite"))
+            continue
+
+        written_decision_ids[decision_id] = residual["id"]
+        written_override_ids[override_id] = residual["id"]
+        (decisions_dir / f"{decision_id}.json").write_text(json.dumps(result["decision"], indent=2))
+        (overrides_dir / f"{override_id}.json").write_text(json.dumps(result["override"], indent=2))
+        results.append((residual["id"], "drafted", f"{decision_id} / {override_id}"))
+
+    return results
 
 
 if __name__ == "__main__":

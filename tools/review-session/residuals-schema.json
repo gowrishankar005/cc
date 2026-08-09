@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver residual review session — residuals.json",
-  "description": "T-RS1-3. Written by pack.py (via triage.py's build_residuals), read by the bound Copilot Chat agent (T-RS1-5) and, once built, draft_tier_b.py (T-RS4-1). MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape).",
+  "description": "T-RS1-3. Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent (T-RS1-5) and by draft_tier_b.py (T-RS4-1, built) for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). Real, still-open gap (B-tier-b-detector): no trigger currently produces tier 'B', so every real residual today is 'A' or 'C'.",
   "type": "object",
   "required": ["generatedAt", "items"],
   "properties": {
@@ -14,13 +14,17 @@
   "definitions": {
     "residual": {
       "type": "object",
-      "required": ["id", "tier", "class", "trigger", "unitIds", "evidenceRefs", "rationale", "status"],
+      "required": ["id", "tier", "class", "trigger", "unitIds", "evidenceRefs", "rationale", "status", "card"],
       "properties": {
         "id": { "type": "string", "pattern": "^R-[0-9]{3,}$", "description": "Stable within one Session Pack; not reused across packs." },
         "tier": {
           "type": "string",
           "enum": ["A", "B", "C"],
-          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (RS-4, not yet built — every Tier B item is treated as Tier A until then). C = do not invent; document OOS or leave open."
+          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (RS-4, built — either in-chat via Copilot's editFiles tool, the primary path, or the secondary/headless draft_tier_b.py; no trigger currently produces this tier, B-tier-b-detector). C = do not invent; document OOS or leave open."
+        },
+        "card": {
+          "type": "string",
+          "description": "T-RS1-4. Deterministic markdown choice card (cards.py) — options from a fixed per-class generator, an evidence blockquote, and a similar-residuals note. For a carried_forward residual this is a short note instead of a full card. This is the field the bound chat-mode agent presents as-is; it does not re-derive or invent options from the other fields."
         },
         "class": {
           "type": "string",

@@ -66,6 +66,15 @@ def _run_validation(session_dir: Path, manifest: dict) -> tuple[bool, list[str],
             calm_relationship_ids = {r["unique-id"] for r in calm.get("relationships", [])}
 
     report = validate_drafts(decisions_by_id, overrides_list, calm_node_ids, calm_relationship_ids)
+    # Real gap found on review: if the source scan's architecture.calm.json
+    # went missing (moved/deleted since this pack was built), endpoint
+    # checks silently degrade to "not checked" with no warning at all — the
+    # real safety property still holds (override-applier.ts independently
+    # re-checks node/relationship existence at real apply time regardless),
+    # but a pre-flight pass that silently skipped a meaningful check with no
+    # explanation is a real observability gap, not just a style nit.
+    if calm_node_ids is None:
+        report.warnings.insert(0, f"source scan's architecture.calm.json not found under manifest outDir ({out_dir}) — endpoint existence was NOT checked here (override-applier.ts will still catch a real dangling endpoint at apply time, just later and with a less specific message)")
     return report.valid, report.errors, report.warnings
 
 
@@ -146,6 +155,13 @@ def main() -> int:
     manifest = json.loads(manifest_path.read_text())
 
     valid, errors, warnings = _run_validation(session_dir, manifest)
+    # Real gap found on review: warnings (e.g. "endpoint existence not
+    # checked" when the source CALM is missing) were only ever surfaced on
+    # the failure path — on a successful validation they were silently
+    # discarded, including this file's own new warning above. Print
+    # whenever non-empty, regardless of outcome.
+    for w in warnings:
+        print(f"[apply] warning: {w}", file=sys.stderr)
     if not valid:
         print("[apply] REFUSING — validate_drafts found errors:", file=sys.stderr)
         for e in errors:
@@ -205,6 +221,7 @@ def main() -> int:
         "rejected": [o["override_id"] for o in overrides_result.get("rejected", [])],
         "skipped": [o["override_id"] for o in overrides_result.get("skipped", [])],
         "orphans": [o["override_id"] for o in overrides_result.get("orphans", [])],
+        "validation_warnings": warnings,
     }
     _write_apply_report(session_dir, entry)
     _append_decisions_log(session_dir, entry)
