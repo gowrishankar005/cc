@@ -17,6 +17,7 @@ import { CoverageReport, computeCompleteness } from '../analysis/coverage-report
 import { UnmappedSignalsReport } from '../analysis/unmapped-signals';
 import { TypedFacts, CONTRACT_VERSION } from '../types/typed-facts';
 import { logMem } from '../util/debug-mem';
+import { isTestPath } from '../rules/test-path';
 
 /**
  * Shared by both a normal scan-and-build run and --from-facts reconstruct-only
@@ -102,11 +103,25 @@ async function runSlice(
   const rawByRoot = new Map<string, RawRootFacts>();
   let anySilentFailure = false;
   for (const root of packageRoots) {
-    const { handle, nativeRoutes } = await engine.indexPackage(root);
-    const detectGateResult = runDetectGateSmokeTest(root, nativeRoutes.length);
+    const { handle, nativeRoutes: allNativeRoutes } = await engine.indexPackage(root);
+    const detectGateResult = runDetectGateSmokeTest(root, allNativeRoutes.length);
     if (detectGateResult.suspectedSilentFailure) anySilentFailure = true;
 
-    const indexedFiles = engine.listIndexedFiles(handle, ['.py', '.ts', '.java']);
+    // T-TC1-2 (B-test-code-exclusion) — real, confirmed bug: a JUnit test
+    // file's own JAX-RS-annotated inner test-fixture classes were typed as
+    // a real service at confidence 100 with a fabricated route, because
+    // nothing ever excluded /test/-path files from decorator/native-route
+    // extraction. Filtered here, before any extraction runs, not after —
+    // every excluded file becomes a real IgnoredItem (mapSignalsPass, per
+    // this pass's own excludedTestFiles list), never a silent skip.
+    const allIndexedFiles = engine.listIndexedFiles(handle, ['.py', '.ts', '.java']);
+    const indexedFiles = allIndexedFiles.filter((file) => !isTestPath(file));
+    const excludedTestFiles = allIndexedFiles.filter((file) => isTestPath(file));
+    const nativeRoutes = allNativeRoutes.filter((r) => !isTestPath(r.filePath));
+    for (const r of allNativeRoutes) {
+      if (isTestPath(r.filePath) && !excludedTestFiles.includes(r.filePath)) excludedTestFiles.push(r.filePath);
+    }
+
     const decoratorFacts = indexedFiles.flatMap((file) => engine.extractDecoratorFacts(handle, root, file));
     const callFacts = indexedFiles.flatMap((file) => engine.extractCallFacts(handle, root, file)); // T-D1
     const typeReferenceFacts = indexedFiles.flatMap((file) => engine.extractTypeReferenceFacts(handle, root, file)); // T-E1
@@ -117,7 +132,7 @@ async function runSlice(
       filesByExt[ext] = (filesByExt[ext] ?? 0) + 1;
     }
     const deployableManifests = discoverDeployableManifests(root); // T-X8-1
-    rawByRoot.set(root, { nativeRoutes, decoratorFacts, callFacts, typeReferenceFacts, extendsFacts, filesByExt, deployableManifests });
+    rawByRoot.set(root, { nativeRoutes, decoratorFacts, callFacts, typeReferenceFacts, extendsFacts, filesByExt, deployableManifests, excludedTestFiles });
   }
 
   // T-X1-2 — detect-gate-smoketest.ts already computes suspectedSilentFailure

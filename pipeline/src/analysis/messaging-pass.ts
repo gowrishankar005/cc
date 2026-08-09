@@ -34,7 +34,12 @@ export const detectMessagingPass: AnalysisPass = {
   name: 'detectMessaging',
   run(ctx: AnalysisContext) {
     if (!ctx.graphifyRun) return;
-    const messagingUnitsByRoot = detectMessagingUnits(ctx.graphifyRun);
+    const { unitsByRoot: messagingUnitsByRoot, excludedTestFiles } = detectMessagingUnits(ctx.graphifyRun);
+    // T-TC1-3 (B-test-code-exclusion) — real, visible record, never a silent skip.
+    for (const filePath of excludedTestFiles) {
+      ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: 'Excluded from messaging detection — matched a real test-path/filename convention (isTestPath()), despite importing a catalogued messaging-client library' });
+    }
+    if (excludedTestFiles.length > 0) console.log(`[run-slice] ${excludedTestFiles.length} test file(s) excluded from messaging detection`);
     const existingUnitsById = new Map(ctx.allUnits.map((u) => [u.id, u]));
     for (const [root, messagingUnits] of messagingUnitsByRoot) {
       const genuinelyNewUnits = [];

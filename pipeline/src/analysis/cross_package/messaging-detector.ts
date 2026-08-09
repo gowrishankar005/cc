@@ -1,8 +1,7 @@
 import * as path from 'path';
 import { GraphifyRun } from '../../scanner/graphify-provider';
-import { TypedUnit } from '../../types/typed-facts';
 import { loadMessagingDetectionCatalogue, importOnlyMessagingLibraries } from '../../rules/messaging-detection-schema';
-import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector';
+import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
 
 /**
  * T-X7-2 (G-L2-03) — the import-only strategy from
@@ -26,7 +25,7 @@ import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector
  * silently assumed safe — the existing unique-id-uniqueness regression
  * test (T-X2-1) would catch it the moment a real fixture triggers it.
  */
-export function detectMessagingUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): Map<string, TypedUnit[]> {
+export function detectMessagingUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): ImportStrategyResult {
   const catalogue = loadMessagingDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
   const libraries = importOnlyMessagingLibraries(catalogue);
 

@@ -3,6 +3,7 @@ import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
 import { TypedUnit, Evidence } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
 import { classExtendsBaseClass } from '../../rules/class-ownership-resolver';
+import { isTestPath } from '../../rules/test-path';
 
 /**
  * Shared by persistence-detector.ts, messaging-detector.ts, and
@@ -67,6 +68,12 @@ export function findFilesImportingLibraries(run: GraphifyRun, libraries: Set<str
   return [...new Set(findLibraryImportEdges(run, libraries).map((e) => e.source_file))];
 }
 
+/** T-TC1-3 — excludedTestFiles is real, relative file paths skipped as test code despite matching a catalogued library import; the caller (persistence/messaging pass) turns each into a real IgnoredItem. */
+export interface ImportStrategyResult {
+  unitsByRoot: Map<string, TypedUnit[]>;
+  excludedTestFiles: string[];
+}
+
 export interface ImportStrategyUnitConfig {
   kind: TypedUnit['kind'];
   category: Evidence['category'];
@@ -107,15 +114,26 @@ export function detectUnitsByImportStrategy(
    * library's behavior is byte-for-byte unchanged (empty Map by default).
    */
   ownerBaseClasses: Map<string, string> = new Map()
-): Map<string, TypedUnit[]> {
+): ImportStrategyResult {
   const { graph } = run;
   const unitsByRoot = new Map<string, TypedUnit[]>();
+  const excludedTestFiles: string[] = [];
   const fileLineCache = new Map<string, string[]>();
   const files = [...new Set(findLibraryImportEdges(run, libraries, fileLineCache).map((e) => e.source_file))];
 
   for (const file of files) {
     const resolved = run.resolveRoot(file);
     if (!resolved) continue; // outside every given package root
+    // T-TC1-3 (B-test-code-exclusion) — real, confirmed contamination: 17
+    // real /test/-path files in one Fineract scan were typed as database
+    // units purely because they happened to import a real catalogued
+    // driver library (test setup/fixture code, not real persistence).
+    // Excluded here, not silently — the caller reports each one as a real
+    // IgnoredItem (reason TEST_CODE).
+    if (isTestPath(resolved.relativeFilePath)) {
+      excludedTestFiles.push(resolved.relativeFilePath);
+      continue;
+    }
     if (existingServiceFilePaths.has(resolved.relativeFilePath)) continue; // already established as a service — don't also emit a competing database/topic unit for the same file
 
     const fileNodeId = graph.nodes.find((n) => n.source_file === file && n.source_location === 'L1')?.id;
@@ -180,5 +198,5 @@ export function detectUnitsByImportStrategy(
     }
   }
 
-  return unitsByRoot;
+  return { unitsByRoot, excludedTestFiles };
 }

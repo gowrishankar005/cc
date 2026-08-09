@@ -39,17 +39,37 @@ export function composeJaxRsRoutes(fileDecoratorFacts: DecoratorFact[]): JaxRsCo
 
   const consumed = new Set<DecoratorFact>();
 
-  // Slice 1/2 granularity: one JAX-RS resource class per file, so at most one
-  // class-level @Path applies to every method in the file.
-  let classPath: string | undefined;
-  for (const facts of byNode.values()) {
-    const classPathFact = facts.find((f) => f.fromNodeKind === 'class' && f.referenceName === 'Path' && f.argument !== undefined);
-    if (classPathFact) {
-      classPath = classPathFact.argument;
-      consumed.add(classPathFact);
-      break;
+  // T-TC2-1 (B-jaxrs-composer-class-scoping) — real, confirmed bug, fixed.
+  // Previously took the FIRST class-level @Path found anywhere in the file
+  // and applied it, unconditionally, to every method in the file — correct
+  // only for the real, common "one resource class per file" production
+  // shape this was originally proven against (19/19 real Fineract routes),
+  // but silently wrong the moment a file has 2+ classes each carrying their
+  // own @Path (rare in production JAX-RS, common in test-fixture files —
+  // confirmed via a real Fineract test with 5 nested resource classes, all
+  // 5 methods wrongly composed to the first class's path, at confidence
+  // 100). Fixed: each method resolves to the NEAREST PRECEDING class-level
+  // @Path by source line, not the file's first one — correct for standard
+  // top-to-bottom Java layout including nested classes, and reproduces the
+  // exact original behavior when only one class-level @Path exists in the
+  // file (the single-class production case, still verified below). A
+  // method with no class-level @Path preceding it anywhere (a genuinely
+  // malformed/unusual case) falls back to method-path-only or no compose —
+  // never guesses the wrong class's path, which the old code effectively
+  // did for this case too.
+  const classPathFacts = fileDecoratorFacts
+    .filter((f) => f.fromNodeKind === 'class' && f.referenceName === 'Path' && f.argument !== undefined)
+    .sort((a, b) => a.line - b.line);
+  for (const f of classPathFacts) consumed.add(f);
+
+  const resolveClassPath = (methodLine: number): string | undefined => {
+    let resolved: string | undefined;
+    for (const f of classPathFacts) {
+      if (f.line > methodLine) break;
+      resolved = f.argument;
     }
-  }
+    return resolved;
+  };
 
   const composed: DecoratorFact[] = [];
   for (const facts of byNode.values()) {
@@ -58,6 +78,7 @@ export function composeJaxRsRoutes(fileDecoratorFacts: DecoratorFact[]): JaxRsCo
 
     const methodPathFact = facts.find((f) => f.fromNodeKind === 'method' && f.referenceName === 'Path');
     const methodPath = methodPathFact?.argument;
+    const classPath = resolveClassPath(httpFact.line);
     const fullPath = [classPath, methodPath].filter(Boolean).join('/');
     if (!fullPath) continue; // no @Path anywhere at all — not a reachable JAX-RS route, don't guess one
 

@@ -34,6 +34,7 @@ const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a
 const SPRING_CONFIG_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample'); // checked-in
 const SPRING_CONFIG_PROPERTIES_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample'); // checked-in
 const CDXGEN_SAMPLE_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/cdxgen-sample'); // checked-in, real committed requirements.txt for cdxgen to read
+const JAXRS_MULTICLASS_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/jaxrs-multiclass-sample'); // checked-in — reproduces the real test-code-contamination bug shape
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
@@ -653,7 +654,14 @@ test(
       // surfaced 11 more real database units and their real entity-mesh
       // edges in fineract-core alone — a real, expected count shift from a
       // separate, later fix, not a rebaseline-to-force-green.
-      assert.equal(r0Graded.length, 96, `expected exactly 96 direct-reconciler relationships (post-T-R1-3 baseline), got ${r0Graded.length}`);
+      // 96 -> 94 (B-test-code-exclusion, T-TC1-3): 28 real /test/-path files
+      // in fineract-core (1 of them importing a catalogued driver library)
+      // were previously contaminating this count with entity-mesh noise
+      // from test-fixture classes, not real architecture — confirmed via a
+      // direct re-run: R2b's real production count (3, service->repository
+      // chains) is UNCHANGED, only the R0/structural count dropped, exactly
+      // as expected from removing test contamination and nothing else.
+      assert.equal(r0Graded.length, 94, `expected exactly 94 direct-reconciler relationships (post-B-test-code-exclusion baseline), got ${r0Graded.length}`);
       for (const rel of r0Graded) {
         assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural', `expected structural grade on ${rel['unique-id']} (entity<->entity, no service endpoint)`);
       }
@@ -857,7 +865,7 @@ test('SQS/SNS import-only messaging detection — low confidence, topic kind, di
   };
   const run = { graph, resolveRoot: (f) => (f === 'worker.ts' ? { root: '/root', relativeFilePath: 'worker.ts' } : undefined) };
 
-  const unitsByRoot = detectMessagingUnits(run);
+  const { unitsByRoot } = detectMessagingUnits(run);
   const units = unitsByRoot.get('/root');
   assert.equal(units.length, 1);
   assert.equal(units[0].kind, 'topic');
@@ -2566,4 +2574,99 @@ test('Review fix (2026-08-09) — cdxgen-provider scans every matching ecosystem
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('T-TC1-1 (B-test-code-exclusion) — isTestPath() real positive/negative cases across languages', () => {
+  const { isTestPath } = require(path.join(PIPELINE_ROOT, 'dist/rules/test-path'));
+
+  // Real positives, including the actual real Fineract path that found this bug.
+  assert.ok(isTestPath('src/test/java/org/apache/fineract/infrastructure/openapi/FineractOperationIdReaderTest.java'));
+  assert.ok(isTestPath('src/test/java/example/Foo.java'), 'a /test/ directory segment must match regardless of filename');
+  assert.ok(isTestPath('tests/foo.py'));
+  assert.ok(isTestPath('__tests__/foo.ts'));
+  assert.ok(isTestPath('test_foo.py'), 'pytest test_*.py convention');
+  assert.ok(isTestPath('foo_test.py'), 'the other real pytest foo_test.py convention');
+  assert.ok(isTestPath('src/main/java/example/FooTest.java'), 'JUnit *Test.java convention, even outside a /test/ dir');
+  assert.ok(isTestPath('src/main/java/example/FooTests.java'), 'JUnit *Tests.java convention');
+  assert.ok(isTestPath('foo.test.ts'), 'Jest/Vitest convention');
+  assert.ok(isTestPath('foo.spec.ts'), 'Jasmine/Angular convention');
+
+  // Real negatives — must not over-match.
+  assert.ok(!isTestPath('src/main/java/example/OrderApiResource.java'));
+  assert.ok(!isTestPath('db.py'));
+  assert.ok(!isTestPath('src/services/latest.ts'), 'must not substring-match "test" inside an unrelated word/path segment');
+  assert.ok(!isTestPath('contest.py'), 'must not substring-match "test" inside a filename that merely contains it');
+});
+
+test('T-TC1-2/T-TC2-2/T-TC2-3 (B-test-code-exclusion, B-jaxrs-composer-class-scoping) — real fixture reproduces and closes the exact contamination bug', () => {
+  const { outDir, calm } = runPipeline([JAXRS_MULTICLASS_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+    // The test file (2 nested JAX-RS-annotated fixture classes, mirrors the
+    // real FineractOperationIdReaderTest.java shape) must produce ZERO units.
+    assert.ok(!facts.units.some((u) => u.filePath.includes('MultiResourceFileTest.java')), 'a test file must never become a real architectural unit');
+    const testCodeItem = facts.ignoredItems.find((i) => i.reason === 'TEST_CODE' && i.ref.includes('MultiResourceFileTest.java'));
+    assert.ok(testCodeItem, 'the excluded test file must be a real, visible TEST_CODE ignored item, never a silent drop');
+
+    // The real, legitimate production file (2 distinct resource classes in
+    // ONE file) must resolve EACH method to its OWN class's path — the
+    // exact correctness bug this program fixed, not just avoided by exclusion.
+    const node = calm.nodes.find((n) => n['unique-id'].includes('MultiResourceFile.java') && !n['unique-id'].includes('Test'));
+    assert.ok(node, 'expected the real MultiResourceFile.java service node');
+    const paths = node.interfaces.map((i) => i.path).sort();
+    assert.deepEqual(paths, ['GET /orders', 'GET /products'], 'each method must resolve to its OWN class\'s path, never both copies of the first class\'s path (the original bug)');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-TC1-3 (B-test-code-exclusion) — Graphify-driven persistence detection excludes a /test/-path file importing a real catalogued driver library', () => {
+  const { outDir } = runPipeline([JAXRS_MULTICLASS_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    assert.ok(!facts.units.some((u) => u.filePath.includes('test_db.py')), 'a test file importing psycopg2 must never become a real database unit');
+    const testCodeItem = facts.ignoredItems.find((i) => i.reason === 'TEST_CODE' && i.ref.includes('test_db.py'));
+    assert.ok(testCodeItem, 'the excluded test file must be a real, visible TEST_CODE ignored item');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact real Fineract shape) each resolve to their own real, distinct path', () => {
+  const { composeJaxRsRoutes } = require(path.join(PIPELINE_ROOT, 'dist/analysis/jaxrs-route-composer'));
+  // Mirrors FineractOperationIdReaderTest.java's real shape: 5 nested
+  // classes, each with its own class-level @Path immediately followed by
+  // one @GET method, in file order.
+  const paths = ['/test', '/implicit', '/invalid', '/conflict', '/implicit-conflict'];
+  const facts = [];
+  let line = 90;
+  paths.forEach((p, i) => {
+    const classNodeId = `class${i}`;
+    const methodNodeId = `method${i}`;
+    facts.push({ referenceName: 'Path', fromNodeId: classNodeId, filePath: 'F.java', line, argument: p, fromNodeKind: 'class', language: 'java' });
+    line += 2;
+    facts.push({ referenceName: 'GET', fromNodeId: methodNodeId, filePath: 'F.java', line, fromNodeKind: 'method', language: 'java' });
+    line += 8;
+  });
+
+  const { composed } = composeJaxRsRoutes(facts);
+  const routes = composed.map((c) => c.referenceName).sort();
+  assert.deepEqual(routes, ['GET /conflict', 'GET /implicit', 'GET /implicit-conflict', 'GET /invalid', 'GET /test'], 'each method must resolve to its own class\'s real path — the original bug produced 5 copies of "GET /test"');
+});
+
+test('T-TC2-1 (B-jaxrs-composer-class-scoping) — single-class-per-file (the original, still-primary production shape) is byte-identical to before', () => {
+  const { composeJaxRsRoutes } = require(path.join(PIPELINE_ROOT, 'dist/analysis/jaxrs-route-composer'));
+  const facts = [
+    { referenceName: 'Path', fromNodeId: 'class0', filePath: 'F.java', line: 20, argument: '/v1/charges', fromNodeKind: 'class', language: 'java' },
+    { referenceName: 'GET', fromNodeId: 'method0', filePath: 'F.java', line: 25, fromNodeKind: 'method', language: 'java' },
+    { referenceName: 'Path', fromNodeId: 'method1', filePath: 'F.java', line: 30, argument: '{chargeId}', fromNodeKind: 'method', language: 'java' },
+    { referenceName: 'DELETE', fromNodeId: 'method1', filePath: 'F.java', line: 30, fromNodeKind: 'method', language: 'java' },
+  ];
+  const { composed } = composeJaxRsRoutes(facts);
+  const routes = composed.map((c) => c.referenceName).sort();
+  assert.deepEqual(routes, ['DELETE /v1/charges/{chargeId}', 'GET /v1/charges']);
 });

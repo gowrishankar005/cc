@@ -1,8 +1,7 @@
 import * as path from 'path';
 import { GraphifyRun } from '../../scanner/graphify-provider';
-import { TypedUnit } from '../../types/typed-facts';
 import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportOwnerBaseClasses } from '../../rules/persistence-detection-schema';
-import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector';
+import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
 
 /**
  * Real gap found by auditing pipeline output against Bank of Anthos source
@@ -26,7 +25,7 @@ import { detectUnitsByImportStrategy } from './graphify-import-strategy-detector
  * (post-MVP consolidation — all three were independently-written copies of
  * the identical two-step algorithm before this).
  */
-export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): Map<string, TypedUnit[]> {
+export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): ImportStrategyResult {
   const catalogue = loadPersistenceDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
   const libraries = driverImportLibraries(catalogue);
   const ownerBaseClasses = driverImportOwnerBaseClasses(catalogue);

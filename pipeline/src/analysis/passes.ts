@@ -53,8 +53,13 @@ export const mapSignalsPass: AnalysisPass = {
         }
       }
       pushAll(ctx.allIgnoredItems, ignoredItems);
+      // T-TC1-2 (B-test-code-exclusion) — real, visible record of every
+      // file excluded from extraction as test code, never a silent skip.
+      for (const filePath of raw.excludedTestFiles) {
+        ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: `Excluded from architectural extraction — matched a real test-path/filename convention (isTestPath())` });
+      }
       ctx.unitsByRoot.set(root, units);
-      console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${units.length} unit(s)`);
+      console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${units.length} unit(s)${raw.excludedTestFiles.length > 0 ? `, ${raw.excludedTestFiles.length} test file(s) excluded` : ''}`);
     }
   },
 };
@@ -66,7 +71,7 @@ export const detectPersistencePass: AnalysisPass = {
     if (ctx.packageRoots.length === 0) return;
     try {
       ctx.graphifyRun = runGraphifyPass(ctx.packageRoots);
-      const persistenceUnitsByRoot = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx));
+      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx));
       for (const [root, persistenceUnits] of persistenceUnitsByRoot) {
         console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via graphify`);
         pushAll(ctx.allUnits, persistenceUnits);
@@ -75,6 +80,11 @@ export const detectPersistencePass: AnalysisPass = {
         pushAll(rootUnits, persistenceUnits);
         ctx.unitsByRoot.set(root, rootUnits);
       }
+      // T-TC1-3 (B-test-code-exclusion) — real, visible record, never a silent skip.
+      for (const filePath of excludedTestFiles) {
+        ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: 'Excluded from persistence detection — matched a real test-path/filename convention (isTestPath()), despite importing a catalogued driver library' });
+      }
+      if (excludedTestFiles.length > 0) console.log(`[run-slice] ${excludedTestFiles.length} test file(s) excluded from persistence detection`);
     } catch (err) {
       ctx.graphifyError = err;
       console.warn(`[run-slice] WARNING: graphify pass failed, continuing without cross-package relationships: ${err}`);

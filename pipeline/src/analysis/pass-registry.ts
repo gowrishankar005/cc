@@ -36,6 +36,8 @@ export interface RawRootFacts {
   filesByExt: Record<string, number>;
   /** T-X8-1 — deployable-unit manifests (package.json/pom.xml/build.gradle/Dockerfile) found directly at this root. */
   deployableManifests: DeployableManifest[];
+  /** T-TC1-2 (B-test-code-exclusion) — real files excluded from all CodeGraph-derived extraction because isTestPath() matched them; mapSignalsPass turns each into a real, visible IgnoredItem (reason TEST_CODE), never a silent skip. */
+  excludedTestFiles: string[];
 }
 
 export interface AnalysisContext {
