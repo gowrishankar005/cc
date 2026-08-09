@@ -2670,3 +2670,32 @@ test('T-TC2-1 (B-jaxrs-composer-class-scoping) — single-class-per-file (the or
   const routes = composed.map((c) => c.referenceName).sort();
   assert.deepEqual(routes, ['DELETE /v1/charges/{chargeId}', 'GET /v1/charges']);
 });
+
+test('Review fix (2026-08-09) — outbound-HTTP detector excludes /test/-path files, re-categorized as TEST_CODE not silently dropped', () => {
+  const { detectOutboundHttpClients } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/outbound-http-detector'));
+  const graph = {
+    nodes: [
+      { id: 'file1', label: 'file1', file_type: 'py', source_file: 'app.py', source_location: 'L1', _origin: 'x' },
+      { id: 'file2', label: 'file2', file_type: 'py', source_file: 'test/test_client.py', source_location: 'L1', _origin: 'x' },
+    ],
+    edges: [
+      { source: 'file1', target: 'requests', relation: 'imports_from', context: '', confidence: 'EXTRACTED', source_file: 'app.py', source_location: 'L1', weight: 1, _origin: 'x' },
+      { source: 'file2', target: 'requests', relation: 'imports_from', context: '', confidence: 'EXTRACTED', source_file: 'test/test_client.py', source_location: 'L1', weight: 1, _origin: 'x' },
+    ],
+  };
+  const run = {
+    graph,
+    resolveRoot: (f) => {
+      if (f === 'app.py') return { root: '/root', relativeFilePath: 'app.py' };
+      if (f === 'test/test_client.py') return { root: '/root', relativeFilePath: 'test/test_client.py' };
+      return undefined;
+    },
+  };
+
+  const items = detectOutboundHttpClients(run);
+  assert.equal(items.length, 2, 'both real findings must remain visible, neither silently dropped');
+  const real = items.find((i) => i.ref.startsWith('app.py'));
+  assert.equal(real.reason, 'CROSS_DOMAIN_UNRESOLVED', 'real production code stays a genuine HITL review candidate');
+  const testItem = items.find((i) => i.ref.startsWith('test/test_client.py'));
+  assert.equal(testItem.reason, 'TEST_CODE', 'a test file importing an HTTP client must be re-categorized as TEST_CODE, not left as a genuine review candidate');
+});

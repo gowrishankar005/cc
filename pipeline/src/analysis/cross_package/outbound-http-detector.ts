@@ -3,6 +3,7 @@ import { GraphifyRun, parseSourceLocation } from '../../scanner/graphify-provide
 import { IgnoredItem } from '../../types/typed-facts';
 import { loadHttpClientDetectionCatalogue, importOnlyHttpClientLibraries } from '../../rules/http-client-detection-schema';
 import { findLibraryImportEdges } from './graphify-import-strategy-detector';
+import { isTestPath } from '../../rules/test-path';
 
 /**
  * T-X8-3 (G-L2-13) — the import-only strategy from
@@ -37,6 +38,26 @@ export function detectOutboundHttpClients(run: GraphifyRun): IgnoredItem[] {
     const resolved = run.resolveRoot(edge.source_file);
     if (!resolved) continue;
     const line = parseSourceLocation(edge.source_location) ?? 1;
+
+    // Review finding (2026-08-09) — this detector shares findLibraryImportEdges
+    // with persistence-detector.ts/messaging-detector.ts (via
+    // detectUnitsByImportStrategy) but calls it directly, so it never
+    // received the isTestPath() fix applied there (B-test-code-exclusion).
+    // Confirmed real via a live re-scan: 2/13 real unresolved-http-target
+    // items came from /test/-path files, polluting the HITL review queue
+    // with test-code noise (a test helper importing an HTTP client for its
+    // own setup is not a real outbound-HTTP architectural capability).
+    // Lower severity than the original bug (this detector never creates a
+    // TypedUnit, so no fabricated node was ever at risk), but the same
+    // class of problem — re-categorized to TEST_CODE, not dropped, so the
+    // real finding stays visible in ignored-items-report.json without
+    // wasting a reviewer's attention as a genuine CROSS_DOMAIN_UNRESOLVED
+    // candidate.
+    if (isTestPath(resolved.relativeFilePath)) {
+      ignoredItems.push({ ref: `${resolved.relativeFilePath}:${line}`, reason: 'TEST_CODE', detail: `Excluded from outbound-HTTP detection — matched a real test-path/filename convention (isTestPath()), despite importing a catalogued HTTP-client library "${edge.target}"` });
+      continue;
+    }
+
     ignoredItems.push({
       ref: `${resolved.relativeFilePath}:${line}`,
       reason: 'CROSS_DOMAIN_UNRESOLVED',
