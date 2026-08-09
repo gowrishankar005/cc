@@ -1,5 +1,7 @@
 # Agent task list — Phase 1 close (mechanism-complete)
 
+**STATUS: CLOSED, 2026-08-09.** All three phases (PC-1/PC-2/PC-3) done, real evidence per task, Program DoD fully checked. Phase 1 of Weaver (mechanism-complete framing) is closed — pilot-validation remains a deliberately separate, deferred bar (`Pilot_Ready_Scorecard.md`).
+
 **Single source of truth** for the three items picked 2026-08-09 as the punch list before calling Weaver's current body of work ("Phase 1") closed, under the **mechanism-complete** framing (owner-confirmed, not pilot-validated — see `Pilot_Ready_Scorecard.md` for the separate, deliberately-deferred pilot-validation bar). Almost everything else in `BACKLOG.md`/`Claim_Register.md`/`STATUS.md` is already `done`; these three are the real remaining gaps.
 
 **Product:** Weaver. **Owner:** Gowri.
@@ -127,17 +129,17 @@ New `pipeline/test/fixtures/spring-config-sample/` (or similarly named, matching
 
 ---
 
-## Phase PC-2 — CI Dockerfile-build verification
+## Phase PC-2 — CI Dockerfile-build verification — **CLOSED, 2026-08-09**
 
 ### T-PC2-1 — Add a Docker build step to CI
 `.github/workflows/pipeline-test.yml` currently runs `npm ci && npm test` only — no step ever builds `pipeline/Dockerfile`. GitHub's `ubuntu-latest` runners have Docker preinstalled, so a build-only step (`docker build -t weaver-pipeline pipeline/`) needs no daemon setup and no change to this sandbox's own local constraint (still no local daemon here — that stays a disclosed, permanent local-dev limitation, not something this task fixes).
 **Verify:** real, not simulated — push the change and read the actual run result via `gh run list`/`gh run view`, the same way PC-3 will cite it. If the build fails (a real possibility — the Dockerfile has never been exercised), fix the Dockerfile, don't loosen the CI step to hide the failure.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** New `docker-build` job (separate from `test`) in `.github/workflows/pipeline-test.yml`. **Real result, first attempt, no fix needed**: [run 31306304051](https://github.com/gowrishankar005/cc/actions/runs/31306304051) — `docker build -t weaver-pipeline pipeline/` succeeded cleanly, confirming `pipeline/Dockerfile`'s "written against known-correct requirements but never run" disclosure was accurate — the requirements really were correct.
 
 ### T-PC2-2 — Confirm the built image is minimally sane
 Once the build succeeds, add a cheap real smoke check in the same CI step (e.g. `docker run --rm weaver-pipeline node dist/orchestration/run-slice.js --help` or equivalent, matching how `run-slice`'s own usage message already works) — proves the image actually contains a runnable `dist/`, not just that the build didn't error.
 **Verify:** real CI run shows the smoke check's expected output, cited by run URL/log excerpt, not assumed from "the build succeeded."
-**Status:** not started.
+**Status: DONE, 2026-08-09.** Same run (31306304051): `docker run --rm weaver-pipeline` (zero args) correctly printed the real `run-slice` usage message and exited 1 (the correct, expected behavior for zero args — not a crash), and the smoke-test step's `grep -q "Usage: run-slice"` check against the captured output passed. Real bash pitfall caught and fixed before shipping: piping `docker run`'s expected-non-zero exit directly into `grep` would have failed the step under GitHub Actions' default `pipefail`, even on a correct match — fixed by capturing to a log file and checking `grep`'s own exit code instead.
 
 ---
 
@@ -146,27 +148,24 @@ Once the build succeeds, add a cheap real smoke check in the same CI step (e.g. 
 **Do this last**, once PC-2's real, final result (build succeeds cleanly / needed a fix / smoke check passes) is known — folding a still-changing result into these docs mid-flight would just need a second correction pass.
 
 ### T-PC3-1 — Correct `Platform_Architecture_Analysis.md`
-Currently states CI/deployment as "specified, not yet implemented... no way to trigger real GitHub Actions exist in this sandbox." Real finding (2026-08-09, this program): CI has been running successfully on every push to `dev` for 10+ consecutive runs, confirmed via `gh run list` — the claim was accurate about *this sandbox's own visibility* but is stale as a statement about the real repo's CI status. Correct to state plainly: CI is real, running, green (cite the `gh run list` evidence); the Docker image itself was the one genuinely unverified piece, closed by PC-2 (cite PC-2's real result).
-**Verify:** the corrected text traces every claim to either a `gh run list`/`gh run view` citation or PC-2's own real result — no restated assumption.
-**Status:** not started.
+**Status: DONE, 2026-08-09 — real wording differed from this task's original guess, corrected against the real text, not the assumption.** Grep found the actual stale claims were §5's "No containerization... No CI configuration (no `.github/workflows/`, no equivalent)... `bin` field... never tested" plus matching rows in §7 (Reliability/Testability/Portability) and §8 (Architectural Risk Register) — not the "no way to trigger real GitHub Actions" phrasing this task originally guessed at. Also found this whole document is a much older point-in-time snapshot (24 files/1,927 lines — far behind the current codebase), so the staleness was broader than just the CI claim. Fixed with a dated correction block at the top of §5 (same "correct with a dated note, don't silently rewrite history" convention `Claim_Register.md`'s own changelog uses) citing the real PC-2 run URL + `gh run list` evidence, plus struck-through/corrected rows in §7/§8 rather than deleting the historical text.
+**Verify:** the corrected text traces every claim to either a `gh run list` citation or PC-2's own real run URL — no restated assumption. Done — see the correction block itself.
 
 ### T-PC3-2 — Correct `STATUS.md`
-Same correction, wherever `STATUS.md` currently frames CI/deployment as unverified — check via grep before editing rather than assuming the exact wording/location.
-**Verify:** grep confirms no remaining "CI unverified"/"no Docker daemon in this sandbox" framing stated as a current gap once PC-2 is real and green.
-**Status:** not started.
+**Status: DONE, 2026-08-09 — real, honest negative result: nothing to fix.** Grepped for "no test"/"no CI"/"Docker"/"sandbox" framing across `STATUS.md` — confirmed it never actually made the stale claim (only `Platform_Architecture_Analysis.md` did). No edit made, since none was needed — verifying-before-editing caught that this task's premise ("wherever STATUS.md currently frames CI/deployment as unverified") didn't hold, rather than editing something that didn't need it.
+**Verify:** grep output itself is the verification — confirmed clean.
 
 ### T-PC3-3 — BACKLOG.md close-out
-Flip `B-spring-config`'s row to `done` (reconcile the P0-vs-P1 priority-label mismatch between `BACKLOG.md` and the coe-lab gap-closure doc while touching this row — minor doc-hygiene nit named in the original prioritization pass). Add a note that CI/Docker verification (a real, previously-unnamed residual) is now closed too.
-**Verify:** `BACKLOG.md`'s `B-spring-config` row cites the real fixture/test evidence from PC-1, not just "done."
-**Status:** not started.
+**Status: DONE, 2026-08-09.** `B-spring-config` row flipped to `done` with real fixture/test evidence cited (not just "done"). `PC` row in Now/next flipped to `done` with all three phases' real results summarized. The P0-vs-P1 priority-label mismatch this task named is moot now that the row is `done`, not `todo` — no longer a live prioritization signal to reconcile, noted here rather than a separate edit.
+**Verify:** both rows now cite real evidence (fixture names, test counts, CI run URL), not bare status words.
 
 ---
 
-## Program DoD (Definition of Done)
+## Program DoD (Definition of Done) — **ALL CLOSED, 2026-08-09**
 
-- [ ] PC-1 (T-PC1-0…8) complete: Spring config provider real, tested, catalogue-driven, `protocol` populated for the first time, real fixture with exact assertions, full suite green.
-- [ ] PC-2 (T-PC2-1/2) complete: Dockerfile builds in real CI, minimal smoke check passes, cited by real `gh run` evidence.
-- [ ] PC-3 (T-PC3-1…3) complete: stale CI/deployment claims corrected in both docs, `BACKLOG.md` closed out.
-- [ ] Every existing regression fixture byte-identical (aside from timestamp) throughout PC-1.
-- [ ] `git status --short pipeline/` clean of anything unintended after each phase.
-- [ ] Honest residual named for anything not fully closed (matches this whole project's own convention — deferrals are fine, silent scope cuts are not). Known candidates: A13 runtime-verification lane (explicitly out of scope, separate item); `${PLACEHOLDER}` static resolution (explicitly never done); local Docker daemon still absent in this sandbox (PC-2 verifies via CI, not locally — name this distinction, don't overclaim local verification).
+- [x] PC-1 (T-PC1-0…8) complete: Spring config provider real, tested, catalogue-driven, `protocol` population mechanism real (fixture-proven reachable, not fixture-proven to fire on a real relationship — honest residual), real fixtures with exact assertions, full suite green (65/65).
+- [x] PC-2 (T-PC2-1/2) complete: Dockerfile builds in real CI on the first real attempt, smoke check passes, cited by real `gh run` evidence ([run 31306304051](https://github.com/gowrishankar005/cc/actions/runs/31306304051)).
+- [x] PC-3 (T-PC3-1…3) complete: stale claims in `Platform_Architecture_Analysis.md` corrected with dated notes (real wording differed from this file's original guess — corrected against the real text); `STATUS.md` checked and confirmed clean, no edit needed; `BACKLOG.md` closed out with real evidence cited.
+- [x] Every existing regression fixture byte-identical (aside from timestamp) throughout PC-1 — confirmed via diff and via the unchanged 62 pre-existing tests all still passing.
+- [x] `git status --short pipeline/` clean of anything unintended after each phase.
+- [x] Honest residuals named, not silently dropped: A13 runtime-verification lane (explicitly out of scope, separate item, untouched); `${PLACEHOLDER}` static resolution (explicitly never done, by design); local Docker daemon still absent in this sandbox (PC-2 verified via real CI, not locally — this distinction is stated plainly in `Platform_Architecture_Analysis.md`'s own correction, not overclaimed); ActiveMQ extraction + end-to-end protocol-population both real-but-narrower than their sibling mechanisms, named in PC-1's own task statuses above.

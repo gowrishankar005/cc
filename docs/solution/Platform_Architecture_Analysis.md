@@ -124,7 +124,16 @@ typed-facts.json + overrides-applied-report.json (all written to <outDir>, files
 
 ---
 
-## 5. Deployment View — the honest answer is "none yet"
+## 5. Deployment View — **STALE as written, corrected 2026-08-09 (T-PC3-1)**
+
+> **This section is a point-in-time snapshot from an earlier session** (the codebase was 24 files / 1,927 lines when it was written — it has grown substantially since). Left below as the historical record it was, per this project's own "correct with a dated note, don't silently rewrite history" convention (`Claim_Register.md`'s changelog does the same). **The real, current state, as of 2026-08-09**:
+>
+> - **`pipeline/Dockerfile` exists and now has a real, verified build**, not just a written-but-unexecuted file: [`docker-build` CI job](https://github.com/gowrishankar005/cc/actions/runs/31306304051), `docker build` succeeded, a smoke test confirmed the built image contains a real runnable `dist/` (`AGENT_TASKS_Phase1_Close.md`'s T-PC2-1/T-PC2-2).
+> - **`.github/workflows/pipeline-test.yml` exists and has been running successfully on every push to `dev` for 10+ consecutive real runs** (confirmed via `gh run list`, not assumed) — this was true of the real repo even while this document still said "no CI configuration"; the original claim was accurate about *this analysis's own point-in-time snapshot*, not about the repo's current state.
+> - **A real automated regression suite exists** (`pipeline/test/regression.test.js`, 65 tests as of 2026-08-09) — the "no automated test suite at all" finding in §7/§8 below is also stale; see the Architectural Risk Register correction at the end of §8.
+> - `package.json`'s `bin` field **has been verified working** (`npm pack` → install into an isolated prefix → the installed CLI ran end-to-end) — see `CLAUDE.md`'s "Deployment/packaging story exists now" entry for the full real finding, including one real packaging bug found and fixed (`files` field missing, tarball shipped 105 files instead of 61).
+>
+> The one honest limitation that's still real: none of this has been verified against a **local** Docker daemon (this development sandbox has never had one, in any session) — real CI verification is the only verification that exists, which is a legitimate, sufficient bar for "does this Dockerfile actually build," not a residual gap.
 
 There is currently **no deployment story at all**. This is worth stating plainly rather than leaving implicit:
 
@@ -157,12 +166,12 @@ There is currently **no deployment story at all**. This is worth stating plainly
 | **Functional suitability** | 5/6 builders real; routes/persistence/controls/cross-package all verified against real Fineract+BoA+NestJS; `calm validate` 0 errors across every regression case | **Strong for what's built** — narrow relative to full Fidelity-stack scope (Spring Data/jOOQ/messaging still absent) |
 | **Performance efficiency** | Measured, not assumed: 823-file CodeGraph pass ~10s; full 6,781-file Graphify pass ~96s. No benchmark yet for the full pipeline (CodeGraph + Graphify + construction) at that combined scale | **Promising, incompletely measured** |
 | **Compatibility** | Zero network calls, filesystem-only I/O, no assumed OS beyond Node/Python availability | **Good** |
-| **Reliability/availability** | Graphify failures degrade gracefully (`try/catch`, continues without cross-package data) — real, tested pattern. But: **no retry logic anywhere**, and **no automated test suite at all** — confirmed by `package.json` having no `test` script. Every "regression check" this whole session was a manually-run, manually-eyeballed comparison, not a CI gate | **Real gap** — this is the single most concrete, fixable reliability risk: nothing stops a future change from silently breaking BoA/NestJS/Fineract's known-good output, since nothing runs those checks automatically |
+| **Reliability/availability** | Graphify failures degrade gracefully (`try/catch`, continues without cross-package data) — real, tested pattern. **STALE, corrected 2026-08-09**: the "no automated test suite at all" finding here was accurate for this document's own point-in-time snapshot, not the current repo — `pipeline/test/regression.test.js` (65 tests) runs in real CI on every push, see §5's correction note. **No retry logic anywhere** is still real and unaddressed. | **Was a real gap, now closed for the test-suite half** — a future change breaking BoA/NestJS/Fineract's known-good output is now caught by CI, not just informal manual comparison |
 | **Security** | No secrets handled, no network egress in the core path, LLM advisory layer (when built) explicitly bounded and off by default | **Good, by architectural constraint** |
 | **Maintainability** | Real evidence this session: 6 bugs found, each fixed in one file, none required cross-cutting rework. Builder isolation genuinely holds | **Strong** |
 | **Extensibility** | Catalogue-driven claim proven under real Java testing (not just Python/Node) this session | **Strong, for the catalogue-driven path.** Module-level extensibility (Goal A) unproven — no second module exists |
-| **Testability** | Zero automated tests. Every verification this session was ad hoc scripting against `/tmp` output, by hand, then discarded | **Weak — the most fixable of these findings, and worth prioritizing over new features** |
-| **Portability** | Untested outside this one checkout (§5) | **Unknown** |
+| **Testability** | **STALE, corrected 2026-08-09** — accurate for this document's own point-in-time snapshot, not current. `pipeline/test/regression.test.js` (65 tests, real CI-gated) exists now. | **Was weak, now real and CI-gated** — see §5's correction note |
+| **Portability** | **STALE, corrected 2026-08-09** — `npm pack` install verified working outside this checkout in an isolated prefix; `Dockerfile` now has a real verified CI build. See §5's correction note. | **Was unknown, now verified via CI + a real isolated-install test** |
 | **Observability** | `console.log` only, no structured logs, no metrics, no run history beyond the artefacts of the single most recent run | **Weak** |
 
 ---
@@ -171,8 +180,8 @@ There is currently **no deployment story at all**. This is worth stating plainly
 
 | Risk | Severity | Real, not hypothetical |
 |---|---|---|
-| No automated test suite | **High** | Confirmed absent; this session's own bug-finding relied entirely on manual regression, which doesn't scale and won't survive a contributor who doesn't know the informal ritual |
-| No deployment/packaging story | **Medium** | Confirmed — `bin` field exists but untested; blocks Goal A's "other teams build modules against this" premise at the most basic level |
+| ~~No automated test suite~~ **CLOSED, 2026-08-09** | ~~High~~ | Stale — was accurate when written (24-file/1,927-line snapshot), not current. `pipeline/test/regression.test.js` is real, 65 tests, gated by real CI (`.github/workflows/pipeline-test.yml`) on every push. See §5's correction note above. |
+| ~~No deployment/packaging story~~ **CLOSED, 2026-08-09** | ~~Medium~~ | Stale — `bin` field verified working (real `npm pack` install test), `Dockerfile` now has a real verified CI build + smoke test. See §5's correction note above. |
 | Graphify's ephemeral-output pattern forgoes incremental extraction | **Medium** | Confirmed — CodeGraph's own caching infrastructure sits unused as a model for this; full re-extraction every run at any real repo's scale is a standing, avoidable cost |
 | CodeGraph single-vendor coupling, no automatic fallback | **Medium** | Documented since the original tool comparison; still true, still only a *documented* fallback, not a *coded* one |
 | Graphify's product-direction drift (narrow tool → broad "AI assistant skill" platform) | **Low-Medium, newly observed** | The one flag combination used still works, but a vendor moving this fast warrants a periodic re-check, not a one-time verification |
