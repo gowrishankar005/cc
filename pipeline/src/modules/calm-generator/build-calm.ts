@@ -9,6 +9,7 @@ import { buildRelationships } from './relationship-builder';
 import { attachNodeMetadata, buildDocumentMetadata } from './metadata-builder';
 import { attachControls } from './control-builder';
 import { buildSystemNode } from './system-node-builder';
+import { attachPortInterfaces, springConfigProtocolBySignal } from './port-interface-builder';
 
 /**
  * typed-facts.json -> CALM 1.2. Thin orchestrator over catalogue-driven
@@ -30,11 +31,13 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true): CalmDocu
   const relationshipTypeMapping = loadRelationshipTypeMapping(rulesDir);
   const controlRequirementCatalogue = loadControlRequirementCatalogue(rulesDir);
   const protocolBySignal = driverImportProtocols(loadPersistenceDetectionCatalogue(rulesDir)); // T-X7-4
+  for (const [signal, protocol] of springConfigProtocolBySignal(facts.units)) protocolBySignal.set(signal, protocol); // T-PC1-3/B-protocol-populate
 
   const units = facts.units.filter((u) => u.kind !== 'unresolved');
 
   const nodes = buildNodes(units, nodeTypeMapping);
   attachInterfaces(units, nodes, nodeTypeMapping);
+  attachPortInterfaces(units, nodes); // T-PC1-6/B-formal-interface-port
   attachControls(units, nodes, controlRequirementCatalogue);
   attachNodeMetadata(units, nodes, facts);
 

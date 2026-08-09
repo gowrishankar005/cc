@@ -35,6 +35,7 @@ const SOURCE_PRECEDENCE: Record<Evidence['source'], number> = {
   call: 5, // AREC T-D1 — security-control category only, never interface-building; ordered last for the same reason as graphify-import (completeness, not exercised)
   'field-type': 6, // AREC T-E1 — messaging category only, never interface-building; ordered last for the same reason
   extends: 7, // AREC T-E3 — persistence category only, never interface-building for the JPA/spring-data/serverless-entry-point rows; ordered last for the same reason
+  'structured-config': 8, // T-PC1-7 — spring-config category only, never listed in any interfaceCategories row (attachPortInterfaces handles server.port separately); ordered last for the same reason as the rows above
 };
 
 export function attachInterfaces(units: TypedUnit[], nodes: CalmNode[], mapping: NodeTypeMapping): void {

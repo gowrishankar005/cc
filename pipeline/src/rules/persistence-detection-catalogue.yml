@@ -9,7 +9,7 @@
 # docs/solution/language/java.md §3.1 are NOT dispatched by this file —
 # stated honestly per strategy below, not silently implied working.
 
-version: "0.3.0"
+version: "0.4.0"
 
 strategies:
   - id: driver-import
@@ -162,6 +162,22 @@ strategies:
       evidenced against. `calm validate` 0 errors, 0 warnings.
     status: dispatched
     mechanism: driver-import strategy (see the org.jooq row above), Java qualified-import resolved via java-import-resolver.ts (T-R1-3)
+
+  - id: spring-config-datasource
+    description: >
+      T-PC1-7 (B-spring-config, 2026-08-09) — BUILT, but via a structurally
+      different mechanism than every other row in this file: a real
+      spring.datasource.url key read directly from a deterministically
+      parsed application.yml/.properties file (scanner/spring-config-provider.ts
+      + analysis/spring-config-pass.ts), never a Graphify import-edge match.
+      NOT dispatched by persistence-detector.ts/detectUnitsByImportStrategy
+      at all — named here for strategy-inventory completeness, same
+      convention as jpa-entity/spring-data-repository above. Also feeds a
+      real relationship `protocol` value (JDBC) for the first time via this
+      source — see modules/calm-generator/port-interface-builder.ts's
+      springConfigProtocolBySignal.
+    status: implemented-elsewhere
+    mechanism: structured config file read (scanner/spring-config-provider.ts, analysis/spring-config-pass.ts) — see docs/solution/language/spring-config-property-vocabulary.md for the real, mined key vocabulary
 
   - id: cloud-messaging-sqs-sns
     description: >

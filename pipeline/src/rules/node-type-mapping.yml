@@ -16,12 +16,12 @@ mappings:
     # units come from Y4's CFN/SAM join (a different source, category
     # http-entry-point) once built — see
     # Serverless_HTTP_and_Dynamo_Ownership_Design.md §2/§4.
-    descriptiveCategories: [framework-bootstrap, persistence, messaging, folder-convention, serverless-entry-point]
+    descriptiveCategories: [framework-bootstrap, persistence, messaging, folder-convention, serverless-entry-point, spring-config]
 
   - unitKind: database
     calmNodeType: database
     interfaceCategories: []
-    descriptiveCategories: [persistence]
+    descriptiveCategories: [persistence, spring-config]
 
   # T-X7-1 — a message queue/topic (Kafka topic, JMS queue, SQS queue, SNS
   # topic) maps to CALM's `network` node-type, not a new CALM-side
@@ -32,4 +32,4 @@ mappings:
   - unitKind: topic
     calmNodeType: network
     interfaceCategories: []
-    descriptiveCategories: [messaging]
+    descriptiveCategories: [messaging, spring-config]

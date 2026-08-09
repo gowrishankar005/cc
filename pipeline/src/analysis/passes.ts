@@ -9,6 +9,7 @@ import { openApiPass } from './openapi-pass';
 import { k8sTrustPass } from './k8s-trust-pass';
 import { detectMessagingPass } from './messaging-pass';
 import { outboundHttpPass } from './outbound-http-pass';
+import { springConfigPass } from './spring-config-pass';
 import { envSoftGraphPass } from './env-soft-graph-pass';
 import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
@@ -129,6 +130,14 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   detectPersistencePass,
   detectMessagingPass,
   outboundHttpPass,
+  // T-PC1-3…6 (B-spring-config) — runs after mapSignals/openApi/cfnRoute so
+  // its server.port->service-unit attachment sees the root's FINAL service
+  // unit set, same ordering reason detectPersistence/detectMessaging/
+  // outboundHttp already sit here; before reconcile since it's a
+  // unit-producing pass like its neighbors (Graphify reconciliation can't
+  // structurally match these synthetic config-derived unit ids either way,
+  // same honest limitation as any other non-Graphify-sourced unit).
+  springConfigPass,
   reconcilePass,
   multiHopBridgePass,
   k8sTrustPass,

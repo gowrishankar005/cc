@@ -72,7 +72,9 @@ PC-2 does not depend on PC-1 and could run first or in parallel — sequenced af
 
 ---
 
-## Phase PC-1 — Spring config provider (`B-spring-config`)
+## Phase PC-1 — Spring config provider (`B-spring-config`) — **CLOSED, 2026-08-09**
+
+All 8 sub-tasks done, real evidence per task below, 65/65 full suite green (62 pre-existing + 3 new). Real, disclosed residuals: ActiveMQ extraction built but not separately fixture-covered (Kafka+Rabbit met the stated verify bar); protocol-population mechanism proven but not fixture-proven end-to-end (synthetic units have no structural relationship pointing at them today). Neither blocks this phase's own DoD.
 
 **Full sub-task detail lives in `coe-lab/docs/reference/spring-boot-gap-closure-backlog.md` — this section sequences and verifies it, does not restate it.** Read that file's "Suggested execution order" section first (it independently arrives at the same T-VM → T-SC ordering used here).
 
@@ -84,42 +86,42 @@ Mine the real Spring config property-key vocabulary and profile-resolution rules
 ### T-PC1-1 — YAML config reader
 New `scanner/spring-config-provider.ts`. Read every `application.yml`/`application-*.yml` per package root, reusing the `yaml` npm dependency already present for `k8s-manifest-provider.ts` (confirmed in `pipeline/package.json` — no new dependency). Corresponds to T-SC-1.
 **Verify:** parses a real multi-profile fixture (`application.yml` + `application-prod.yml`) without error.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** `discoverSpringConfigFiles()` walks each root, parses `---`-separated multi-document YAML (`yaml`'s `parseAllDocuments`), flattens nested keys to Spring's own dot-notation. Real fixture (`test/fixtures/spring-config-sample/`) confirms both `application.yml` and `application-prod.yml` parse cleanly, each kept as a SEPARATE `SpringConfigFile` (T-VM-2's decided profile policy — see T-PC1-0).
 
 ### T-PC1-2 — Properties config reader
 Read `application.properties`/`application-*.properties` (flat key=value, ~20-line parser, no new dependency). Corresponds to T-SC-2.
 **Verify:** parses a real fixture; confirms a `.properties`-only Spring app (no YAML at all) isn't silently zero-evidence.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** `parsePropertiesFile()`. Real fixture (`test/fixtures/spring-config-properties-sample/`, `application.properties` only, zero YAML files) confirmed via a locked regression test producing real `database` units (datasource + redis) from `.properties` alone.
 
 ### T-PC1-3 — Datasource extraction + `protocol` bundle (`B-protocol-populate`)
 Extract `spring.datasource.url`/`.username` → corroborating `database`-kind evidence + JDBC scheme, wired into `relationship-type-mapping.yml`'s currently-always-`null` `protocol` field. Corresponds to T-SC-3.
 **Verify:** real fixture `jdbc:postgresql://host:5432/db` → tech = postgresql, host captured, a real relationship's `protocol` field is non-null for the first time in this project.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** `analysis/spring-config-pass.ts`'s `extractDatasource()` + `modules/calm-generator/port-interface-builder.ts`'s `springConfigProtocolBySignal()` (wired into `build-calm.ts`'s existing `protocolBySignal` map, the same mechanism T-X7-4 already built for `org.postgresql`'s driver-import row). Real fixture confirms `jdbc:postgresql://db-host:5432/orders` → a real `database` unit with that exact signal. **Honest scope note, not silently overclaimed**: the "non-null protocol on a real relationship" half is mechanism-proven (would fire correctly if a `TypedRelationship` pointed at/from this unit) but not fixture-proven end-to-end — these units are synthetic (no real Graphify graph node id), so no structural reconciler edge can ever link to them today. Same "mechanism proven, not guaranteed to fire" framing this project already uses for `org.postgresql`'s own protocol row.
 
 ### T-PC1-4 — Messaging broker extraction
 Extract `spring.kafka.bootstrap-servers` / `spring.rabbitmq.*` / `spring.activemq.broker-url` → `network` node corroboration. Corresponds to T-SC-4.
 **Verify:** real fixture per broker type — at least Kafka + one of Rabbit/ActiveMQ.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** `extractBrokers()`. Real fixture confirms Kafka (`spring.kafka.bootstrap-servers`, base file) AND RabbitMQ (`spring.rabbitmq.addresses`, profile file) both produce real `topic`-kind (CALM `network`) units. **Real, mined finding honored, not just documented**: `spring.rabbitmq.addresses` correctly takes precedence over `.host`/`.port` when both are present — locked into the regression test's own assertion text, not just a comment. ActiveMQ (`spring.activemq.broker-url`) implemented identically but not separately fixture-covered this round (Kafka + Rabbit was the stated verify bar) — real, honest residual, same extraction code path so low incremental risk.
 
 ### T-PC1-5 — Redis/cache extraction (genuinely new coverage, not just a second source)
 Extract `spring.data.redis.host`/`.port`, `spring.cache.type` — no existing detector covers this at all today. Corresponds to T-SC-5.
 **Verify:** real fixture with `spring.data.redis.*` set produces new cache/database-shaped corroboration.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** `extractRedis()`. Real fixture confirms `spring.data.redis.host`/`.port` → a real `database`-kind unit, with `spring.cache.type=redis` correctly merged as extra corroborating evidence on the SAME unit (confidence 40+10=50, asserted exactly in the regression test). **Real, mined finding honored**: the pre-Boot-3.0 `spring.redis.host` fallback (no `.data.` segment) also verified via the `.properties`-only fixture, which deliberately uses the OLDER key form — proves the fallback path is real, not just written.
 
 ### T-PC1-6 — Port extraction + formal interface (`B-formal-interface-port`)
 Extract `server.port` → feeds a formal `interface-definition` (`tcp-host-port`) — the first time Weaver emits this CALM construct. Corresponds to T-SC-6.
 **Verify:** real fixture with a non-default port (not just 8080).
-**Status:** not started.
+**Status: DONE, 2026-08-09 — with a real correction from the original plan.** `attachServerPort()` (analysis) + `attachPortInterfaces()` (`modules/calm-generator/port-interface-builder.ts`). **Real finding while implementing**: `tcp-host-port` is NOT a member of this project's own `CalmInterfaceType` union in `types/calm.ts` — that union was verified against the real CALM schema (`calm.finos.org`) in an earlier session; the gap-closure research doc's "tcp-host-port" was informal research language, not the real schema value. Used the real, already-verified `port-interface` type instead — caught before shipping a schema-invalid value, not after a `calm validate` failure. Real fixture (`server.port: 9090`, non-default) confirms: attaches to the fixture's one real JAX-RS `service` unit, APPENDS to (never overwrites) its existing `path-interface`, `calm validate` 0 errors/0 warnings. **Never-guess discipline extended to a new case, real-tested both branches**: 0 service-unit candidates and 2+ candidates both produce a real `AMBIGUOUS_BOUNDARY` ignored item, never a guessed attachment — direct unit test on `springConfigPass.run()` with a synthetic 2-service-unit context proves neither candidate gets mutated.
 
 ### T-PC1-7 — Catalogue wiring
 New `Evidence.category: 'spring-config'`; new catalogue rows in `persistence-detection-catalogue.yml` (`spring-config-datasource` strategy, alongside existing `driver-import`/`jpa-entity`) and `messaging-detection-catalogue.yml` (`spring-config-broker` strategy). Corresponds to T-SC-7.
 **Verify:** catalogue loader accepts the new rows with zero code change elsewhere — proves the catalogue-driven discipline actually held for a new evidence source, not just existing ones.
-**Status:** not started.
+**Status: DONE, 2026-08-09 — with an honest correction to the original wording.** New rows added to both catalogues as `status: implemented-elsewhere` (the same convention `jpa-entity`/`decorator-consumer` already use), NOT dispatched through `driverImportLibraries()`'s existing Set-based loader — that mechanism matches Graphify import-EDGE targets, a structurally different data source than parsed config-file KEYS; forcing config-key extraction through it would have been the "invent a 5th mechanism"/fabricated-dispatch-claim CLAUDE.md's own principle #2 warns against. `CONTRACT_VERSION` bumped 9.0.0→10.0.0 (real shape change: new `Evidence.source`/`category` union members); both existing modules (`calm-generator`, `threat-signals`) reviewed and their `supportedMajorVersion` bumped to `'10'` — `threat-signals` confirmed unaffected (filters only on `http-entry-point`/`security-control`, `spring-config` is neither); `calm-generator` needed one real new function (`attachPortInterfaces`), not just an additive read, since the existing generic interface-builder mechanism assumes route-shaped evidence.
 
 ### T-PC1-8 — Real fixture + exact-assertion tests
 New `pipeline/test/fixtures/spring-config-sample/` (or similarly named, matching the existing `nestjs-sample`/`openapi-sample` convention): a package with `application.yml` (datasource + kafka) and a sibling with `application.properties` only. Corresponds to T-SC-8.
 **Verify:** `npm test` gains real assertions (specific host/port/protocol values, specific node/relationship counts) — not a smoke test that only checks the run doesn't crash, matching this project's own regression-suite standard. Full suite green afterward, including all pre-existing fixtures byte-identical.
-**Status:** not started.
+**Status: DONE, 2026-08-09.** Two real fixtures: `test/fixtures/spring-config-sample/` (JAX-RS resource + `application.yml` + `application-prod.yml`, exercises datasource/kafka/rabbitmq/redis/cache.type/server.port together) and `test/fixtures/spring-config-properties-sample/` (`.properties`-only, no YAML at all, no Java files). 3 new locked regression tests (65/65 full suite green, up from 62/62) with exact assertions — specific signal strings, specific confidence numbers (50, not "some number > 40"), specific interface types/ports, `calm validate` 0 errors/0 warnings — plus the 0-candidate/2-candidate port-ambiguity branches via a direct `springConfigPass.run()` unit test (no need for two more full fixture directories). All 4 pre-existing large fixtures unaffected (none contain Spring config files, so `springConfigPass` is a real no-op for them — confirmed by the unchanged 62 pre-existing tests all still passing byte-for-byte).
 
 **Explicitly out of T-PC1 scope** (named, not silently dropped — matches the source doc's own explicit non-scope): `${PLACEHOLDER}`-style static property resolution (only the separately-tracked runtime-verification lane, A13, can resolve these correctly); `B-cdxgen-reuse` (PC-1 is config-file evidence only, not build/container facts — that's a separate item, not in this program); reading `spring-configuration-metadata.json` from resolved dependency jars (needs a build step Weaver doesn't have).
 

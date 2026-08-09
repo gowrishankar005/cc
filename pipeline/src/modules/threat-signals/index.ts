@@ -55,6 +55,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '9', // bumped for CONTRACT_VERSION 9.0.0 (T-Y4-1) — new 'structured-file' source still has category 'http-entry-point', so this pass correctly ALSO now flags CFN-bound Lambda routes with no security-control evidence — a real, positive side effect, re-verified not just bumped
+  supportedMajorVersion: '10', // bumped for CONTRACT_VERSION 10.0.0 (T-PC1-7) — new 'spring-config' category is neither 'http-entry-point' nor 'security-control', the only two categories this pass filters on, so it's correctly unaffected by the new source — reviewed, not just bumped
   run,
 };

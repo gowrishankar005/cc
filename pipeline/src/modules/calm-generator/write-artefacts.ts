@@ -79,6 +79,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '9', // bumped for CONTRACT_VERSION 9.0.0 (T-Y4-1) — new 'structured-file' Evidence.source added SOURCE_PRECEDENCE tier 2 in interface-builder.ts (between openapi and decorator, per D-openapi-fallback), re-verified the real fixture now gets real paths, not just bumped
+  supportedMajorVersion: '10', // bumped for CONTRACT_VERSION 10.0.0 (T-PC1-7, B-spring-config) — new 'spring-config' Evidence.category + 'structured-config' Evidence.source; attachPortInterfaces (port-interface-builder.ts) is real new logic, not just an additive read, since interface-builder.ts's generic route-shaped mechanism can't handle a bare port number
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

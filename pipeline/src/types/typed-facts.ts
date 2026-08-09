@@ -30,7 +30,16 @@ export interface Evidence {
   // (http-entry-point) as native-route/decorator/openapi evidence — this
   // one carries a REAL path (unlike 'serverless-entry-point', which never
   // does), so it correctly participates in interface-building.
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file';
+  // 'structured-config' added in CONTRACT_VERSION 10.0.0 (T-PC1-7,
+  // B-spring-config) — a fact read directly from a deterministically
+  // parsed `application.yml`/`.properties` file (spring-config-provider.ts),
+  // matched to a semantic key this project's own mined vocabulary names
+  // (`docs/solution/language/spring-config-property-vocabulary.md`). Unlike
+  // every prior source, this one never touches CodeGraph's
+  // extractFromSource()/decorates-ref API at all — a structured non-code
+  // file read, same mechanism class as 'openapi'/'structured-file', not a
+  // 5th extraction mechanism.
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 (T-Y3-1,
   // Serverless_HTTP_and_Dynamo_Ownership_Design.md) — a Lambda handler's
   // `implements RequestHandler` clause. Deliberately NOT the same category
@@ -49,7 +58,16 @@ export interface Evidence {
     | 'messaging'
     | 'folder-convention'
     | 'security-control'
-    | 'serverless-entry-point';
+    | 'serverless-entry-point'
+    // 'spring-config' added in CONTRACT_VERSION 10.0.0 (T-PC1-7) — deliberately
+    // descriptive-only (never added to any node-type-mapping.yml row's
+    // interfaceCategories): the generic interface-builder.ts assumes a
+    // route-shaped signal ("GET /path") for every category it builds
+    // interfaces from, which a datasource URL/broker address/redis
+    // host:port is not. `server.port` still becomes a real `tcp-host-port`
+    // interface, but via a small dedicated function
+    // (build-calm.ts's attachPortInterfaces), not this generic mechanism.
+    | 'spring-config';
   weight: number;
   ref: string; // file:line for code-sourced evidence; "relativeFilePath:paths"-style pointer for openapi (no line numbers available from a parsed YAML/JSON document)
   /**
@@ -209,7 +227,19 @@ export interface IgnoredItem {
 // interface-builder.ts SOURCE_PRECEDENCE table gained the new key in the
 // same change, before this bump; control-builder.ts/threat-signals filter
 // on category, unaffected.
-export const CONTRACT_VERSION = '9.0.0';
+//
+// 10.0.0 (T-PC1-7, B-spring-config, Contract_Evolution_Policy.md §5):
+// Evidence.source gained 'structured-config', Evidence.category gained
+// 'spring-config' — a closed-union extension, tier (c), for the new
+// scanner/spring-config-provider.ts + analysis/spring-config-pass.ts. Both
+// modules reviewed and bumped to supportedMajorVersion "10": calm-generator
+// needed one real, new (not just additive) piece of logic —
+// build-calm.ts's attachPortInterfaces, since interface-builder.ts's
+// existing generic mechanism assumes a route-shaped signal every category
+// it already handles has, which spring-config's facts are not;
+// threat-signals filters on category only ('http-entry-point'/
+// 'security-control'), unaffected by a new, unrelated category value.
+export const CONTRACT_VERSION = '10.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

@@ -8,7 +8,7 @@
 # the unimplemented one, so the strategy inventory is honest and complete —
 # same discipline as persistence-detection-catalogue.yml's jooq/spring-data-repository rows.
 
-version: "0.2.0"
+version: "0.3.0"
 
 strategies:
   - id: import-only-cloud-client
@@ -72,3 +72,18 @@ strategies:
       declaration line (48), calm validate 0 errors.
     status: dispatched
     mechanism: field-type reference (codegraph-provider.ts's extractTypeReferenceFacts, signal-mapper.ts field-type loop)
+
+  - id: spring-config-broker
+    description: >
+      T-PC1-7 (B-spring-config, 2026-08-09) — BUILT, same structured-config-file
+      mechanism as persistence-detection-catalogue.yml's spring-config-datasource
+      row: spring.kafka.bootstrap-servers / spring.rabbitmq.host+port|addresses /
+      spring.activemq.broker-url read directly from application.yml/.properties
+      (scanner/spring-config-provider.ts + analysis/spring-config-pass.ts).
+      NOT dispatched by messaging-detector.ts at all — named here for
+      strategy-inventory completeness, same convention as decorator-consumer
+      above. Real, mined finding this depends on: spring.rabbitmq.addresses
+      takes precedence over .host/.port when set (RabbitProperties.java's
+      own field comment) — see docs/solution/language/spring-config-property-vocabulary.md.
+    status: implemented-elsewhere
+    mechanism: structured config file read (scanner/spring-config-provider.ts, analysis/spring-config-pass.ts)

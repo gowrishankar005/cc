@@ -31,6 +31,8 @@ const FINERACT_PROVIDER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider');
 const WALTZ_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
 const WALTZ_WEB_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-web');
 const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
+const SPRING_CONFIG_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample'); // checked-in
+const SPRING_CONFIG_PROPERTIES_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample'); // checked-in
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
@@ -2209,4 +2211,108 @@ test('AREC T-E5 — HITL review trigger: no silence flags -> empty review queue 
   const coverage = { completeness: { silenceFlags: [] } };
   const queue = buildReviewQueue(facts, coverage);
   assert.deepEqual(queue.items, []);
+});
+
+test('T-PC1-8 (B-spring-config) — application.yml + profile override: real datasource/kafka/rabbitmq/redis units, server.port attaches to the sole service unit, calm validate 0 errors', () => {
+  const { outDir, calm } = runPipeline([SPRING_CONFIG_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const byId = Object.fromEntries(facts.units.map((u) => [u.id, u]));
+
+    // Base application.yml: datasource (postgresql), kafka, redis+cache.type.
+    const baseDatasource = byId['src/main/resources/application.yml::spring-datasource'];
+    assert.ok(baseDatasource, 'base application.yml datasource unit missing');
+    assert.equal(baseDatasource.kind, 'database');
+    assert.equal(baseDatasource.evidence[0].signal, 'spring.datasource.url=jdbc:postgresql://db-host:5432/orders');
+
+    const kafka = byId['src/main/resources/application.yml::spring-kafka'];
+    assert.ok(kafka, 'kafka broker unit missing');
+    assert.equal(kafka.kind, 'topic');
+    assert.equal(kafka.evidence[0].signal, 'spring.kafka.bootstrap-servers=kafka-host:9092');
+
+    const redis = byId['src/main/resources/application.yml::spring-redis'];
+    assert.ok(redis, 'redis unit missing');
+    assert.equal(redis.kind, 'database');
+    assert.equal(redis.evidence[0].signal, 'spring.data.redis.host=redis-host:6380');
+    assert.equal(redis.confidence, 50, 'redis confidence must include the spring.cache.type=redis corroboration (40 + 10)');
+    assert.ok(redis.evidence.some((e) => e.signal === 'spring.cache.type=redis'), 'cache.type evidence must be merged onto the redis unit, not dropped');
+
+    // application-prod.yml: a DIFFERENT datasource (mysql) and rabbitmq —
+    // T-VM-2's decided profile policy: both files' facts kept separate, never merged/overwritten.
+    const prodDatasource = byId['src/main/resources/application-prod.yml::spring-datasource'];
+    assert.ok(prodDatasource, 'profile-specific application-prod.yml datasource unit missing');
+    assert.equal(prodDatasource.evidence[0].signal, 'spring.datasource.url=jdbc:mysql://prod-db-host:3306/orders');
+    assert.notEqual(prodDatasource.id, baseDatasource.id, 'base and profile datasource facts must be two distinct units, never merged into one');
+
+    const rabbitmq = byId['src/main/resources/application-prod.yml::spring-rabbitmq'];
+    assert.ok(rabbitmq, 'rabbitmq unit missing');
+    assert.equal(rabbitmq.evidence[0].signal, 'spring.rabbitmq.addresses=prod-rabbit-host:5672', 'spring.rabbitmq.addresses must win over .host/.port when set (real RabbitProperties.java precedence)');
+
+    // server.port -> attached to the one real service unit (OrderApiResource), never guessed.
+    const serviceUnit = facts.units.find((u) => u.kind === 'service');
+    assert.ok(serviceUnit, 'expected a real JAX-RS service unit');
+    assert.ok(serviceUnit.evidence.some((e) => e.signal === 'server.port=9090'), 'server.port must attach to the sole service unit');
+    assert.equal(facts.ignoredItems.length, 0, 'the single-service case must not produce an ambiguous-port ignored item');
+
+    // CALM: port-interface appended alongside the existing path-interface (never overwritten), calm validate clean.
+    const serviceNode = calm.nodes.find((n) => n['unique-id'] === serviceUnit.id);
+    assert.ok(serviceNode.interfaces.some((i) => i.type === 'path-interface' && i.path === 'GET /orders'), 'existing http interface must survive attachPortInterfaces');
+    const portIface = serviceNode.interfaces.find((i) => i.type === 'port-interface');
+    assert.ok(portIface, 'expected a real port-interface CalmInterface');
+    assert.equal(portIface.port, 9090);
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0, 'calm validate must report 0 errors on spring-config-derived output');
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-PC1-8 (B-spring-config) — .properties-only Spring app (no YAML at all) is not silently zero-evidence, real spring.redis.* fallback works without the spring.data. prefix', () => {
+  const { outDir } = runPipeline([SPRING_CONFIG_PROPERTIES_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    assert.ok(facts.units.length >= 2, 'a .properties-only app must still produce real spring-config units, not zero evidence');
+
+    const datasource = facts.units.find((u) => u.id.endsWith('::spring-datasource'));
+    assert.ok(datasource, 'properties-based datasource unit missing');
+    assert.equal(datasource.evidence[0].signal, 'spring.datasource.url=jdbc:postgresql://prop-host:5432/inventory');
+
+    const redis = facts.units.find((u) => u.id.endsWith('::spring-redis'));
+    assert.ok(redis, 'properties-based redis unit missing');
+    assert.equal(redis.evidence[0].signal, 'spring.data.redis.host=prop-redis-host:6379');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-PC1-8 (B-spring-config) — server.port with zero or 2+ service-unit candidates is a real ignored item, never guessed', () => {
+  const { discoverSpringConfigFiles } = require(path.join(PIPELINE_ROOT, 'dist/scanner/spring-config-provider'));
+  const { springConfigPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/spring-config-pass'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-spring-port-'));
+  try {
+    fs.writeFileSync(path.join(fixtureDir, 'application.yml'), 'server:\n  port: 8443\n');
+
+    // Zero service units in this root -> must not guess, must record a real ignored item.
+    const zeroCandidateCtx = { packageRoots: [fixtureDir], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map() };
+    springConfigPass.run(zeroCandidateCtx);
+    assert.equal(zeroCandidateCtx.allIgnoredItems.length, 1);
+    assert.equal(zeroCandidateCtx.allIgnoredItems[0].reason, 'AMBIGUOUS_BOUNDARY');
+    assert.match(zeroCandidateCtx.allIgnoredItems[0].detail, /no service unit exists/);
+
+    // Two service-unit candidates -> also must not guess.
+    const svcA = { id: 'a', kind: 'service', name: 'a', filePath: 'a', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+    const svcB = { id: 'b', kind: 'service', name: 'b', filePath: 'b', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+    const twoCandidateCtx = { packageRoots: [fixtureDir], allUnits: [svcA, svcB], allIgnoredItems: [], unitsByRoot: new Map([[fixtureDir, [svcA, svcB]]]) };
+    springConfigPass.run(twoCandidateCtx);
+    assert.equal(twoCandidateCtx.allIgnoredItems.length, 1);
+    assert.match(twoCandidateCtx.allIgnoredItems[0].detail, /2 service units exist/);
+    assert.equal(svcA.evidence.length, 0, 'must not guess-attach to either candidate');
+    assert.equal(svcB.evidence.length, 0, 'must not guess-attach to either candidate');
+
+    assert.ok(discoverSpringConfigFiles(fixtureDir).length === 1); // sanity: the provider itself found the one real file
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
 });
