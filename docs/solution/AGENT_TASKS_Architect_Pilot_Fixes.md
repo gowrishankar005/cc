@@ -105,33 +105,38 @@ Add/extend fixtures covering: a single, cleanly-named class (expect real class n
 
 ---
 
-## Phase AP-4 — `DecisionRecord.final_decision.action` leave-open clarity (Entry 8)
+## Phase AP-4 — `DecisionRecord.final_decision.action` leave-open clarity (Entry 8) — **CLOSED, 2026-08-10**
 
 ### T-AP4-1 — Decide and document the mapping
 Two options, pick one (recommend option A — smaller, no schema churn):
 - **(A)** Keep the existing 4-value enum (`accepted | overridden | added | removed`). Add an explicit code comment on `overrides.ts`'s `DecisionRecord.final_decision.action` field, and a corresponding line in `Architect_Residual_Review_Session.md` §3's Tier A taxonomy, stating plainly: `"accepted"` is the correct value for a reviewed "leave open" outcome (confirming the scan found nothing real to connect) — not just the closest fit, the *designated* one.
 - **(B)** Add a fifth enum value (e.g. `'left-open'`) if the team decides the semantic distinction is worth a schema change. Requires touching `validate_drafts.py`'s `VALID_DECISION_ACTIONS` and `override-applier.ts`'s equivalent check too — a wider blast radius than (A).
 **Verify:** whichever is chosen, re-generate the three Decision Records from the real Fineract R-001/R-002/R-003 session (Entries 7-8) and confirm they validate cleanly against the (possibly updated) schema, with the mapping now stated rather than inferred.
+**Status: DONE — option A chosen** (no schema churn, matches the recommendation). `overrides.ts`'s `final_decision.action` field and `Architect_Residual_Review_Session.md` §3 both now state explicitly that `"accepted"` is the designated leave-open value.
 
 ### T-AP4-2 — Update `tools/review-session/examples/README.md`
 The worked example currently only shows `"overridden"` for a `type_change`. Add a second worked example showing a "leave open" Decision Record with no matching Override, using the now-documented `action` value — gives future architects (and drafting agents) a real template for this exact, now-confirmed-common case (3 of 3 residuals in the real BoA/Fineract sessions were this shape).
 **Verify:** example validates via `validate_drafts.py`, matches the chosen option from T-AP4-1.
+**Status: DONE.** New `decision-D-example-002-leave-open.json` (modeled on the real R-001 residual from Entry 7), `examples/README.md` extended with a "The other common case" section. Validated for real: `validate_drafts.py` against a temp session dir containing only this file — 0 errors, exactly the two expected warnings (`no --calm given`, `no overrides found`).
 
 ---
 
-## Phase AP-5 — Guide doc updates (Entries 1, 6, 7, 16)
+## Phase AP-5 — Guide doc updates (Entries 1, 6, 7, 16) — **CLOSED, 2026-08-10**
 
 ### T-AP5-1 — "Before you start" install-noise note
 One short paragraph in `Architect_Guide_Scan_To_Signoff.md`: `npm install` producing deprecation warnings and a vulnerability count is expected, not a failure; don't run `npm audit fix --force`.
 **Verify:** reads clearly against Entry 1's actual transcript — an architect seeing that exact output shouldn't stop and ask.
+**Status: DONE.** Added to "Before you start."
 
 ### T-AP5-2 — Step 3 rewritten with concrete activation steps and both confirmed hosts
 Replace the current one-line chat-mode reference with: (a) explicit confirmation it's a checked-in repo file, not external; (b) the real VS Code Copilot Chat activation steps (open workspace, find the chat-mode picker, select by description); (c) Claude Code chat named as a second, **confirmed-working but weaker-safety** alternative, with the explicit "always approve individually, never allow-all" guidance from AP-2; (d) a note that the duplicated "Other" option on choice cards (Entry 7) is host-dependent cosmetic behavior, not a data issue.
 **Verify:** re-read against Entries 6, 7, 9, 16 — every point raised in those entries should be addressed in the rewritten section, not just some of them.
+**Status: DONE.** Step 3 rewritten in full — file location confirmed, numbered VS Code activation steps, Claude Code named as the weaker-safety alternative with explicit "approve individually, never allow-all" guidance, cosmetic duplicate-"Other" note, and the manual-authoring fallback now points at both worked examples (the correction and the leave-open case from AP-4).
 
 ### T-AP5-3 — Cross-link the feedback notes
 Add a line near the top of the guide pointing at `Architect_Pilot_Feedback_Notes.md` for architects who hit something not covered — keeps the guide from needing to restate every pilot finding inline while still surfacing that a real feedback trail exists.
 **Verify:** link resolves, one line, doesn't duplicate content.
+**Status: DONE.** One-line cross-link added right after the guide's opening "Review Bench" naming note.
 
 ---
 
@@ -149,13 +154,13 @@ These are real, well-evidenced, and worth doing — but they're catalogue/detect
 
 ---
 
-## Program DoD (Definition of Done)
+## Program DoD (Definition of Done) — **ALL CLOSED, 2026-08-10**
 
-- [ ] AP-1: unknown flags rejected loudly, real Entry 3 repro re-run and confirmed fixed, regression test locked.
-- [ ] AP-2: chat-mode header + design doc corrected to state the real, host-scoped safety claim — no code change, no overclaim either direction.
-- [ ] AP-3: node `name` is a real identifier (or documented basename fallback) for both the Fineract and BoA real re-runs, `unique-id` confirmed untouched, regression fixtures for all three naming shapes.
-- [ ] AP-4: `DecisionRecord.final_decision.action`'s leave-open mapping is documented (or extended), example updated, real Fineract Decision Records re-validated.
-- [ ] AP-5: guide's install-noise, chat-mode activation, and multi-host safety guidance all updated; feedback-notes cross-link added.
-- [ ] Full regression suite green throughout, byte-identical on unrelated fixtures.
-- [ ] `BACKLOG.md`: 4 active rows flipped `done` with real evidence; 2-3 Java-detection rows added as `todo` (§5), not started.
-- [ ] `Architect_Pilot_Feedback_Notes.md`: Entries 3, 8, 9/16, 10 each get a one-line "Fixed, see AP-N" addendum.
+- [x] AP-1: unknown flags rejected loudly, real Entry 3 repro re-run and confirmed fixed, regression test locked.
+- [x] AP-2: chat-mode header + design doc corrected to state the real, host-scoped safety claim — no code change, no overclaim either direction.
+- [x] AP-3: node `name` is a real identifier (or documented basename fallback) for both the Fineract and BoA real re-runs, `unique-id` confirmed untouched, regression fixtures for all three naming shapes.
+- [x] AP-4: `DecisionRecord.final_decision.action`'s leave-open mapping is documented (option A, no schema change), example added, validated clean.
+- [x] AP-5: guide's install-noise, chat-mode activation, and multi-host safety guidance all updated; feedback-notes cross-link added.
+- [x] Full regression suite green throughout (81/81 — 80 pre-existing + 1 new for AP-1; AP-3's 3 new assertions live inside already-counted existing tests), byte-identical on unrelated fixtures.
+- [x] `BACKLOG.md`: 4 active rows flipped `done` with real evidence; 2 Java-detection rows (`B-plain-interface-bridge-detection`, `B-spring-bean-factory-detection`) remain `todo` (§5), untouched, not started.
+- [x] `Architect_Pilot_Feedback_Notes.md`: Entries 3, 8, 9, 10, 15 each got a one-line "Fixed 2026-08-10, see AP-N" addendum; the top-of-file open-items summary table updated too.
