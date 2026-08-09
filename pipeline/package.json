@@ -22,6 +22,7 @@
     "yaml": "^2.4.5"
   },
   "devDependencies": {
+    "@cyclonedx/cdxgen": "^12.8.2",
     "@finos/calm-cli": "^1.52.0",
     "@types/node": "^22.0.0",
     "typescript": "^5.5.0"

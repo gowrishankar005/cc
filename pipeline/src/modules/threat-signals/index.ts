@@ -55,6 +55,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '10', // bumped for CONTRACT_VERSION 10.0.0 (T-PC1-7) — new 'spring-config' category is neither 'http-entry-point' nor 'security-control', the only two categories this pass filters on, so it's correctly unaffected by the new source — reviewed, not just bumped
+  supportedMajorVersion: '11', // bumped for CONTRACT_VERSION 11.0.0 (T-CDX-2/3) — new 'dependency-manifest' source lands on the existing 'persistence'/'messaging' categories, neither of which this pass filters on ('http-entry-point'/'security-control' only) — reviewed, not just bumped
   run,
 };

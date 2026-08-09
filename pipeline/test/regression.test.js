@@ -33,6 +33,7 @@ const WALTZ_WEB_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-w
 const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
 const SPRING_CONFIG_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample'); // checked-in
 const SPRING_CONFIG_PROPERTIES_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample'); // checked-in
+const CDXGEN_SAMPLE_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/cdxgen-sample'); // checked-in, real committed requirements.txt for cdxgen to read
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
@@ -2454,4 +2455,64 @@ test('Review fix (2026-08-09) — springConfigProtocolBySignal actually populate
   const rel = calm.relationships.find((r) => r['relationship-type']?.connects?.destination?.node === 'application.yml::spring-datasource');
   assert.ok(rel, 'expected a real relationship pointing at the spring-config-derived unit');
   assert.equal(rel.protocol, 'JDBC', 'protocol must be populated from the spring-config datasource evidence, end-to-end through build-calm.ts');
+});
+
+test('T-CDX-2/3 (B-cdxgen-reuse) — real cdxgen dependency corroboration raises confidence on an existing persistence unit, real requirements.txt, no network/install', () => {
+  const { execFileSync: execSync } = require('node:child_process');
+  const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
+  if (!fs.existsSync(cdxgenBin)) {
+    // Real, disclosed optional-tool degradation (AGENT_TASKS_Cdxgen_Reuse.md
+    // integrity table) — this test still needs the real binary to prove
+    // the real end-to-end mechanism; skip rather than fail if a checkout
+    // somehow lacks the devDependency (npm ci should always install it).
+    return;
+  }
+  const { outDir } = runPipeline([CDXGEN_SAMPLE_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const unit = facts.units.find((u) => u.id === 'db.py::OrdersDb');
+    assert.ok(unit, 'expected the real Graphify-import-derived persistence unit');
+    assert.equal(unit.kind, 'database');
+    assert.equal(unit.confidence, 30, 'confidence must be 20 (graphify-import) + 10 (real cdxgen corroboration) = 30, not just the base 20');
+
+    const corroboration = unit.evidence.find((e) => e.source === 'dependency-manifest');
+    assert.ok(corroboration, 'expected a real dependency-manifest evidence entry');
+    assert.equal(corroboration.signal, 'cdxgen:psycopg2@2.9.9', 'must cite the real, pinned version from the fixture\'s own requirements.txt, not a guessed or latest-resolved one');
+    assert.equal(corroboration.category, 'persistence');
+    assert.equal(corroboration.weight, 10, 'corroboration must stay at the corroboration-only weight tier, never enough alone to create a unit');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0, 'calm validate must report 0 errors');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-CDX-3 (B-cdxgen-reuse) — never guesses which unit a corroborating dependency belongs to when 0 or 2+ candidates exist', () => {
+  const { cdxgenCorroborationPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'));
+  const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
+  if (!fs.existsSync(cdxgenBin)) return;
+
+  // Zero candidates: real dependency present, but no persistence/messaging unit in the root at all.
+  const zeroCtx = { packageRoots: [CDXGEN_SAMPLE_ROOT], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map() };
+  cdxgenCorroborationPass.run(zeroCtx);
+  assert.equal(zeroCtx.allIgnoredItems.length, 1);
+  assert.equal(zeroCtx.allIgnoredItems[0].reason, 'AMBIGUOUS_BOUNDARY');
+  assert.match(zeroCtx.allIgnoredItems[0].detail, /no persistence\/messaging unit exists/);
+
+  // Two candidates: never guess which one owns the real corroborating dependency.
+  const dbA = { id: 'a', kind: 'database', name: 'a', filePath: 'a', startLine: 1, endLine: 1, evidence: [], confidence: 20 };
+  const dbB = { id: 'b', kind: 'database', name: 'b', filePath: 'b', startLine: 1, endLine: 1, evidence: [], confidence: 20 };
+  const twoCtx = { packageRoots: [CDXGEN_SAMPLE_ROOT], allUnits: [dbA, dbB], allIgnoredItems: [], unitsByRoot: new Map([[CDXGEN_SAMPLE_ROOT, [dbA, dbB]]]) };
+  cdxgenCorroborationPass.run(twoCtx);
+  assert.equal(twoCtx.allIgnoredItems.length, 1);
+  assert.match(twoCtx.allIgnoredItems[0].detail, /2 persistence\/messaging units exist/);
+  assert.equal(dbA.evidence.length, 0, 'must not guess-attach to either candidate');
+  assert.equal(dbB.evidence.length, 0, 'must not guess-attach to either candidate');
+});
+
+test('T-CDX-2 (B-cdxgen-reuse) — no lockfile/manifest -> graceful empty result, never a crash (checked-in NestJS fixture has no package-lock.json)', () => {
+  const { discoverCdxgenComponents } = require(path.join(PIPELINE_ROOT, 'dist/scanner/cdxgen-provider'));
+  const components = discoverCdxgenComponents(path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'));
+  assert.deepEqual(components, [], 'a manifest with no committed lockfile must produce an honest empty result, not an error or a guessed resolution');
 });

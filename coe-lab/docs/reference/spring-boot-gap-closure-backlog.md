@@ -16,7 +16,7 @@
 
 | ID | Item | Closes | Size | Priority | Depends on |
 |---|---|---|---|---|---|
-| **B-spring-config** | New `scanner/spring-config-provider.ts` — deterministic `application.yml`/`.properties` reader | A1 (biggest miss), contributes to B9 (protocol) and B5 (formal interfaces) | M | **P0** | none |
+| **B-spring-config** | New `scanner/spring-config-provider.ts` — deterministic `application.yml`/`.properties` reader | A1 (biggest miss), contributes to B9 (protocol) and B5 (formal interfaces) | M | **P0 — done, 2026-08-09.** (Reconciled: `BACKLOG.md` had recorded this as P1 while under `todo` — a real priority-label mismatch between the two docs, closed by completion rather than by picking a value; see `AGENT_TASKS_Phase1_Close.md` Phase PC-1 for the real shipped implementation.) | none |
 | **B-cdxgen-reuse** | Shell out to `cdxgen` (npm) for build-file + container/compose facts instead of hand-rolling parsers | A2, A3 | S–M | P1 | none (independent of B-spring-config) |
 | **B-protocol-populate** | Wire `spring.datasource.url`'s JDBC scheme into `relationship-type-mapping.yml`'s currently-always-`null` `protocol` field | B9 | XS | P0 (bundled with B-spring-config, not standalone) | B-spring-config |
 | **B-formal-interface-port** | Emit `server.port` as a formal `interface-definition` (`tcp-host-port`) | B5 | XS | P1 (bundled with B-spring-config) | B-spring-config |

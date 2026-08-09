@@ -10,6 +10,7 @@ import { k8sTrustPass } from './k8s-trust-pass';
 import { detectMessagingPass } from './messaging-pass';
 import { outboundHttpPass } from './outbound-http-pass';
 import { springConfigPass } from './spring-config-pass';
+import { cdxgenCorroborationPass } from './cdxgen-corroboration-pass';
 import { envSoftGraphPass } from './env-soft-graph-pass';
 import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
@@ -138,6 +139,12 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // structurally match these synthetic config-derived unit ids either way,
   // same honest limitation as any other non-Graphify-sourced unit).
   springConfigPass,
+  // T-CDX-3 (B-cdxgen-reuse) — runs after springConfigPass so its
+  // corroboration candidates (persistence/messaging units) include
+  // spring-config-derived database/topic units too, not just
+  // Graphify-import-derived ones; before reconcile like its neighbors,
+  // since it only mutates existing units' evidence, never relationships.
+  cdxgenCorroborationPass,
   reconcilePass,
   multiHopBridgePass,
   k8sTrustPass,

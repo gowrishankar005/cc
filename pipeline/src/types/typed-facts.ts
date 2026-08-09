@@ -39,7 +39,14 @@ export interface Evidence {
   // extractFromSource()/decorates-ref API at all — a structured non-code
   // file read, same mechanism class as 'openapi'/'structured-file', not a
   // 5th extraction mechanism.
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config';
+  // 'dependency-manifest' added in CONTRACT_VERSION 11.0.0 (T-CDX-2/3,
+  // B-cdxgen-reuse) — a real component name/version from a deterministically
+  // parsed CycloneDX SBOM (`@cyclonedx/cdxgen`, shelled out to the same way
+  // Graphify already is), corroborating an ALREADY-detected persistence/
+  // messaging unit — never a primary detection source on its own, always
+  // weight-10 (corroboration tier), and only ever attached when exactly one
+  // candidate unit exists in the root (never guessed under ambiguity).
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 (T-Y3-1,
   // Serverless_HTTP_and_Dynamo_Ownership_Design.md) — a Lambda handler's
   // `implements RequestHandler` clause. Deliberately NOT the same category
@@ -239,7 +246,19 @@ export interface IgnoredItem {
 // it already handles has, which spring-config's facts are not;
 // threat-signals filters on category only ('http-entry-point'/
 // 'security-control'), unaffected by a new, unrelated category value.
-export const CONTRACT_VERSION = '10.0.0';
+//
+// 11.0.0 (T-CDX-2/3, B-cdxgen-reuse, Contract_Evolution_Policy.md §5):
+// Evidence.source gained 'dependency-manifest' — a closed-union extension,
+// tier (c), for scanner/cdxgen-provider.ts + analysis/cdxgen-corroboration-pass.ts.
+// No new Evidence.category (reuses the existing 'persistence'/'messaging'
+// values — this genuinely IS persistence/messaging evidence, just from a
+// third mechanism, corroboration-weight-10 only). Both modules reviewed and
+// bumped to supportedMajorVersion "11": calm-generator's interface-builder.ts
+// SOURCE_PRECEDENCE table gained the new key (never contributes interfaces,
+// ordered last like every other non-route-shaped source); threat-signals
+// filters on category only, unaffected by a new source value on an
+// already-existing category.
+export const CONTRACT_VERSION = '11.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION
