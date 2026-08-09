@@ -2,6 +2,13 @@
 
 **STATUS: CLOSED, 2026-08-09.** T-CDX-1/2/3 done, real evidence per task, Program DoD checked (T-CDX-4/5 remain the honestly-deferred residuals they were always scoped to be, not silently dropped).
 
+**Post-close review (2026-08-09, same day): 3 real bugs found and fixed, actively hunted for, not assumed clean.**
+1. **Confirmed via direct repro, most severe of the three**: when a root's manifest declared 2+ real catalogue-matching dependencies (e.g. both `psycopg2` and `pymongo`) but only ONE persistence/messaging unit existed to attach anything to, the pass attached ALL matches — a real `UserDb` unit built purely from a `psycopg2` import got a fabricated-looking `cdxgen:pymongo@...` evidence entry with no real relationship to Mongo. Not just incomplete — actively misleading. Fixed: the same never-guess discipline already applied to "which unit" now applies to "which dependency" — 2+ real matches for one candidate unit now refuses (real ignored item), same as 0/2+ unit candidates already did.
+2. **Confirmed via grep**: `discoverCdxgenComponents`'s catch block swallowed every shell-out failure with zero logging — inconsistent with this codebase's own established convention (`detectPersistencePass`'s `console.warn` on a Graphify failure). Fixed: now logs `[cdxgen-provider] WARNING: ...` on failure, still never fails the run.
+3. **Confirmed via `cdxgen --help`**: `inferProjectType` picked the FIRST matching ecosystem (nodejs > python > java) even though cdxgen's own `-t`/`--type` flag is documented as accepting an array — a genuinely polyglot root would silently only ever get one ecosystem's corroboration. Fixed: `inferProjectTypes` (renamed, now plural) returns every matching type, all passed to cdxgen in one invocation — verified via direct repro that a root with both `requirements.txt` and `package.json` now returns both `psycopg2` and `pg` in one real combined BOM.
+
+2 new regression tests added (finding 1's misattachment-refusal, finding 3's polyglot-scan) — finding 2 verified live but not separately locked (cdxgen was too tolerant of malformed input to reliably trigger a real throw for an automated test; the fix itself is a one-line, low-risk addition). Full suite now 74/74 (was 72/72).
+
 **Single source of truth** for the one item left open from the "Open threads right now" punch list after Phase 1 close: `B-cdxgen-reuse` (P2, dependency/container-fact corroboration, independent of the now-closed `B-spring-config`).
 
 **Product:** Weaver. **Owner:** Gowri.

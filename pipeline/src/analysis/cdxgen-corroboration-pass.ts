@@ -66,17 +66,35 @@ export const cdxgenCorroborationPass: AnalysisPass = {
         continue;
       }
 
+      // Review finding (2026-08-09) — a real, confirmed misattribution bug:
+      // with exactly one candidate UNIT but 2+ real MATCHING dependencies
+      // (e.g. a root declaring both psycopg2 and pymongo, but the unit was
+      // only ever built from a psycopg2 import), every match used to be
+      // attached regardless of relevance — a specific, wrong claim
+      // ("this unit is corroborated by pymongo"), not just an incomplete
+      // one. Fixed: the same never-guess discipline already applied to
+      // "which unit" now applies to "which dependency" too — only attach
+      // when exactly one real match exists; 2+ matches record a real,
+      // named ignored item instead of guessing which one is relevant.
+      if (matches.length !== 1) {
+        ctx.allIgnoredItems.push({
+          ref: `${root}:cdxgen-dependency-corroboration`,
+          reason: 'AMBIGUOUS_BOUNDARY',
+          detail: `cdxgen found ${matches.length} real corroborating dependencies (${matches.map((m) => m.name).join(', ')}) for the one persistence/messaging unit in this root — never guessing which one actually corroborates it`,
+        });
+        continue;
+      }
+
       const unit = candidates[0];
       const category = unit.kind === 'database' ? 'persistence' : 'messaging';
-      for (const m of matches) {
-        unit.evidence.push({
-          signal: `cdxgen:${m.name}${m.version ? `@${m.version}` : ''}`,
-          source: 'dependency-manifest',
-          category,
-          weight: CORROBORATION_WEIGHT,
-          ref: m.purl ?? `${root}:cdxgen:${m.name}`,
-        });
-      }
+      const match = matches[0];
+      unit.evidence.push({
+        signal: `cdxgen:${match.name}${match.version ? `@${match.version}` : ''}`,
+        source: 'dependency-manifest',
+        category,
+        weight: CORROBORATION_WEIGHT,
+        ref: match.purl ?? `${root}:cdxgen:${match.name}`,
+      });
       unit.confidence = scoreConfidence(unit.evidence);
     }
   },

@@ -2516,3 +2516,54 @@ test('T-CDX-2 (B-cdxgen-reuse) — no lockfile/manifest -> graceful empty result
   const components = discoverCdxgenComponents(path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'));
   assert.deepEqual(components, [], 'a manifest with no committed lockfile must produce an honest empty result, not an error or a guessed resolution');
 });
+
+test('Review fix (2026-08-09) — cdxgen corroboration never misattaches an unrelated dependency when 2+ real matches exist for one candidate unit', () => {
+  const cdxgenProvider = require(path.join(PIPELINE_ROOT, 'dist/scanner/cdxgen-provider'));
+  const originalDiscover = cdxgenProvider.discoverCdxgenComponents;
+  cdxgenProvider.discoverCdxgenComponents = () => [
+    { name: 'psycopg2', version: '2.9.9' },
+    { name: 'pymongo', version: '4.6.0' },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'))];
+  const { cdxgenCorroborationPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'));
+  try {
+    const unit = {
+      id: 'db.py::UserDb',
+      kind: 'database',
+      name: 'UserDb',
+      filePath: 'db.py',
+      startLine: 1,
+      endLine: 1,
+      evidence: [{ signal: 'psycopg2', source: 'graphify-import', category: 'persistence', weight: 20, ref: 'db.py:1' }],
+      confidence: 20,
+    };
+    const ctx = { packageRoots: ['/fake/root'], allUnits: [unit], allIgnoredItems: [], unitsByRoot: new Map([['/fake/root', [unit]]]) };
+    cdxgenCorroborationPass.run(ctx);
+
+    assert.equal(unit.evidence.length, 1, 'must not attach pymongo evidence to a unit that was only ever built from a psycopg2 import');
+    assert.equal(unit.confidence, 20, 'confidence must stay unchanged when corroboration is correctly refused');
+    assert.equal(ctx.allIgnoredItems.length, 1);
+    assert.match(ctx.allIgnoredItems[0].detail, /2 real corroborating dependencies/);
+  } finally {
+    cdxgenProvider.discoverCdxgenComponents = originalDiscover;
+  }
+});
+
+test('Review fix (2026-08-09) — cdxgen-provider scans every matching ecosystem in a polyglot root, not just the first found', () => {
+  const { discoverCdxgenComponents } = require(path.join(PIPELINE_ROOT, 'dist/scanner/cdxgen-provider'));
+  const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
+  if (!fs.existsSync(cdxgenBin)) return;
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-cdxgen-polyglot-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'requirements.txt'), 'psycopg2==2.9.9\n');
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'tooling', version: '1.0.0', dependencies: { pg: '^8.11.3' } }));
+    execFileSync('npm', ['install', '--package-lock-only'], { cwd: dir, stdio: 'pipe' });
+
+    const names = discoverCdxgenComponents(dir).map((c) => c.name);
+    assert.ok(names.includes('psycopg2'), 'must still find the Python ecosystem dependency');
+    assert.ok(names.includes('pg'), 'must ALSO find the Node ecosystem dependency, not silently pick only one ecosystem');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

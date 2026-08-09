@@ -34,27 +34,36 @@ export interface CdxgenComponent {
 /**
  * Manifest-based language-type inference, same convention as
  * `deployable-manifest-provider.ts`'s own root-level marker check — checked
- * AT packageRoot only (not recursive), since cdxgen's own `-t` flag expects
- * one project type per invocation.
+ * AT packageRoot only (not recursive). Review finding (2026-08-09): `-t`
+ * was originally treated as if it only accepted one value, picking the
+ * first ecosystem found and silently ignoring the rest — but `cdxgen
+ * --help` documents `-t, --type` as `[array]`, i.e. the tool itself
+ * natively supports scanning more than one ecosystem in a single
+ * invocation. A genuinely polyglot root (e.g. a Java service with a small
+ * Node-based tooling `package.json` alongside its `pom.xml`) would
+ * otherwise only ever get corroboration for whichever ecosystem happened
+ * to be checked first. Fixed: returns EVERY matching type, not just the
+ * first.
  */
-function inferProjectType(packageRoot: string): string | undefined {
-  if (fs.existsSync(path.join(packageRoot, 'package.json'))) return 'nodejs';
+function inferProjectTypes(packageRoot: string): string[] {
+  const types: string[] = [];
+  if (fs.existsSync(path.join(packageRoot, 'package.json'))) types.push('nodejs');
   if (
     fs.existsSync(path.join(packageRoot, 'requirements.txt')) ||
     fs.existsSync(path.join(packageRoot, 'pyproject.toml')) ||
     fs.existsSync(path.join(packageRoot, 'uv.lock')) ||
     fs.existsSync(path.join(packageRoot, 'Pipfile'))
   ) {
-    return 'python';
+    types.push('python');
   }
   if (
     fs.existsSync(path.join(packageRoot, 'pom.xml')) ||
     fs.existsSync(path.join(packageRoot, 'build.gradle')) ||
     fs.existsSync(path.join(packageRoot, 'build.gradle.kts'))
   ) {
-    return 'java';
+    types.push('java');
   }
-  return undefined;
+  return types;
 }
 
 /**
@@ -68,13 +77,14 @@ function inferProjectType(packageRoot: string): string | undefined {
  * subprocess already established.
  */
 export function discoverCdxgenComponents(packageRoot: string): CdxgenComponent[] {
-  const projectType = inferProjectType(packageRoot);
-  if (!projectType) return [];
+  const projectTypes = inferProjectTypes(packageRoot);
+  if (projectTypes.length === 0) return [];
   if (!fs.existsSync(CDXGEN_BIN)) return [];
 
+  const typeArgs = projectTypes.flatMap((t) => ['-t', t]);
   const outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-cdxgen-')), 'bom.json');
   try {
-    execFileSync(CDXGEN_BIN, ['-t', projectType, '--no-install-deps', '-o', outFile, packageRoot], { stdio: 'pipe' });
+    execFileSync(CDXGEN_BIN, [...typeArgs, '--no-install-deps', '-o', outFile, packageRoot], { stdio: 'pipe' });
     if (!fs.existsSync(outFile)) return [];
     const bom = JSON.parse(fs.readFileSync(outFile, 'utf8'));
     const components: unknown[] = Array.isArray(bom?.components) ? bom.components : [];
@@ -85,10 +95,14 @@ export function discoverCdxgenComponents(packageRoot: string): CdxgenComponent[]
         version: typeof c.version === 'string' ? c.version : undefined,
         purl: typeof c.purl === 'string' ? c.purl : undefined,
       }));
-  } catch {
-    // Real, disclosed degradation: a shell-out failure (missing binary,
-    // unsupported project shape, cdxgen internal error) never fails a
-    // Weaver run — this is corroboration-only evidence, never load-bearing.
+  } catch (err) {
+    // Review finding (2026-08-09) — this used to swallow every shell-out
+    // failure with zero logging, inconsistent with this codebase's own
+    // established convention for optional-tool degradation
+    // (detectPersistencePass's console.warn on a Graphify failure,
+    // passes.ts). Still never fails a Weaver run (corroboration-only,
+    // never load-bearing) — but now visible, not silent.
+    console.warn(`[cdxgen-provider] WARNING: cdxgen failed for ${packageRoot}, continuing without dependency corroboration: ${err}`);
     return [];
   } finally {
     fs.rmSync(path.dirname(outFile), { recursive: true, force: true });
