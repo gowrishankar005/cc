@@ -4,7 +4,7 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
 **Task list:** [`docs/solution/AGENT_TASKS_Residual_Review_Session.md`](../../docs/solution/AGENT_TASKS_Residual_Review_Session.md)
-**Status:** RS-1 through RS-4 CLOSED. The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. RS-4 (optional Tier B LLM drafting) is real code with 2 honestly-named open gaps: `triage.py` never classifies anything Tier B yet, and the live-model call path has never run against a real API in this environment. RS-5 (hardening/portability) is next. See the task list for what's built vs. not yet.
+**Status:** RS-1 through RS-4 CLOSED. The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. Tier B drafting's PRIMARY path is in-chat — Copilot Chat's own `editFiles` tool, bound by the §5.1 rules in `.github/chatmodes/residual-review.chatmode.md`; `draft_tier_b.py` is a secondary, headless/scripted alternative, not the default. One real, named gap either way: `triage.py` never classifies anything Tier B yet, so neither path has real production input today. RS-5 (hardening/portability) is next. See the task list for what's built vs. not yet.
 
 ## Non-negotiable rules (S1–S12 — do not violate, do not skip)
 
@@ -45,7 +45,7 @@ tools/review-session/
   test_effective_ir.py     (built) non-empty output, MVP-scope-note present, never touches intelligence-ir.md
   apply.py                (T-RS3-1/T-RS3-2, built) the ONLY place that invokes run-slice/override-applier — validate -> confirm -> merge drafts -> apply -> apply-report.md/decisions-log.md
   test_apply.py            (built, 5 real end-to-end tests) real type_change applies, calm validate 0 errors, refuses without confirmation, refuses on validation failure, decision+override filename collision handled correctly (regression test for a real bug found+fixed on review)
-  draft_tier_b.py          (T-RS4-1/T-RS4-2, built) optional Tier B LLM drafting — §5.1 system prompt, stdlib-only network call, a fully-testable guardrail. No key -> reports what it would attempt, writes nothing. Real, named gap: no trigger in triage.py produces Tier B yet, so this has zero real production input today; live-model path never run against a real API here (no key set)
+  draft_tier_b.py          (T-RS4-1/T-RS4-2, built) SECONDARY/headless Tier B drafting path — §5.1 system prompt, stdlib-only network call, a fully-testable guardrail. The PRIMARY path is in-chat: Copilot Chat's own editFiles tool, bound by the same §5.1 rules embedded in .github/chatmodes/residual-review.chatmode.md — use this script only for scripted/batch runs outside a chat session. No key -> reports what it would attempt, writes nothing. Real, named gap: no trigger in triage.py produces Tier B yet, so neither path has real production input today; this script's live-model path has never run against a real API here (no key set) — the in-chat path doesn't need one, since Copilot Chat supplies its own model
   test_draft_tier_b.py     (built, 14 tests) all 6 named trap fixtures (100% on refusal cases) + 6 more guardrail tests, all against synthetic responses (no live model call) + real CLI no-key-path tests
 ```
 
@@ -77,8 +77,9 @@ python3 pack.py --out-dir /tmp/my-run-2 --session-dir ../../review-sessions/my-r
 python3 effective_ir.py --calm /tmp/my-run-reviewed/architecture.calm.json --session-dir ../../review-sessions/my-run \
   --out ../../review-sessions/my-run/effective-architecture-ir.md
 
-# optional Tier B LLM drafting (needs ANTHROPIC_API_KEY; no real Tier B residuals exist in this pipeline's output yet)
-python3 draft_tier_b.py --session-dir ../../review-sessions/my-run
+# Tier B drafting: normally happens IN Copilot Chat (editFiles tool, no key needed — see the
+# chat-mode file). draft_tier_b.py is only for a headless/scripted run outside a chat session:
+python3 draft_tier_b.py --session-dir ../../review-sessions/my-run  # needs ANTHROPIC_API_KEY
 ```
 
 `pack.py` refuses to overwrite a session dir that already has unapplied drafts (fails loud, exit code 1) — apply or discard first.

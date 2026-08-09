@@ -71,6 +71,15 @@ class TestChatModeSafety(unittest.TestCase):
         self.assertIn("typed-facts.json", self.text)
         self.assertIn("Never edit", self.text)
 
+    def test_tier_b_in_chat_drafting_rules_present(self):
+        """The chat mode is the PRIMARY Tier B drafting path (editFiles
+        writes drafts/ directly, in-conversation) — draft_tier_b.py is a
+        secondary, headless alternative. This checks the real §5.1 hard
+        rules the in-chat path must follow are actually spelled out here,
+        not just asserted in prose elsewhere."""
+        for marker in ("llm-advisory:", "cannot_decide", "drafts/decisions", "drafts/overrides", "Accept / Reject / Edit"):
+            self.assertIn(marker, self.text, f"expected Tier B in-chat drafting rule marker '{marker}' in the chat-mode file")
+
     def test_degraded_path_documented(self):
         self.assertIn("Degraded path", self.text)
 
