@@ -5,7 +5,7 @@
 // Node 22, no new dependency) — this is a handful of integration checks
 // against the real CLI, not a reason to add a test framework.
 //
-// Fixtures under spikes/ (Bank of Anthos, Fineract) are disposable scratch
+// Fixtures under spikes/ (a reference Python microservices banking app, a reference Java/JAX-RS banking platform) are disposable scratch
 // clones per CLAUDE.md's own convention — tests SKIP, not fail, when they're
 // absent, so a fresh checkout without them still runs the one fixture that's
 // actually checked in (test/fixtures/nestjs-sample).
@@ -20,16 +20,16 @@ const PIPELINE_ROOT = path.resolve(__dirname, '..');
 const RUN_SLICE = path.join(PIPELINE_ROOT, 'dist', 'orchestration', 'run-slice.js');
 const CONTROL_URL_MAPPING = path.join(PIPELINE_ROOT, 'dist', 'rules', 'control-url-mapping.json');
 
-const BOA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/accounts');
-const FINERACT_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/fineract/repo');
-const FINERACT_KAFKA_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/springbatch/messagehandler/kafka');
-const FINERACT_KAFKA_PRODUCER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/event/external/producer/kafka');
-const GHOSTFOLIO_ACCESS_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/app/access');
-const GHOSTFOLIO_PRISMA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/services/prisma');
-const FINERACT_SECURITY_ROOT = path.resolve(FINERACT_ROOT, 'fineract-security');
-const FINERACT_PROVIDER_ROOT = path.resolve(FINERACT_ROOT, 'fineract-provider');
-const WALTZ_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
-const WALTZ_WEB_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-web');
+const PYTHON_SAMPLE_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/accounts');
+const JAVA_SAMPLE_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/fineract/repo');
+const JAVA_SAMPLE_KAFKA_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/springbatch/messagehandler/kafka');
+const JAVA_SAMPLE_KAFKA_PRODUCER_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/event/external/producer/kafka');
+const NODE_SAMPLE_ACCESS_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/app/access');
+const NODE_SAMPLE_PRISMA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/ghostfolio/repo/apps/api/src/services/prisma');
+const JAVA_SAMPLE_SECURITY_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-security');
+const JAVA_SAMPLE_PROVIDER_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-provider');
+const JAVA_SAMPLE2_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
+const JAVA_SAMPLE2_WEB_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-web');
 const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
 const SPRING_CONFIG_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample'); // checked-in
 const SPRING_CONFIG_PROPERTIES_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample'); // checked-in
@@ -46,7 +46,7 @@ function runPipeline(roots, extraArgs = [], nodeArgs = []) {
 // Real finding, not assumed: calm-cli truncates its own stdout at exactly
 // 8192 bytes when piped (not a TTY) — a classic Node CLI bug (process exits
 // before a large piped write finishes flushing). Confirmed by testing
-// against real Fineract fineract-core output (44 nodes, ~11KB of validation
+// against real a reference Java/JAX-RS banking platform fineract-core output (44 nodes, ~11KB of validation
 // JSON — well past the 8192-byte cutoff). Not a maxBuffer issue (raising it
 // didn't help) and not npx-specific (the same truncation happens invoking
 // the calm binary directly). The robust fix, using calm-cli's own supported
@@ -128,8 +128,8 @@ test('AP-1 self-review fix — a value-taking flag\'s own value must never be ch
   }
 });
 
-test('Bank of Anthos — cross-package Graphify pass, real relationships, 0 errors 0 warnings', { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' }, () => {
-  const { outDir, calm } = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+test('a reference Python microservices banking app — cross-package Graphify pass, real relationships, 0 errors 0 warnings', { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' }, () => {
+  const { outDir, calm } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
   try {
     const userservice = findNode(calm, 'userservice.py');
     const contacts = findNode(calm, 'contacts.py');
@@ -186,7 +186,7 @@ test('Bank of Anthos — cross-package Graphify pass, real relationships, 0 erro
     // structural-only entity mesh could also satisfy) so R2 work in Session
     // C/D cannot silently regress the one architecture shape that already
     // works. If this starts failing, R1 broke — fix R1, don't loosen this.
-    assert.ok(serviceToDbRel, 'T-B1 R1 lock: expected a service->database relationship (R1 one-hop) — BoA-class shape must never regress');
+    assert.ok(serviceToDbRel, 'T-B1 R1 lock: expected a service->database relationship (R1 one-hop) — the reference Python app-class shape must never regress');
     assert.equal(relMetadata(serviceToDbRel, 'x-aac-relationship-grade'), 'architecture', 'service->database relationship must be graded architecture, not structural');
 
     // T-X2-1 acceptance ("no duplicate DB nodes") — the decorator-based
@@ -206,10 +206,10 @@ test('Bank of Anthos — cross-package Graphify pass, real relationships, 0 erro
 });
 
 test(
-  'Fineract fineract-charge — JAX-RS route composition + JPA persistence typing',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'a reference Java/JAX-RS banking platform fineract-charge — JAX-RS route composition + JPA persistence typing',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const chargesResource = findNode(calm, 'ChargesApiResource.java');
       assert.ok(chargesResource, 'ChargesApiResource.java node missing');
@@ -255,10 +255,10 @@ test(
 );
 
 test(
-  'Fineract fineract-core — control-builder finds real @PreAuthorize evidence on a route-less service',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'a reference Java/JAX-RS banking platform fineract-core — control-builder finds real @PreAuthorize evidence on a route-less service',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-core')]);
+    const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-core')]);
     try {
       const datatableService = findNode(calm, 'DatatableWriteService.java');
       assert.ok(datatableService, 'DatatableWriteService.java node missing — a pure-interface, no-HTTP-route class control-builder.ts is specifically meant to surface');
@@ -302,9 +302,9 @@ test(
 );
 
 test(
-  'Robustness T-R1-3 follow-up (B-charge-jdbc-driver) — real multi-root closure of the flagship Fineract residual: ChargesApiResource -> ChargeReadPlatformServiceImpl now resolves, real cross-root confidence 10',
+  'Robustness T-R1-3 follow-up (B-charge-jdbc-driver) — real multi-root closure of the flagship a reference Java/JAX-RS banking platform residual: ChargesApiResource -> ChargeReadPlatformServiceImpl now resolves, real cross-root confidence 10',
   {
-    skip: !fs.existsSync(FINERACT_PROVIDER_ROOT) && 'spikes/fineract/repo/fineract-provider not present (scratch clone, see CLAUDE.md)',
+    skip: !fs.existsSync(JAVA_SAMPLE_PROVIDER_ROOT) && 'spikes/fineract/repo/fineract-provider not present (scratch clone, see CLAUDE.md)',
     timeout: 180_000, // real combined scan of 2733+37 Java files — genuinely slow, not a hang
   },
   () => {
@@ -313,7 +313,7 @@ test(
     // (Node's default ~4GB limit, confirmed not a leak). Not needed for any
     // other test in this suite; scoped to this one via nodeArgs.
     const { outDir } = runPipeline(
-      [path.join(FINERACT_ROOT, 'fineract-charge'), FINERACT_PROVIDER_ROOT],
+      [path.join(JAVA_SAMPLE_ROOT, 'fineract-charge'), JAVA_SAMPLE_PROVIDER_ROOT],
       [],
       ['--max-old-space-size=8192']
     );
@@ -358,7 +358,7 @@ test(
       // the coverage breakdown reflects real, non-trivial counts for BOTH
       // mechanisms, which is the actual point of T-L3-2 (visibility of the
       // real breakdown), not a specific number that would be a maintenance
-      // trap the next time Fineract's real source or the resolver changes.
+      // trap the next time a reference Java/JAX-RS banking platform's real source or the resolver changes.
       // Real finding while writing this assertion: NOT every kind:'calls'/
       // source:'graphify' relationship is multi-hop-derived — R0's own
       // direct reconciler (graphify-reconciler.ts) also emits kind:'calls'
@@ -384,10 +384,10 @@ test(
 );
 
 test(
-  'AREC T-D1/T-D2 — call-site control detection: real Fineract fineract-charge ChargesApiResource gets security-rbac-002 with expression, at grep-verified lines',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-D1/T-D2 — call-site control detection: real a reference Java/JAX-RS banking platform fineract-charge ChargesApiResource gets security-rbac-002 with expression, at grep-verified lines',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const resource = findNode(calm, 'ChargesApiResource.java');
       assert.ok(resource, 'ChargesApiResource.java node missing');
@@ -436,10 +436,10 @@ test('AREC T-D1/T-D2 — call-site control detection: lab py-jwt-gateway fixture
 });
 
 test(
-  'Robustness T-R2-2 (C-call expansion) — real Waltz waltz-web: 4 real call sites get security-rbac-003 (UserRoleService.hasRole, a DIFFERENT real repo\'s own RBAC vocabulary), calm validate 0 errors',
-  { skip: !fs.existsSync(WALTZ_WEB_ROOT) && 'spikes/waltz/repo/waltz-web not present (scratch clone, see CLAUDE.md)' },
+  'Robustness T-R2-2 (C-call expansion) — real a reference Java governance platform waltz-web: 4 real call sites get security-rbac-003 (UserRoleService.hasRole, a DIFFERENT real repo\'s own RBAC vocabulary), calm validate 0 errors',
+  { skip: !fs.existsSync(JAVA_SAMPLE2_WEB_ROOT) && 'spikes/waltz/repo/waltz-web not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([WALTZ_WEB_ROOT]);
+    const { outDir, calm } = runPipeline([JAVA_SAMPLE2_WEB_ROOT]);
     try {
       // Grep-verified real call sites (WebUtilities.java:148, plus 3 real
       // endpoint classes that call it or the underlying service directly).
@@ -458,7 +458,7 @@ test(
         const node = findNode(calm, fileName);
         assert.ok(node, `${fileName} node missing`);
         const rbac = node.controls?.['security-rbac-003'];
-        assert.ok(rbac, `expected security-rbac-003 (Waltz hasRole call-site) control on ${fileName}`);
+        assert.ok(rbac, `expected security-rbac-003 (a reference Java governance platform hasRole call-site) control on ${fileName}`);
         assert.equal(rbac.requirements[0].config.detectedVia, 'call');
         assert.equal(rbac.requirements[0].config.authorityRef, authorityRef, `authorityRef mismatch for ${fileName}`);
       }
@@ -472,7 +472,7 @@ test(
   }
 );
 
-test('Robustness T-R2-2 (C-call expansion) — Fineract isAuthenticated() call-site: weighted 30 (below the fine-grained RBAC tier, a real stated distinction — authentication proves login, not authorization), synthetic buildCalm check since the signal alone sits below the unit confidence floor when isolated (same as jwt.decode\'s tier, by design)', () => {
+test('Robustness T-R2-2 (C-call expansion) — a reference Java/JAX-RS banking platform isAuthenticated() call-site: weighted 30 (below the fine-grained RBAC tier, a real stated distinction — authentication proves login, not authorization), synthetic buildCalm check since the signal alone sits below the unit confidence floor when isolated (same as jwt.decode\'s tier, by design)', () => {
   const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
   const facts = {
     contractVersion: '7.0.0',
@@ -508,7 +508,7 @@ test('Robustness T-R2-2 (C-call expansion) — Fineract isAuthenticated() call-s
   const node = findNode(calm, 'ClientSearchService.java');
   assert.ok(node, 'ClientSearchService.java node missing');
   const auth = node.controls?.['security-auth-002'];
-  assert.ok(auth, 'expected security-auth-002 (Fineract isAuthenticated call-site) control');
+  assert.ok(auth, 'expected security-auth-002 (a reference Java/JAX-RS banking platform isAuthenticated call-site) control');
   assert.equal(auth.requirements[0].config.evidenceRef, 'ClientSearchService.java:52');
   assert.ok(
     auth.description.includes('NOT that they are authorized'),
@@ -621,7 +621,7 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
 
     // T-L3-2 — the R2b-side counterpart to the flagship test's r2-phase1
     // assertion, proving relationshipsByMechanism buckets BOTH mechanism
-    // values correctly, not just the one that happens to fire on Fineract.
+    // values correctly, not just the one that happens to fire on a reference Java/JAX-RS banking platform.
     const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
     assert.equal(coverage.relationshipsByMechanism['r2b'], 1, 'expected the R2b edge counted under relationshipsByMechanism.r2b');
     assert.equal(coverage.relationshipsByMechanism['r2-phase1'], undefined, 'no Phase 1 edges expected in this fixture — only the R2b hop fires');
@@ -636,14 +636,14 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
 });
 
 test(
-  'AREC T-C1 — R2 multi-hop bridge: real Fineract fineract-charge produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-C1 — R2 multi-hop bridge: real a reference Java/JAX-RS banking platform fineract-charge produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    const { outDir } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
       const multiHopItems = facts.ignoredItems.filter((i) => i.detail?.startsWith('unresolved-multi-hop'));
-      // Real Fineract-charge alone: ChargesApiResource's ChargeReadPlatformService
+      // Real a reference Java/JAX-RS banking platform-charge alone: ChargesApiResource's ChargeReadPlatformService
       // bridge has 0 candidate implementers in scope (the real implementer
       // lives in fineract-provider, a third module — see the design note §1)
       // and a ChargeRequest DTO bridge also resolves to 0 — exactly 2, not the
@@ -665,10 +665,10 @@ test(
 );
 
 test(
-  'AREC T-A2/R2b — R0 grading: Fineract fineract-core direct-reconciler edges stay structural; R2b now resolves 3 real service->repository chains, graded architecture',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-A2/R2b — R0 grading: a reference Java/JAX-RS banking platform fineract-core direct-reconciler edges stay structural; R2b now resolves 3 real service->repository chains, graded architecture',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([path.join(FINERACT_ROOT, 'fineract-core')]);
+    const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-core')]);
     try {
       // Documented pre-R2b baseline: fineract-core's 85 direct-reconciler
       // (graphify-reconciler.ts, confidence: undefined) relationships are
@@ -692,7 +692,7 @@ test(
       assert.ok(calm.relationships.length > 0, 'expected real relationships from fineract-core');
       // Excludes the system node's own composed-of relationship (T-X7-3) —
       // synthetic CALM scaffolding, not a graded TypedRelationship; see the
-      // BoA test above for the full rationale.
+      // the reference Python app test above for the full rationale.
       const graded = calm.relationships.filter((rel) => !rel['relationship-type']['composed-of']);
       assert.ok(graded.length > 0, 'expected real graded relationships from fineract-core');
 
@@ -728,10 +728,10 @@ test(
 );
 
 test(
-  'AREC T-A1 — silence metrics: Fineract fineract-charge flags S1 (service+db present, 0 service-touching relationships)',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-A1 — silence metrics: a reference Java/JAX-RS banking platform fineract-charge flags S1 (service+db present, 0 service-touching relationships)',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir } = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    const { outDir } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
       // This IS the documented baseline (coe-lab/docs/fineract-gold-vs-platform-finding.md):
@@ -754,13 +754,13 @@ test(
 );
 
 test(
-  'AREC T-A1 — silence metrics: S1 does NOT fire when a real service-touching relationship exists (Bank of Anthos, false-positive guard)',
-  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-A1 — silence metrics: S1 does NOT fire when a real service-touching relationship exists (a reference Python microservices banking app, false-positive guard)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir } = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    const { outDir } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
     try {
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
-      assert.ok(coverage.completeness.serviceTouchingRelationshipCount > 0, 'expected BoA to have real service-touching relationships (R1 one-hop)');
+      assert.ok(coverage.completeness.serviceTouchingRelationshipCount > 0, 'expected the reference Python app to have real service-touching relationships (R1 one-hop)');
       assert.ok(
         !coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
         'S1 must not fire when service-touching relationships exist'
@@ -772,20 +772,20 @@ test(
 );
 
 test(
-  'Robustness T-R0-2 — architecture coverage metric: real BoA shows 100% (2/2 services), real Fineract-charge shows 0% (0/1) — shapes differ sensibly',
-  { skip: (!fs.existsSync(BOA_ROOT) || !fs.existsSync(FINERACT_ROOT)) && 'spikes/boa or spikes/fineract not present (scratch clone, see CLAUDE.md)' },
+  'Robustness T-R0-2 — architecture coverage metric: real the reference Python app shows 100% (2/2 services), real a reference Java/JAX-RS banking platform-charge shows 0% (0/1) — shapes differ sensibly',
+  { skip: (!fs.existsSync(PYTHON_SAMPLE_ROOT) || !fs.existsSync(JAVA_SAMPLE_ROOT)) && 'spikes/boa or spikes/fineract not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const boa = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    const boa = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
     try {
       const coverage = JSON.parse(fs.readFileSync(path.join(boa.outDir, 'coverage-report.json'), 'utf8'));
       assert.equal(coverage.completeness.serviceUnitCount, 2);
-      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 2, 'both BoA services have a real R1 architecture-grade outbound edge');
-      assert.equal(coverage.completeness.architectureOutboundCoverage, 1, 'expected 100% architecture coverage for BoA');
+      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 2, 'both the reference Python app services have a real R1 architecture-grade outbound edge');
+      assert.equal(coverage.completeness.architectureOutboundCoverage, 1, 'expected 100% architecture coverage for the reference Python app');
     } finally {
       fs.rmSync(boa.outDir, { recursive: true, force: true });
     }
 
-    const charge = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    const charge = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const coverage = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'coverage-report.json'), 'utf8'));
       assert.equal(coverage.completeness.serviceUnitCount, 1);
@@ -925,10 +925,10 @@ test('SQS/SNS import-only messaging detection — low confidence, topic kind, di
 });
 
 test(
-  'Kafka consumer — @KafkaListener detected as a real topic/network node (T-X7-1/T-X7-2, real Fineract evidence)',
-  { skip: !fs.existsSync(FINERACT_KAFKA_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'Kafka consumer — @KafkaListener detected as a real topic/network node (T-X7-1/T-X7-2, real a reference Java/JAX-RS banking platform evidence)',
+  { skip: !fs.existsSync(JAVA_SAMPLE_KAFKA_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([FINERACT_KAFKA_ROOT]);
+    const { outDir, calm } = runPipeline([JAVA_SAMPLE_KAFKA_ROOT]);
     try {
       const listener = findNode(calm, 'KafkaRemoteMessageListener.java');
       assert.ok(listener, 'KafkaRemoteMessageListener.java node missing — @KafkaListener decorator detection regression');
@@ -946,10 +946,10 @@ test(
 );
 
 test(
-  'AREC T-E1 — messaging PRODUCER: real Fineract KafkaExternalEventProducer.java (KafkaTemplate-typed field) detected as a real topic/network node',
-  { skip: !fs.existsSync(FINERACT_KAFKA_PRODUCER_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-E1 — messaging PRODUCER: real a reference Java/JAX-RS banking platform KafkaExternalEventProducer.java (KafkaTemplate-typed field) detected as a real topic/network node',
+  { skip: !fs.existsSync(JAVA_SAMPLE_KAFKA_PRODUCER_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([FINERACT_KAFKA_PRODUCER_ROOT]);
+    const { outDir, calm } = runPipeline([JAVA_SAMPLE_KAFKA_PRODUCER_ROOT]);
     try {
       const producer = findNode(calm, 'KafkaExternalEventProducer.java');
       assert.ok(producer, 'KafkaExternalEventProducer.java node missing — closes messaging-detection-catalogue.yml\'s previously not-implemented typed-field-producer strategy');
@@ -987,11 +987,11 @@ test('Module registry — two independent modules both run against the same type
 
 test(
   'K8s trust — shared jwt-key secret produces a real shares-secret relationship (T-X5-1, requirements v0.7 §3 real case)',
-  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const k8sManifestsDir = path.resolve(BOA_ROOT, '..', '..', 'kubernetes-manifests'); // BOA_ROOT is .../repo/src/accounts; manifests live at .../repo/kubernetes-manifests
+    const k8sManifestsDir = path.resolve(PYTHON_SAMPLE_ROOT, '..', '..', 'kubernetes-manifests'); // PYTHON_SAMPLE_ROOT is .../repo/src/accounts; manifests live at .../repo/kubernetes-manifests
     const { outDir, calm } = runPipeline(
-      [path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')],
+      [path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')],
       ['--k8s-manifests', k8sManifestsDir]
     );
     try {
@@ -1220,9 +1220,9 @@ test('HITL review trigger — S5 triggers wired in (found via Architect_Residual
 
 test(
   'Node/TS real evidence (ghostfolio/ghostfolio, NestJS+Prisma) — Graphify ref_ target normalization + Controller/database precedence (generic fixes, real bugs found by testing against a real repo)',
-  { skip: !fs.existsSync(GHOSTFOLIO_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },
+  { skip: !fs.existsSync(NODE_SAMPLE_ACCESS_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },
   () => {
-    const { outDir, calm } = runPipeline([GHOSTFOLIO_ACCESS_ROOT]);
+    const { outDir, calm } = runPipeline([NODE_SAMPLE_ACCESS_ROOT]);
     try {
       // Q13 ontology fix (Robustness): AccessService merely imports Prisma's
       // TYPES for its own method signatures (`import { Access, Prisma } from
@@ -1261,10 +1261,10 @@ test(
 );
 
 test(
-  'Robustness (B-ontology, Q13 fix) — real Ghostfolio PrismaService (extends PrismaClient) correctly IS a database unit — the positive case the ownership check must not over-correct away',
-  { skip: !fs.existsSync(GHOSTFOLIO_PRISMA_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },
+  'Robustness (B-ontology, Q13 fix) — real a reference Node/NestJS wealth-management app PrismaService (extends PrismaClient) correctly IS a database unit — the positive case the ownership check must not over-correct away',
+  { skip: !fs.existsSync(NODE_SAMPLE_PRISMA_ROOT) && 'spikes/ghostfolio/repo not present (scratch clone)' },
   () => {
-    const { outDir, calm } = runPipeline([GHOSTFOLIO_PRISMA_ROOT]);
+    const { outDir, calm } = runPipeline([NODE_SAMPLE_PRISMA_ROOT]);
     try {
       // Real source, grep-verified: services/prisma/prisma.service.ts:13-14
       // is `export class PrismaService\n  extends PrismaClient`, a genuinely
@@ -1680,16 +1680,16 @@ test('AREC T-E4 — OpenAPI dual-unit merge (trap card T8): lab ts-nestjs-users 
 });
 
 test(
-  'Outbound HTTP — real requests import in BoA frontend.py produces unresolved-http-target, not a fabricated relationship (T-X8-3, real evidence)',
-  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  'Outbound HTTP — real requests import in the reference Python app frontend.py produces unresolved-http-target, not a fabricated relationship (T-X8-3, real evidence)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([path.join(BOA_ROOT, '..', 'frontend')]);
+    const { outDir, calm } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, '..', 'frontend')]);
     try {
       const ignored = JSON.parse(fs.readFileSync(path.join(outDir, 'ignored-items-report.json'), 'utf8'));
       const httpUnresolved = ignored.filter((i) => i.detail?.startsWith('unresolved-http-target:'));
       assert.ok(httpUnresolved.length >= 1, 'expected at least 1 unresolved-http-target ignored item — frontend.py genuinely imports requests and calls other services');
       assert.ok(httpUnresolved.every((i) => i.reason === 'CROSS_DOMAIN_UNRESOLVED'));
-      assert.ok(httpUnresolved.every((i) => i.detail.includes('requests')), 'BoA frontend uses the Python requests library, grep-verified');
+      assert.ok(httpUnresolved.every((i) => i.detail.includes('requests')), 'the reference Python app frontend uses the Python requests library, grep-verified');
       // Never a fabricated relationship — every real target in frontend.py is env-var-mediated, not a literal, so none should be resolvable.
       assert.equal(calm.relationships.length, 0, 'no relationship should be fabricated from import-only evidence with no resolvable target');
     } finally {
@@ -1699,10 +1699,10 @@ test(
 );
 
 test(
-  'Outbound HTTP — real OkHttpClient/HttpURLConnection imports in Fineract credit-bureau integration produce unresolved-http-target, not a fabricated relationship (B-http-client, WDL rank 7)',
-  { skip: !fs.existsSync(FINERACT_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  'Outbound HTTP — real OkHttpClient/HttpURLConnection imports in a reference Java/JAX-RS banking platform credit-bureau integration produce unresolved-http-target, not a fabricated relationship (B-http-client, WDL rank 7)',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const creditBureauRoot = path.join(FINERACT_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/creditbureau');
+    const creditBureauRoot = path.join(JAVA_SAMPLE_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/creditbureau');
     const { outDir, calm } = runPipeline([creditBureauRoot]);
     try {
       const ignored = JSON.parse(fs.readFileSync(path.join(outDir, 'ignored-items-report.json'), 'utf8'));
@@ -1742,10 +1742,10 @@ test('OpenAPI absent — coverage reports openapiStatus: absent, run completes n
 });
 
 test(
-  'System node + composed-of — real BoA output, disableable via --no-system-node (T-X7-3)',
-  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  'System node + composed-of — real the reference Python app output, disableable via --no-system-node (T-X7-3)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    const { outDir, calm } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
     try {
       const systemNodes = calm.nodes.filter((n) => n['node-type'] === 'system');
       assert.equal(systemNodes.length, 1, 'expected exactly one system node when 2+ real nodes exist');
@@ -1755,7 +1755,7 @@ test(
       assert.equal(container, systemNodes[0]['unique-id']);
       assert.equal(composedNodeIds.length, calm.nodes.length - 1, 'system must be composed-of every OTHER node, not itself');
 
-      const { outDir: outDirNoSys, calm: calmNoSys } = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')], ['--no-system-node']);
+      const { outDir: outDirNoSys, calm: calmNoSys } = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')], ['--no-system-node']);
       try {
         assert.equal(calmNoSys.nodes.filter((n) => n['node-type'] === 'system').length, 0, '--no-system-node must suppress it entirely');
       } finally {
@@ -1938,7 +1938,7 @@ test('Module registry — version-incompatible module is skipped, a throwing mod
 
 // T-B3 (docs/solution/AGENT_TASKS_Solution_Cleanup_and_Prioritized_Actions.md) —
 // a real gap: no fixture in this suite has ever produced a genuine
-// service->service TypedRelationship (BoA/Fineract only ever exercise
+// service->service TypedRelationship (the reference Python app/a reference Java/JAX-RS banking platform only ever exercise
 // service->database). The interacts/connects fix (v0.9 §1, Solution Design
 // v2 §5.3) is only actually proven for that one edge shape unless this case
 // is tested directly. Synthetic TypedFacts, run through the real buildCalm(),
@@ -1992,10 +1992,10 @@ test('Protocol population — JDBC inferred from real evidence (org.postgresql),
 });
 
 test(
-  'Robustness T-R1-3 — Java Graphify import target normalization: real Fineract org.postgresql import now correctly becomes a database unit (was silently unreachable before this fix)',
-  { skip: !fs.existsSync(FINERACT_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
+  'Robustness T-R1-3 — Java Graphify import target normalization: real a reference Java/JAX-RS banking platform org.postgresql import now correctly becomes a database unit (was silently unreachable before this fix)',
+  { skip: !fs.existsSync(JAVA_SAMPLE_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir, calm } = runPipeline([FINERACT_SECURITY_ROOT]);
+    const { outDir, calm } = runPipeline([JAVA_SAMPLE_SECURITY_ROOT]);
     try {
       // Grep-verified: SqlInjectionPreventerServiceImpl.java:29 has
       // `import org.postgresql.core.Utils;` — Graphify's own edge target for
@@ -2026,10 +2026,10 @@ test(
 );
 
 test(
-  'Robustness T-R1-3 — jOOQ strategy dispatched (was not-implemented): real Waltz waltz-data produces 229 real database units, evidence names the real org.jooq.* import',
-  { skip: !fs.existsSync(WALTZ_DATA_ROOT) && 'spikes/waltz/repo/waltz-data not present (scratch clone, see CLAUDE.md)' },
+  'Robustness T-R1-3 — jOOQ strategy dispatched (was not-implemented): real a reference Java governance platform waltz-data produces 229 real database units, evidence names the real org.jooq.* import',
+  { skip: !fs.existsSync(JAVA_SAMPLE2_DATA_ROOT) && 'spikes/waltz/repo/waltz-data not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const { outDir } = runPipeline([WALTZ_DATA_ROOT]);
+    const { outDir } = runPipeline([JAVA_SAMPLE2_DATA_ROOT]);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
       const dbUnits = facts.units.filter((u) => u.kind === 'database');
@@ -2079,11 +2079,11 @@ test('shares-secret relationship kind maps to connects with a distinct descripti
 });
 
 test(
-  'Env soft-graph — OFF by default, real BoA name-correlation when enabled, red-team: no ConfigMap VALUES ever leak (T-X9-0/T-X9-1)',
-  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  'Env soft-graph — OFF by default, real the reference Python app name-correlation when enabled, red-team: no ConfigMap VALUES ever leak (T-X9-0/T-X9-1)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const k8sManifestsDir = path.resolve(BOA_ROOT, '..', '..', 'kubernetes-manifests');
-    const roots = [path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts'), path.join(BOA_ROOT, '..', 'frontend')];
+    const k8sManifestsDir = path.resolve(PYTHON_SAMPLE_ROOT, '..', '..', 'kubernetes-manifests');
+    const roots = [path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts'), path.join(PYTHON_SAMPLE_ROOT, '..', 'frontend')];
 
     // 1. Default (no flag, even with --k8s-manifests present) — must be a no-op.
     {
@@ -2096,7 +2096,7 @@ test(
       }
     }
 
-    // 2. --enable-env-soft-graph — real BoA name correlation.
+    // 2. --enable-env-soft-graph — real the reference Python app name correlation.
     {
       const { outDir, calm } = runPipeline(roots, ['--k8s-manifests', k8sManifestsDir, '--enable-env-soft-graph']);
       try {
@@ -2134,15 +2134,15 @@ test(
 );
 
 test(
-  'Deployment correlation — Java Controller-class naming resolves via normalize+substring, never matches a database/topic unit (generic fix, real full-BoA evidence)',
-  { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  'Deployment correlation — Java Controller-class naming resolves via normalize+substring, never matches a database/topic unit (generic fix, real full-the reference Python app evidence)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
-    const k8sManifestsDir = path.resolve(BOA_ROOT, '..', '..', 'kubernetes-manifests');
-    const ledgerRoot = path.resolve(BOA_ROOT, '..', 'ledger');
+    const k8sManifestsDir = path.resolve(PYTHON_SAMPLE_ROOT, '..', '..', 'kubernetes-manifests');
+    const ledgerRoot = path.resolve(PYTHON_SAMPLE_ROOT, '..', 'ledger');
     const roots = [
-      path.join(BOA_ROOT, 'userservice'),
-      path.join(BOA_ROOT, 'contacts'),
-      path.join(BOA_ROOT, '..', 'frontend'),
+      path.join(PYTHON_SAMPLE_ROOT, 'userservice'),
+      path.join(PYTHON_SAMPLE_ROOT, 'contacts'),
+      path.join(PYTHON_SAMPLE_ROOT, '..', 'frontend'),
       path.join(ledgerRoot, 'balancereader'),
       path.join(ledgerRoot, 'ledgerwriter'),
       path.join(ledgerRoot, 'transactionhistory'),
@@ -2187,12 +2187,12 @@ test(
 );
 
 test(
-  'AREC T-E5 — HITL review trigger: real Fineract fineract-charge (S1) lists the actual units, real BoA (S2 only, S1 does not fire) lists only the flagged unit — offline, deterministic, no LLM',
-  { skip: (!fs.existsSync(FINERACT_ROOT) || !fs.existsSync(BOA_ROOT)) && 'spikes/fineract or spikes/boa not present (scratch clone, see CLAUDE.md)' },
+  'AREC T-E5 — HITL review trigger: real a reference Java/JAX-RS banking platform fineract-charge (S1) lists the actual units, real the reference Python app (S2 only, S1 does not fire) lists only the flagged unit — offline, deterministic, no LLM',
+  { skip: (!fs.existsSync(JAVA_SAMPLE_ROOT) || !fs.existsSync(PYTHON_SAMPLE_ROOT)) && 'spikes/fineract or spikes/boa not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
 
-    const charge = runPipeline([path.join(FINERACT_ROOT, 'fineract-charge')]);
+    const charge = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'typed-facts.json'), 'utf8'));
       const coverage = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'coverage-report.json'), 'utf8'));
@@ -2213,12 +2213,12 @@ test(
       fs.rmSync(charge.outDir, { recursive: true, force: true });
     }
 
-    const boa = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
+    const boa = runPipeline([path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')]);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(boa.outDir, 'typed-facts.json'), 'utf8'));
       const coverage = JSON.parse(fs.readFileSync(path.join(boa.outDir, 'coverage-report.json'), 'utf8'));
       const queue = buildReviewQueue(facts, coverage);
-      // Real baseline: BoA has real service->database relationships (R1) ->
+      // Real baseline: the reference Python app has real service->database relationships (R1) ->
       // S1 must NOT fire. userservice.py has no security-control evidence -> S2 fires for it alone.
       assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0);
       const s2Items = queue.items.filter((i) => i.trigger === 'S2-http-without-security-control');
@@ -2230,11 +2230,11 @@ test(
 );
 
 test(
-  'Robustness T-R4-1 — HITL review trigger: low-architecture-coverage fires on real Fineract fineract-security (17% coverage, S1 does NOT fire), mutually exclusive with S1',
-  { skip: !fs.existsSync(FINERACT_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
+  'Robustness T-R4-1 — HITL review trigger: low-architecture-coverage fires on real a reference Java/JAX-RS banking platform fineract-security (17% coverage, S1 does NOT fire), mutually exclusive with S1',
+  { skip: !fs.existsSync(JAVA_SAMPLE_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
-    const { outDir } = runPipeline([FINERACT_SECURITY_ROOT]);
+    const { outDir } = runPipeline([JAVA_SAMPLE_SECURITY_ROOT]);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
@@ -2629,8 +2629,8 @@ test('Review fix (2026-08-09) — cdxgen-provider scans every matching ecosystem
 test('T-TC1-1 (B-test-code-exclusion) — isTestPath() real positive/negative cases across languages', () => {
   const { isTestPath } = require(path.join(PIPELINE_ROOT, 'dist/rules/test-path'));
 
-  // Real positives, including the actual real Fineract path that found this bug.
-  assert.ok(isTestPath('src/test/java/org/apache/fineract/infrastructure/openapi/FineractOperationIdReaderTest.java'));
+  // Real positives, including the actual real a reference Java/JAX-RS banking platform path that found this bug.
+  assert.ok(isTestPath('src/test/java/com/example/app/infrastructure/openapi/OperationIdReaderTest.java'));
   assert.ok(isTestPath('src/test/java/example/Foo.java'), 'a /test/ directory segment must match regardless of filename');
   assert.ok(isTestPath('tests/foo.py'));
   assert.ok(isTestPath('__tests__/foo.ts'));
@@ -2654,7 +2654,7 @@ test('T-TC1-2/T-TC2-2/T-TC2-3 (B-test-code-exclusion, B-jaxrs-composer-class-sco
     const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
 
     // The test file (2 nested JAX-RS-annotated fixture classes, mirrors the
-    // real FineractOperationIdReaderTest.java shape) must produce ZERO units.
+    // real OperationIdReaderTest.java shape) must produce ZERO units.
     assert.ok(!facts.units.some((u) => u.filePath.includes('MultiResourceFileTest.java')), 'a test file must never become a real architectural unit');
     const testCodeItem = facts.ignoredItems.find((i) => i.reason === 'TEST_CODE' && i.ref.includes('MultiResourceFileTest.java'));
     assert.ok(testCodeItem, 'the excluded test file must be a real, visible TEST_CODE ignored item, never a silent drop');
@@ -2692,9 +2692,9 @@ test('T-TC1-3 (B-test-code-exclusion) — Graphify-driven persistence detection 
   }
 });
 
-test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact real Fineract shape) each resolve to their own real, distinct path', () => {
+test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact real a reference Java/JAX-RS banking platform shape) each resolve to their own real, distinct path', () => {
   const { composeJaxRsRoutes } = require(path.join(PIPELINE_ROOT, 'dist/analysis/jaxrs-route-composer'));
-  // Mirrors FineractOperationIdReaderTest.java's real shape: 5 nested
+  // Mirrors OperationIdReaderTest.java's real shape: 5 nested
   // classes, each with its own class-level @Path immediately followed by
   // one @GET method, in file order.
   const paths = ['/test', '/implicit', '/invalid', '/conflict', '/implicit-conflict'];
