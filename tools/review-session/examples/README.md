@@ -49,6 +49,35 @@ Both files go under this Session Pack's own `drafts/decisions/` and
 `drafts/overrides/` — copy this example's shape, change the ids/values,
 done. No template engine, no code generation required.
 
+## The other common case: "leave open" — a Decision Record with NO Override
+
+AP-4 (`Architect_Pilot_Feedback_Notes.md` Entry 8) — empirically the single
+most common Tier A outcome across two real pilot sessions was the architect
+confirming the scan correctly found nothing real to connect, i.e. picking
+`[none]`/`[leave-open]` rather than a specific candidate. This needs only
+ONE file, not two:
+
+```
+### R-001 (Tier A: multi-candidate-bridge)
+
+ChargesApiResource.java has 0 relationships. Which unit should it connect to?
+
+- [1] Connect to Charge.java
+- [2] Connect to ChargeRepository.java
+- [none] None of these
+- [other] Other…
+```
+
+The architect answers `none`. See **`decision-D-example-002-leave-open.json`**
+— `final_decision.action` is `"accepted"` (the designated value for this
+outcome, per `pipeline/src/types/overrides.ts`'s own comment — it means "the
+scan's finding is confirmed correct," not "a proposed edit was accepted"),
+`new_value` is `null`, and there is **no matching Override file at all** —
+nothing in CALM changes, so there's nothing to override. The Decision Record
+alone is the complete, valid audit trail for this outcome; `validate_drafts.py`
+accepts a Decision Record with no matching Override without error (it only
+requires the reverse — every Override must resolve to an active decision).
+
 ## Validate before you (eventually) apply
 
 ```bash

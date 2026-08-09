@@ -23,6 +23,16 @@ export interface DecisionRecord {
     evidence_refs?: string[];
   };
   final_decision: {
+    // AP-4 (Architect_Pilot_Feedback_Notes.md Entry 8) — 'accepted' is the
+    // DESIGNATED value for a reviewed "leave open" outcome: the architect
+    // (or Tier B drafting agent) confirmed the scan correctly found no real
+    // node/relationship to add or change here, not an inferred best-fit.
+    // No dedicated 'target_ref' Override is written for this case (nothing
+    // in CALM changes) — the Decision Record alone is the audit trail. This
+    // was, empirically, the single most common Tier A outcome across two
+    // real pilot sessions (3/3 residuals in both the Fineract and Bank of
+    // Anthos runs) — worth stating explicitly rather than leaving an
+    // architect or drafting agent to infer the mapping each time.
     action: 'accepted' | 'overridden' | 'added' | 'removed';
     new_value?: unknown;
   };

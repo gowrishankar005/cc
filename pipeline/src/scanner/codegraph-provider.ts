@@ -97,9 +97,11 @@ export function extractDecoratorFacts(cg: any, packageRoot: string, relativeFile
   const result = cg.extractFromSource(relativeFilePath, source);
 
   const nodeKindById = new Map<string, 'class' | 'method' | 'other'>();
+  const nodeNameById = new Map<string, string>();
   for (const n of result.nodes) {
     if (n.kind === 'class') nodeKindById.set(n.id, 'class');
     else if (n.kind === 'method') nodeKindById.set(n.id, 'method');
+    if (n.name) nodeNameById.set(n.id, n.name);
   }
 
   return result.unresolvedReferences
@@ -111,6 +113,7 @@ export function extractDecoratorFacts(cg: any, packageRoot: string, relativeFile
       line: r.line,
       argument: extractLiteralArgument(sourceLines, r.line, r.referenceName),
       fromNodeKind: nodeKindById.get(r.fromNodeId) ?? 'other',
+      fromNodeName: nodeNameById.get(r.fromNodeId),
       language: languageForFile(relativeFilePath),
     }));
 }
@@ -149,9 +152,11 @@ export function extractCallFacts(cg: any, packageRoot: string, relativeFilePath:
   const result = cg.extractFromSource(relativeFilePath, source);
 
   const nodeKindById = new Map<string, 'class' | 'method' | 'other'>();
+  const nodeNameById = new Map<string, string>();
   for (const n of result.nodes) {
     if (n.kind === 'class') nodeKindById.set(n.id, 'class');
     else if (n.kind === 'method') nodeKindById.set(n.id, 'method');
+    if (n.name) nodeNameById.set(n.id, n.name);
   }
 
   const decoratesKeys = new Set(
@@ -174,6 +179,7 @@ export function extractCallFacts(cg: any, packageRoot: string, relativeFilePath:
         line: r.line,
         argument: extractCallArgumentText(sourceLines, r.line, lastSegment),
         fromNodeKind: nodeKindById.get(r.fromNodeId) ?? 'other',
+        fromNodeName: nodeNameById.get(r.fromNodeId),
         language: languageForFile(relativeFilePath),
       };
     });
@@ -203,9 +209,11 @@ export function extractTypeReferenceFacts(cg: any, packageRoot: string, relative
   const result = cg.extractFromSource(relativeFilePath, source);
 
   const nodeKindById = new Map<string, 'class' | 'method' | 'other'>();
+  const nodeNameById = new Map<string, string>();
   for (const n of result.nodes) {
     if (n.kind === 'class') nodeKindById.set(n.id, 'class');
     else if (n.kind === 'method') nodeKindById.set(n.id, 'method');
+    if (n.name) nodeNameById.set(n.id, n.name);
   }
 
   return result.unresolvedReferences
@@ -216,6 +224,7 @@ export function extractTypeReferenceFacts(cg: any, packageRoot: string, relative
       filePath: relativeFilePath,
       line: r.line,
       fromNodeKind: nodeKindById.get(r.fromNodeId) ?? 'other',
+      fromNodeName: nodeNameById.get(r.fromNodeId),
       language: languageForFile(relativeFilePath),
     }));
 }
@@ -248,9 +257,11 @@ export function extractExtendsFacts(cg: any, packageRoot: string, relativeFilePa
   const result = cg.extractFromSource(relativeFilePath, source);
 
   const nodeKindById = new Map<string, 'class' | 'method' | 'other'>();
+  const nodeNameById = new Map<string, string>();
   for (const n of result.nodes) {
     if (n.kind === 'class') nodeKindById.set(n.id, 'class');
     else if (n.kind === 'method') nodeKindById.set(n.id, 'method');
+    if (n.name) nodeNameById.set(n.id, n.name);
   }
 
   return result.unresolvedReferences
@@ -261,6 +272,7 @@ export function extractExtendsFacts(cg: any, packageRoot: string, relativeFilePa
       filePath: relativeFilePath,
       line: r.line,
       fromNodeKind: nodeKindById.get(r.fromNodeId) ?? 'other',
+      fromNodeName: nodeNameById.get(r.fromNodeId),
       language: languageForFile(relativeFilePath),
     }));
 }

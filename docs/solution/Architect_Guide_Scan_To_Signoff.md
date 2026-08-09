@@ -6,6 +6,8 @@
 
 **The workflow this covers is internally called the "residual review session."** If you want a name to call it in conversation: think of it as **the Review Bench** — the workbench where whatever the scan couldn't decide on its own gets finished, reviewed, and signed off. That name is a convenience for this guide, not a renamed product — the code, files, and other docs still say "residual review session" / "Session Pack," and that's fine.
 
+**Hit something not covered here?** [`Architect_Pilot_Feedback_Notes.md`](./Architect_Pilot_Feedback_Notes.md) is a real log of everything a first-time architect actually ran into walking through this guide — worth a check before assuming something unexpected is your mistake.
+
 ---
 
 ## The shape of the whole thing
@@ -46,6 +48,8 @@ Every write into the final CALM file goes through step 5, and step 5 only ever a
 - Python 3, standard library only — no extra install needed for `tools/review-session/`
 - You know the package root(s) you want scanned (one repo, one or more sub-package directories)
 
+**`npm install` prints deprecation warnings and a vulnerability count — expected, not a failure.** The warnings come from transitive sub-dependencies, not this project's own. The vulnerability count (checked: traces to `@cyclonedx/cdxgen`'s `tar`/`undici` sub-deps, not exploitable in how this pipeline uses it — a local filesystem scan, not untrusted network input) is real but not actionable here. **Do not run `npm audit fix --force`** — it bumps `cdxgen` to an untested breaking major version.
+
 ---
 
 ## Step 1 — Scan the repo
@@ -75,11 +79,23 @@ If a pack for this run already exists with unapplied drafts, this refuses to ove
 
 ## Step 3 — Work the pack
 
-**Recommended:** open the repo in VS Code with GitHub Copilot Chat, and use the bound chat mode at `.github/chatmodes/residual-review.chatmode.md`. It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card, and only ever writes proposals under `drafts/` — it cannot apply anything on its own (no terminal access is granted to that mode).
+The chat mode lives at `.github/chatmodes/residual-review.chatmode.md` — it's a real file checked into this repo, not something to fetch separately. It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
 
-**Without Copilot Chat:** open `SESSION.md` directly and hand-author the Decision Record + Override JSON pairs yourself. See `tools/review-session/examples/` for a worked pair — this path works today, it's just more typing.
+**Recommended, strongest safety guarantee: VS Code + GitHub Copilot Chat.**
+1. Open this repo as a workspace in VS Code (the desktop app, not the terminal).
+2. Open the Copilot Chat panel and find its chat-mode picker (usually a dropdown near the chat input).
+3. Select the mode matching this file's `description` frontmatter ("Weaver residual review session...").
+4. Point it at your pack, e.g.: `Read review-sessions/<run-id>/SESSION.md and start the residual review.`
 
-Either way, by the end of this step `review-sessions/<run-id>/drafts/decisions/` and `drafts/overrides/` are populated.
+**Confirmed real** (not just designed): in an actual VS Code Copilot Chat session, the chat wrote a Decision Record and then genuinely stopped — it has no terminal tool available at all, so you run `validate_drafts.py`/`apply.py` yourself in Step 4/5. This is a structural guarantee in this host, not a convention.
+
+**Also works, weaker safety guarantee: Claude Code chat.** The same chat-mode file works when opened directly in Claude Code — same choice cards, same evidence-first behavior. **But confirmed differently here**: Claude Code chat *does* have terminal (`Bash`) access despite the identical file, so nothing structurally stops it from running `apply.py` itself. In practice it stayed within its stated rules (wrote only to `drafts/`, asked before writing) — but the only thing actually enforcing that is the model's own compliance plus this host's per-action permission prompt. **If you use this path: always approve each file write individually, and never choose a blanket "allow all edits this session" option** — that's the one thing standing between you and an unreviewed apply.
+
+**A small cosmetic quirk you may see, host-dependent, not a bug:** every choice card already includes its own "Other…" option (by design). Some hosts' own chat UI adds a second, independent "Other" on top of it — two overlapping ways to say the same thing, harmless.
+
+**Without a chat interface at all:** open `SESSION.md` directly and hand-author the Decision Record + Override JSON pairs yourself. See `tools/review-session/examples/` for two worked examples — a correction (`decision-D-example-001.json` + its Override) and a "leave it open" confirmation (`decision-D-example-002-leave-open.json`, no Override needed) — this path works today, it's just more typing.
+
+Either way, by the end of this step `review-sessions/<run-id>/drafts/decisions/` (and, if anything actually needs to change in CALM, `drafts/overrides/`) are populated.
 
 ## Step 4 — Validate the drafts
 

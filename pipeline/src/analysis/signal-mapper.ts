@@ -1,8 +1,25 @@
+import * as path from 'path';
 import { NativeRouteFact, DecoratorFact } from '../scanner/structural-engine';
 import { SignalCatalogue, findRule } from '../rules/rule-schema';
 import { Evidence, TypedUnit, IgnoredItem } from '../types/typed-facts';
 import { ignoreUnknownSignal } from './ignored-items';
 import { scoreConfidence } from './confidence-scorer';
+
+// AP-3 (Architect_Pilot_Feedback_Notes.md Entries 10, 15) — mapSignalsPass
+// used to hardcode every unit's `name` to its raw file path. Real fix: prefer
+// the actual class name CodeGraph already extracted (DecoratorFact.fromNodeName,
+// only trusted when fromNodeKind === 'class'), falling back to the file's own
+// basename (still far more readable than a full path) when no single,
+// unambiguous class name exists for that file — e.g. a file with 2+ real
+// classes (Entry 12's ChargeConfiguration.java shape) or no class evidence at
+// all (a bare Python/JS module). Never guesses between multiple candidates.
+function deriveUnitName(filePath: string, classNamesByFile: Map<string, Set<string>>): string {
+  const names = classNamesByFile.get(filePath);
+  if (names && names.size === 1) {
+    return [...names][0];
+  }
+  return path.basename(filePath).replace(/\.[^./]+$/, '');
+}
 
 /**
  * requirements v0.6 §3 Slice-1 table, now data-driven off rules/signal-catalogue.yml
@@ -23,6 +40,19 @@ export function mapSignalsToUnits(
   const evidenceByFile = new Map<string, Evidence[]>();
   const linesByFile = new Map<string, { start: number; end: number }>();
   const ignoredItems: IgnoredItem[] = [];
+
+  // AP-3 — real class names seen per file, collected from every fact array
+  // that carries fromNodeKind/fromNodeName (decorators/calls/type-refs/
+  // extends all share the DecoratorFact shape). Native routes carry no
+  // class info (NativeRouteFact has no fromNode fields) — files typed only
+  // via native routes fall through to deriveUnitName()'s basename fallback.
+  const classNamesByFile = new Map<string, Set<string>>();
+  for (const fact of [...decoratorFacts, ...callFacts, ...typeReferenceFacts, ...extendsFacts]) {
+    if (fact.fromNodeKind === 'class' && fact.fromNodeName) {
+      if (!classNamesByFile.has(fact.filePath)) classNamesByFile.set(fact.filePath, new Set());
+      classNamesByFile.get(fact.filePath)!.add(fact.fromNodeName);
+    }
+  }
 
   // Node kind is now decided once, at the end, directly from the CATEGORY
   // of a file's aggregated evidence (see the priority order below) — not
@@ -211,7 +241,7 @@ export function mapSignalsToUnits(
     units.push({
       id: filePath,
       kind,
-      name: filePath,
+      name: deriveUnitName(filePath, classNamesByFile),
       filePath,
       startLine: span.start,
       endLine: span.end,
