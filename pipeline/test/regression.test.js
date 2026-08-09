@@ -110,6 +110,24 @@ test('AP-1 (B-cli-unknown-flag-validation) — a single-dash flag typo fails lou
   }
 });
 
+test('AP-1 self-review fix — a value-taking flag\'s own value must never be checked against the known-flags list', () => {
+  // Regression for a real bug found on self-review: the first version of
+  // checkForUnknownFlags() scanned every arg, including flag VALUES, so a
+  // dash-prefixed --overrides directory would have been wrongly rejected.
+  const outDir = path.join(os.tmpdir(), `ap1-value-${Date.now()}`);
+  const overridesDir = path.join(os.tmpdir(), `-ap1-dash-prefixed-overrides-${Date.now()}`);
+  fs.mkdirSync(overridesDir, { recursive: true });
+  try {
+    // Must NOT throw — a dash-prefixed --overrides value is a legitimate
+    // (if unusual) argument, not an unknown flag.
+    execFileSync('node', [RUN_SLICE, path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'), '--out', outDir, '--overrides', overridesDir], { stdio: 'pipe' });
+    assert.ok(fs.existsSync(path.join(outDir, 'architecture.calm.json')), 'a dash-prefixed --overrides value must not be rejected as an unknown flag');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(overridesDir, { recursive: true, force: true });
+  }
+});
+
 test('Bank of Anthos — cross-package Graphify pass, real relationships, 0 errors 0 warnings', { skip: !fs.existsSync(BOA_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' }, () => {
   const { outDir, calm } = runPipeline([path.join(BOA_ROOT, 'userservice'), path.join(BOA_ROOT, 'contacts')]);
   try {

@@ -271,8 +271,20 @@ const KNOWN_FLAGS = [
   '--from-facts',
 ];
 
+// Flags that consume the NEXT token as their value — that token must never
+// itself be checked against KNOWN_FLAGS (self-review, 2026-08-10: the first
+// version of this function checked every token including flag VALUES, so a
+// real invocation like `--overrides -tmp/session-drafts` would have wrongly
+// rejected a legitimate, if unusually-named, directory argument).
+const VALUE_TAKING_FLAGS = ['--out', '--overrides', '--modules', '--k8s-manifests', '--cfn-manifests', '--from-facts'];
+
 function checkForUnknownFlags(args: string[]): void {
-  for (const token of args) {
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i];
+    if (VALUE_TAKING_FLAGS.includes(token)) {
+      i++; // skip this flag's value — never validated as a flag name itself
+      continue;
+    }
     if (!token.startsWith('-') || KNOWN_FLAGS.includes(token)) continue;
     // Real case this was built for: "-out" (single dash) — prepending one
     // more dash recovers the intended flag name for a helpful suggestion.
