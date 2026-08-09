@@ -4,7 +4,7 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
 **Task list:** [`docs/solution/AGENT_TASKS_Residual_Review_Session.md`](../../docs/solution/AGENT_TASKS_Residual_Review_Session.md)
-**Status:** RS-1 in progress. See the task list for what's built vs. not yet.
+**Status:** RS-1 CLOSED. RS-2 in progress. See the task list for what's built vs. not yet.
 
 ## Non-negotiable rules (S1–S12 — do not violate, do not skip)
 
@@ -38,9 +38,12 @@ tools/review-session/
   test_triage.py           (built) trigger -> tier/class mapping tests
   test_cards.py            (built) card determinism + real-units-only candidates + Tier C never invents relationship_add
   test_chatmode_safety.py  (built) static proof the chat-mode's tools: allowlist excludes every known terminal tool
-  validate_drafts.py      (T-RS2-1, not yet built) schema + integrity checks on drafts/
+  validate_drafts.py      (T-RS2-1, built) schema + integrity checks on drafts/, mirrors override-applier.ts's real validation logic
+  test_validate_drafts.py (built) good fixture passes; bad fixtures (dangling DR ref, superseded decision, dangling relationship endpoint, orphaned target_ref, unknown override_type) fail with clear reasons
+  examples/                (T-RS2-2, built) worked Decision Record + Override pair (synthetic), README explaining the manual draft path — no LLM required
+  effective_ir.py          (T-RS2-3 MVP, built) provenance + node/relationship counts + open residuals + decision log — full 8-section §7.1 template deferred to B-calm-portable-ir
+  test_effective_ir.py     (built) non-empty output, MVP-scope-note present, never touches intelligence-ir.md
   apply.py                (T-RS3-1, not yet built) validate -> run-slice --overrides -> apply-report
-  examples/                (T-RS2-2, not yet built) synthetic Decision Record + Override pairs
 ```
 
 Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitignored by default — see `Architect_Residual_Review_Session.md` §4.1 for why, and the redaction/audit convention for the pieces worth checking in).
@@ -48,13 +51,24 @@ Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitig
 ## How to run
 
 ```bash
-# unit tests (redaction fixtures + triage mapping + card generation + chat-mode safety) + real end-to-end (needs pipeline/dist built)
+# all unit tests + real end-to-end (needs pipeline/dist built)
 cd tools/review-session
-python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety -v
+python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety test_validate_drafts test_effective_ir -v
 
 # build a real pack from a real run-slice out-dir
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
 python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
+
+# hand-author drafts (see examples/README.md), then validate before applying
+python3 validate_drafts.py --session-dir ../../review-sessions/my-run --calm /tmp/my-run/architecture.calm.json
+
+# apply today, before apply.py exists (RS-3) — merge decisions+overrides into one dir first, see examples/README.md
+node ../../pipeline/dist/orchestration/run-slice.js --from-facts /tmp/my-run/typed-facts.json \
+  --overrides <merged decisions+overrides dir> --out /tmp/my-run-reviewed
+
+# effective architecture summary (MVP)
+python3 effective_ir.py --calm /tmp/my-run-reviewed/architecture.calm.json --session-dir ../../review-sessions/my-run \
+  --out ../../review-sessions/my-run/effective-architecture-ir.md
 ```
 
 `pack.py` refuses to overwrite a session dir that already has unapplied drafts (fails loud, exit code 1) — apply or discard first.

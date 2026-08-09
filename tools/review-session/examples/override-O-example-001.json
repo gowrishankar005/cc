@@ -1,0 +1,12 @@
+{
+  "override_id": "O-example-001",
+  "module": "architecture",
+  "target_ref": "svc-prisma-service",
+  "override_type": "type_change",
+  "new_value": "database",
+  "decision_record_ref": "D-example-001",
+  "applied_since_run": null,
+  "status": "active",
+  "created_by": "architect:example",
+  "created_at": "2026-08-09T00:00:00Z"
+}

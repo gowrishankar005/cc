@@ -19,7 +19,7 @@
 ```
 RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
   → RS-1  Session pack + triage + choice-card templates + chat-mode (no LLM draft required) ── DONE (2026-08-09)
-  → RS-2  validate_drafts + effective IR (MVP)  [ir-to-calm may defer to B-calm-portable-ir]
+  → RS-2  validate_drafts + effective IR (MVP)  [ir-to-calm may defer to B-calm-portable-ir] ── DONE (2026-08-09, MVP scope)
   → RS-3  apply.py + apply-report + initial --baseline
   → RS-4  Optional Tier B LLM drafting (system prompt §5.1) + fabricate traps
   → RS-5  Eval traps, pilot scorecard note, optional prose rewrite, portable IR if deferred
@@ -231,6 +231,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Checks** | DR JSON matches DecisionRecord fields; Override has `decision_record_ref` to active DR; override_type supported; relationship_add is connects-shaped; endpoints exist in typed-facts/CALM nodes; no typed-facts paths written |
 | **Exit** | Good fixture passes; bad fixtures fail with clear reasons |
+| **Status** | **done, 2026-08-09.** `tools/review-session/validate_drafts.py` mirrors `override-applier.ts`'s real validation logic in Python (same field requirements, same rejection wording style) — a draft that passes here is not a surprise at real apply time. **Real finding while building this**: the Session Pack's own `drafts/decisions/` + `drafts/overrides/` split (design §4.1) is structurally incompatible with `override-applier.ts`'s current `loadOverridesDir()`, which scans ONE flat directory — apply.py (RS-3) will need to merge both before calling `run-slice --overrides`, matching that task's own "copy/point overrides dir" phrasing; not a bug, a real integration detail named here before RS-3 hits it blind. 12 unit tests (good fixture passes; dangling `decision_record_ref`; superseded decision rejected; unknown `override_type`; `boundary_change` is a warning not an error, matching real apply-time behavior; orphaned `type_change` target; dangling `relationship_add` endpoint; the design's own same-batch-`node_add` exception honored). **Verified via the real CLI, not just the in-process function**: ran against a synthetic good/bad fixture pair with `--calm`, confirmed exit 0/clean and exit 1/clear-reason respectively. |
 
 ### T-RS2-2 — Manual draft path documented
 
@@ -238,6 +239,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Deliverable** | Example DR + Override pair in `tools/review-session/examples/` (synthetic ids) + how architect pastes from choice answer |
 | **Exit** | Human can create drafts without LLM |
+| **Status** | **done, 2026-08-09.** `tools/review-session/examples/` — a worked, synthetic Decision Record + Override pair (mirroring the design's own §2.1 PrismaService example) + `README.md` walking through choice-card-answer → DR/Override by hand. **Proven end-to-end for real, not just documented**: ran the example pair through `validate_drafts.py` against a synthetic CALM (clean pass), then ran the FULL real path — a real `run-slice.js` scan of the NestJS fixture, a hand-authored DR+Override merged into one directory, applied via `run-slice.js --from-facts --overrides` — confirmed the target node's `node-type` genuinely changed (`service` → `database`) and `calm validate` still reported 0 errors. This is the first time in this whole program that an override has been applied end-to-end from a human-authored draft, not a synthetic test fixture. |
 
 ### T-RS2-3 — Effective IR MVP generator
 
@@ -247,6 +249,7 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 | **Preferred** | §7.1 sections 1–7 templated; fenced calm fragments only if complete and schema-aligned (`x-aac-relationship-grade`, metadata arrays) |
 | **Defer OK** | Full ir-to-calm + checksum → **B-calm-portable-ir** if called out on BACKLOG |
 | **Exit** | Real post-apply CALM produces non-empty effective IR; facts-IR honesty not overwritten |
+| **Status** | **MVP done, 2026-08-09 — full §7.1 richness explicitly deferred, not silently dropped.** `tools/review-session/effective_ir.py` builds the stated minimum: provenance table, node inventory (grouped by kind, overridden nodes annotated), relationships by `x-aac-relationship-grade`, open residuals (from `residuals.json`), decision log (from `drafts/decisions/`). **Not built**: the full 8-section template with literal `calm-node`/`calm-relationship` fenced fragments and checksum drift detection (§7.1/§7.4) — that's **T-RS2-4 below, deferred to B-calm-portable-ir** per the design's own explicit MVP-cut allowance (§0.4). 6 unit tests + **real verification against actual applied CALM** (the same real override-applied output from T-RS2-2's test): non-empty output confirmed, and `intelligence-ir.md` confirmed byte-identical before/after (hashed, not assumed) — this tool never touches it. |
 
 ### T-RS2-4 — (Optional same phase) `ir-to-calm` + checksum
 
@@ -254,12 +257,15 @@ RS-0  Design sign-off          ── DONE (Gowri, 2026-08-08)
 |---|---|
 | **Only if** | Not deferring portable IR |
 | **Exit** | Round-trip calm validate; hand-edit fails checksum |
+| **Status** | **Deferred to B-calm-portable-ir**, per the design's own §0.4 MVP-cut allowance and T-RS2-3's own "Defer OK" line — not built this phase. Named explicitly here (not silently skipped) so a future session knows this was a deliberate scope decision, not an oversight. |
 
-**RS-2 exit checklist**
+**RS-2 exit checklist — ALL DONE (MVP scope), 2026-08-09. Phase RS-2 CLOSED.**
 
-- [ ] validate_drafts green  
-- [ ] Effective IR MVP or explicit defer of portable IR  
-- [ ] No TypedFacts mutation  
+- [x] validate_drafts green — 12 tests, plus real CLI verification against real synthetic good/bad fixtures  
+- [x] Effective IR MVP built; full portable-IR richness (T-RS2-4) explicitly deferred to **B-calm-portable-ir**, not silently dropped  
+- [x] No TypedFacts mutation — confirmed structurally (no code path in any RS-2 tool writes `typed-facts.json`) and empirically (`intelligence-ir.md` hash unchanged across a real effective-IR generation run)  
+
+**51 real tests total across `tools/review-session/`** (all RS-1 tests + `test_validate_drafts` ×12 + `test_effective_ir` ×6). Real, first-of-its-kind proof this session: a hand-authored Decision Record + Override, applied via the existing `run-slice --overrides` mechanism, genuinely changed a real CALM node's type — the manual draft path this whole design sits on top of is now proven working end-to-end, not just specified. **Next: RS-3** (`apply.py` wrapping the merge-and-apply flow T-RS2-1 found necessary, `apply-report.md`, initial `--baseline`).
 
 ---
 
@@ -438,6 +444,7 @@ Start at first incomplete RS-1 task (T-RS1-1) unless the user names a later phas
 
 | Date | Note |
 |---|---|
+| 2026-08-09 | **Phase RS-2 CLOSED (MVP scope) — T-RS2-1/2/3 done, T-RS2-4 explicitly deferred to B-calm-portable-ir.** `validate_drafts.py` mirrors `override-applier.ts`'s real integrity checks; found and named a real (not yet fixed) integration gap along the way — the Session Pack's split `drafts/decisions/`+`drafts/overrides/` layout doesn't match `override-applier.ts`'s single-flat-directory scan, so RS-3's `apply.py` will need to merge them. `examples/` proves the manual (no-LLM) draft path end-to-end for real — a hand-authored override genuinely changed a real CALM node's type via the existing `run-slice --overrides` mechanism, `calm validate` still 0 errors. `effective_ir.py` (MVP) generates a real, non-empty effective-architecture summary from real applied CALM, confirmed (by hash, not assumption) to never touch `intelligence-ir.md`. 51 real tests total across the tool suite. Next: RS-3. |
 | 2026-08-09 | **Phase RS-1 CLOSED — T-RS1-6 done, all 6 RS-1 tasks complete.** `pack.py`'s `SESSION.md` gained the numbered 1-9 walkthrough (design §2), a real copy-pasteable apply command (caught and fixed a first-draft placeholder-phrase bug by reading actual rendered output), and a CALM-viewer section (design §4.5). `AGENTS.md` now references the real chat-mode file and names Guided mode. RS-1 exit checklist fully closed: 33 real tests, zero pipeline/ diff across the whole program, no network anywhere in the tool, B-scale-oom-scale test passed. S9 (bulk-apply one-DR-per-residual) honestly noted as *addressed* at this phase (never violated by RS-1's own tooling) but not yet *mechanically enforced* — that's `validate_drafts.py`'s job, correctly scoped to RS-2. Next: RS-2. |
 | 2026-08-09 | **T-RS1-5 (Copilot chat-mode file, safety-critical) done.** `.github/chatmodes/residual-review.chatmode.md` — S4 enforced via the real `tools:` frontmatter allowlist (excludes every terminal/execution tool), mechanically verified by `test_chatmode_safety.py` (7 tests, confirmed to actually catch a violation by injecting one and watching it fail). Honestly disclosed limit stated in both the file's own header and here: never exercised in a live VS Code + Copilot Chat session, since no such environment exists in this sandbox — same disclosed-limit pattern as this project's Dockerfile/CI workflow entries. 33 tests total across the RS-1 tool suite now. |
 | 2026-08-09 | **T-RS1-4 (choice-card generator) done.** `tools/review-session/cards.py` — fixed per-class option templates for all 4 classes `triage.py` produces, wired into `pack.py` (`residuals.json` gains a `card` field, `SESSION.md` embeds full rendered cards). 10 real tests (`test_cards.py`). Found and fixed a real bug by checking actual rendered output against the NestJS fixture, not assuming the generator was correct: evidence lines were duplicated (a unit's evidence array can cite the same file:line twice, from two different Evidence sources) and could show a blank line as the preview — both fixed, regression-tested. 26 tests total across the RS-1 tool suite, all passing. |

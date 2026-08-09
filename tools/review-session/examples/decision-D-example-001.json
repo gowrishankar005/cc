@@ -1,0 +1,22 @@
+{
+  "decision_id": "D-example-001",
+  "module": "architecture",
+  "target_type": "node",
+  "target_ref": "svc-prisma-service",
+  "original_suggestion": {
+    "proposed_type": "service",
+    "confidence_score": 40,
+    "evidence_refs": ["services/prisma/prisma.service.ts:1"]
+  },
+  "final_decision": {
+    "action": "overridden",
+    "new_value": "database"
+  },
+  "rationale": "Architect answered residual R-014 (ontology-judgment) with option [1]: PrismaService extends PrismaClient directly (confirmed via source read-back at services/prisma/prisma.service.ts:1-4) and owns the DB client, not a thin facade — matches Architect_Residual_Review_Session.md §2.1's own worked example.",
+  "evidence_snapshot": ["services/prisma/prisma.service.ts:1: export class PrismaService extends PrismaClient implements OnModuleInit {"],
+  "reviewer": "architect:example",
+  "reviewed_at": "2026-08-09T00:00:00Z",
+  "source_run_id": "example-run-001",
+  "status": "active",
+  "supersedes": null
+}
