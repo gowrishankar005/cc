@@ -44,12 +44,18 @@ See `coe-lab/ISOLATION.md`. Gold paths are also listed in `.cursorignore` / `.gr
 
 ## Build and run
 
+**Prerequisite:** Python with `graphifyy` on `PATH` (`pip install graphifyy`) — required for the Graphify cross-package pass. Missing it doesn't fail the build; it degrades cross-package detection instead (caught, logged as a warning, run continues without cross-package relationships).
+
 ```bash
 cd pipeline && npm install && npm run build
 node dist/orchestration/run-slice.js <package-root> [<package-root> ...] --out <dir>
 npm run validate -- <dir>/architecture.calm.json -f pretty   # FINOS calm-cli schema validation
 npm test                                                      # full regression suite
+
+cd ../tools/review-session && python3 -m unittest discover -s . -p "test_*.py"  # separate Python test suite (residual-review tooling), not covered by npm test
 ```
+
+`npm test` baseline on a fresh clone: **64 pass, 0 fail, 25 skip**. The skips are tests gated on third-party sample repos under `spikes/` (gitignored, never committed — see "Working in this repo" below); more tests pass locally if those scratch clones happen to be present.
 
 ## Pipeline architecture
 
@@ -69,7 +75,7 @@ Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with 
 
 **Vendor isolation** — `scanner/structural-engine.ts` defines a neutral `StructuralEngine` interface; only `codegraph-provider.ts` imports the CodeGraph SDK directly, so a future alternate engine is a second implementation swapped in at one call site, not a change to every consumer.
 
-**Module registry** — `TypedFacts` carries a `contractVersion`; `modules/registry.ts` skips a module that declares an incompatible major version and isolates a throwing module rather than crashing the whole run. Module outputs are namespaced under `outDir/modules/<name>/`.
+**Module registry** — `TypedFacts` carries a `contractVersion`; `modules/registry.ts` skips a module that declares an incompatible major version and isolates a throwing module rather than crashing the whole run. Module outputs are namespaced under `outDir/modules/<name>/`. See [`docs/solution/Module_Authoring_Guide.md`](docs/solution/Module_Authoring_Guide.md) for adding a new module and [`docs/solution/Contract_Evolution_Policy.md`](docs/solution/Contract_Evolution_Policy.md) for when a change to `TypedFacts` requires a `contractVersion` bump versus a catalogue-only change.
 
 ## Known, disclosed limitations
 
