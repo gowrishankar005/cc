@@ -7,9 +7,8 @@ import { DeployableManifest } from '../scanner/deployable-manifest-provider';
 import { logMem } from '../util/debug-mem';
 
 /**
- * Wave M T-M7 (Modularity_and_Integration_Assessment.md friction F1 — "the
- * highest-impact modularity fix without inventing a fake unified Engine
- * interface"). `run-slice.ts` used to be a single function body where
+ * The highest-impact modularity fix without inventing a fake unified Engine
+ * interface. `run-slice.ts` used to be a single function body where
  * mapSignals, JAX-RS composition, persistence detection, and reconciliation
  * were all inline steps — every new analysis step meant editing that one
  * function, not registering something named. This is the fix: an ordered

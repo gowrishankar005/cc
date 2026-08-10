@@ -36,7 +36,7 @@ export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePath
     {
       kind: 'database',
       category: 'persistence',
-      weight: 20, // persistence signal weight, Gap_Closure_Build_Ready_Specs_v0.1.md §7
+      weight: 20, // persistence signal weight
       confidence: 20,
       unknownLibraryFallback: 'unknown-persistence-lib',
     },

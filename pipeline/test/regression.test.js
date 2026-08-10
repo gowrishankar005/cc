@@ -393,7 +393,7 @@ test(
       assert.ok(resource, 'ChargesApiResource.java node missing');
       const rbac = resource.controls?.['security-rbac-002'];
       assert.ok(rbac, 'expected security-rbac-002 (call-site) control — context.authenticatedUser().validateHasReadPermission(...) is real, grep-verified evidence in this file');
-      // Grep-verified exact lines: 84, 101, 129 (docs/solution/AREC_R2_MultiHop_Strategy.md §1's own re-investigation of this file).
+      // Grep-verified exact lines: 84, 101, 129.
       const lines = rbac.requirements.map((r) => r.config.evidenceRef).sort();
       assert.deepEqual(lines, [
         'src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java:101',
@@ -2692,7 +2692,7 @@ test('T-TC1-3 (B-test-code-exclusion) — Graphify-driven persistence detection 
   }
 });
 
-test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact a real reference Java/JAX-RS banking platform shape) each resolve to their own real, distinct path', () => {
+test('T-TC2-1 (B-jaxrs-composer-class-scoping) — direct unit test: 5 nested classes in one file (the exact shape seen in a reference Java/JAX-RS banking platform) each resolve to their own real, distinct path', () => {
   const { composeJaxRsRoutes } = require(path.join(PIPELINE_ROOT, 'dist/analysis/jaxrs-route-composer'));
   // Mirrors OperationIdReaderTest.java's real shape: 5 nested
   // classes, each with its own class-level @Path immediately followed by

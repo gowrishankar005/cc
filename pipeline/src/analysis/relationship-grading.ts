@@ -1,9 +1,9 @@
 import { TypedRelationship, TypedUnit } from '../types/typed-facts';
 
 /**
- * AREC Wave 3 T-A2 (Architecture_Relation_Evidence_Completeness.md §3, R0
- * product rule 1: "R0 may always run. Output should be graded or described
- * so entity-entity mesh is not sold as 'service architecture.'"). Generic
+ * Product rule: structural (R0) relationships may always run, but output
+ * should be graded or described so entity-entity mesh is not sold as
+ * "service architecture." Generic
  * over TypedUnit.kind/TypedRelationship.kind — no relationship producer
  * (graphify-reconciler, k8s-trust-detector, env-soft-graph-detector,
  * outbound-http-detector) needs to know about grading; this runs once, last,

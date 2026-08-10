@@ -100,7 +100,7 @@ export interface TypedUnit {
   startLine: number;
   endLine: number;
   evidence: Evidence[];
-  confidence: number; // 0-100, Gap_Closure_Build_Ready_Specs_v0.1.md §7 bands
+  confidence: number; // 0-100, weighted confidence bands
 }
 
 export interface TypedRelationship {
@@ -126,10 +126,8 @@ export interface TypedRelationship {
   // other relationship producer leaves it unset, which relationship-builder.ts
   // correctly treats as "no confidence claim," not zero.
   confidence?: number;
-  // AREC Wave 3 T-A2 — additive OPTIONAL field (Contract_Evolution_Policy.md
-  // §2(b), no CONTRACT_VERSION bump). Design (A) from
-  // Architecture_Relation_Evidence_Completeness.md §3's "TypedFacts impact"
-  // options. Computed generically by analysis/relationship-grading.ts's
+  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no
+  // CONTRACT_VERSION bump). Computed generically by analysis/relationship-grading.ts's
   // gradeRelationshipsPass (last pass in DEFAULT_PASSES, after every
   // relationship producer) from rel.kind + endpoint TypedUnit.kind — never
   // from a repo-specific name. 'structural': Graphify dual-unit edge with

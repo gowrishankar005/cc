@@ -1,5 +1,4 @@
-# Catalogue for persistence-detector.ts (Wave M T-M9,
-# Modularity_and_Integration_Assessment.md friction F5). Java persistence has
+# Catalogue for persistence-detector.ts. Java persistence has
 # at least four genuinely different code shapes — JPA @Entity classes,
 # Spring Data repository interfaces, jOOQ typed queries, plain driver
 # imports — and the old persistence-detector.ts hardcoded only one of them

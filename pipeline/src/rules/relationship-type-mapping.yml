@@ -1,7 +1,6 @@
 # Catalogue 2b (docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.3).
 # {relationshipKind, sourceNodeType, targetNodeType} -> CALM relationship-type
-# + protocol (when known, honestly null when not — core.json#/defs/protocol
-# enum, requirements v0.9 §1 / CALM_Construct_Reference_Deep_Dive_Spike.md §5).
+# + protocol (when known, honestly null when not — core.json#/defs/protocol enum).
 #
 # THIS IS THE interacts/connects BUG FIX: every row this pipeline can
 # currently produce resolves to `connects` — confirmed against the
@@ -9,9 +8,9 @@
 # even for in-process, non-network delegation, so it's the real default for
 # node-to-node relationships generally, not strictly "network connections").
 # `interacts` is actor-centric fan-out (actor -> nodes[]) and is never emitted
-# by any row here, because this pipeline has no actor-node detection yet
-# (requirements v0.9 §1's explicit recommendation). Adding actor detection
-# later means adding a row, not touching relationship-builder.ts.
+# by any row here, because this pipeline has no actor-node detection yet.
+# Adding actor detection later means adding a row, not touching
+# relationship-builder.ts.
 
 version: "0.1.0"
 

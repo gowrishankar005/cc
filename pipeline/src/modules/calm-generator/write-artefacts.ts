@@ -32,7 +32,7 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
   let calm: CalmDocument = buildCalm(facts, includeSystemNode);
   logMem('write-artefacts after buildCalm');
 
-  // Solution Design v2 §5.4 / Gap_Closure_Build_Ready_Specs_v0.1.md §6: a
+  // Solution Design v2 §5.4: a
   // final, auditable pass over the DETERMINISTIC output above — never
   // changes what the deterministic core concluded, only patches its output
   // when a human (or the bounded LLM advisory layer) has recorded a real,

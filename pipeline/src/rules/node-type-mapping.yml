@@ -27,7 +27,7 @@ mappings:
   # construct — matches this project's own established convention of
   # reusing an existing CALM enum value for a new architectural category
   # rather than inventing one (the same reasoning `system` got for the
-  # composite/boundary case, per CALM_Construct_Reference_Deep_Dive_Spike.md).
+  # composite/boundary case).
   - unitKind: topic
     calmNodeType: network
     interfaceCategories: []

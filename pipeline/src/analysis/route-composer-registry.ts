@@ -3,7 +3,6 @@ import { composeJaxRsRoutes } from './jaxrs-route-composer';
 import { pushAll } from './pass-registry';
 
 /**
- * Wave M T-M8 (Modularity_and_Integration_Assessment.md friction F4):
  * `composeJaxRsRoutes` used to be called directly, inline, in run-slice.ts's
  * main loop — correct behavior, wrong extension model. The next
  * language/framework needing route composition (a non-native route stack

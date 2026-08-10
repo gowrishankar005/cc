@@ -698,7 +698,7 @@ Both become `signal-catalogue.yml` rows plus `control-requirement-catalogue.yml`
 | **Two-tier mapping-config** (`global/` + `domains/<domain>/`) | Specified since `Gap_Closure §4`, still unbuilt, already flagged in §11. Distinct from §5's construct-mapping catalogues (a different concern) — both needed, only the latter designed here. |
 | **Golden-dataset regression program** | §8 commits to a *floor* (automate the existing the reference Python app/NestJS checks so catalogue edits can't silently regress counts), explicitly not a full program. Unchanged, deliberate. |
 | **`interacts` / actor nodes** | No longer permanently unreachable — §4.1's k8s Ingress → `actor` node is the concrete path. Still backlog, but now with a named mechanism rather than a dead schema branch. |
-| **Scala/Spark (a large financial-services organization data tier)** | Out of scope by language. Real, evidenced (`v0.14`), named — a a large financial-services organization-shaped estate has a data tier this design cannot see at all. |
+| **Scala/Spark (a large financial-services organization data tier)** | Out of scope by language. Real, evidenced, named — a large financial-services-organization-shaped estate has a data tier this design cannot see at all. |
 
 ---
 

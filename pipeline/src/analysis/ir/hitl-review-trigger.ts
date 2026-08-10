@@ -69,8 +69,7 @@ export interface ReviewQueueItem {
  * 50% is a real, reviewable starting threshold (below half of a run's
  * services having ANY real outbound architecture edge is a reasonable bar
  * for "worth a human look"), same "draft, not physics, expected to be
- * recalibrated" framing as every other weight/threshold in this project
- * (Gap_Closure_Build_Ready_Specs_v0.1.md §7's own confidence-band framing).
+ * recalibrated" framing as every other weight/threshold in this project.
  */
 const LOW_ARCHITECTURE_COVERAGE_THRESHOLD = 0.5;
 

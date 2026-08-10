@@ -203,7 +203,7 @@ rules:
   # validateHasPermission family, just a different framework's own vocabulary
   # (confirmed real call sites beyond the helper itself: SettingsEndpoint.java:100,
   # LicenceEndpoint.java:119, BulkUploadLegalEntityRelationshipEndpoint.java:98).
-  # A DIFFERENT real repo's real vocabulary, not a a reference Java/JAX-RS banking platform-shaped guess —
+  # A DIFFERENT real repo's real vocabulary, not a reference Java/JAX-RS banking platform-shaped guess —
   # exactly the breadth this task exists to add. Weighted 40, same tier as
   # the other definite (not merely corroborating) call-site controls.
   - id: java-user-role-service-check

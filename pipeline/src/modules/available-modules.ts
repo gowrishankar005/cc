@@ -3,11 +3,10 @@ import { calmGeneratorModule } from './calm-generator/write-artefacts';
 import { threatSignalsModule } from './threat-signals';
 
 /**
- * The built-in name -> Module lookup (Wave M T-M1). Before this, adding a
+ * The built-in name -> Module lookup. Before this, adding a
  * module to a run meant editing `run-slice.ts`'s hardcoded
  * `runModules([calmGeneratorModule, threatSignalsModule], ...)` call — a
- * core-file edit, not a "seamless module add" (Modularity_and_Integration_Assessment.md
- * §5 F3). `run-slice.ts` now resolves module NAMES (via `--modules
+ * core-file edit, not a "seamless module add". `run-slice.ts` now resolves module NAMES (via `--modules
  * calm-generator,threat-signals` or the default list below) against this
  * map — adding an internal module still means adding one entry here, not
  * touching orchestration logic, and an external/third-party module could

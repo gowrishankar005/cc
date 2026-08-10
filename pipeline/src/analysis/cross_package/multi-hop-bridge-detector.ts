@@ -3,9 +3,8 @@ import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-fac
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 
 /**
- * AREC Wave 3 T-C1 (docs/solution/AREC_R2_MultiHop_Strategy.md — the R2
- * design note this implements). Produces architecture-grade relationships
- * for the layered shape R0/R1 structurally cannot see: a `service` unit
+ * Produces architecture-grade relationships for the layered shape R0/R1
+ * structurally cannot see: a `service` unit
  * references a BRIDGE (an interface/type with zero TypedUnits of its own —
  * no HTTP/persistence/messaging/security-control evidence, e.g. a reference Java/JAX-RS banking platform's
  * `ChargeReadPlatformService`), and that bridge is `implements`-ed by
@@ -25,7 +24,7 @@ const R2_SAME_ROOT_CONFIDENCE = 15;
 /** Lower again — the bridge's implementer was resolved in a DIFFERENT scanned root than the source service, a larger, Q11-labeled claim. */
 const R2_CROSS_ROOT_CONFIDENCE = 10;
 /**
- * AREC R2b (docs/solution/AREC_R2b_Implementer_Store_Hop.md §2.1) — the sole
+ * The second-hop case: the sole
  * implementer is itself not a database/topic unit (a plain service/JDBC/
  * RowMapper-shaped class, real layered-Java shape), but it imports/references
  * EXACTLY ONE database/topic unit directly. Two inference layers deep (bridge
@@ -131,10 +130,10 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
       continue;
     }
 
-    // AREC R2b (docs/solution/AREC_R2b_Implementer_Store_Hop.md §2) —
     // Phase 1's terminal check just failed (implementer is absent, or exists
-    // but isn't itself a database/topic unit — the real a reference Java/JAX-RS banking platform
-    // JDBC-RowMapper/plain-service-layer shape). Before giving up, chase ONE
+    // but isn't itself a database/topic unit — the real JDBC-RowMapper/
+    // plain-service-layer shape seen in a reference Java/JAX-RS banking
+    // platform). Before giving up, chase ONE
     // more hop through what the implementer itself imports/references,
     // filtered to targets that are ALREADY a database/topic TypedUnit (no
     // new detection mechanism — reuses whatever R1/persistence-detector/

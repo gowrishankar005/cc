@@ -74,8 +74,7 @@ function isValidConnectsRelationship(value: unknown): value is CalmRelationship 
 /**
  * Applies ACTIVE overrides to an already-deterministically-built CalmDocument
  * — the final pass, per Solution Design v2 §5.4. Mechanically enforces the
- * "no override without a traceable decision" integrity rule from
- * Gap_Closure_Build_Ready_Specs_v0.1.md §6: an Override whose
+ * "no override without a traceable decision" integrity rule: an Override whose
  * decision_record_ref doesn't resolve to a real, ACTIVE Decision Record in
  * the same directory is rejected, not applied and not silently dropped —
  * every rejection is reported so a run doesn't silently ignore a
