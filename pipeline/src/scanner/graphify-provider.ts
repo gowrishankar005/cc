@@ -101,8 +101,8 @@ function computeCommonAncestor(roots: string[]): string {
  * --code-only --no-cluster is the exact flag combination the tool comparison
  * confirmed makes clean, network-call-free, no-API-key runs.
  *
- * PERSISTENT cache dir, not a temp dir deleted after every run. Real finding
- * this session: `graphify extract` is already incremental on its own when
+ * PERSISTENT cache dir, not a temp dir deleted after every run. Real finding:
+ * `graphify extract` is already incremental on its own when
  * pointed at the SAME --out directory across runs — it hashes each file's
  * content and skips re-extracting anything unchanged (confirmed: a second
  * run against an unchanged fixture went from a full AST pass to "0 changed,

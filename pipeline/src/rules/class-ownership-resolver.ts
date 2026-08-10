@@ -21,8 +21,8 @@ const MAX_HEADER_LINES = 10; // bounded scan — real class headers (even multi-
  * `extends Y`, `implements Z` on separate lines, confirmed via
  * `prisma.service.ts:13-16`) back from source, bounded to a small window
  * ending at the opening `{`, and check for `extends <baseClassName>`. Same
- * read-back technique already proven twice this session (T-R1-3's Java
- * import-target resolution, decorator/call-argument extraction) — applied
+ * read-back technique already proven elsewhere (Java import-target
+ * resolution, decorator/call-argument extraction) — applied
  * here to a different structural gap in the same underlying tool.
  */
 export function classExtendsBaseClass(absoluteFilePath: string, classSourceLocation: string, baseClassName: string, fileLineCache: Map<string, string[]>): boolean {

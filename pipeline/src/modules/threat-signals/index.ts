@@ -5,7 +5,7 @@ import { Module, ModuleContext } from '../registry';
 
 /**
  * The actual test of Goal A ("platform, not CALM-only script") — sketched
- * in Solution Design v2 §9, built for real this session as the second
+ * in Solution Design v2 §9, built for real as the second
  * module. Consumes typed-facts.json only — no change to Scanner, Rules,
  * Analysis, or CALM Generator was needed to write this file.
  *

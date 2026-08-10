@@ -10,7 +10,7 @@ import { TypedUnit, TypedRelationship } from '../../types/typed-facts';
  * roots. Replaces a from-scratch FQN-stitcher (v0.6 §4 Option B) — see the
  * plan's Context section for why.
  *
- * Rewritten this session to work off ONE global GraphifyRun instead of a
+ * Rewritten to work off ONE global GraphifyRun instead of a
  * Map<root, graph> — the earlier per-root-Map design could only ever look up
  * both endpoints of an edge under the SAME root prefix, which made
  * `crossPackage: true` structurally unreachable regardless of what Graphify

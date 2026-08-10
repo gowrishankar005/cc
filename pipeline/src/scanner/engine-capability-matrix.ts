@@ -36,7 +36,7 @@ export function loadEngineCapabilityMatrix(scannerDir: string = __dirname): Engi
  * StructuralEngine, structural-engine.ts). Confirms the matrix stays in
  * sync with what's actually running (primaryEngine for jax-rs/jpa really is
  * codegraph-extract-from-source, not codeql) rather than letting docs and
- * code drift the way v2 §6.1's YAML once did before this session's fix.
+ * code drift the way v2 §6.1's YAML once did before this fix.
  */
 export function logEngineCapabilitySummary(matrix: EngineCapabilityMatrix): void {
   const proven = matrix.routes.filter((r) => r.evidenceLevel === 'proven' || r.evidenceLevel === 'proven-entity-only').length;

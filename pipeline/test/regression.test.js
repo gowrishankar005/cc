@@ -281,7 +281,7 @@ test(
       const ids = calm.nodes.map((n) => n['unique-id']);
       assert.equal(new Set(ids).size, ids.length, 'duplicate unique-id found — persistence double-emit regression');
 
-      // AREC Wave 3 T-D1 — real bug found and fixed this session:
+      // Real bug found and fixed:
       // AppUser.java is a genuine @Entity that ALSO calls
       // validateHasPermission()/validateHasReadPermission() internally. The
       // old "service wins any tie" precedence would have mistyped it
@@ -860,7 +860,7 @@ test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging doubl
   try {
     fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
-    // Real bug found this session (T-E3): OrdersDynamoStore imports BOTH
+    // Real bug found: OrdersDynamoStore imports BOTH
     // @aws-sdk/client-dynamodb (persistence) AND @aws-sdk/client-sqs
     // (messaging) — detectPersistencePass and detectMessagingPass each
     // independently walked file->contains->class over the same file,
@@ -1047,9 +1047,9 @@ test('Lambda RequestHandler -> service (not database, not invisible); handler th
   fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    // WDL-1 clean positive case: TierService has NO Dynamo import of its
+    // Clean positive case: TierService has NO Dynamo import of its
     // own — before this fix it was invisible (0 units at all), matching
-    // the real aws-saas-boost-tenant-service finding (HT-ASB-007).
+    // a real finding from a reference AWS SaaS sample's tenant-service.
     const tierService = findNode(calm, 'TierService.java');
     assert.ok(tierService, 'TierService.java must be a real service unit (was invisible before T-Y3-1)');
     assert.equal(tierService['node-type'], 'service');
@@ -1058,14 +1058,12 @@ test('Lambda RequestHandler -> service (not database, not invisible); handler th
     // a bogus path-interface. Paths are Y4's job (CFN join), not yet built.
     assert.equal(tierService.interfaces, undefined, 'must NOT have a bogus interface built from the type-reference signal text before CFN path join (Y4) exists');
 
-    // WDL-2 disconfirming case: LegacyTierHandler DOES own a DynamoDbClient
+    // Disconfirming case: LegacyTierHandler DOES own a DynamoDbClient
     // field directly — before this fix it was mis-typed `database` solely
-    // from that import, matching the real aws-saas-boost-tier-service
-    // finding (HT-ASB-002). Real finding this session: the fix required
-    // ZERO new priority-mechanism code (T-Y2) — the existing
-    // existingServiceFilePaths exclusion (built for B-ontology) already
-    // worked correctly the moment T-Y3-1 supplied the missing
-    // http-entry-point-tier evidence.
+    // from that import, matching a real finding from a reference AWS SaaS
+    // sample's tier-service. The fix required ZERO new priority-mechanism
+    // code — the existing existingServiceFilePaths exclusion already
+    // worked correctly once entry-point-tier evidence was supplied.
     const legacyHandler = findNode(calm, 'LegacyTierHandler.java');
     assert.ok(legacyHandler, 'LegacyTierHandler.java must be a real unit');
     assert.equal(legacyHandler['node-type'], 'service', 'a handler with real entry-point evidence must win the kind tie-break over a bare Dynamo import (D-dynamo-priority)');
@@ -1100,7 +1098,7 @@ test('CFN/SAM path join: real path/method/handler binding resolved across TWO se
   // --cfn-manifests points at the SAME fixture dir, which real-evidence
   // testing found needs its own multi-file join: api-gateway.yaml (Resource
   // tree + Method) and lambda-functions.yaml (Function/Handler) are
-  // deliberately separate files, mirroring the real aws-saas-boost split.
+  // deliberately separate files, mirroring a real reference AWS SaaS sample's split.
   const { outDir, calm } = runPipeline([fixtureRoot], ['--cfn-manifests', fixtureRoot]);
   try {
     const tierService = findNode(calm, 'TierService.java');

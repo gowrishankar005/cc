@@ -59,7 +59,7 @@ export const AVAILABLE_MODULES: Record<string, Module> = {
 };
 ```
 
-Once registered, your module runs by default, or opt-in only via `run-slice.js <roots> --modules my-module` (or `--modules calm-generator,my-module` to run alongside others) — verified this session: `--modules calm-generator` alone correctly excludes `threat-signals`; an unknown name fails with a clear error rather than being silently dropped.
+Once registered, your module runs by default, or opt-in only via `run-slice.js <roots> --modules my-module` (or `--modules calm-generator,my-module` to run alongside others) — verified directly: `--modules calm-generator` alone correctly excludes `threat-signals`; an unknown name fails with a clear error rather than being silently dropped.
 
 ## Output — namespace your files
 

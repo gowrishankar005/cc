@@ -36,7 +36,7 @@ export interface CalmMetadataEntry {
   value: unknown;
 }
 
-// Real shape confirmed this session against the authoritative schema
+// Real shape confirmed directly against the authoritative schema
 // (control.json#/defs/{controls,control-detail}) and a real worked example
 // (calm/getting-started/conference-signup.pattern.json — a node-level
 // micro-segmentation control and a relationship-level permitted-connection

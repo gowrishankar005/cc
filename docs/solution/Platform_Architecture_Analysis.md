@@ -1,6 +1,6 @@
 # Platform Architecture Analysis — What This Actually Is, As a Piece of Software
 
-**Why this document exists:** every prior design document analyzes this system's *domain logic* (how signals become CALM constructs). None analyze it as *software* — its architectural style, runtime topology, technology stack, and quality attributes. That's a real gap, correctly flagged: naming a platform well requires first being precise about what it actually is. This is that analysis, grounded in the real `pipeline/src/` codebase (1,927 lines of TypeScript, 24 files) as it exists after this session's fixes, not the aspirational version in the design docs.
+**Why this document exists:** every prior design document analyzes this system's *domain logic* (how signals become CALM constructs). None analyze it as *software* — its architectural style, runtime topology, technology stack, and quality attributes. That's a real gap, correctly flagged: naming a platform well requires first being precise about what it actually is. This is that analysis, grounded in the real `pipeline/src/` codebase (1,927 lines of TypeScript, 24 files) as it currently exists, not the aspirational version in the design docs.
 
 ---
 
@@ -27,10 +27,10 @@ The dominant real mechanism in this system — proven, not aspirational — is t
 This is a **pipeline (pipes-and-filters) architecture with a catalogue-driven strategy layer**, not a service, not an event-driven system, not a monolith in the pejorative sense. Concretely:
 
 - **Pipes-and-filters**: Scanner → Rules → Analysis → Construction is a strict, one-directional data transformation chain. Each stage consumes the previous stage's output and produces a new, more refined artefact (raw source → `Evidence[]` → `TypedFacts` → `CalmDocument`). No stage reaches backward into an earlier one — confirmed architecturally by the override mechanism's own design constraint (§5.4 of Solution Design v2: overrides apply *after* construction, never feeding back into `typed-facts.json`).
-- **Strategy pattern via external configuration**, not inheritance or polymorphism in code: `signal-catalogue.yml`, `node-type-mapping.yml`, `relationship-type-mapping.yml`, `control-requirement-catalogue.yml` are the actual extension points. This is why the "new framework = catalogue row" claim held up under real Java testing this session — it's not a design aspiration, it's what the code structurally does (`findRule`/`findNodeTypeMapping`/`findRelationshipTypeMapping`/`findControlRequirement` are the only four functions any new signal type has to be found by).
+- **Strategy pattern via external configuration**, not inheritance or polymorphism in code: `signal-catalogue.yml`, `node-type-mapping.yml`, `relationship-type-mapping.yml`, `control-requirement-catalogue.yml` are the actual extension points. This is why the "new framework = catalogue row" claim held up under real Java testing — it's not a design aspiration, it's what the code structurally does (`findRule`/`findNodeTypeMapping`/`findRelationshipTypeMapping`/`findControlRequirement` are the only four functions any new signal type has to be found by).
 - **Not (yet) a plugin architecture**, despite Goal A's stated ambition. `run-slice.ts` hardcodes exactly one consumer of `typed-facts.json` (`writeArtefacts` → `buildCalm`). The module registry / `contractVersion` boundary that would make this a real plugin architecture is specified, not built — this is the single most consequential gap between the stated architectural style and the real one.
 
-**Anti-pattern check, since this project holds itself to that discipline elsewhere**: this is *not* a big-ball-of-mud despite being one process — the isolation between builders (`node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `metadata-builder.ts`, `control-builder.ts`, each independently testable and independently touched this session without breaking the others) is real, evidenced by six real bugs this session each requiring a change to exactly one file.
+**Anti-pattern check, since this project holds itself to that discipline elsewhere**: this is *not* a big-ball-of-mud despite being one process — the isolation between builders (`node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `metadata-builder.ts`, `control-builder.ts`, each independently testable and independently touched without breaking the others) is real, evidenced by six real bugs each requiring a change to exactly one file.
 
 ---
 
@@ -87,7 +87,7 @@ This is a **pipeline (pipes-and-filters) architecture with a catalogue-driven st
 - **Single Node.js process**, invoked synchronously, terminates on completion. No daemon, no listener, no persistent server.
 - **One external subprocess per run**: `graphify extract` (Python), invoked via `execFileSync` — a **blocking, synchronous** call. The whole pipeline stalls on Graphify's completion; there's no concurrency between the CodeGraph pass and the Graphify pass (confirmed: `run-slice.ts`'s `for` loop over package roots completes entirely before the single `runGraphifyPass` call begins).
 - **CodeGraph is invoked in-process** (native npm module, not a subprocess) — a real architectural asymmetry from Graphify worth naming: one engine is a library call, the other is a subprocess call, with different failure/error-surface characteristics (CodeGraph errors are JS exceptions; Graphify errors are subprocess exit codes wrapped in a try/catch that degrades gracefully, per `run-slice.ts`'s `catch` block).
-- **Two different persistence models for the two engines**: CodeGraph maintains a **persistent, incremental-capable local cache** (`.codegraph/` SQLite per package root — confirmed present after every run this session). Graphify's output is written to an **ephemeral temp directory, deleted at the end of every run** (`fs.mkdtempSync`/`fs.rmSync` in `graphify-provider.ts`) — meaning Graphify does a full re-extraction every single run, with zero incremental benefit, even though CodeGraph's own caching infrastructure is sitting right next to it unused for this purpose. **This is a real, concrete, previously-unnamed optimization opportunity**: nothing about Graphify's own incremental story is being exploited, and the temp-dir-then-delete pattern actively prevents ever building one.
+- **Two different persistence models for the two engines**: CodeGraph maintains a **persistent, incremental-capable local cache** (`.codegraph/` SQLite per package root — confirmed present after every run). Graphify's output is written to an **ephemeral temp directory, deleted at the end of every run** (`fs.mkdtempSync`/`fs.rmSync` in `graphify-provider.ts`) — meaning Graphify does a full re-extraction every single run, with zero incremental benefit, even though CodeGraph's own caching infrastructure is sitting right next to it unused for this purpose. **This is a real, concrete, previously-unnamed optimization opportunity**: nothing about Graphify's own incremental story is being exploited, and the temp-dir-then-delete pattern actively prevents ever building one.
 
 ---
 
@@ -124,11 +124,11 @@ typed-facts.json + overrides-applied-report.json (all written to <outDir>, files
 
 ---
 
-## 5. Deployment View — **STALE as written, corrected 2026-08-09 (T-PC3-1)**
+## 5. Deployment View — **STALE as written, corrected 2026-08-09**
 
-> **This section is a point-in-time snapshot from an earlier session** (the codebase was 24 files / 1,927 lines when it was written — it has grown substantially since). Left below as the historical record it was, per this project's own "correct with a dated note, don't silently rewrite history" convention (`Claim_Register.md`'s changelog does the same). **The real, current state, as of 2026-08-09**:
+> **This section is a point-in-time snapshot from an earlier draft** (the codebase was 24 files / 1,927 lines when it was written — it has grown substantially since). Left below as the historical record it was, per this project's own "correct with a dated note, don't silently rewrite history" convention. **The real, current state, as of 2026-08-09**:
 >
-> - **`pipeline/Dockerfile` exists and now has a real, verified build**, not just a written-but-unexecuted file: [`docker-build` CI job](https://github.com/gowrishankar005/cc/actions/runs/31306304051), `docker build` succeeded, a smoke test confirmed the built image contains a real runnable `dist/` (AGENT TASKS Phase1 Close's T-PC2-1/T-PC2-2).
+> - **`pipeline/Dockerfile` exists and now has a real, verified build**, not just a written-but-unexecuted file: [`docker-build` CI job](https://github.com/gowrishankar005/cc/actions/runs/31306304051), `docker build` succeeded, a smoke test confirmed the built image contains a real runnable `dist/`.
 > - **`.github/workflows/pipeline-test.yml` exists and has been running successfully on every push to `dev` for 10+ consecutive real runs** (confirmed via `gh run list`, not assumed) — this was true of the real repo even while this document still said "no CI configuration"; the original claim was accurate about *this analysis's own point-in-time snapshot*, not about the repo's current state.
 > - **A real automated regression suite exists** (`pipeline/test/regression.test.js`, 65 tests as of 2026-08-09) — the "no automated test suite at all" finding in §7/§8 below is also stale; see the Architectural Risk Register correction at the end of §8.
 > - `package.json`'s `bin` field **has been verified working** (`npm pack` → install into an isolated prefix → the installed CLI ran end-to-end) — see `CLAUDE.md`'s "Deployment/packaging story exists now" entry for the full real finding, including one real packaging bug found and fixed (`files` field missing, tarball shipped 105 files instead of 61).
@@ -139,8 +139,8 @@ There is currently **no deployment story at all**. This is worth stating plainly
 
 - No containerization (no `Dockerfile` anywhere in `pipeline/`).
 - No CI configuration (no `.github/workflows/`, no equivalent).
-- `package.json` declares a `bin` field (`run-slice`), which *would* make this installable as a global CLI via `npm install -g` or `npm link` — but this has never been tested in this session or, as far as the codebase shows, ever.
-- Every run this session has been invoked as `node dist/orchestration/run-slice.js` from inside the `pipeline/` directory — a developer-machine invocation pattern, not a packaged tool's.
+- `package.json` declares a `bin` field (`run-slice`), which *would* make this installable as a global CLI via `npm install -g` or `npm link` — but this had never been tested as of this section's original writing (see the correction above — it has since been verified working).
+- Every run as of this section's original writing had been invoked as `node dist/orchestration/run-slice.js` from inside the `pipeline/` directory — a developer-machine invocation pattern, not a packaged tool's.
 
 **For a platform whose Goal A is "modules other teams build against," this is a real gap**, distinct from the Java/persistence-strategy gaps already tracked — nobody outside this exact checkout can currently run this tool at all.
 
@@ -152,14 +152,14 @@ There is currently **no deployment story at all**. This is worth stating plainly
 |---|---|---|---|
 | Orchestration/construction | TypeScript, Node.js, `commonjs`, ES2022 target | Matches CodeGraph's own npm-native distribution; `strict: true` in `tsconfig.json` (confirmed) — real type safety, not just convention | Low — mature, well-understood |
 | Structural extraction (primary) | `@colbymchenry/codegraph` npm package (native module) | Fast (Rust-backed per earlier spikes), rich native typing for Spring/Flask/FastAPI/NestJS | **Single-vendor dependency, no fallback in code today** — Graphify is the documented fallback but nothing currently auto-switches; a breaking CodeGraph release would silently break the pipeline until manually caught (mitigated only by version-pinning discipline, not by code) |
-| Cross-package backbone | `graphify` CLI (external Python package, subprocess) | Only tool with a real bulk-export contract and no per-root `detect()` gate | **Two real, newly-found risks this session**: (1) it evolved from a narrow extraction tool into a much larger multi-command "AI coding assistant skill" product (v0.9.34) — the one flag combination this pipeline uses (`extract --code-only --no-cluster`) still works, but the vendor's own product direction has visibly shifted, worth monitoring; (2) confirmed data-quality inconsistency at wide scan scope (dangling edge-target ids, §CLAUDE.md) |
+| Cross-package backbone | `graphify` CLI (external Python package, subprocess) | Only tool with a real bulk-export contract and no per-root `detect()` gate | **Two real, newly-found risks**: (1) it evolved from a narrow extraction tool into a much larger multi-command "AI coding assistant skill" product (v0.9.34) — the one flag combination this pipeline uses (`extract --code-only --no-cluster`) still works, but the vendor's own product direction has visibly shifted, worth monitoring; (2) confirmed data-quality inconsistency at wide scan scope (dangling edge-target ids, §CLAUDE.md) |
 | Schema validation | `@finos/calm-cli` (npm devDependency) | The authoritative external validator — never reimplemented in-house, correctly | Low — this is exactly the "produce output for external validators" boundary the design intends |
 | Catalogue format | YAML (`yaml` npm package) | Human-editable, matches this project's own "architects should be able to read/edit the rules" goal | Low |
 | Rule authoring assist | Offline LLM (`suggest-rules.ts`, model-agnostic per env var) | Explicitly outside the run path — architecturally enforced, not policy-enforced | Low, by design |
 
 ---
 
-## 7. Quality Attribute Analysis (ISO 25010-style, each grounded in this session's real evidence)
+## 7. Quality Attribute Analysis (ISO 25010-style, each grounded in real evidence)
 
 | Attribute | Real evidence | Verdict |
 |---|---|---|
@@ -168,8 +168,8 @@ There is currently **no deployment story at all**. This is worth stating plainly
 | **Compatibility** | Zero network calls, filesystem-only I/O, no assumed OS beyond Node/Python availability | **Good** |
 | **Reliability/availability** | Graphify failures degrade gracefully (`try/catch`, continues without cross-package data) — real, tested pattern. **STALE, corrected 2026-08-09**: the "no automated test suite at all" finding here was accurate for this document's own point-in-time snapshot, not the current repo — `pipeline/test/regression.test.js` (65 tests) runs in real CI on every push, see §5's correction note. **No retry logic anywhere** is still real and unaddressed. | **Was a real gap, now closed for the test-suite half** — a future change breaking the reference Python app/NestJS/the reference Java/JAX-RS banking platform's known-good output is now caught by CI, not just informal manual comparison |
 | **Security** | No secrets handled, no network egress in the core path, LLM advisory layer (when built) explicitly bounded and off by default | **Good, by architectural constraint** |
-| **Maintainability** | Real evidence this session: 6 bugs found, each fixed in one file, none required cross-cutting rework. Builder isolation genuinely holds | **Strong** |
-| **Extensibility** | Catalogue-driven claim proven under real Java testing (not just Python/Node) this session | **Strong, for the catalogue-driven path.** Module-level extensibility (Goal A) unproven — no second module exists |
+| **Maintainability** | Real evidence: 6 bugs found, each fixed in one file, none required cross-cutting rework. Builder isolation genuinely holds | **Strong** |
+| **Extensibility** | Catalogue-driven claim proven under real Java testing (not just Python/Node) | **Strong, for the catalogue-driven path.** Module-level extensibility (Goal A) unproven — no second module exists |
 | **Testability** | **STALE, corrected 2026-08-09** — accurate for this document's own point-in-time snapshot, not current. `pipeline/test/regression.test.js` (65 tests, real CI-gated) exists now. | **Was weak, now real and CI-gated** — see §5's correction note |
 | **Portability** | **STALE, corrected 2026-08-09** — `npm pack` install verified working outside this checkout in an isolated prefix; `Dockerfile` now has a real verified CI build. See §5's correction note. | **Was unknown, now verified via CI + a real isolated-install test** |
 | **Observability** | `console.log` only, no structured logs, no metrics, no run history beyond the artefacts of the single most recent run | **Weak** |
@@ -191,13 +191,13 @@ There is currently **no deployment story at all**. This is worth stating plainly
 
 ## 9. What This Analysis Changes About "Locked"
 
-The prior lock (Solution Design v2, this session) covered the *construction* architecture — catalogues, builders, override mechanism. This analysis adds two things that were genuinely absent from that lock and shouldn't be assumed settled just because the construction logic is:
+The prior lock (Solution Design v2) covered the *construction* architecture — catalogues, builders, override mechanism. This analysis adds two things that were genuinely absent from that lock and shouldn't be assumed settled just because the construction logic is:
 
-1. **Testability is the highest-leverage next investment, ahead of new features.** Every real bug this session was caught by hand; formalizing the reference Python app/NestJS/the reference Java/JAX-RS banking platform regression checks into an actual `npm test` (even a simple one) converts a fragile ritual into a real safety net — cheap, and the single most consequential gap this analysis found.
+1. **Testability is the highest-leverage next investment, ahead of new features.** Every real bug documented here was caught by hand; formalizing the reference Python app/NestJS/the reference Java/JAX-RS banking platform regression checks into an actual `npm test` (even a simple one) converts a fragile ritual into a real safety net — cheap, and the single most consequential gap this analysis found.
 2. **Deployment/packaging is a real precondition for Goal A**, not a later polish item — a platform other teams build modules against has to be runnable by those teams first.
 
 ---
 
 ## Sources
 
-`pipeline/package.json`, `pipeline/tsconfig.json`, full `pipeline/src/` file tree (read directly this session), `docs/solution/Architecture_as_Code_Solution_Design_v2.md`, `CLAUDE.md`'s pipeline-architecture section (this session's real findings), direct observation of `.codegraph/` cache persistence and Graphify's temp-dir lifecycle during this session's test runs.
+`pipeline/package.json`, `pipeline/tsconfig.json`, full `pipeline/src/` file tree (read directly), `docs/solution/Architecture_as_Code_Solution_Design_v2.md`, `CLAUDE.md`'s pipeline-architecture section, direct observation of `.codegraph/` cache persistence and Graphify's temp-dir lifecycle across real test runs.
