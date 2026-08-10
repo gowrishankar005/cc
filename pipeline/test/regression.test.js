@@ -35,6 +35,9 @@ const SPRING_CONFIG_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config
 const SPRING_CONFIG_PROPERTIES_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample'); // checked-in
 const CDXGEN_SAMPLE_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/cdxgen-sample'); // checked-in, real committed requirements.txt for cdxgen to read
 const JAXRS_MULTICLASS_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/jaxrs-multiclass-sample'); // checked-in — reproduces the real test-code-contamination bug shape
+const PACKAGE_JSON_MANIFEST_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/package-json-manifest-sample'); // checked-in — reproduces the real package.json manifest false-positive bug shape
+const STEREOTYPE_BARE_COLLISION_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-bare-collision-sample'); // checked-in — reproduces the real @Component/@Entity bare-identifier collision bug shape
+const DUPLICATE_RELATIONSHIP_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/duplicate-relationship-sample'); // checked-in — a class that both references (field) AND calls (method) the same other unit, reproducing the real duplicate-relationship-object bug shape
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
@@ -1418,6 +1421,52 @@ test('Orphan/stale override detection — reported separately from other rejecti
   }
 });
 
+test('Unrecognized override_type — reported as rejected, not silently dropped from every result category', () => {
+  const { applyOverrides } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/override-applier'));
+  const baseCalm = { nodes: [{ 'unique-id': 'svc.py', 'node-type': 'service', name: 'svc.py', description: 'x' }], relationships: [] };
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-unrecognized-override-'));
+  try {
+    fs.writeFileSync(
+      path.join(dir, 'dr.json'),
+      JSON.stringify({
+        decision_id: 'dr-unrecognized',
+        module: 'architecture',
+        target_type: 'node',
+        target_ref: 'svc.py',
+        final_decision: { action: 'overridden' },
+        rationale: 'test',
+        reviewer: 'test',
+        reviewed_at: new Date().toISOString(),
+        status: 'active',
+      })
+    );
+    fs.writeFileSync(
+      path.join(dir, 'ov.json'),
+      JSON.stringify({
+        override_id: 'ov-unrecognized',
+        module: 'architecture',
+        target_ref: 'svc.py',
+        override_type: 'not_a_real_override_type',
+        new_value: 'database',
+        decision_record_ref: 'dr-unrecognized',
+        status: 'active',
+        created_by: 'test',
+        created_at: new Date().toISOString(),
+      })
+    );
+    const { calm, result } = applyOverrides(baseCalm, dir);
+    assert.equal(result.applied.length, 0, 'an unrecognized override_type must never be applied');
+    assert.equal(result.skipped.length, 0, 'unrecognized is a rejection, not a skip — skip means "recognized but not yet implemented"');
+    assert.equal(result.rejected.length, 1, 'an unrecognized override_type must be reported as rejected, not silently dropped');
+    assert.equal(result.rejected[0].override_id, 'ov-unrecognized');
+    assert.ok(result.rejected[0].reason.includes('not_a_real_override_type'), 'rejection reason should name the unrecognized override_type');
+    assert.deepEqual(calm.nodes, baseCalm.nodes, 'unrecognized override_type must not mutate the CALM document');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('Relationship overrides — relationship_add/relationship_remove with DR enforcement (T-X6-1)', () => {
   const { applyOverrides } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/override-applier'));
   const baseCalm = {
@@ -2685,6 +2734,157 @@ test('T-TC1-3 (B-test-code-exclusion) — Graphify-driven persistence detection 
     assert.ok(!facts.units.some((u) => u.filePath.includes('test_db.py')), 'a test file importing psycopg2 must never become a real database unit');
     const testCodeItem = facts.ignoredItems.find((i) => i.reason === 'TEST_CODE' && i.ref.includes('test_db.py'));
     assert.ok(testCodeItem, 'the excluded test file must be a real, visible TEST_CODE ignored item');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('package.json manifest false-positive — a declared dependency name matching a catalogued persistence library must never turn package.json into a bogus database unit', () => {
+  const { outDir, calm } = runPipeline([PACKAGE_JSON_MANIFEST_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+    // Before the fix: Graphify parses package.json's own JSON structure into
+    // synthetic 'imports' edges (dependencies.pg -> node "pg"), making
+    // package.json register as an importing FILE, and its own top-level
+    // keys (name/version/dependencies) as one bogus unit each.
+    assert.ok(!facts.units.some((u) => u.filePath === 'package.json'), 'package.json must never itself become a unit source — it is a manifest, not source code');
+    assert.ok(!facts.units.some((u) => u.kind === 'database'), 'declaring "pg" as a dependency name must not fabricate a database unit from package.json\'s own keys');
+    assert.ok(!calm.nodes.some((n) => ['name', 'version', 'dependencies'].includes(n.name)), 'package.json\'s own top-level JSON keys must never surface as CALM nodes');
+
+    // The real service file must still be detected normally — the fix must
+    // exclude package.json specifically, not import-strategy detection broadly.
+    assert.ok(facts.units.some((u) => u.filePath === 'src/index.js'), 'the real source file must still produce its own unit');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('B-stereotype-name-collision — a common Spring/JAX-RS annotation must never fabricate a relationship to an unrelated same-named class', () => {
+  const { outDir } = runPipeline([STEREOTYPE_BARE_COLLISION_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+    // Before the fix: Graphify resolves the bare identifier "Component"
+    // (from the @Component annotation on ChargesApiResource, which imports
+    // Spring's org.springframework.stereotype.Component — a framework
+    // marker, not a same-repo reference) against ANY same-named in-repo
+    // class, fabricating both an 'imports' and a 'references'->'connects'
+    // edge to the unrelated example.domain.Component entity.
+    const falsePositive = facts.relationships.find(
+      (r) => r.from.endsWith('ChargesApiResource.java') && r.to.endsWith('domain/Component.java')
+    );
+    assert.ok(!falsePositive, 'must never fabricate a relationship from ChargesApiResource to the unrelated same-named Component entity');
+
+    // The real, legitimate same-package reference (OrderService genuinely
+    // references Helper, same package, no import statement needed in Java)
+    // must still be detected — the fix must reject only a CONFIRMED
+    // disagreement between a real import and the destination's real
+    // package, never a same-package reference with no import at all.
+    const legitimate = facts.relationships.find(
+      (r) => r.from.endsWith('OrderService.java') && r.to.endsWith('Helper.java')
+    );
+    assert.ok(legitimate, 'a real, legitimate same-package reference must not be suppressed by the collision fix');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('B-stereotype-name-collision — findJavaImportForBareName/getJavaPackageDeclaration direct unit tests', () => {
+  const { findJavaImportForBareName, getJavaPackageDeclaration } = require(path.join(PIPELINE_ROOT, 'dist/rules/java-import-resolver'));
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-java-import-resolver-'));
+  try {
+    const framework = path.join(dir, 'ChargesApiResource.java');
+    fs.writeFileSync(
+      framework,
+      ['package example.api;', '', 'import org.springframework.stereotype.Component;', '', '@Component', 'public class ChargesApiResource {', '}'].join('\n')
+    );
+    const samePackage = path.join(dir, 'OrderService.java');
+    fs.writeFileSync(samePackage, ['package example.domain;', '', 'public class OrderService {', '    private Helper helper;', '}'].join('\n'));
+    const noPackage = path.join(dir, 'Unpackaged.java');
+    fs.writeFileSync(noPackage, ['public class Unpackaged {', '}'].join('\n'));
+
+    const cache = new Map();
+    assert.equal(findJavaImportForBareName(framework, 'Component', cache), 'org.springframework.stereotype.Component', 'must find the real qualified import for the bare annotation name');
+    assert.equal(findJavaImportForBareName(samePackage, 'Helper', cache), undefined, 'a genuine same-package reference has no import statement — must return undefined, not guess');
+    assert.equal(findJavaImportForBareName(framework, 'NoSuchImport', cache), undefined);
+
+    assert.equal(getJavaPackageDeclaration(framework, cache), 'example.api');
+    assert.equal(getJavaPackageDeclaration(samePackage, cache), 'example.domain');
+    assert.equal(getJavaPackageDeclaration(noPackage, cache), undefined, 'a file with no package declaration must degrade to undefined, not crash or guess');
+    assert.equal(getJavaPackageDeclaration(path.join(dir, 'DoesNotExist.java'), cache), undefined, 'an unreadable file must degrade to undefined, not throw');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('B-duplicate-relationship-objects — two raw edges of different kinds between the same pair must collapse to one CalmRelationship', () => {
+  const { buildRelationships } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/relationship-builder'));
+
+  const nodes = [
+    { 'unique-id': 'ChargesApiResource.java', 'node-type': 'service', name: 'ChargesApiResource', description: 'x' },
+    { 'unique-id': 'ChargeReadPlatformServiceImpl.java', 'node-type': 'service', name: 'ChargeReadPlatformServiceImpl', description: 'x' },
+  ];
+  // A minimal mapping table whose `default` (always used here, since
+  // `mappings` is empty) resolves to `connects` — matches the real
+  // relationship-type-mapping.yml's own behavior (every real row resolves to
+  // connects) without needing to load the real catalogue file.
+  const mapping = { version: '1.0.0', mappings: [], default: { calmRelationshipType: 'connects', protocol: null } };
+  const relationships = [
+    { from: 'ChargesApiResource.java', to: 'ChargeReadPlatformServiceImpl.java', kind: 'imports', crossPackage: false, source: 'graphify' },
+    { from: 'ChargesApiResource.java', to: 'ChargeReadPlatformServiceImpl.java', kind: 'calls', crossPackage: false, source: 'r2-phase1' },
+  ];
+
+  const result = buildRelationships(relationships, nodes, mapping);
+
+  assert.equal(result.length, 1, 'two raw edges of different kinds between the same real pair must collapse to exactly one CalmRelationship');
+  assert.equal(result[0]['unique-id'], 'rel-0', 'first-encountered id must survive the merge, deterministically');
+  assert.deepEqual(relMetadata(result[0], 'x-aac-provenance'), ['graphify', 'r2-phase1'], 'distinct provenance values must be merged into an array, never silently dropped');
+  assert.match(result[0].description, /imports\+calls/, 'description must name both distinct raw kinds, not just the first');
+});
+
+test('B-duplicate-relationship-objects — same kind/source but differing x-aac-mechanism must not be silently dropped by the merge', () => {
+  const { buildRelationships } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/relationship-builder'));
+
+  const nodes = [
+    { 'unique-id': 'A.java', 'node-type': 'service', name: 'A', description: 'x' },
+    { 'unique-id': 'B.java', 'node-type': 'database', name: 'B', description: 'x' },
+  ];
+  const mapping = { version: '1.0.0', mappings: [], default: { calmRelationshipType: 'connects', protocol: null } };
+  // Real, reachable shape: graphify-reconciler.ts's own direct 'calls' edge
+  // (no mechanism set) and multi-hop-bridge-detector.ts's inferred 'calls'
+  // edge (mechanism: 'r2-phase1') both use kind:'calls'/source:'graphify' —
+  // identical on both fields the OLD merge logic gated its "did anything
+  // diverge" check on, differing only in `mechanism`.
+  const relationships = [
+    { from: 'A.java', to: 'B.java', kind: 'calls', crossPackage: false, source: 'graphify' },
+    { from: 'A.java', to: 'B.java', kind: 'calls', crossPackage: false, source: 'graphify', mechanism: 'r2-phase1' },
+  ];
+
+  const result = buildRelationships(relationships, nodes, mapping);
+
+  assert.equal(result.length, 1);
+  assert.equal(relMetadata(result[0], 'x-aac-mechanism'), 'r2-phase1', 'a mechanism value present on only one duplicate must survive the merge, never silently dropped because kind/source matched');
+});
+
+test('B-duplicate-relationship-objects — real fixture (field reference + method call to the same class) produces exactly one CALM relationship', () => {
+  const { outDir, calm } = runPipeline([DUPLICATE_RELATIONSHIP_ROOT]);
+  try {
+    const matches = calm.relationships.filter(
+      (r) => r['relationship-type'].connects?.source.node.endsWith('OrderProcessor.java') && r['relationship-type'].connects?.destination.node.endsWith('InventoryService.java')
+    );
+    assert.equal(matches.length, 1, 'a field reference AND a method call to the same class must collapse to exactly one relationship, not two');
+    assert.match(matches[0].description, /connects\+calls/, 'the merged description must name both distinct raw kinds');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
   }

@@ -1,0 +1,10 @@
+{
+  "name": "package-json-manifest-sample",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Minimal real fixture reproducing the package.json manifest false-positive: the project's own declared dependency name ('pg') matches a catalogued persistence library, which previously made package.json itself register as an importing FILE, and its own top-level keys (name/version/dependencies) as bogus 'database' units.",
+  "dependencies": {
+    "express": "^4.18.0",
+    "pg": "^8.11.3"
+  }
+}

@@ -57,6 +57,19 @@ function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<s
  */
 export function findLibraryImportEdges(run: GraphifyRun, libraries: Set<string>, fileLineCache: Map<string, string[]> = new Map()): GraphifyEdge[] {
   return run.graph.edges.filter((e) => {
+    // Real false-positive, confirmed via a real fixture: Graphify parses
+    // package.json's own JSON structure into synthetic 'imports' edges, one
+    // per declared dependency name (`dependencies.pg` -> node "pg", relation
+    // "imports") — indistinguishable, by relation/target alone, from a real
+    // source file importing that same-named library. When a project's own
+    // declared dependency name happens to match a catalogued persistence/
+    // messaging/HTTP-client library, package.json itself would otherwise be
+    // treated as an importing FILE, and its sibling top-level keys (name,
+    // version, dependencies, ...) as "classes" it contains — one bogus unit
+    // per top-level key. package.json is never real source, so it can never
+    // be a legitimate import-strategy match. Not observed for Python
+    // manifests (requirements.txt isn't parsed into synthetic edges).
+    if (path.basename(e.source_file) === 'package.json') return false;
     if (e.relation !== 'imports_from' && e.relation !== 'imports') return false;
     if (libraries.has(e.target)) return true;
     return resolveJavaMatch(run, e, libraries, fileLineCache) !== undefined;

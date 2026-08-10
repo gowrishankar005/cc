@@ -258,6 +258,14 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
       case 'boundary_change':
         result.skipped.push({ override_id: override.override_id, override_type: override.override_type, reason: `override_type "${override.override_type}" is recognized but not yet implemented` });
         break;
+
+      default:
+        // override_type is read from an on-disk JSON file, so an
+        // unrecognized value is real, reachable input (not just a TS
+        // exhaustiveness formality) — must be reported as rejected, not
+        // silently dropped from every result category.
+        result.rejected.push({ override_id: override.override_id, reason: `override_type "${String((override as { override_type: unknown }).override_type)}" is not a recognized override type` });
+        break;
     }
   }
 

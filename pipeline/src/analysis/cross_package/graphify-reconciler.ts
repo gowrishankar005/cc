@@ -1,5 +1,7 @@
-import { GraphifyRun, parseSourceLocation } from '../../scanner/graphify-provider';
+import * as path from 'path';
+import { GraphifyRun, GraphifyEdge, parseSourceLocation } from '../../scanner/graphify-provider';
 import { TypedUnit, TypedRelationship } from '../../types/typed-facts';
+import { findJavaImportForBareName, getJavaPackageDeclaration } from '../../rules/java-import-resolver';
 
 /**
  * Maps each Graphify node to the CodeGraph-typed unit it refers to (which
@@ -70,8 +72,68 @@ export function buildNodeToUnitMap(run: GraphifyRun, unitsByRoot: Map<string, Ty
   return nodeToUnit;
 }
 
+/**
+ * B-stereotype-name-collision — Graphify resolves a bare identifier (e.g. an
+ * `@Component` annotation's simple class name) against ANY same-named class
+ * node anywhere in the whole combined-extraction graph, regardless of what
+ * the referencing class's own real import statement actually names.
+ * Confirmed via a live repro against the real graphify CLI: a class
+ * annotated `@Component` (importing `org.springframework.stereotype.Component`,
+ * a framework marker) produces both an `imports` edge AND a `references`
+ * edge to an unrelated, same-named in-repo class — quantified at 32.4% of
+ * relationships on a real 918-relationship Fineract scan.
+ *
+ * Java-only (the only evidenced language) — rejects an edge only on a
+ * POSITIVE, CONFIRMED disagreement: the source class has a real import for
+ * this bare name, and that import's qualified package does not match the
+ * destination unit's own real `package` declaration. No import found at all
+ * (the legitimate same-package-reference case, which needs no Java import)
+ * or an unreadable/unpackaged destination both degrade to "can't disprove
+ * this edge, leave it" — never a false rejection from missing data.
+ *
+ * `collisionCache` is keyed on (source file, bare name, destination unit) —
+ * not just source+dest — since one file can bare-reference multiple
+ * different names against different destinations, and multiple raw Graphify
+ * edges (imports + references, in the evidenced repro) commonly land on the
+ * exact same false-positive pair.
+ */
+function isBareNameCollision(
+  edge: GraphifyEdge,
+  from: NodeUnitMatch,
+  to: NodeUnitMatch,
+  nodeById: Map<string, { label: string }>,
+  run: GraphifyRun,
+  fileLineCache: Map<string, string[]>,
+  collisionCache: Map<string, boolean>
+): boolean {
+  if (!edge.source_file.endsWith('.java')) return false;
+  const bareName = nodeById.get(edge.target)?.label;
+  if (!bareName) return false;
+
+  const srcResolved = run.resolveRoot(edge.source_file);
+  if (!srcResolved) return false;
+  const srcAbsPath = path.join(srcResolved.root, srcResolved.relativeFilePath);
+
+  const cacheKey = `${srcAbsPath}|${bareName}|${to.unit.id}`;
+  const cached = collisionCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const qualifiedImport = findJavaImportForBareName(srcAbsPath, bareName, fileLineCache);
+  let result = false;
+  if (qualifiedImport) {
+    const destAbsPath = path.join(to.root, to.unit.filePath);
+    const destPackage = getJavaPackageDeclaration(destAbsPath, fileLineCache);
+    result = destPackage !== undefined && qualifiedImport !== `${destPackage}.${bareName}`;
+  }
+  collisionCache.set(cacheKey, result);
+  return result;
+}
+
 export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): TypedRelationship[] {
   const nodeToUnit = buildNodeToUnitMap(run, unitsByRoot);
+  const nodeById = new Map(run.graph.nodes.map((n) => [n.id, n]));
+  const fileLineCache = new Map<string, string[]>();
+  const collisionCache = new Map<string, boolean>();
 
   const relationships: TypedRelationship[] = [];
   for (const edge of run.graph.edges) {
@@ -79,6 +141,7 @@ export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<st
     const to = nodeToUnit.get(edge.target);
     if (!from || !to) continue;
     if (from.root === to.root && from.unit.id === to.unit.id) continue; // same unit, not a relationship
+    if (isBareNameCollision(edge, from, to, nodeById, run, fileLineCache, collisionCache)) continue;
 
     relationships.push({
       from: from.unit.id,
