@@ -34,6 +34,9 @@ venv/
 *.swp
 .DS_Store
 
+# Local scratch folder (root-level only; docs/solution/ is tracked)
+/soln/
+
 # Logs and temp
 *.log
 tmp/
