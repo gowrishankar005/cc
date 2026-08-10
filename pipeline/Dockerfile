@@ -1,13 +1,8 @@
-# Loom pipeline runtime image — Node.js orchestration + Python (Graphify).
+# Weaver pipeline runtime image — Node.js orchestration + Python (Graphify).
 #
-# HONEST STATUS: written against known, verified requirements (Node 22 —
-# confirmed via `node --version` this session; the real `graphifyy` pip
-# package and its console-script PATH quirk, confirmed this session;
-# package.json's real build steps) but never actually run through
-# `docker build` — no Docker daemon is available in this development
-# sandbox. Verify with a real build before relying on this in CI/production,
-# per this project's own "specified vs proven" discipline — don't treat
-# this comment as equivalent to a passing build.
+# Built and smoke-tested via .github/workflows/pipeline-test.yml's
+# docker-build job on every push — not just written against known-correct
+# requirements and assumed to work.
 
 FROM node:22-bookworm-slim
 
@@ -32,8 +27,7 @@ COPY src ./src
 COPY scripts ./scripts
 RUN npm run build
 
-# The CLI entrypoint (package.json's "bin" field, confirmed this session to
-# actually work when installed globally — a real, tested finding, not an
-# assumption). Callers pass package roots + --out as CMD args, e.g.:
-#   docker run --rm -v "$(pwd):/repo" loom /repo/some-service --out /repo/out
+# The CLI entrypoint (package.json's "bin" field, confirmed to actually work
+# when installed globally). Callers pass package roots + --out as CMD args, e.g.:
+#   docker run --rm -v "$(pwd):/repo" weaver-pipeline /repo/some-service --out /repo/out
 ENTRYPOINT ["node", "dist/orchestration/run-slice.js"]

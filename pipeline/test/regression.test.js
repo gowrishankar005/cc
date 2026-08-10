@@ -37,7 +37,7 @@ const CDXGEN_SAMPLE_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/cdxgen-sample
 const JAXRS_MULTICLASS_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/jaxrs-multiclass-sample'); // checked-in — reproduces the real test-code-contamination bug shape
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
   execFileSync('node', [...nodeArgs, RUN_SLICE, ...roots, '--out', outDir, ...extraArgs], { stdio: 'pipe' });
   const calm = JSON.parse(fs.readFileSync(path.join(outDir, 'architecture.calm.json'), 'utf8'));
   return { outDir, calm };
@@ -1296,7 +1296,7 @@ test('K8s manifests absent — --k8s-manifests omitted entirely is a no-op, run 
 test('--from-facts reconstruct-only mode — byte-identical output with no rescan, refuses incompatible contractVersion (T-X6-3)', () => {
   const { outDir: origDir, calm: origCalm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
   try {
-    const reconstructDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
+    const reconstructDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
     try {
       execFileSync('node', [RUN_SLICE, '--from-facts', path.join(origDir, 'typed-facts.json'), '--out', reconstructDir], { stdio: 'pipe' });
       const reconstructCalm = JSON.parse(fs.readFileSync(path.join(reconstructDir, 'architecture.calm.json'), 'utf8'));
@@ -1307,7 +1307,7 @@ test('--from-facts reconstruct-only mode — byte-identical output with no resca
       const facts = JSON.parse(fs.readFileSync(path.join(origDir, 'typed-facts.json'), 'utf8'));
       facts.contractVersion = '99.0.0';
       fs.writeFileSync(badFactsPath, JSON.stringify(facts));
-      const badOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
+      const badOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
       try {
         assert.throws(() => execFileSync('node', [RUN_SLICE, '--from-facts', badFactsPath, '--out', badOutDir], { stdio: 'pipe' }), /FAILED|Command failed/);
       } finally {
@@ -1327,7 +1327,7 @@ test('Orphan/stale override detection — reported separately from other rejecti
 
   // 1. Unit-level: type_change against a node that no longer exists is an orphan, not just a generic rejection.
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-orphan-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-orphan-'));
     try {
       fs.writeFileSync(
         path.join(dir, 'dr.json'),
@@ -1369,7 +1369,7 @@ test('Orphan/stale override detection — reported separately from other rejecti
 
   // 2. CLI-level: --strict-overrides must fail the run when an orphan exists; default must not.
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-orphan-cli-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-orphan-cli-'));
     try {
       fs.writeFileSync(
         path.join(dir, 'dr.json'),
@@ -1399,14 +1399,14 @@ test('Orphan/stale override detection — reported separately from other rejecti
         })
       );
 
-      const outDirDefault = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
+      const outDirDefault = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
       try {
         execFileSync('node', [RUN_SLICE, path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'), '--out', outDirDefault, '--overrides', dir], { stdio: 'pipe' });
       } finally {
         fs.rmSync(outDirDefault, { recursive: true, force: true });
       }
 
-      const outDirStrict = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
+      const outDirStrict = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
       try {
         assert.throws(() =>
           execFileSync('node', [RUN_SLICE, path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'), '--out', outDirStrict, '--overrides', dir, '--strict-overrides'], { stdio: 'pipe' })
@@ -1458,7 +1458,7 @@ test('Relationship overrides — relationship_add/relationship_remove with DR en
 
   // 1. DR + override present, active -> applied.
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-overrides-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
     try {
       fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-1')));
       fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(relOverride('ov-1', 'dr-1')));
@@ -1477,7 +1477,7 @@ test('Relationship overrides — relationship_add/relationship_remove with DR en
 
   // 2. Override references a decision_record_ref that doesn't resolve -> rejected, not applied.
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-overrides-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
     try {
       fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(relOverride('ov-2', 'dr-does-not-exist')));
       const { calm, result } = applyOverrides(baseCalm, dir);
@@ -1491,7 +1491,7 @@ test('Relationship overrides — relationship_add/relationship_remove with DR en
 
   // 3. relationship_add targeting a node that doesn't exist -> rejected (no dangling endpoint).
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-overrides-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
     try {
       fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-3')));
       const badOverride = relOverride('ov-3', 'dr-3', 'auth-service.py--calls-->ghost-service.py');
@@ -1509,7 +1509,7 @@ test('Relationship overrides — relationship_add/relationship_remove with DR en
 
   // 4. relationship_remove — add then remove in the same pass, ends with 0 relationships.
   {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-overrides-'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
     try {
       fs.writeFileSync(path.join(dir, 'dr1.json'), JSON.stringify(decisionRecord('dr-4a')));
       fs.writeFileSync(path.join(dir, 'ov1.json'), JSON.stringify(relOverride('ov-4a', 'dr-4a')));
@@ -1537,7 +1537,7 @@ test('Relationship overrides — relationship_add/relationship_remove with DR en
 });
 
 test('Relationship overrides end-to-end via CLI --overrides, calm validate 0 errors (T-X6-1)', () => {
-  const overridesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-overrides-e2e-'));
+  const overridesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-e2e-'));
   try {
     const targetRef = 'src/users.controller.ts--connects-->orphan-service';
     fs.writeFileSync(
@@ -1803,7 +1803,7 @@ test('Interface merge precedence — native-route beats openapi beats decorator,
 
 test('Evidence packs redact secret-looking lines, --no-snippets suppresses snippets entirely (T-X3-1)', () => {
   const { buildEvidencePacks } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/evidence-packs'));
-  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-evidence-pack-'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-evidence-pack-'));
   try {
     const filePath = path.join(fixtureDir, 'config.py');
     fs.writeFileSync(
@@ -1829,7 +1829,7 @@ test('Evidence packs redact secret-looking lines, --no-snippets suppresses snipp
 
 test('B-scale-oom (T-SP0-1/T-SP1-1): evidence packs cap at MAX_EVIDENCE_PACKS, file reads are cached, truncation is honestly reported', () => {
   const { buildEvidencePacks, countReviewWorthyIgnoredItems, MAX_EVIDENCE_PACKS } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/evidence-packs'));
-  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-evidence-cap-'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-evidence-cap-'));
   try {
     // One real file, many ignored items pointing at different lines within it —
     // mirrors the real fineract-provider shape (avg 57 ignored items per file)
@@ -1864,7 +1864,7 @@ test('--strict-detect exits non-zero on a suspected detect()-gate silent failure
   const codegraphCache = path.join(STRICT_ROOT, '.codegraph');
 
   const runAndCapture = (extraArgs) => {
-    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-test-'));
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
     try {
       execFileSync('node', [RUN_SLICE, STRICT_ROOT, '--out', outDir, ...extraArgs], { stdio: 'pipe' });
       return { exitCode: 0 };
@@ -2349,7 +2349,7 @@ test('T-PC1-8 (B-spring-config) — .properties-only Spring app (no YAML at all)
 test('T-PC1-8 (B-spring-config) — server.port with zero or 2+ service-unit candidates is a real ignored item, never guessed', () => {
   const { discoverSpringConfigFiles } = require(path.join(PIPELINE_ROOT, 'dist/scanner/spring-config-provider'));
   const { springConfigPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/spring-config-pass'));
-  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-spring-port-'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-spring-port-'));
   try {
     fs.writeFileSync(path.join(fixtureDir, 'application.yml'), 'server:\n  port: 8443\n');
 
@@ -2378,7 +2378,7 @@ test('T-PC1-8 (B-spring-config) — server.port with zero or 2+ service-unit can
 
 test('Review fix (2026-08-09) — spring.config.activate.on-profile documents are never merged into the unconditional facts', () => {
   const { discoverSpringConfigFiles } = require(path.join(PIPELINE_ROOT, 'dist/scanner/spring-config-provider'));
-  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-spring-onprofile-'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-spring-onprofile-'));
   try {
     fs.writeFileSync(
       path.join(fixtureDir, 'application.yml'),
@@ -2413,7 +2413,7 @@ test('Review fix (2026-08-09) — spring.config.activate.on-profile documents ar
 
 test('Review fix (2026-08-09) — an on-profile document never collides unit ids with the file\'s unconditional entry', () => {
   const { springConfigPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/spring-config-pass'));
-  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-spring-onprofile-units-'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-spring-onprofile-units-'));
   try {
     fs.writeFileSync(
       path.join(fixtureDir, 'application.yml'),
@@ -2612,7 +2612,7 @@ test('Review fix (2026-08-09) — cdxgen-provider scans every matching ecosystem
   const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
   if (!fs.existsSync(cdxgenBin)) return;
 
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'loom-cdxgen-polyglot-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-cdxgen-polyglot-'));
   try {
     fs.writeFileSync(path.join(dir, 'requirements.txt'), 'psycopg2==2.9.9\n');
     fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'tooling', version: '1.0.0', dependencies: { pg: '^8.11.3' } }));

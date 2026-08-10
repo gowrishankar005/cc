@@ -47,9 +47,6 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  # pipeline/Dockerfile was written against known-correct requirements but
-  # never actually run through `docker build` (no daemon in the dev
-  # sandbox it was authored in) — a real, disclosed gap until this job.
   # Separate job (not a step in `test` above): a real Dockerfile problem
   # should be visible on its own, not block or get masked by the primary
   # regression-suite signal. `ubuntu-latest` runners ship Docker
@@ -62,7 +59,7 @@ jobs:
       - name: docker build
         run: docker build -t weaver-pipeline pipeline/
 
-      # T-PC2-2 — proves the built image actually contains a runnable
+      # Proves the built image actually contains a runnable
       # dist/, not just that `docker build` didn't error. run-slice.js's
       # own usage message (printed + exit 1 on zero args, see
       # orchestration/run-slice.ts's main()) is a real, already-existing
