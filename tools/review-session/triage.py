@@ -1,4 +1,4 @@
-"""Builds residuals.json from a run's review-queue.json (T-RS1-3, MVP scope).
+"""Builds residuals.json from a run's review-queue.json (MVP scope).
 
 S7 (no sample hardcodes): the trigger -> tier/class mapping below is keyed
 purely on review-queue.json's own trigger names (S1/S2/S5/low-architecture-
@@ -6,11 +6,10 @@ coverage), which are themselves generic across every language/framework
 this pipeline supports — nothing here references a specific repo, class
 name, or framework.
 
-MVP scope note (matches AGENT_TASKS_Residual_Review_Session.md's own T-RS1-2
-/ T-RS1-3 split): this covers every trigger hitl-review-trigger.ts already
+MVP scope note: this covers every trigger hitl-review-trigger.ts already
 emits. It deliberately does NOT yet cover unmapped-signal-cluster ->
 catalogue_candidate promotion or generic ontology-kind-conflict detection
-beyond what S5 already names — those are real, separate T-RS1-3 extensions,
+beyond what S5 already names — those are real, separate extensions,
 named here as a TODO rather than silently assumed done.
 """
 
@@ -73,7 +72,7 @@ def _evidence_refs_for(item: dict) -> list[str]:
 
 
 def apply_baseline(residuals: list[dict], baseline_residuals: list[dict], baseline_decisions: list[dict]) -> list[dict]:
-    """T-RS3-3 (thin --baseline). A prior Session Pack's residuals.json +
+    """Thin --baseline handling. A prior Session Pack's residuals.json +
     drafts/decisions/ define what's already been decided. For each of THIS
     run's residuals:
       - If a baseline residual with the SAME (trigger, unitIds) signature
@@ -90,9 +89,9 @@ def apply_baseline(residuals: list[dict], baseline_residuals: list[dict], baseli
         instead of silently carrying forward or silently re-asking as if
         nothing happened.
     Real limitation, stated not hidden: matching is by (trigger, unitIds)
-    signature, not a stable residual id (T-RS1-3's residual ids are
+    signature, not a stable residual id (this module's residual ids are
     positional/regenerated per run, not stable across runs) — this is a
-    real MVP scope narrowing, full multi-scan polish is deferred to RS-5
+    real MVP scope narrowing, full multi-scan polish is deferred
     per this task's own spec.
     """
     baseline_by_unit: dict[str, dict] = {}

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""draft_tier_b.py — T-RS4-1. Optional Tier B LLM drafting.
+"""draft_tier_b.py — Optional Tier B LLM drafting.
 
-Gated behind RS-3's own bar (do not start RS-4 before the human apply path
-works without an LLM — AGENT_TASKS_Residual_Review_Session.md §0.1). That
-bar is met (RS-3 closed, proven end-to-end).
+Gated behind a real bar: the human apply path must work without an LLM
+first. That bar is met (proven end-to-end).
 
 REAL, HONEST LIMIT NAMED UP FRONT (not hidden): `triage.py`'s current
-trigger map (T-RS1-3 MVP) never classifies any residual as Tier B — every
+trigger map never classifies any residual as Tier B — every
 trigger it knows about (S1, S2, S5x2, low-architecture-coverage) maps to
 Tier A or Tier C. So this tool has zero real production input to act on
 today. It's built and tested against the design's own trap fixtures
@@ -193,7 +192,7 @@ def draft_for_residual(residual: dict, unit_index: dict, packs: dict, calm_node_
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="T-RS4-1: optional Tier B LLM drafting. No API key -> reports what would be attempted, writes nothing.")
+    parser = argparse.ArgumentParser(description="Optional Tier B LLM drafting. No API key -> reports what would be attempted, writes nothing.")
     parser.add_argument("--session-dir", required=True)
     args = parser.parse_args()
 

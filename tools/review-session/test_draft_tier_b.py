@@ -1,5 +1,4 @@
-"""T-RS4-2: the 6-fixture fabricate-trap suite (AGENT_TASKS_Residual_Review_Session.md's
-own spec, tightened 2026-08-09). Tests parse_and_validate_response — the
+"""The 6-fixture fabricate-trap suite. Tests parse_and_validate_response — the
 actual guardrail — against SYNTHETIC raw-response text, never a live model
 call (no ANTHROPIC_API_KEY in this environment; see draft_tier_b.py's own
 module docstring for the full honest disclosure of what is and isn't

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""effective_ir.py — T-RS2-3, MVP scope.
+"""effective_ir.py — MVP scope.
 
 Writes effective-architecture-ir.md: a human-readable, reviewed-architecture
 summary distinct from intelligence-ir.md (the deterministic, facts-only
@@ -10,7 +10,7 @@ MVP scope (Architect_Residual_Review_Session.md §7.1's full 8-section
 template with literal calm-node/calm-relationship fenced fragments is
 explicitly NOT built here — the design's own §0.4 MVP cut allows deferring
 that richness to B-calm-portable-ir, as long as the deferral is stated, not
-silently assumed done). What IS real here, per T-RS2-3's own stated
+silently assumed done). What IS real here, per the stated
 minimum: provenance, node/relationship counts (by kind/grade), open
 residuals, and a decision-log summary — assembled from real CALM +
 Session Pack data, never LLM-authored prose.
@@ -43,7 +43,7 @@ def build_effective_ir(calm: dict, residuals: list[dict], decisions: list[dict],
     lines = [
         "# Effective architecture (MVP)",
         "",
-        "**MVP scope note**: this is the T-RS2-3 minimum bar (provenance, counts, open residuals, "
+        "**MVP scope note**: this is the minimum bar (provenance, counts, open residuals, "
         "decision log) — the full 8-section template with literal `calm-node`/`calm-relationship` "
         "fenced fragments (`Architect_Residual_Review_Session.md` §7.1) is explicitly deferred to "
         "**B-calm-portable-ir**, not silently assumed done. This file is a projection for reading, "
@@ -58,7 +58,7 @@ def build_effective_ir(calm: dict, residuals: list[dict], decisions: list[dict],
         f"| contractVersion | {provenance.get('contractVersion', 'unknown')} |",
         f"| Node count | {len(nodes)} |",
         f"| Relationship count | {len(relationships)} |",
-        f"| Residuals resolved this run | 0 (RS-3 apply.py not yet built — no residual has ever been marked resolved by this tooling) |",
+        f"| Residuals resolved this run | 0 (this tooling does not yet track per-run resolution counts) |",
         "",
         "## 1. Node inventory",
         "",
@@ -79,8 +79,8 @@ def build_effective_ir(calm: dict, residuals: list[dict], decisions: list[dict],
         lines.append("_No relationships in this run._")
     lines.append("")
 
-    # Real fix (found on review): status tracking WAS built in RS-3
-    # (triage.py's apply_baseline, T-RS3-3, carried_forward) — this section
+    # Real fix (found on review): carried-forward status tracking
+    # (triage.py's apply_baseline) — this section
     # used to claim otherwise and list every residual as "open" regardless
     # of real status, which became actively wrong the moment a Session Pack
     # could legitimately carry non-open residuals.
@@ -98,7 +98,7 @@ def build_effective_ir(calm: dict, residuals: list[dict], decisions: list[dict],
         lines.append("_None open — every residual this run was already carried forward from a prior session (see below)._")
     lines.append("")
     if carried_residuals:
-        lines.append(f"_{len(carried_residuals)} additional residual(s) carried forward from a prior session (`--baseline`, T-RS3-3) — already decided, not re-asked: {', '.join(r['id'] for r in carried_residuals)}._")
+        lines.append(f"_{len(carried_residuals)} additional residual(s) carried forward from a prior session (`--baseline`) — already decided, not re-asked: {', '.join(r['id'] for r in carried_residuals)}._")
         lines.append("")
 
     lines += ["## 4. Decision log (this pack's drafts/decisions/)", ""]
@@ -117,7 +117,7 @@ def build_effective_ir(calm: dict, residuals: list[dict], decisions: list[dict],
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Build effective-architecture-ir.md (T-RS2-3, MVP scope) from a real CALM document + Session Pack residuals/decisions.")
+    parser = argparse.ArgumentParser(description="Build effective-architecture-ir.md (MVP scope) from a real CALM document + Session Pack residuals/decisions.")
     parser.add_argument("--calm", required=True, help="path to architecture.calm.json (real, post-apply if applicable)")
     parser.add_argument("--session-dir", help="Session Pack dir (reads residuals.json + drafts/decisions/) — optional, sections 3/4 are empty without it")
     parser.add_argument("--out", required=True, help="output path for effective-architecture-ir.md")

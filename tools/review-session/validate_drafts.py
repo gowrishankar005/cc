@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""validate_drafts.py — T-RS2-1. Pre-flight integrity checks on
+"""validate_drafts.py — Pre-flight integrity checks on
 drafts/decisions/ + drafts/overrides/, BEFORE apply.py ever calls the real
 Node override-applier.ts. Mirrors override-applier.ts's own validation
 logic (same field names, same rejection wording style) so a draft that
@@ -13,7 +13,7 @@ drafts/decisions/ and drafts/overrides/ into separate directories, but
 override-applier.ts's own loadOverridesDir() scans ONE flat directory and
 dispatches by which key each file has (decision_id vs override_id). Two
 separate directories, as this pack layout produces, will never be seen by
-override-applier.ts as-is — apply.py (T-RS3-1) needs to merge/point both
+override-applier.ts as-is — apply.py needs to merge/point both
 into one directory before calling run-slice --overrides, matching that
 task's own "copy/point overrides dir" phrasing. validate_drafts.py doesn't
 need to replicate that merge — it validates the two directories directly,

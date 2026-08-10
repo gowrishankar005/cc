@@ -1,4 +1,4 @@
-"""T-RS1-5 (safety-critical): a static, checkable proof that the chat-mode
+"""Safety-critical: a static, checkable proof that the chat-mode
 file's own tools: allowlist excludes every terminal/command/task-execution
 tool name — the real enforcement mechanism S4 depends on, not just the
 prose instructions in the file's body.

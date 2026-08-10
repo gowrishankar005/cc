@@ -4,7 +4,7 @@ tools: ['codebase', 'search', 'usages', 'problems', 'editFiles']
 ---
 
 <!--
-SAFETY: no autonomous apply (S4, AGENT_TASKS_Residual_Review_Session.md §0.3).
+SAFETY: no autonomous apply (S4, see Architect_Residual_Review_Session.md §0.3).
 
 The `tools:` list above is the real enforcement mechanism in VS Code Copilot
 Chat, not just an instruction below asking the model to behave — VS Code
@@ -43,7 +43,7 @@ stale for both hosts tested):
   real safety gate is that host's own per-action permission prompt: always
   approve file writes individually, and NEVER grant a blanket "allow all
   edits this session" — that removes the one thing actually protecting you.**
-- Live-model API cost/behavior for RS-4's Tier B drafting path: still
+- Live-model API cost/behavior for the Tier B drafting path: still
   untested against a real key in this project's own dev environment (works
   normally for a pilot operator with their own Copilot/API access).
 -->
@@ -153,5 +153,4 @@ whole design sits on top of, not a replacement for it. See
 ## Design authority
 
 `docs/solution/Architect_Residual_Review_Session.md` (full taxonomy, choice
-card design, safety principles). `docs/solution/AGENT_TASKS_Residual_Review_Session.md`
-(build status — check before assuming any phase beyond RS-1 is available).
+card design, safety principles, and current build status).

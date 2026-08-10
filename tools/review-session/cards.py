@@ -1,4 +1,4 @@
-"""T-RS1-4 — deterministic choice-card generator.
+"""Deterministic choice-card generator.
 
 Design authority: Architect_Residual_Review_Session.md §2.1 (choice-driven
 UX) + §3 (per-class option shapes) + §4.4 (cards render as ordinary

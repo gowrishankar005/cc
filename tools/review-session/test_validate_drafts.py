@@ -1,4 +1,4 @@
-"""T-RS2-1 exit criteria: good fixture passes; bad fixtures fail with clear
+"""Exit criteria: good fixture passes; bad fixtures fail with clear
 reasons. Mirrors override-applier.ts's own real validation semantics —
 these fixtures are synthetic (S7: no sample hardcodes), not copied from a
 real repo."""

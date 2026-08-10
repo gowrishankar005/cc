@@ -1,4 +1,4 @@
-"""T-RS2-3 exit: real post-apply CALM produces a non-empty effective IR;
+"""Exit criteria: real post-apply CALM produces a non-empty effective IR;
 never touches intelligence-ir.md."""
 
 import unittest
@@ -54,8 +54,8 @@ class TestEffectiveIR(unittest.TestCase):
 
     def test_carried_forward_residuals_excluded_from_open_section(self):
         """Real bug found on review: this section used to claim 'status
-        tracking not yet built (RS-3)' and list every residual as open
-        regardless — stale the moment T-RS3-3 built real carried_forward
+        tracking not yet built' and list every residual as open
+        regardless — stale the moment carried-forward tracking was built
         status. A carried-forward residual must not appear as if it were
         still open."""
         open_r = {"id": "R-001", "tier": "A", "class": "security-authority-policy", "rationale": "still open", "status": "open"}

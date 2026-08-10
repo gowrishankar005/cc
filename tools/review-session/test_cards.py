@@ -1,4 +1,4 @@
-"""T-RS1-4 exit criteria: same residual + evidence -> same options,
+"""Exit criteria: same residual + evidence -> same options,
 deterministic, generated from a fixed template per class — never an LLM
 inventing plausible-sounding categories."""
 

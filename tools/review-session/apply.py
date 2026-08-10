@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""apply.py — T-RS3-1. The one command that turns a validated Session Pack's
+"""apply.py — The one command that turns a validated Session Pack's
 drafts into a real, applied CALM document. This is the ONLY place in this
 whole tool suite that ever invokes run-slice.js / override-applier.ts — a
 deliberate, narrow chokepoint (S3/S4).
@@ -7,8 +7,8 @@ deliberate, narrow chokepoint (S3/S4).
 Flow: validate_drafts (in-process, re-run here even if already run
 manually — never trust a stale prior validation) -> refuse if it fails ->
 require explicit confirmation (S4: never silent) -> merge drafts/decisions/
-+ drafts/overrides/ into one directory (the real integration detail found
-while building T-RS2-1: override-applier.ts's loadOverridesDir() scans ONE
++ drafts/overrides/ into one directory (a real integration detail found
+while building this: override-applier.ts's loadOverridesDir() scans ONE
 flat directory, dispatched by which key each file has — the Session Pack's
 own split-directory layout doesn't match that, so this merge is required,
 not optional) -> node dist/orchestration/run-slice.js --from-facts

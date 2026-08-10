@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver residual review session — residuals.json",
-  "description": "T-RS1-3. Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent (T-RS1-5) and by draft_tier_b.py (T-RS4-1, built) for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). Real, still-open gap (B-tier-b-detector): no trigger currently produces tier 'B', so every real residual today is 'A' or 'C'.",
+  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). Real, still-open gap (B-tier-b-detector): no trigger currently produces tier 'B', so every real residual today is 'A' or 'C'.",
   "type": "object",
   "required": ["generatedAt", "items"],
   "properties": {
@@ -20,11 +20,11 @@
         "tier": {
           "type": "string",
           "enum": ["A", "B", "C"],
-          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (RS-4, built — either in-chat via Copilot's editFiles tool, the primary path, or the secondary/headless draft_tier_b.py; no trigger currently produces this tier, B-tier-b-detector). C = do not invent; document OOS or leave open."
+          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (either in-chat via Copilot's editFiles tool, the primary path, or the secondary/headless draft_tier_b.py; no trigger currently produces this tier, B-tier-b-detector). C = do not invent; document OOS or leave open."
         },
         "card": {
           "type": "string",
-          "description": "T-RS1-4. Deterministic markdown choice card (cards.py) — options from a fixed per-class generator, an evidence blockquote, and a similar-residuals note. For a carried_forward residual this is a short note instead of a full card. This is the field the bound chat-mode agent presents as-is; it does not re-derive or invent options from the other fields."
+          "description": "Deterministic markdown choice card (cards.py) — options from a fixed per-class generator, an evidence blockquote, and a similar-residuals note. For a carried_forward residual this is a short note instead of a full card. This is the field the bound chat-mode agent presents as-is; it does not re-derive or invent options from the other fields."
         },
         "class": {
           "type": "string",
@@ -48,11 +48,11 @@
         "status": {
           "type": "string",
           "enum": ["open", "drafted", "applied", "carried_forward"],
-          "description": "'carried_forward' is set by pack.py --baseline (T-RS3-3) when a prior session already decided this exact residual — never re-carded. 'drafted'/'applied' are not yet set by any built tool (no code path marks a residual resolved after apply — see the effective_ir.py MVP's own honest note about this)."
+          "description": "'carried_forward' is set by pack.py --baseline when a prior session already decided this exact residual — never re-carded. 'drafted'/'applied' are not yet set by any built tool (no code path marks a residual resolved after apply — see the effective_ir.py MVP's own honest note about this)."
         },
         "reconfirm": {
           "type": "boolean",
-          "description": "T-RS3-3 (--baseline). True when a prior session's decision exists for this residual's unit, but THIS run's (trigger, class) differs from what the baseline recorded — the underlying source/facts likely changed shape since the decision was made. Never silently carried forward or silently overwritten; still gets a real, fresh choice card. Absent (not false) when no baseline was given or no prior decision matched."
+          "description": "(--baseline). True when a prior session's decision exists for this residual's unit, but THIS run's (trigger, class) differs from what the baseline recorded — the underlying source/facts likely changed shape since the decision was made. Never silently carried forward or silently overwritten; still gets a real, fresh choice card. Absent (not false) when no baseline was given or no prior decision matched."
         }
       }
     }

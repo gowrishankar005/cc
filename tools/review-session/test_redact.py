@@ -1,4 +1,4 @@
-"""T-RS1-2 exit criteria: a fixture snippet with a known FAKE secret pattern
+"""Exit criteria: a fixture snippet with a known FAKE secret pattern
 must come out redacted from redact.py — a testable claim, not a design-doc
 assertion (this is exactly the gap Architect_Residual_Review_Session.md
 §4.1 named and required a real test for).

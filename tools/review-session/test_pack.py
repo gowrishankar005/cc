@@ -1,4 +1,4 @@
-"""T-RS1-2's own stated exit bar: "Pack on NestJS fixture or BoA out-dir
+"""Stated exit bar: "Pack on NestJS fixture or a Python-app out-dir
 succeeds offline." Automated, not just the manual run this was originally
 proven with — same "lock every proven behavior into a regression test"
 discipline as pipeline/test/regression.test.js.

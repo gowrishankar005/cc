@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""pack.py — T-RS1-2. Builds a Session Pack from a real run-slice out-dir.
+"""pack.py — Builds a Session Pack from a real run-slice out-dir.
 
 Usage:
     python3 pack.py --out-dir <run-slice-out> --session-dir <review-sessions/<run-id>>
@@ -42,7 +42,7 @@ def main() -> int:
     parser.add_argument("--out-dir", required=True, help="run-slice output directory (must contain typed-facts.json + coverage-report.json)")
     parser.add_argument("--session-dir", required=True, help="where to write the Session Pack (typically review-sessions/<run-id>)")
     parser.add_argument("--roots", nargs="*", default=None, help="override package roots for source snippet reads (defaults to typed-facts.json's own packageRoots)")
-    parser.add_argument("--baseline", help="T-RS3-3: a prior Session Pack dir — residuals already decided there are carried forward, not re-asked; residuals whose evidence shape changed since are flagged re-confirm")
+    parser.add_argument("--baseline", help="a prior Session Pack dir — residuals already decided there are carried forward, not re-asked; residuals whose evidence shape changed since are flagged re-confirm")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir).resolve()
@@ -111,11 +111,11 @@ def main() -> int:
     packs = _build_evidence_packs(residuals, unit_index, package_roots)
     (session_dir / "evidence" / "packs.json").write_text(json.dumps(packs, indent=2))
 
-    # T-RS1-4 — deterministic choice cards, generated from the fixed
+    # Deterministic choice cards, generated from the fixed
     # per-class templates in cards.py (never LLM-invented), attached
-    # directly onto each residual so the bound Copilot Chat agent (T-RS1-5)
+    # directly onto each residual so the bound Copilot Chat agent
     # can read the card straight out of residuals.json. carried_forward
-    # residuals (T-RS3-3) never get a full choice card — they're not being
+    # residuals never get a full choice card — they're not being
     # asked again — just a short note.
     askable = [r for r in residuals if r.get("status") != "carried_forward"]
     card_markdown = build_all_cards(askable, unit_index, packs)
@@ -237,7 +237,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "",
         f"Generated {manifest['generatedAt']} from `{manifest['outDir']}`.",
         "",
-        "## How this session works (T-RS1-6, design §2 target experience)",
+        "## How this session works",
         "",
         "1. You already ran a Weaver scan → `architecture.calm.json` (unchanged, upstream of this pack).",
         "2. `pack.py` built this Session Pack from that scan's out-dir — the step you just did.",
@@ -245,7 +245,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "(`.github/chatmodes/residual-review.chatmode.md`) — or, if that chat mode's tools are disabled by "
         "your org's Copilot policy, just read this file and `residuals.json` directly (the degraded path — see below).",
         "4. The agenda below is already split into Tier A (you decide), Tier B (the chat agent may draft "
-        "in-conversation, per its own bound rules — RS-4), and Tier C (never invented, document or leave open).",
+        "in-conversation, per its own bound rules), and Tier C (never invented, document or leave open).",
         "5. Answer every Tier A card with its option key or `other: <rationale>`.",
         "6. For any Tier B residual, the chat agent may draft directly (writing under `drafts/decisions/` / "
         "`drafts/overrides/` via its own tools) — review each draft as Accept/Reject/Edit, never treat a draft "
@@ -277,7 +277,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
     lines += [f"## Residuals ({len(residuals)} total: {len(askable_a)} Tier A, {len(askable_b)} Tier B, {len(askable_c)} Tier C, {len(carried)} carried forward)", ""]
 
     if carried:
-        lines += ["## Carried forward from a prior session (not re-asked — T-RS3-3)", ""]
+        lines += ["## Carried forward from a prior session (not re-asked)", ""]
         for r in carried:
             lines.append(f"- **{r['id']}**: {r['rationale']}")
         lines.append("")
@@ -285,7 +285,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
     lines += ["## Tier A — you decide", ""]
     for r in askable_a:
         lines.append(r["card"])
-    lines += ["", "## Tier B — the chat agent may draft in-conversation if the evidence bar is met (RS-4 — review each draft as Accept/Reject/Edit)", ""]
+    lines += ["", "## Tier B — the chat agent may draft in-conversation if the evidence bar is met (review each draft as Accept/Reject/Edit)", ""]
     for r in askable_b:
         lines.append(r["card"])
     lines += ["", "## Tier C — do not invent, document or leave open", ""]
@@ -299,7 +299,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         lines.append(f"- No `architecture.calm.json` was found in `{manifest['outDir']}` at pack time — it will exist after step 8's apply run; open that new out-dir's copy in your CALM viewer then.")
     lines.append("- Most static-file CALM viewers do not auto-reload — **manually reload after step 8's apply**, per design §4.5.")
     lines.append("- This pack's `decisions-log.md` and `apply-report.md` (written by `apply.py`) are the audit trail — check those in if you want to keep a record; the rest of this pack is scratch by default (gitignored).")
-    lines.append("- Starting a NEW scan later? Pass `--baseline " + str(session_dir) + "` to `pack.py` so residuals already decided here aren't re-asked (T-RS3-3).")
+    lines.append("- Starting a NEW scan later? Pass `--baseline " + str(session_dir) + "` to `pack.py` so residuals already decided here aren't re-asked.")
     return "\n".join(lines)
 
 
@@ -307,7 +307,7 @@ def _render_agents_md() -> str:
     return (
         "# Bound agent playbook for this Session Pack\n\n"
         "This is the per-pack copy of the rules already enforced repo-wide by "
-        "`.github/chatmodes/residual-review.chatmode.md` (T-RS1-5) — read that file's "
+        "`.github/chatmodes/residual-review.chatmode.md` — read that file's "
         "`tools:` frontmatter for how autonomous apply is structurally prevented, not just instructed against.\n\n"
         "**Mode: Guided (v1's only mode — design §5)** — ask all Tier A items as choice cards; "
         "Tier B may be drafted in-chat (editFiles, per the chat-mode's own §5.1 hard rules) and is always shown as "
@@ -318,14 +318,14 @@ def _render_agents_md() -> str:
         "4. Write proposals only under drafts/.\n"
         "5. Every override must reference an active Decision Record with rationale.\n"
         "6. Tier A is the architect's decision — offer choices, never decide alone.\n"
-        "7. Tier B may be drafted directly in this chat (RS-4) — see the chat-mode file's own §5.1 hard rules "
+        "7. Tier B may be drafted directly in this chat — see the chat-mode file's own §5.1 hard rules "
         "for the exact evidence bar and required fields (llm-advisory: reviewer, cited evidence, no invented ids). "
         "`draft_tier_b.py` is a separate, optional headless alternative for scripted runs, not the primary path. "
         "Whichever path drafted it, present it as Accept / Reject / Edit rationale — a draft existing is not the "
         "same as it being approved. No trigger currently classifies any residual as Tier B, so in practice this "
         "won't happen yet, but the rule holds the moment one does.\n"
         "8. Weak/ambiguous evidence -> cannot_decide / leave open, never fabricate.\n"
-        "9. Never run apply.py / run-slice / override-applier from this chat — applying is a human step (RS-3).\n"
+        "9. Never run apply.py / run-slice / override-applier from this chat — applying is a human step.\n"
     )
 
 

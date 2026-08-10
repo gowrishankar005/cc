@@ -1,4 +1,4 @@
-"""Secret redaction — S8 (AGENT_TASKS_Residual_Review_Session.md §0.3).
+"""Secret redaction — S8 (see Architect_Residual_Review_Session.md §0.3).
 
 Every source snippet that reaches evidence/packs.json must pass through
 redact() first. This is a fixed, testable step, not a documentation

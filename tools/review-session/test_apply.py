@@ -1,4 +1,4 @@
-"""T-RS3-1's own exit bar: a real override (type_change or relationship_add)
+"""Stated exit bar: a real override (type_change or relationship_add)
 applies; calm validate reports 0 errors on the reviewed out-dir. Real,
 genuine subprocess chain: run-slice -> pack.py -> hand-authored draft ->
 apply.py -> calm validate. No mocks.
@@ -51,7 +51,7 @@ class TestApplyEndToEnd(unittest.TestCase):
             "target_type": "node",
             "target_ref": self.target_node_id,
             "final_decision": {"action": "overridden", "new_value": "database"},
-            "rationale": "Real end-to-end apply.py test (T-RS3-1).",
+            "rationale": "Real end-to-end apply.py test.",
             "reviewer": "architect:test",
             "reviewed_at": "2026-08-09T00:00:00Z",
             "status": "active",
@@ -154,7 +154,7 @@ class TestApplyEndToEnd(unittest.TestCase):
         self.assertIn("REFUSING", run.stderr)
 
     def test_calm_validate_zero_errors_on_reviewed_out(self):
-        """T-RS3-1's own exit bar, literally. Uses the project's own real
+        """Stated exit bar, literally. Uses the project's own real
         `npm run validate` wrapper (pipeline/package.json) — the same
         command this whole session has used everywhere else — rather than
         guessing at calm-cli's own flag/output shape independently."""

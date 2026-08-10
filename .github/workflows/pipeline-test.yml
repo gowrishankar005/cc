@@ -47,7 +47,6 @@ jobs:
       - run: npm ci
       - run: npm test
 
-  # T-PC2-1/2 (B-scale-oom's sibling program, AGENT_TASKS_Phase1_Close.md) —
   # pipeline/Dockerfile was written against known-correct requirements but
   # never actually run through `docker build` (no daemon in the dev
   # sandbox it was authored in) — a real, disclosed gap until this job.

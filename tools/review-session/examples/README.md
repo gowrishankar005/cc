@@ -1,8 +1,8 @@
-# Manual draft path (T-RS2-2)
+# Manual draft path
 
 An architect can create Decision Record + Override drafts **without any
-LLM involvement at all** — RS-4's Tier B drafting doesn't exist yet, and
-even once it does, every card is answerable this way. This directory shows
+LLM involvement at all** — Tier B drafting via chat is optional, and
+even when used, every card is answerable this way. This directory shows
 a real, worked, synthetic example.
 
 ## From a choice card to a draft, step by step
@@ -43,7 +43,7 @@ The architect answers `1`. That answer becomes exactly two files:
    it) mechanically enforces. `override_type` is whichever of `type_change`
    / `node_add` / `node_remove` / `node_rename` / `relationship_add` /
    `relationship_remove` matches the card's answer (`boundary_change` is
-   recognized but not yet implemented — see `AGENT_TASKS_Residual_Review_Session.md`).
+   recognized but not yet implemented).
 
 Both files go under this Session Pack's own `drafts/decisions/` and
 `drafts/overrides/` — copy this example's shape, change the ids/values,
@@ -51,7 +51,7 @@ done. No template engine, no code generation required.
 
 ## The other common case: "leave open" — a Decision Record with NO Override
 
-AP-4 (`Architect_Pilot_Feedback_Notes.md` Entry 8) — empirically the single
+Empirically the single
 most common Tier A outcome across two real pilot sessions was the architect
 confirming the scan correctly found nothing real to connect, i.e. picking
 `[none]`/`[leave-open]` rather than a specific candidate. This needs only
@@ -86,11 +86,10 @@ python3 ../validate_drafts.py --session-dir <your-session-dir> --calm <out-dir>/
 
 Run against this example pair with a synthetic CALM containing
 `svc-prisma-service`, it passes clean (0 errors, 0 warnings) — verified for
-real, not just asserted; see the T-RS2-1/T-RS2-2 changelog entries in
-`AGENT_TASKS_Residual_Review_Session.md` for the exact commands run.
+real, not just asserted.
 
 Applying (turning a validated draft into a new `architecture.calm.json`) is
-a real, human-confirmed step — `apply.py` (T-RS3-1, built):
+a real, human-confirmed step — `apply.py`:
 
 ```bash
 python3 ../apply.py --session-dir <your-session-dir> --out <new-out-dir>
@@ -106,8 +105,7 @@ by which field each JSON file has), not the Session Pack's own split
 into a temp directory before calling `run-slice.js`, so you never have to
 do that by hand. Proven for real against this exact example pair: the
 target node's `node-type` genuinely changed, `calm validate` reported 0
-errors — see the T-RS3-1 changelog entry in
-`AGENT_TASKS_Residual_Review_Session.md`.
+errors.
 
 If you ever need to apply without `apply.py` (e.g. debugging it), the
 underlying mechanism is still the plain platform command, with the merge
