@@ -8,6 +8,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For scope, see [`docs/Requirements.md`](docs/Requirements.md). For what's built vs. backlog, see [`docs/solution/Capabilities.md`](docs/solution/Capabilities.md). For the current solution design, see [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](docs/solution/Architecture_as_Code_Solution_Design_v2.md) (platform) and [`docs/solution/language/java.md`](docs/solution/language/java.md) (Java specifics).
 
+**Before scoping anything, read the three governance registries** —
+[`docs/solution/BACKLOG.md`](docs/solution/BACKLOG.md) (what's already known-missing, often with evidence attached),
+[`docs/solution/Claim_Register.md`](docs/solution/Claim_Register.md) (what may be *said* to work, and the forbidden-phrase table),
+[`docs/solution/OOS_Registry.md`](docs/solution/OOS_Registry.md) (permanent non-goals, each with a revisit trigger).
+Skipping them produces work that is rejected on review or re-derives a
+question already answered here: a detector keyed to a sample repo's class
+names is always rejected, a permanent non-goal has a defined trigger rather
+than being simply unbuilt, and a P1 backlog row usually already carries the
+real evidence someone is about to go and re-gather.
+
 ## Working principles
 
 **1. Think Before Coding — don't assume, verify against the real tool/schema/repo.** "Specified" and "true" are different claims. Before asserting a design or dependency assumption holds, verify it — a schema-shaped claim can be falsified the moment the real validator runs against it; a "not installed" claim can be stale the moment someone actually checks again. When a genuine decision point has more than one defensible answer and only the user can pick it (build-environment assumptions, scope tradeoffs, which of several correct designs to build), ask rather than picking silently.
@@ -40,7 +50,7 @@ tools/          Standalone tooling (e.g. the residual-review session helper)
 | `coe-lab/generated/` | No | Yes — platform output under test |
 | `coe-lab/scripts/` | No | Yes |
 
-See `coe-lab/ISOLATION.md`. Gold paths are also listed in `.cursorignore` / `.grokignore`.
+See `coe-lab/ISOLATION.md`. Gold paths are also listed in `.cursorignore` / `.grokignore`. **Those ignore-files only guard the tools that read them** — under any other tooling, isolation rests on discipline alone. When in doubt, run implementation and scoring as separate sessions: a measurement taken by a process that read the answer key is void, not merely weak.
 
 ## Build and run
 
@@ -91,3 +101,57 @@ Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with 
 - `npm test` (from `pipeline/`) is the real regression suite — exact-value assertions against checked-in fixtures, not smoke tests. Some tests reference sample repos that are only present locally for manual testing (see `.gitignore`'s `spikes/` entry) and skip gracefully when absent.
 - New detection coverage should be a catalogue row plus one of the four proven extraction mechanisms, per the Simplicity First principle above — see [`docs/solution/Catalogue_Intake.md`](docs/solution/Catalogue_Intake.md) for the intake process (evidence + test + backlog entry required).
 - Before claiming a fix or a new detection works, run it against a real fixture and check the actual output — don't infer correctness from reading the code.
+
+## Process discipline (from this project's build retrospective)
+
+The retrospective measured roughly **two lines of planning prose for every one
+line of code that shipped** — ~11,000 lines of planning docs eventually deleted
+as superseded churn, and a requirements doc that reached v0.14 before scope
+locked. The engineering discipline in this repo is *why the codebase held up*;
+the cost was in where the effort went, not how much. These rules exist to keep
+that ratio from returning.
+
+**One requirements doc, ever.** Version it in commit history, not in
+filenames. The moment a doc is about to be saved as `_v2`, edit the original
+and commit — git already remembers what it said.
+
+**Two solutioning passes, hard cap.** A first draft, one structured critique,
+then build. Wanting a third review *before* writing code is itself the signal
+to go write the code — real evidence critiques a design faster and more
+honestly than another planning pass.
+
+**Turn open questions into tests, not paragraphs.** "Will this approach work?"
+is not settled by arguing in a document; it's settled by the smallest real
+test that could prove it wrong. If that test can't be written yet, the
+question isn't understood yet either.
+
+**"Documented" and "specified" never mean "done."** `Capabilities.md` and
+`Claim_Register.md` are the status of record. A design paragraph is not a
+capability.
+
+**Delete finished planning artifacts as you go.** A task or requirements doc's
+job ends when its content ships or is rejected. Don't archive "just in case" —
+that's what git history is for, and it doesn't clutter the working tree in the
+meantime.
+
+**Comments are for a stranger with no memory of today.** No session references,
+no task-ID shorthand only the author can resolve. Reasoning that matters
+belongs in the commit message — durable and searchable — not narrated through
+source files where it rots as context changes.
+
+**Abstract third-party references the day you write them.** Using real
+repositories as evidence is good practice; generalise the reference
+immediately ("a reference banking platform", not the real name). Retrofitting
+this across a whole repo is real, avoidable work — this project has already
+paid for it once.
+
+**Second occurrence of a mistake fixes the process, not the instance.** The
+first time something breaks, patch it. The second time the *same class* breaks,
+build the guardrail — a test, a lint rule, a frozen exam — so there's no third.
+Cross-document reference rot (a `§`, ID, or path that no longer resolves after
+a restructure) has now recurred enough times to warrant a mechanical check
+rather than another manual sweep.
+
+**Handover-ready is a standing constraint, not a final sweep.** The cheapest
+time to keep the repo clean is continuously; the most expensive is a dedicated
+pass at the end, which is exactly what closed out the previous cycle.
