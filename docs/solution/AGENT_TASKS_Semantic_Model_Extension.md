@@ -163,6 +163,34 @@ silence/completeness metrics, unmapped-signal clustering, catalogue-as-data
 isolation, `StructuralEngine` vendor isolation, module registry, exact-value
 regression suite, secret redaction (closes `CGR-2`).
 
+## 5b. Knowingly deferred — named so they aren't mistaken for oversights
+
+| Item | Why deferred | What would reopen it |
+|---|---|---|
+| **Scale target** (`NFR-50`) | No target repo set committed, and no measured scale problem. Inventing a number would be requirements outrunning evidence | A pilot repo where a run is too slow to sit in per-PR CI |
+| **Access governance over the generated model** (`NFR-60`) | Real need — the model can reveal architecture/security detail more legibly than raw source — but no design in either project | First time the model is shared beyond the team that can already read the source |
+| **Second representation emitter** (`NFR-40` proof) | Portability becomes measurable via emission-coverage (T-CL-5) without building one | A real consumer needing a non-CALM form |
+| **Catalogue authoring-cost tracking** (`CGR-8`) | E4 tests that catalogue-as-data holds; per-convention cost tracking is extra bookkeeping until breadth actually strains | Framework breadth becomes the bottleneck |
+
+**Closed by discovery, not by work:** `CGR-11` asked whether the two
+structural engines have value beyond one negative finding. Answered — both are
+in production use as complementary primary/secondary sources. No experiment
+needed.
+
+## 5c. Feeding the value/cost ledger during execution (`BR-130`)
+
+Every lane task that produces a real run gets one question at close: **did
+this produce a value event, a cost event, both, or neither?** Log it in the
+monitoring station's ledger. "Neither" is a valid answer and needs no entry —
+do not manufacture one. A ledger with only wins is marketing, not measurement,
+so cost events (wasted review time, false positives, heavy manual correction)
+are logged with the same rigour.
+
+**Isolation enforcement note:** gold paths are listed in `.cursorignore` /
+`.grokignore`. A session using different tooling has **no automatic guard** —
+`CON-40` then rests on discipline alone. If in doubt, run scoring and
+implementation as separate sessions.
+
 ## 6. Contract-change coupling — fails silently
 
 Phase 3 changes `TypedFacts` → `contractVersion` **major** bump per

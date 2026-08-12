@@ -16,6 +16,11 @@ than engine work. Do them first.**
 | **T-LR-5 CodeQL engine, generic** | T-P0-3 pass | Second `StructuralEngine`, one call site. Mechanism-class detector only |
 | **T-LR-6 Per-(engine, fact-type) trust tiers** | T-LR-5 | Matrix becomes evidence-earned per fact type, not config-declared per framework |
 
+**Prior evidence — read before starting T-LR-1:** `soln/bug3-jdbc-ownership-phase-a-memo.md`
+already records a real evidence pass on this exact class, including signals
+that were **falsified** as discriminators. Re-deriving it wastes a day and
+risks re-adopting a signal already disproven.
+
 **Two landmines:**
 - **JDBC ownership:** a fix may only change `kind` from `database` to
   `service` — **never suppress unit creation**, or it regresses the gold-scored
