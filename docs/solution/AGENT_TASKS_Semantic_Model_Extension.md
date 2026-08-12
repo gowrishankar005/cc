@@ -1,7 +1,7 @@
 # AGENT TASKS — Semantic Model Extension
 
 **Branch:** `feature/semantic-model-extension` (base `main` @ `370b7c7`)
-**Status:** scoped, not started.
+**Status:** scoped, not started. Lane files: `AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace
 (`codeintel/Architecture Model/docs/`), referenced by ID (`BR-*`, `NFR-*`,
 `CON-*`, `L*`, `A*`, `E*`).
@@ -108,54 +108,60 @@ if ≥1 fact changes status in a way a reviewer agrees is more correct.
 
 ---
 
-## 5. Phase 1+ — build, only if gates pass
+## 5. Execution lanes
 
-Existing `BACKLOG.md` P1 items marked **[B]** — these are *already evidenced*
-by this repo and are cheaper paths to the layered-architecture goal than new
-tooling. Prefer them.
+Work is split into lane files for parallel/sequential tracking. **This file
+holds the cross-cutting governance (§0), gates (§1-3) and DoD (§7); lane files
+hold tasks and reference back here rather than restating.** Requirements are
+tracked as rows in `BACKLOG.md` — not in a separate register.
 
-| Phase | Item | Ref |
+```
+        T-P0-0 Baseline
+              │
+   ┌──────────┼───────────────┬──────────────┬─────────────┐
+   ▼          ▼               ▼              ▼             │
+ P0: E2    P0: E1-prereq   P0: E3/E4/E5      │             │
+   │          │                              │             │
+   │          ▼                              │             │
+   │       P0: E1 eval                       │             │
+   │          │                              │             │
+   └────┬─────┘                              │             │
+        ▼                                    │             │
+   Fact Semantics ──► Contract & Lifecycle   │             │
+        │                    │               │             │
+        ├──► Layered Recovery│               │             │
+        ├──► Review Throughput               │             │
+        │                    ▼               │             │
+        │            MultiRepo & Deployment  │             │
+        │                                    │             │
+   Lens Modules ◄────────────────────────────┴─────────────┘
+   (independent — parallel from day one)
+```
+
+| Lane file | Gate | Parallel with |
 |---|---|---|
-| 1 | **[B] Tier-B residual detection** — no detector currently emits a "medium-confidence, needs human decision" class. **This is `L7`'s status vocabulary, already identified here as a gap** | `BACKLOG` P1, `L7` |
-| 1 | Graded fact admission, productionised | `L1`, E2 |
-| 1 | Contradiction detection → conflict → review | `L4` |
-| 1 | Probabilistic-OR confidence (gate on E5) | `L3` |
-| 1 | Secondary sources may introduce facts | `L2` |
-| 2 | **[B] Direct-delegate bridge detection** — 28 real candidates found, 0 resolved | `BACKLOG` P1 |
-| 2 | **[B] Plain-interface bridge detection** | `BACKLOG` P1 |
-| 2 | **[B] Bean-factory / stereotype-free wiring** | `BACKLOG` P1 |
-| 2 | **[B] `@Configuration` mis-typed `database`** — cheap, general, ready | `BACKLOG` P1 |
-| 2 | CodeQL engine, productionised (generic) | E1, `BR-10` |
-| 2 | Per-(tool, fact-type) trust tiers | `L5` |
-| 3 | Fact identity + incremental merge + review history | `L6`, **§6** |
-| 3 | Emission-coverage as governed rule | `L9` |
-| 4 | Lens modules: green-engineering, resilience, data-flow, vulnerability | `BR-50` |
-| 4 | **[B] Call-site security controls** (4 vocabularies today, not general) | `BACKLOG`, `C-call` |
-| 4 | **[B] Bulk residual-decision authoring** — real throughput problem | `BACKLOG` P1, `NFR-80` |
-| 5 | Cross-repo joins (beyond co-scanned multi-root) | `L8`, `BR-20` |
-| 5 | **[B] k8s-derived `deployed-in`** | `BACKLOG`, `BR-10` |
-| 5 | **[B] Persistence catalogue completion** (plain-import drivers) | `BACKLOG`, `BR-10` |
-| 5 | **[B] Decision Record boundary-change overrides** | `BACKLOG`, `BR-70` |
-| 5 | Reviewer assistance — advisory only, never on generation path | `BR-80`, `OOS-llm-core-path` |
+| `AGENT_TASKS_Ext_P0_Experiments.md` | none — runs first | Lens Modules |
+| `AGENT_TASKS_Ext_Fact_Semantics.md` | E2, E5 report | Lens Modules, Layered `[B]` tasks |
+| `AGENT_TASKS_Ext_Layered_Recovery.md` | `[B]` tasks: none. Engine: E1 pass | Fact Semantics, Lens Modules |
+| `AGENT_TASKS_Ext_Lens_Modules.md` | **none — fully independent** | everything |
+| `AGENT_TASKS_Ext_Contract_Lifecycle.md` | Fact Semantics | Lens Modules |
+| `AGENT_TASKS_Ext_Review_Throughput.md` | T-FS-1 | Layered Recovery |
+| `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-CL-2 | Lens Modules |
 
-**JDBC ownership landmine** (`BACKLOG` P1): a fix must only ever change `kind`
-from `database` to `service` — **never suppress unit creation**, or it
-regresses `R2-multi-root-access-terminal`, which depends on that class
-resolving to a unit at all.
+**Two lanes can start immediately:** P0 experiments, and Lens Modules —
+modules consume `typed-facts.json` only, so they neither block nor are blocked
+by the gate. The `[B]`-marked tasks in Layered Recovery are existing,
+already-evidenced backlog items and are cheaper than engine work.
 
 **Deferred:** third-party plugin discovery, two-tier mapping config,
 container/compose corroboration, Kinesis, deeper OAuth2, ADR ingestion,
-portable round-trippable IR (`BACKLOG` P2/P3).
+portable round-trippable IR.
 
-**Adopted from this repo into the research design — no build work, governance
-only:** relationship grading (`A1`), silence/completeness metrics (`A2`),
-unmapped-signal clustering (`A3`), catalogue-as-data (`A5`, tested by E4),
-strict-detect gate (`A6`), claim register + exams (`A7`), isolation (`A8`),
-`StructuralEngine` vendor isolation (`A9`), module registry (`A10`),
-exact-value regression suite (`A11`), secret redaction (`A12` — closes
-`CGR-2`).
-
----
+**Adopted into the research design, no build work:** relationship grading,
+silence/completeness metrics, unmapped-signal clustering, catalogue-as-data
+(tested by E4), strict-detect gate, claim register + exams, evaluation
+isolation, `StructuralEngine` vendor isolation, module registry, exact-value
+regression suite, secret redaction (closes `CGR-2`).
 
 ## 6. Contract-change coupling — fails silently
 
