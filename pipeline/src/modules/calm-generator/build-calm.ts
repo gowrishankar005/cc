@@ -33,7 +33,11 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true): CalmDocu
   const protocolBySignal = driverImportProtocols(loadPersistenceDetectionCatalogue(rulesDir)); // T-X7-4
   for (const [signal, protocol] of springConfigProtocolBySignal(facts.units)) protocolBySignal.set(signal, protocol); // T-PC1-3/B-protocol-populate
 
-  const units = facts.units.filter((u) => u.kind !== 'unresolved');
+  // T-P0-1 (E2) — 'unresolved' units (graded-fact-admission placeholders)
+  // used to be filtered out here unconditionally; now catalogue-driven via
+  // node-type-mapping.yml's own row for unitKind: unresolved, same as every
+  // other kind. No special-case filtering left in this file.
+  const units = facts.units;
 
   const nodes = buildNodes(units, nodeTypeMapping);
   attachInterfaces(units, nodes, nodeTypeMapping);
