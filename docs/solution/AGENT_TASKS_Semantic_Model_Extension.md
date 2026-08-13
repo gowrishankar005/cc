@@ -222,6 +222,17 @@ each was *reviewed*, not merely bumped.
    messages.
 8. Third-party references abstracted **same-day**, never as a later sweep.
 9. Write-up obeys the forbidden-phrase table.
+10. **If the task involved fixing a failing/unexpected case: the mechanism
+    class is named, and the fix is verified against a second, different
+    instance of that class** — not only the case that revealed it
+    (`Catalogue_Intake.md`, `CLAUDE.md` "Bug fixes are capability work"). If
+    no second instance exists yet, state that explicitly rather than skip it.
+    Applies across every lane — E2's admission logic, E1/T-LR-5's engine
+    detector, and every `[B]` backlog item in Layered Recovery are all
+    exactly this shape of work. **T-LR-2, landed live during this
+    documentation pass, is a real positive instance of this rule already
+    being followed correctly** — see `Claim_Register.md`'s `R2-mechanism` row,
+    updated with a second real repo (Waltz) beyond the original sample.
 
 ## 8. Out of scope
 

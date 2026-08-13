@@ -24,9 +24,49 @@ real evidence someone is about to go and re-gather.
 
 **2. Simplicity First — minimum code that solves the problem, nothing speculative.** The construct-mapping catalogues (`node-type-mapping.yml`, `relationship-type-mapping.yml`, `control-requirement-catalogue.yml`, and the persistence/messaging/http-client detection catalogues) exist so builders stay thin and new capability is a data row, not new code. If a new signal needs more than a catalogue row plus one of the already-proven extraction mechanisms (native framework typing, decorator/annotation extraction, import detection, structured-file ingestion), stop and confirm it's actually in scope before inventing a new mechanism.
 
-**3. Surgical Changes — touch only what you must, clean up only your own mess.** Every builder (`node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `metadata-builder.ts`, `control-builder.ts`, `port-interface-builder.ts`) is isolated on purpose — fixing one should never require touching another. Remove only what your own change makes unused; leave pre-existing gaps named, not silently patched over.
+**3. Surgical Changes — touch only what you must, clean up only your own mess.** Every builder (`node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `metadata-builder.ts`, `control-builder.ts`, `port-interface-builder.ts`) is isolated on purpose — fixing one should never require touching another. Remove only what your own change makes unused; leave pre-existing gaps named, not silently patched over. **"Surgical" governs footprint — which files change — not generalization
+scope. A small diff tuned to make one failing repo pass is not more surgical
+than a slightly larger diff that fixes the actual mechanism class; it's just
+narrower, and narrower-but-instance-specific is the anti-pattern, not the
+virtue. If a bug traces to a mechanism (a matching pattern, a resolution
+strategy, a catalogue gap), fix the mechanism — see "Bug fixes are capability
+work" below.**
 
 **4. Goal-Driven Execution — define success criteria, loop until verified.** Every change should be framed as "does the regression suite still produce the same counts, does `calm validate` return 0 errors, does the output match grep-verified ground truth" — never "does this code look right." State the verify step before making a non-trivial change, not after.
+
+## Bug fixes are capability work, not exceptions to it
+
+Named because it recurs: a fix that makes one failing repo/fixture pass by
+adding a conditional, tuning a regex, or hardcoding a value is easy to mistake
+for a small, safe change. It is usually the opposite — a mechanism-instance
+patch dressed as a mechanism-class fix, and the next language, framework, or
+repo hits the same underlying gap again under a different symptom.
+
+**`OOS-sample-repo-detectors`** (`docs/solution/OOS_Registry.md`) already
+forbids the sharpest version of this — any code path keyed to a specific
+sample repo's class/module/package name — permanently, not as a backlog item.
+**`Catalogue_Intake.md`'s four requirements apply to any bug fix that changes
+detection, matching, or relationship-building logic, not only PRs framed as
+new capability.** Calling it a bug fix does not exempt it.
+
+Before writing a fix, not after:
+
+1. **Name the mechanism class the bug belongs to** — the same discipline
+   `Claim_Register.md`'s mechanism-class matrix already uses (`U-*`/`R-*`/`C-*`
+   rows are classes, never single-repo instances).
+2. **Check whether it's a catalogue gap or a mechanism gap.** A catalogue gap
+   is a data row (Simplicity First, above). A mechanism gap needs a real,
+   evidenced new extraction strategy — not a special case bolted onto an
+   existing one.
+3. **Verify the fix against a second, different instance of the same class**
+   — not just the case that reported the bug. This is now a stated
+   requirement in `Catalogue_Intake.md`, not a suggestion. If no second
+   instance exists yet, say so explicitly rather than silently skip it.
+4. **State the mechanism class in the commit message and the `Claim_Register.md`
+   entry**, so the next person (or session) can tell a capability fix from an
+   instance patch without reading the diff.
+
+## Repository layout
 
 ## Repository layout
 
