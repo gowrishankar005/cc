@@ -126,7 +126,17 @@ export function detectUnitsByImportStrategy(
    * Only libraries present here get the extra ownership check; every other
    * library's behavior is byte-for-byte unchanged (empty Map by default).
    */
-  ownerBaseClasses: Map<string, string> = new Map()
+  ownerBaseClasses: Map<string, string> = new Map(),
+  /**
+   * T-LR-1 — class-level annotation names that mark a class as a
+   * dependency-wiring factory, never a real user/owner of what it wires
+   * (`wiring-annotation-catalogue.yml`, `wiringAnnotationNames()`). Data,
+   * not code: adding a new ecosystem's equivalent convention is a catalogue
+   * row, never a hardcoded name here — the check below is generic over
+   * however many entries this list has, from zero to many, across any
+   * language `classHasAnnotation`'s `@`-prefixed-annotation scan covers.
+   */
+  wiringOnlyAnnotations: string[] = []
 ): ImportStrategyResult {
   const { graph } = run;
   const unitsByRoot = new Map<string, TypedUnit[]>();
@@ -177,15 +187,22 @@ export function detectUnitsByImportStrategy(
 
       // T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
       // driver-import evidence") — a class whose only relationship to a
-      // matched library is via `@Configuration`/`@Bean`-factory wiring is
-      // never a real owner/user of it, regardless of which library or which
-      // kind (database/topic/outbound-http-client) this detector instance
-      // is producing — it exists to WIRE the thing for something ELSE to
-      // use, not to use it itself. Generic, unconditional on
-      // ownerBaseClasses (unlike the Q13 check below, which only applies to
+      // matched library is via factory-wiring (any annotation in
+      // wiringOnlyAnnotations, catalogue-driven, never a hardcoded name
+      // here) is never a real owner/user of it, regardless of which
+      // library or which kind (database/topic) this detector instance is
+      // producing — it exists to WIRE the thing for something ELSE to use,
+      // not to use it itself. Generic, unconditional on ownerBaseClasses
+      // (unlike the Q13 check below, which only applies to
       // specifically-configured libraries) — this exclusion is real for
-      // every driver-import library.
-      if (classHasAnnotation(path.join(resolved.root, resolved.relativeFilePath), classNode.source_location, 'Configuration', fileLineCache)) continue;
+      // every driver-import library, for every catalogued wiring
+      // annotation.
+      if (
+        wiringOnlyAnnotations.some((annotationName) =>
+          classHasAnnotation(path.join(resolved.root, resolved.relativeFilePath), classNode.source_location, annotationName, fileLineCache)
+        )
+      )
+        continue;
 
       // Q13 ontology fix — for a library that requires ownership proof
       // (e.g. @prisma/client), a plain import is no longer sufficient: THIS

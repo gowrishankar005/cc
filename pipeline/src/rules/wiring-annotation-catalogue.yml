@@ -1,0 +1,22 @@
+# T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
+# driver-import evidence"). Class-level annotations that mark a class as a
+# dependency-wiring factory for something ELSE to use — never itself a real
+# user/owner of what it wires. detectUnitsByImportStrategy
+# (graphify-import-strategy-detector.ts) excludes any class carrying one of
+# these from unit creation, regardless of which driver-import library
+# matched or which kind (database/topic) that detector instance produces.
+#
+# Adding a new ecosystem's equivalent wiring-marker convention (a different
+# DI framework's own factory-class annotation) is a catalogue row here, not
+# a code change — same discipline as persistence-detection-catalogue.yml's
+# per-library rows. Each row needs real evidence before it ships; do not add
+# a framework's annotation speculatively because it "seems similar."
+
+version: "0.1.0"
+
+annotations:
+  - name: Configuration
+    language: java
+    ecosystem: spring
+    evidenceLevel: verified
+    evidence: "35 of 156 real Fineract files importing org.springframework.jdbc.core are @Configuration classes wiring the driver via a @Bean factory-method parameter, never querying with it directly (soln/bug3-jdbc-ownership-phase-a-memo.md, Finding 2); confirmed live against AccountingJournalEntryConfiguration.java"
