@@ -1,7 +1,14 @@
 # AGENT TASKS — Semantic Model Extension
 
 **Branch:** `feature/semantic-model-extension` (base `main` @ `370b7c7`)
-**Status:** scoped, not started. Lane files: `AGENT_TASKS_Ext_*.md`.
+**Status (updated 2026-08-13):** P0 experiments in progress — T-P0-0/2a/2/3
+done (baseline captured, licensing resolved, E1/CodeQL evaluated positively —
+see `E1-codeql-engine-evaluation.md`); T-P0-1/E2 run twice and reverted both
+times, real design work needed before a third attempt — see
+`E2-graded-fact-admission-experiment.md`; T-P0-4/5/6 (E3/E4/E5) not started.
+No other lane has started. See `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
+for a deliberate research pause taken before continuing past P0. Lane files:
+`AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace
 (`codeintel/Architecture Model/docs/`), referenced by ID (`BR-*`, `NFR-*`,
 `CON-*`, `L*`, `A*`, `E*`).
@@ -30,18 +37,19 @@ violated by a naive reading of the extension goal.
 
 ---
 
-## 1. Hard gates — verified on this machine, 2026-08-13
+## 1. Hard gates — verified on this machine, 2026-08-13 (original), re-verified same day (update)
 
-| Prerequisite | State | Needed for |
-|---|---|---|
-| `spikes/` sample repos | **Absent** | E1, E2 stage 2 |
-| CodeQL CLI | **Not installed** | E1 |
-| Working Java build of the sample | **Unverified** | E1 (`CON-10` — the step that blocked prior attempts) |
-| `graphifyy` on PATH | **Not present** | Cross-package pass. Degrades *silently* — and that pass is what E2 measures |
-| coe-lab fixtures + scripts | Present | E2 stage 1 — unblocked today |
+| Prerequisite | State (original) | State (update, later same day) | Needed for |
+|---|---|---|---|
+| `spikes/` sample repos | Absent | **Present** — `apache/fineract`, `bank-of-anthos`, `ghostfolio`, `finos/waltz` cloned, unshallowed | E1, E2 round 2 |
+| CodeQL CLI | Not installed | **Installed** — 2.26.3 via `brew install --cask codeql` | E1 |
+| Working Java build of the sample | Unverified | **Confirmed working** (`CON-10` resolved) — the real blocker hit was a shallow clone missing git tags for Fineract's Gradle version-derivation plugin, not a network/dependency problem; fixed by unshallowing | E1 |
+| `graphifyy` on PATH | Not present | **Correction: this was always wrong** — `graphifyy` (0.9.34) was genuinely installed the whole time; the original `pip show` check ran against the wrong Python on this machine. See `baseline-2026-08-13.md`'s correction note | Cross-package pass |
+| coe-lab fixtures + scripts | Present | Present, but found to produce **zero raw Graphify edges** even in a combined 7-root scan — too sparse to exercise cross-reference detection at all (a separate finding from the `graphifyy` question above) | E2 stage 1 |
 
-**Sequencing:** E2 stage 1 leads (unblocked). E1 prerequisites install in
-parallel; E1 itself follows.
+**Sequencing (original plan, now moot — both stages ran):** E1 evaluated
+positively (`E1-codeql-engine-evaluation.md`); E2 run twice, reverted twice
+(`E2-graded-fact-admission-experiment.md`).
 
 ## 2. Isolation (`CON-40`)
 

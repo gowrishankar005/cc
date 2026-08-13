@@ -21,6 +21,19 @@ already records a real evidence pass on this exact class, including signals
 that were **falsified** as discriminators. Re-deriving it wastes a day and
 risks re-adopting a signal already disproven.
 
+**Status, 2026-08-13:** T-LR-1 starting now. T-LR-2 next (already scoped in
+detail this session — no new evidence pass needed). T-LR-5's dependency
+(T-P0-3 pass) is now satisfied, but deliberately not started yet:
+`docs/solution/Engine_Capability_Research_Java_SpringBoot_JAXRS.md` §6
+recommends two more targeted CodeQL experiments (DI/bean-graph resolution —
+directly relevant to T-LR-3/T-LR-4 below — and JDBC ownership
+disambiguation) before committing to T-LR-5's integration shape, since T-LR-5
+is real production integration work, not an experiment repeat, and the
+research doc's own evidence so far leans toward a corroboration/trust-tier
+role for CodeQL rather than "second `StructuralEngine`." T-LR-3/T-LR-4 are
+similarly held pending that DI-resolution experiment — see `BACKLOG.md`'s
+rows for both, updated the same day with this cross-reference.
+
 ### T-LR-5 expanded acceptance — production integration, not an experiment repeat
 
 T-P0-3 proved the *query*. This task wires it live, which is a different class
