@@ -11,8 +11,8 @@ than engine work. Do them first.**
 |---|---|---|---|
 | **T-LR-1 `@Configuration` mis-typed `database`** `[B]` | **Done, and hardened for genericity** — `class-ownership-resolver.ts`'s new `classHasAnnotation`, wired into `graphify-import-strategy-detector.ts`, generic across every driver-import library. First pass hardcoded the annotation name (`'Configuration'`) as a string literal — a real overfit flagged on review: fixes must be catalogue-driven, not repo/framework-specific patches, to hold up across languages/frameworks. Refactored same-day: new `wiring-annotation-catalogue.yml` + `wiring-annotation-schema.ts`, `detectUnitsByImportStrategy` now takes a `wiringOnlyAnnotations: string[]` (data), never a hardcoded name — adding a new ecosystem's equivalent convention (a different DI framework's own factory-marker annotation) is a catalogue row, matching this codebase's existing `ownerBaseClass` precedent. Real Fineract evidence (`AccountingJournalEntryConfiguration`) + synthetic fixture (`configuration-wiring-sample`) both regression-locked; `npm test` 91/0/0, coe-lab core gates unchanged. Row removed from `BACKLOG.md` per its own update rule. | — | A wiring class referencing a driver-import only as a factory-method parameter type is no longer a table owner. Cheap, general, ready-to-implement |
 | **T-LR-2 Direct-delegate bridge detection** `[B]` | **Done** — `multi-hop-bridge-detector.ts` gains an `r2c` branch inside the existing `implementers.length === 0` case: reuses `importsBySource` unchanged, no new interface layer, 2-hop bound unaffected (`OOS-unbounded-multihop`). New confidence tier (6/3), below R2b's (8/5) — no `implements`-edge corroboration exists for this shape. Real evidence: Fineract synthetic-shape confirmed + **Waltz 3-module scan resolves 7 real direct-delegate chains, 0 fabricated** (the exact gap `waltz-multihop-genericity-probe.md` named — 26 of its 28 real candidates were this shape). Surfaced two separate, real, out-of-scope findings while building: (1) a second independent instance of the JDBC read-service-vs-owner ambiguity (`LegalEntityRelationshipKindService`, cross-referenced into that BACKLOG row); (2) a pre-existing `ctx.unitsByRoot`/`ctx.allUnits` confidence-floor divergence that can under-grade (never fabricate) a real relationship — filed as its own new BACKLOG row. Synthetic fixture (`r2c-direct-delegate-sample`, positive + ambiguity-refusal cases) + real-repo test both regression-locked; `npm test` 93/0/0. Row removed from `BACKLOG.md`. | — | Concrete service referenced directly with no interface layer resolves. **28 real candidates already found, 0 resolved** — that's the measurable bar |
-| **T-LR-3 Plain-interface bridge detection** `[B]` | Held, see status note | T-LR-2 | Interfaces with no framework marker sitting on a real service boundary. Needs its own evidence pass before building |
-| **T-LR-4 Bean-factory / stereotype-free wiring** `[B]` | T-LR-2 | Components wired via factory methods with no class-level stereotype produce signal |
+| **T-LR-3 Plain-interface bridge detection** `[B]` | **Unblocked** — DI-resolution experiment positive, `E1b-codeql-di-resolution-experiment.md`. Design not started. | T-LR-2 | Interfaces with no framework marker sitting on a real service boundary. Needs its own evidence pass before building |
+| **T-LR-4 Bean-factory / stereotype-free wiring** `[B]` | **Unblocked** — same experiment covers this shape directly (`bean-factory` mechanism, 774 real bindings). Design not started. | T-LR-2 | Components wired via factory methods with no class-level stereotype produce signal |
 | **T-LR-5 CodeQL engine, generic** | T-P0-3 pass | Second `StructuralEngine`, one call site. Mechanism-class detector only — see expanded acceptance below |
 | **T-LR-6 Per-(engine, fact-type) trust tiers** | T-LR-5 | Matrix becomes evidence-earned per fact type, not config-declared per framework |
 
@@ -21,18 +21,22 @@ already records a real evidence pass on this exact class, including signals
 that were **falsified** as discriminators. Re-deriving it wastes a day and
 risks re-adopting a signal already disproven.
 
-**Status, 2026-08-13:** T-LR-1 done. T-LR-2 next (already scoped in
-detail this session — no new evidence pass needed). T-LR-5's dependency
-(T-P0-3 pass) is now satisfied, but deliberately not started yet:
-`docs/solution/Engine_Capability_Research_Java_SpringBoot_JAXRS.md` §6
-recommends two more targeted CodeQL experiments (DI/bean-graph resolution —
-directly relevant to T-LR-3/T-LR-4 below — and JDBC ownership
-disambiguation) before committing to T-LR-5's integration shape, since T-LR-5
-is real production integration work, not an experiment repeat, and the
-research doc's own evidence so far leans toward a corroboration/trust-tier
-role for CodeQL rather than "second `StructuralEngine`." T-LR-3/T-LR-4 are
-similarly held pending that DI-resolution experiment — see `BACKLOG.md`'s
-rows for both, updated the same day with this cross-reference.
+**Status, 2026-08-13:** T-LR-1 and T-LR-2 done. The DI-resolution experiment
+that was gating T-LR-3/T-LR-4 has now run — **positive**
+(`docs/solution/E1b-codeql-di-resolution-experiment.md`): CodeQL resolves
+both real evidenced DI-resolution gaps (plain-interface field injection via
+stereotype; `@Bean`-factory wiring with no stereotype at all) at real
+whole-codebase scale (2106 real bindings, 401 distinct interfaces, real
+ambiguity found and correctly refused, not just the two flagship cases).
+CodeQL's own built-in Spring model does not cover either shape (checked, not
+assumed) — both needed hand-rolled queries. **T-LR-3/T-LR-4 are now
+unblocked to be designed against this real evidence.** T-LR-5's own
+expanded acceptance bar (generic detector, build-lifecycle handling,
+CI/Docker impact, trust tier, second real-repo instance) is still the actual
+gate for wiring CodeQL in as a live `StructuralEngine` — this experiment
+cleared "does the capability exist," not "is it in production shape."
+The JDBC ownership disambiguation experiment (`Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
+§6.2) remains untested, independent of this lane.
 
 ### T-LR-5 expanded acceptance — production integration, not an experiment repeat
 
