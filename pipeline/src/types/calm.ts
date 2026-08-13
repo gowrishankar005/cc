@@ -13,7 +13,17 @@ export type CalmNodeType =
   | 'network'
   | 'ldap'
   | 'webclient'
-  | 'data-asset';
+  | 'data-asset'
+  // T-P0-1 (E2) — not one of CALM 1.2's 9 enum values, but schema-valid:
+  // core.json's node-type-definition is `anyOf: [enum, {type: string}]`,
+  // confirmed directly against
+  // node_modules/@finos/calm-cli/dist/calm/release/1.2/meta/core.json —
+  // any string passes `calm validate`. Used only for a graded-fact-admission
+  // placeholder unit (TypedUnit.kind === 'unresolved') representing a real
+  // Graphify-referenced class this pipeline could not classify into any of
+  // the 9 real architectural kinds above; reusing one of those 9 instead
+  // would misrepresent unclassified code as a real architectural kind.
+  | 'unresolved-endpoint';
 
 export type CalmInterfaceType =
   | 'host-port-interface'

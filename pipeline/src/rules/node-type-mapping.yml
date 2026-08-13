@@ -32,3 +32,18 @@ mappings:
     calmNodeType: network
     interfaceCategories: []
     descriptiveCategories: [messaging, spring-config]
+
+  # T-P0-1 (E2, graded fact admission) — a placeholder unit
+  # graphify-reconciler.ts synthesizes for the unresolved endpoint of an
+  # otherwise-dropped Graphify edge (real reference, target not classifiable
+  # into service/database/topic). calmNodeType is deliberately NOT one of
+  # CALM's 9 real architectural node-types (misrepresenting unclassified
+  # code as a real kind is worse than dropping the edge) — 'unresolved-endpoint'
+  # is schema-valid (core.json's node-type-definition accepts any string)
+  # but self-documents as not-a-real-architectural-claim. No interfaces or
+  # descriptive metadata categories: these units carry no evidence to
+  # attach any.
+  - unitKind: unresolved
+    calmNodeType: unresolved-endpoint
+    interfaceCategories: []
+    descriptiveCategories: []
