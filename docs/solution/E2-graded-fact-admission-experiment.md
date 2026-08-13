@@ -5,11 +5,18 @@ a Graphify edge whose one endpoint doesn't resolve to a `TypedUnit`
 (`graphify-reconciler.ts:142`, `if (!from || !to) continue`) recovers real
 architecture — `BACKLOG.md`'s "Graded fact admission (dual-unit gate)" row.
 
-**Result: implemented, evidenced, then reverted from the default pipeline
-path** at the reporting session's own recommendation, confirmed by the user.
-Full implementation is preserved in git history
-(`89b7bd3` implement / `279a9fb` revert) for future re-attempt once real
-recall evidence exists — see "What would reopen this" below.
+**Result: implemented, evidenced against coe-lab (round 1) and real
+reference repos (round 2), reverted from the default pipeline path both
+times.** Round 1 (against coe-lab's sparse fixtures only) found 0 recall
+gain — see "Round 1" below. Round 2 (`spikes/apache-fineract`,
+`bank-of-anthos`, `ghostfolio`, `finos/waltz`, populated after round 1)
+reverses that conclusion — **E2 does recover real signal against densely-linked
+real code** — but surfaces a materially bigger problem: the mechanism, as
+designed, conflicts with several of this pipeline's other existing invariants
+(see "Round 2" below), not just the two false-positive classes round 1 found.
+Full implementation is preserved in git history for a future, more careful
+attempt: `89b7bd3`/`49e08b7` implement (twice — once per round),
+`279a9fb`/`b4c4492` revert.
 
 ## Claim triple
 
@@ -109,11 +116,132 @@ codebase's docs or tests, so it silently drifts as the real upstream repo
 evolves — not an E2 regression (E2 was already fully reverted when this ran),
 a separate reproducibility gap worth its own fix.
 
+This section (through "What changed after this report's numbers were
+captured" above) is **Round 1** — coe-lab fixtures only, no real repo present.
+Round 2 below supersedes its "0 recall gain" conclusion with real evidence,
+but does not change the disposition (still reverted) — for a different,
+larger reason.
+
+## Round 2 — re-run against real `spikes/` repos (2026-08-13)
+
+With `apache/fineract`, `GoogleCloudPlatform/bank-of-anthos`,
+`ghostfolio/ghostfolio`, and `finos/waltz` populated, the round-1
+implementation (`git show 89b7bd3`) was reapplied and the full regression
+suite re-run: **80 pass, 9 fail** (vs. 89/0 on the reverted baseline with the
+same repos present — see the Fineract count-drift fix above, a prerequisite
+for this round to even give a stable baseline).
+
+**Recall ↑ at L2 — now demonstrated, reversing Round 1's finding.** Against
+`fineract-core` alone, admission recovers 371 additional low-confidence
+facts (`371 admitted via unresolved-endpoint placeholder`, vs. 0 in every
+coe-lab fixture). Against `fineract-charge` alone, 9 admitted relationships
+appear where 0 existed before. This is real, structurally-grounded signal —
+the mechanism works exactly as designed. But recovering it breaks 9 existing
+regression tests, which fall into three distinct, real problem classes (not
+one bug — three separable architectural conflicts):
+
+**1. Collides with other detectors' own "never guess, stay an honest
+ignored-item" invariants.** `outbound-http-detector.ts` deliberately never
+resolves an unresolvable outbound HTTP target — every such reference stays an
+`unresolved-http-target` ignored item, by design (`U-outbound-http`'s Claim
+Register cell: "never resolves a target — every detection lands as an
+ignored-item for human review, by design"). Against the real Python
+reference app's `frontend.py`, E2 admission created 6 relationships where
+this exact invariant expects 0
+(`Outbound HTTP — ... produces unresolved-http-target, not a fabricated
+relationship`, `test/regression.test.js:1755`). Round 1's fix scoped E2 to
+defer to `multi-hop-bridge-detector.ts`'s reserved territory (interface files
+with real `implements` edges); it did not know about outbound-HTTP's
+separate reserved territory, and would need a similar carve-out for it —
+and, by extension, for every other current or future detector that makes the
+same "stay honest, never guess" choice. This is the core architectural
+problem: **a single generic catch-all admission mechanism, sitting upstream
+of every specialized detector, cannot know in advance which edges are
+"genuinely nobody's territory" vs. "another detector's deliberate residual."**
+Carve-outs discovered one regression at a time do not generalize safely.
+
+**2. Silences completeness/silence signals (S1) without the story actually
+being more complete.** `fineract-charge`'s `S1-zero-service-touching-relationships`
+flag exists specifically to stay loud when a service+database pair is
+present but genuinely disconnected (`Claim_Register.md`'s `S-silence` row;
+`E-charge-single-L2`'s whole reason for existing). E2's admitted
+relationships are honestly graded `structural`, never `architecture` — but
+S1's own check only asks "does ≥1 relationship touch a service unit," not
+"does an architecture-grade relationship touch a service unit." A structural,
+low-confidence, unresolved-endpoint relationship still counts as
+"service-touching" by that definition, so **S1 silently stops firing** for
+`fineract-charge` even though nothing about the real, actionable-story
+completeness changed (`silence metrics: ... flags S1`, `test/regression.test.js:643`).
+This cascades directly into the HITL review queue emptying out for the same
+package (`HITL review trigger: ... (S1) lists the actual units`,
+`test/regression.test.js:2262`, expected 3 flagged units, got 0) — a human
+reviewer who should be told "this package's architecture story is genuinely
+thin" is now told nothing, because a low-confidence admitted fact happened
+to touch the service node. **S1 would need to become grade-aware (only
+architecture-grade relationships count as "service-touching") before E2 could
+coexist with it safely** — a real, separate design change, not a quick fix.
+
+**3. Ripples into unrelated correlation/security logic via the shared
+`ctx.allUnits` array.** `deployment-correlation`'s Java-controller-name
+substring matching (`Deployment correlation — Java Controller-class naming
+resolves via normalize+substring, never matches a database/topic unit`,
+`test/regression.test.js:2209`) now incorrectly correlates a k8s Deployment
+to a database-kind unit instead of a service-kind one — a real, unexplained
+regression this session did not root-cause before reverting. The mechanism
+adds ~370+ extra `unresolved`-kind units per real package scan directly into
+`ctx.allUnits`, the same array every other pass (env soft-graph, deployment
+correlation, HITL review, threat-signals) reads — this round's evidence shows
+that volume of extra units is enough to change candidate-matching behavior in
+at least one security-adjacent consumer that was never designed with
+"thousands of low-signal placeholder units now exist" in mind. Two more
+failures (`Node/TS real evidence (ghostfolio...) — ... Controller/database
+precedence`, `Robustness (B-ontology, Q13 fix) — ... PrismaService`) are a
+milder version of the same shared-array effect: a calm-cli spectral
+"unreferenced node" warning that existing tests pin at exactly 1 goes to 0,
+because an admitted relationship gives a previously-orphaned node something
+to connect to — arguably correct behavior, but it means **any test anywhere
+in this codebase that encodes "0 signal here" as its expected, correct state
+is a latent E2 regression**, and there is no way to enumerate all of them
+short of exactly what this round did: run the full suite against real data.
+
+**One further compounding factor, not new but relevant:** the already-filed
+CodeGraph under-repeated-invocation degradation (see the Fineract
+count-drift fix above) interacts with E2 specifically — under degraded
+conditions a real database unit can fail to resolve, causing E2 to
+synthesize an `unresolved` placeholder for it, which then downgrades what
+should be a real `multi-hop-bridge-detector.ts` R2b `architecture`-grade
+relationship to `structural` (observed once: `R0 grading: ... R2b now
+resolves 3 real service->repository chains`, one of 3 R2b relationships
+graded `structural` instead of `architecture` in the node:test-hosted run,
+not reproduced in an isolated fresh-process run). E2 is not the cause of
+that degradation, but it is the first mechanism observed to let it silently
+corrupt a *different*, previously-reliable mechanism's grading — a concrete
+illustration of why the shared-unit-pool ripple effect (problem 3 above) is
+a real risk, not a theoretical one.
+
+## Disposition after Round 2
+
+**Reverted again** (`b4c4492`) — for a different and larger reason than
+Round 1. This is not "tighten one more false-positive class and ship." A
+generic, upstream, catch-all admission mechanism structurally conflicts with
+this pipeline's existing pattern of many independent, specialized "stay
+honest, never guess" detectors and with at least one completeness-signal
+invariant (S1) that assumes "any service-touching relationship" implies
+architecture, not just structure. Making E2 safe at real-repo scale would
+need, at minimum: (a) a registry of "reserved territory" every specialized
+detector opts into, checked generically rather than one hardcoded carve-out
+per detector found; (b) S1 (and any other consumer of "does a relationship
+touch a service unit") made grade-aware; (c) the shared `ctx.allUnits` ripple
+effect on unrelated consumers (deployment correlation, at minimum) actually
+root-caused, not just observed. This is real design work, not incremental
+tightening — a case for the next solutioning pass to scope deliberately,
+not for a third silent re-attempt in this session.
+
 ## What would reopen this
 
-- A real, densely cross-referenced repo (now available in `spikes/`) actually
-  showing a genuine `L2` recall gain from re-running the reverted design
-  (`git show 89b7bd3` for the full diff) against it — not assumed to transfer
-  from the coe-lab-fixture-only result above.
-- A specific enterprise pilot repo shape where the coe-lab fixture set's
-  current sparseness is shown to be unrepresentative.
+- (a)–(c) above are designed and built, in that order — (a) and (b) are
+  prerequisites for (c) to even be diagnosable cleanly (right now it's
+  entangled with both the shared-array volume and the CodeGraph degradation
+  interaction).
+- A specific enterprise pilot repo shape where recovering this class of
+  signal is shown to matter enough to justify the design work above.
