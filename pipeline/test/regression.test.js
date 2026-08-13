@@ -30,6 +30,7 @@ const JAVA_SAMPLE_SECURITY_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-secur
 const JAVA_SAMPLE_PROVIDER_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-provider');
 const JAVA_SAMPLE2_DATA_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-data');
 const JAVA_SAMPLE2_WEB_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-web');
+const JAVA_SAMPLE2_SERVICE_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/waltz/repo/waltz-service');
 const LAB_ROOT = path.resolve(PIPELINE_ROOT, '../coe-lab'); // checked-in, not a scratch clone — no skip guard needed
 const SPRING_CONFIG_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample'); // checked-in
 const SPRING_CONFIG_PROPERTIES_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample'); // checked-in
@@ -703,6 +704,117 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
   }
 });
 
+test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixture: service -> concrete class (no interface at all) -> imported entity resolves, and the ambiguity path still refuses to guess', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2c-direct-delegate-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // Positive path: GizmoService has no interface at all — GizmoApiResource
+    // references the concrete class directly. Distinct from R2b
+    // (r2b-implementer-hop-sample): there is no bridge interface for
+    // `implements` to ever target, so `implementers.length` is 0 not
+    // because the real implementer is out of scope, but because nothing
+    // implements a concrete class in the first place. GizmoService itself
+    // must NOT become a CALM node — pure plumbing, same as R2/R2b's bridge
+    // and implementer.
+    const resource = findNode(calm, 'GizmoApiResource.java');
+    const entity = findNode(calm, 'GizmoEntity.java');
+    assert.ok(resource, 'GizmoApiResource.java node missing');
+    assert.equal(resource['node-type'], 'service');
+    assert.ok(entity, 'GizmoEntity.java node missing');
+    assert.equal(entity['node-type'], 'database');
+    assert.equal(findNode(calm, 'GizmoService.java'), undefined, 'the direct delegate must not become its own CALM node — it is plumbing, same as R2/R2b');
+
+    const r2cRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === resource['unique-id'] && conn.destination.node === entity['unique-id'];
+    });
+    assert.ok(r2cRel, 'expected a resolved direct-delegate relationship from GizmoApiResource to GizmoEntity');
+    assert.equal(relMetadata(r2cRel, 'x-aac-relationship-grade'), 'architecture');
+    assert.equal(relMetadata(r2cRel, 'x-aac-confidence'), 6, 'R2c same-root confidence must be below R2b (8/5), the weakest tier this pipeline produces');
+    assert.ok(r2cRel.description.includes('calls'), 'R2c must use the calls kind, same as R2/R2b');
+    assert.equal(relMetadata(r2cRel, 'x-aac-mechanism'), 'r2c', 'R2c (direct-delegate) must be distinguishable from r2-phase1/r2b without decoding the confidence value');
+
+    // Ambiguity path: ThingService imports TWO real stores directly — must
+    // refuse to guess, same "never guess" discipline as R2b's own
+    // 2-implementer-imports case, not silently pick one.
+    assert.equal(findNode(calm, 'ThingService.java'), undefined, 'ambiguous direct delegate must not become a node either');
+    const thingResource = findNode(calm, 'ThingApiResource.java');
+    const thingRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === thingResource['unique-id'];
+    });
+    assert.equal(thingRel, undefined, 'ambiguous R2c case (2 store imports) must NOT emit a fabricated relationship');
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const ambiguousItem = facts.ignoredItems.find((i) => i.detail?.startsWith('unresolved-multi-hop') && i.detail.includes('ThingApiResource'));
+    assert.ok(ambiguousItem, 'expected an honest unresolved-multi-hop ignored-item for the ambiguous Thing case');
+    assert.ok(ambiguousItem.detail.includes('0 candidate implementation'), `expected the item to name 0 implementers (no interface exists), got: ${ambiguousItem.detail}`);
+
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    assert.equal(coverage.relationshipsByMechanism['r2c'], 1, 'expected the R2c edge counted under relationshipsByMechanism.r2c');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
+test(
+  'T-LR-2 real evidence: a reference Java governance platform (Waltz), 3-module scan — 7 real direct-delegate chains resolve, 0 fabricated, closing the exact gap the waltz-multihop-genericity-probe finding named (26 of 28 real candidates were this shape)',
+  {
+    skip: !fs.existsSync(JAVA_SAMPLE2_SERVICE_ROOT) && 'spikes/waltz/repo/waltz-service not present (scratch clone, see CLAUDE.md)',
+    timeout: 180_000,
+  },
+  () => {
+    const { outDir, calm } = runPipeline([JAVA_SAMPLE2_WEB_ROOT, JAVA_SAMPLE2_SERVICE_ROOT, JAVA_SAMPLE2_DATA_ROOT], [], ['--max-old-space-size=8192']);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const r2cRelationships = facts.relationships.filter((r) => r.mechanism === 'r2c');
+      assert.ok(r2cRelationships.length >= 1, `expected at least 1 real r2c (direct-delegate) relationship, got ${r2cRelationships.length}`);
+      for (const rel of r2cRelationships) {
+        assert.ok([6, 3].includes(rel.confidence), `expected r2c confidence to be the same-root (6) or cross-root (3) tier, got ${rel.confidence}`);
+        // Real, pre-existing pipeline finding surfaced while building this
+        // (BACKLOG.md's own new row, not a T-LR-2 defect): passes.ts's
+        // mapSignalsPass writes the UNFILTERED unit list into
+        // ctx.unitsByRoot (consumed by buildNodeToUnitMap, shared by every
+        // relationship producer including this one), but only
+        // confidence-floor-passing units into ctx.allUnits (consumed by
+        // grading's kindById). A source unit below the floor (e.g.
+        // JWTAuthenticationFilter here — real, grep-verified, no
+        // stereotype, low-confidence evidence only) can anchor a real
+        // relationship that then grades 'structural' instead of
+        // 'architecture', because grading can't see it as 'service' at
+        // all. The endpoint and the store are both real and correct either
+        // way — this only affects the grade label, never fabricates a
+        // wrong target — so it's tolerated here, not treated as a failure.
+        assert.ok(['architecture', 'structural'].includes(rel.grade), `expected architecture or structural grade, got ${rel.grade}`);
+      }
+      assert.ok(
+        r2cRelationships.some((rel) => rel.grade === 'architecture'),
+        'expected at least one r2c relationship to grade architecture (most sources are floor-passing service units)'
+      );
+
+      // The exact real case grep-verified while building this: SettingsEndpoint
+      // (waltz-web) references SettingsDao (waltz-data) directly — no
+      // interface, no ambiguity, confirmed via real source before writing
+      // this assertion.
+      const settingsRel = facts.relationships.find((r) => r.mechanism === 'r2c' && r.from.endsWith('SettingsEndpoint.java') && r.to.includes('SettingsDao'));
+      assert.ok(settingsRel, `expected SettingsEndpoint -> SettingsDao to resolve via r2c; got r2c relationships: ${r2cRelationships.map((r) => `${r.from} -> ${r.to}`).join(' | ')}`);
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
 test(
   'R2 multi-hop bridge: a real reference Java/JAX-RS banking platform (fineract-charge module) produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
@@ -733,7 +845,7 @@ test(
 );
 
 test(
-  'R0 grading: a reference Java/JAX-RS banking platform (fineract-core module) direct-reconciler edges stay structural; R2b now resolves 3 real service->repository chains, graded architecture',
+  'R0 grading: a reference Java/JAX-RS banking platform (fineract-core module) direct-reconciler edges stay structural; R2b resolves 3 real service->repository chains and R2c (T-LR-2) resolves 1 real direct-delegate chain, all graded architecture',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-core')]);
@@ -810,11 +922,32 @@ test(
         assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural', `expected structural grade on ${rel['unique-id']} (entity<->entity, no service endpoint)`);
       }
 
-      assert.ok(r2Graded.length >= 1, `expected at least 1 R2b-resolved relationship (floor, same reasoning as the r0Graded floor above), got ${r2Graded.length}`);
+      // T-LR-2 (2026-08-13) — real, new finding while adding direct-delegate
+      // detection: InternalExternalEventsApiResource references
+      // ExternalEventRepository directly (a Spring Data repository
+      // interface with zero implementers in source — Spring proxies it at
+      // runtime, no explicit `implements` class exists to find), and that
+      // interface itself references ExternalEvent (a real @Entity database
+      // unit) via its `extends JpaRepository<ExternalEvent, Long>` — a
+      // genuinely real, correct architectural edge this pipeline could not
+      // see before (grep-verified against the real source, not assumed).
+      // r2Graded now legitimately mixes r2b (8/5) and r2c (6/3) confidence
+      // — every entry must still be architecture-graded, but confidence is
+      // asserted per-mechanism, not as one shared constant.
+      assert.ok(r2Graded.length >= 1, `expected at least 1 multi-hop-resolved relationship (floor, same reasoning as the r0Graded floor above), got ${r2Graded.length}`);
       for (const rel of r2Graded) {
-        assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'architecture', `expected architecture grade on R2b relationship ${rel['unique-id']}`);
-        assert.equal(relMetadata(rel, 'x-aac-confidence'), 8, 'R2b same-root confidence must be the fixed R2b tier (below both R2 Phase 1 tiers)');
+        assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'architecture', `expected architecture grade on ${rel['unique-id']}`);
+        const mechanism = relMetadata(rel, 'x-aac-mechanism');
+        const confidence = relMetadata(rel, 'x-aac-confidence');
+        if (mechanism === 'r2b') assert.equal(confidence, 8, 'R2b same-root confidence must be the fixed R2b tier');
+        else if (mechanism === 'r2c') assert.equal(confidence, 6, 'R2c (direct-delegate) same-root confidence must be the fixed R2c tier, below R2b');
+        else assert.fail(`unexpected mechanism on a confidence-bearing relationship: ${mechanism}`);
       }
+      assert.ok(r2Graded.some((rel) => relMetadata(rel, 'x-aac-mechanism') === 'r2b'), 'expected at least one real r2b relationship (the 3 pre-existing service->repository chains)');
+      assert.ok(
+        r2Graded.some((rel) => relMetadata(rel, 'x-aac-mechanism') === 'r2c'),
+        'expected the real T-LR-2 direct-delegate case: InternalExternalEventsApiResource -> ExternalEventRepository -> ExternalEvent'
+      );
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }

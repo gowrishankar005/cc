@@ -33,6 +33,20 @@ const R2_CROSS_ROOT_CONFIDENCE = 10;
 const R2B_SAME_ROOT_CONFIDENCE = 8;
 /** Deepest, most-inferred tier this pipeline produces — implementer-import chase AND a root-boundary claim together. */
 const R2B_CROSS_ROOT_CONFIDENCE = 5;
+/**
+ * T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — a concrete class
+ * referenced directly, with no `implements`-based interface layer at all,
+ * that itself imports/references exactly one database/topic unit. Real
+ * evidence: 28 candidates found in a real public-sample scan, 0 resolved
+ * before this. Below R2b's tier, deliberately: R2b's implementer is at
+ * least corroborated by a real `implements` type-system fact (this class
+ * genuinely implements that interface); a direct delegate has no such
+ * corroboration at all — only "referenced directly, imports exactly one
+ * store," a strictly weaker structural signal.
+ */
+const R2C_SAME_ROOT_CONFIDENCE = 6;
+/** Weakest tier this pipeline produces — direct-delegate AND a root-boundary claim together. */
+const R2C_CROSS_ROOT_CONFIDENCE = 3;
 
 export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
@@ -109,9 +123,38 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
 
     const implementers = implementersByTarget.get(bridgeNodeId) ?? [];
     if (implementers.length !== 1) {
-      // 0 (no implementer in scanned roots — the real single-module case
-      // seen in a reference Java/JAX-RS banking platform, per the design
-      // note) or 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
+      // T-LR-2 — 0 implementers doesn't only mean "the interface's
+      // implementer isn't in scanned roots" (the case the ignored-item
+      // below was originally written for). It's ALSO the exact shape a
+      // concrete class referenced directly, with no interface at all,
+      // produces: nothing has an `implements` edge targeting it, because
+      // it isn't an interface. Before giving up, check whether the
+      // candidate ITSELF (not an implementer of it — there is none)
+      // imports/references exactly one database/topic unit, reusing the
+      // exact same importsBySource lookup R2b's second hop already uses.
+      // A genuine interface with a real implementer outside scanned roots
+      // naturally fails this (interfaces don't import concrete stores in
+      // their own declarations), so this doesn't need to structurally
+      // distinguish "interface" from "concrete class" — the check is
+      // self-limiting to the real shape by construction. 2+ implementers
+      // (genuine ambiguity between real candidates) is untouched — that's
+      // a different, already-correctly-handled case, never routed here.
+      if (implementers.length === 0) {
+        const delegateTargets = importsBySource.get(bridgeNodeId) ?? [];
+        const delegateStoreCandidates = delegateTargets
+          .map((targetId) => nodeToUnit.get(targetId))
+          .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
+        const uniqueDelegateStores = [...new Map(delegateStoreCandidates.map((m) => [m.unit.id, m])).values()];
+        if (uniqueDelegateStores.length === 1) {
+          emitBridgeRelationship(fromMatch, uniqueDelegateStores[0], R2C_SAME_ROOT_CONFIDENCE, R2C_CROSS_ROOT_CONFIDENCE, 'r2c');
+          continue;
+        }
+      }
+
+      // 0 (no implementer in scanned roots, AND (T-LR-2) not itself a
+      // direct delegate either — the real single-module case seen in a
+      // reference Java/JAX-RS banking platform, per the design note) or
+      // 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -173,7 +216,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     to: NodeUnitMatch,
     sameRootConfidence: number,
     crossRootConfidence: number,
-    mechanism: 'r2-phase1' | 'r2b'
+    mechanism: 'r2-phase1' | 'r2b' | 'r2c'
   ): void {
     if (from.unit.id === to.unit.id) return; // degenerate: bridge resolves back to the source's own unit
     const dedupeKey = `${from.unit.id}|${to.unit.id}`;
