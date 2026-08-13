@@ -35,15 +35,6 @@ export interface NodeUnitMatch {
   unit: TypedUnit;
 }
 
-// T-P0-1 (E2, graded fact admission) — BACKLOG.md's "Graded fact admission
-// (dual-unit gate)" row. Below multi-hop-bridge-detector.ts's R2b tier
-// (8/5), the lowest confidence this pipeline emits before this change: an
-// admitted edge is weaker evidence than a 2-hop bridge inference — it's a
-// raw structural reference to a target this pipeline could not classify at
-// all, not an inference chained through units it DID classify.
-export const ADMITTED_SAME_ROOT_CONFIDENCE = 3;
-export const ADMITTED_CROSS_ROOT_CONFIDENCE = 2;
-
 /**
  * AREC Wave 3 T-C1 — extracted so multi-hop-bridge-detector.ts (R2) can
  * reuse the EXACT same node->unit resolution reconcileCrossPackageEdges
@@ -138,140 +129,36 @@ function isBareNameCollision(
   return result;
 }
 
-/**
- * T-P0-1 (E2) — synthesizes a NodeUnitMatch for a raw Graphify node that
- * didn't resolve to any real TypedUnit, so an edge touching it can be
- * admitted instead of silently dropped. Only ever built from REAL data
- * already on the node (source_file/source_location/label) — never a fake
- * filePath or a guessed root. Returns undefined (never admitted) when the
- * node's file falls outside every given package root: `resolveRoot`
- * failing means this pipeline genuinely doesn't know what root/file this
- * is, and admitting a fact with a fabricated location would violate the
- * same "never guess" discipline this codebase already holds everywhere
- * else (v0.9 §1). Memoized by raw node id so the same unresolved node
- * referenced by multiple edges gets exactly one placeholder unit, not one
- * per edge.
- */
-function buildPlaceholderMatch(
-  nodeId: string,
-  run: GraphifyRun,
-  placeholders: Map<string, NodeUnitMatch>,
-  implementsTargetFiles: Set<string>
-): NodeUnitMatch | undefined {
-  const cached = placeholders.get(nodeId);
-  if (cached) return cached;
-
-  const node = run.graph.nodes.find((n) => n.id === nodeId);
-  if (!node) return undefined;
-  // T-P0-1 (E2) — real, evidenced regression found while building this:
-  // a node whose FILE also declares a real `implements`-edge target (e.g.
-  // an interface something in the repo implements, or any other member —
-  // a method node, say — in that same interface's file) is exactly a
-  // multi-hop-bridge-detector.ts (R2/R2b) bridge candidate's territory —
-  // reserved for that detector's own careful, ambiguity-aware resolution,
-  // which sometimes correctly refuses to emit anything at all (an
-  // ambiguous 2-implementer case, per the r2b-implementer-hop-sample
-  // fixture's own regression test — first caught on the interface node
-  // itself, then again on one of its method nodes, both real Graphify
-  // nodes for the exact same file). File-level, not node-id-level: a
-  // node-id-only check missed the method-node case, since Graphify emits
-  // a separate node per method, not just per type. Admitting a blunt
-  // low-confidence placeholder relationship here for any node in that file
-  // would create a second, competing "fact" for an edge R2b deliberately
-  // left unresolved — never admitted; defer entirely to the specialized
-  // detector.
-  if (node.source_file && implementsTargetFiles.has(node.source_file)) return undefined;
-  // T-P0-1 (E2) — real, evidenced regression found while building this:
-  // Graphify emits `source_file: ''`/`source_location: ''` for a bare
-  // symbol it could never attribute to a real file at all (confirmed via
-  // test/fixtures/nestjs-sample's checked-in graph.json — 'Controller',
-  // 'Get', 'Param', 'Post', 'Body', the decorator names imported from
-  // '@nestjs/common', all carry empty source_file). `resolveRoot('')`
-  // incorrectly resolves an empty path to the scan root itself
-  // (`path.resolve(scanRoot, '')` collapses to `scanRoot`, which then
-  // equality-matches `absRoot`) — without this guard, every external
-  // library/framework symbol a repo merely imports gets admitted as a fake
-  // architectural node. A symbol with no real source location is not
-  // evidence of anything in this repo; never admitted.
-  if (!node.source_file) return undefined;
-  const resolved = run.resolveRoot(node.source_file);
-  if (!resolved) return undefined;
-
-  const line = parseSourceLocation(node.source_location) ?? 0;
-  const unit: TypedUnit = {
-    id: `unresolved:${nodeId}`,
-    kind: 'unresolved',
-    name: node.label,
-    filePath: resolved.relativeFilePath,
-    startLine: line,
-    endLine: line,
-    evidence: [],
-    confidence: ADMITTED_SAME_ROOT_CONFIDENCE,
-  };
-  const match: NodeUnitMatch = { root: resolved.root, unit };
-  placeholders.set(nodeId, match);
-  return match;
-}
-
-export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): { relationships: TypedRelationship[]; unresolvedUnits: TypedUnit[] } {
+export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): TypedRelationship[] {
   const nodeToUnit = buildNodeToUnitMap(run, unitsByRoot);
   const nodeById = new Map(run.graph.nodes.map((n) => [n.id, n]));
   const fileLineCache = new Map<string, string[]>();
   const collisionCache = new Map<string, boolean>();
-  const placeholders = new Map<string, NodeUnitMatch>();
-  // T-P0-1 (E2) — file-level, not node-id-level; see buildPlaceholderMatch's
-  // doc comment for why. Built from the same `implements` edges
-  // multi-hop-bridge-detector.ts's `implementersByTarget` uses.
-  const implementsTargetFiles = new Set(
-    run.graph.edges
-      .filter((e) => e.relation === 'implements')
-      .map((e) => nodeById.get(e.target)?.source_file)
-      .filter((f): f is string => !!f)
-  );
 
   const relationships: TypedRelationship[] = [];
   for (const edge of run.graph.edges) {
-    let from = nodeToUnit.get(edge.source);
-    let to = nodeToUnit.get(edge.target);
-    // T-P0-1 (E2) — previously `if (!from || !to) continue` dropped the
-    // edge outright whenever EITHER side didn't resolve. Now: if exactly
-    // one side is missing, try to admit it via a synthesized placeholder;
-    // if BOTH are missing, there's no real endpoint to anchor a fact to at
-    // all — still dropped, unchanged from before.
-    let admitted = false;
-    if (!from && to) {
-      from = buildPlaceholderMatch(edge.source, run, placeholders, implementsTargetFiles);
-      admitted = !!from;
-    } else if (from && !to) {
-      to = buildPlaceholderMatch(edge.target, run, placeholders, implementsTargetFiles);
-      admitted = !!to;
-    }
+    const from = nodeToUnit.get(edge.source);
+    const to = nodeToUnit.get(edge.target);
     if (!from || !to) continue;
     if (from.root === to.root && from.unit.id === to.unit.id) continue; // same unit, not a relationship
     if (isBareNameCollision(edge, from, to, nodeById, run, fileLineCache, collisionCache)) continue;
 
-    const crossPackage = from.root !== to.root;
     relationships.push({
       from: from.unit.id,
       to: to.unit.id,
       kind: edge.relation === 'imports' ? 'imports' : edge.relation === 'calls' ? 'calls' : 'connects',
-      crossPackage,
+      crossPackage: from.root !== to.root,
       source: 'graphify',
-      ...(admitted
-        ? { confidence: crossPackage ? ADMITTED_CROSS_ROOT_CONFIDENCE : ADMITTED_SAME_ROOT_CONFIDENCE, mechanism: 'admitted-unresolved' as const }
-        : {}),
     });
   }
 
   // De-duplicate identical relationships (Graphify can report the same
   // logical edge from multiple AST sites).
   const seen = new Set<string>();
-  const dedupedRelationships = relationships.filter((r) => {
+  return relationships.filter((r) => {
     const key = `${r.from}|${r.to}|${r.kind}|${r.crossPackage}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-
-  return { relationships: dedupedRelationships, unresolvedUnits: [...placeholders.values()].map((m) => m.unit) };
 }
