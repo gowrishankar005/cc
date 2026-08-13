@@ -229,10 +229,19 @@ each was *reviewed*, not merely bumped.
     no second instance exists yet, state that explicitly rather than skip it.
     Applies across every lane — E2's admission logic, E1/T-LR-5's engine
     detector, and every `[B]` backlog item in Layered Recovery are all
-    exactly this shape of work. **T-LR-2, landed live during this
-    documentation pass, is a real positive instance of this rule already
-    being followed correctly** — see `Claim_Register.md`'s `R2-mechanism` row,
-    updated with a second real repo (Waltz) beyond the original sample.
+    exactly this shape of work.
+
+    **This rule exists because of a real incident, not a hypothetical one —
+    read both sides of it.** T-LR-1's first pass hardcoded an annotation name
+    as a literal; it was not self-caught. The project owner found the diff
+    suspicious and had to explicitly task a review before it was refactored
+    into a catalogue row. **Don't treat a task's own "Done" status or a
+    status-note phrase like "flagged on review" as proof this rule was
+    followed — read the diff.** T-LR-2's second-repo verification (Waltz,
+    beyond the original Fineract sample) is a genuine example of the rule's
+    *outcome* done right, in `Claim_Register.md`'s `R2-mechanism` row — but
+    it doesn't establish that the *process* catches violations on its own.
+    So far, only a human reading a diff has.
 
 ## 8. Out of scope
 

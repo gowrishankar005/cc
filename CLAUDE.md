@@ -66,6 +66,16 @@ Before writing a fix, not after:
    entry**, so the next person (or session) can tell a capability fix from an
    instance patch without reading the diff.
 
+**A task's own status note claiming a fix was "caught" or "refactored" is not
+itself evidence the catch was systemic.** The first real instance of this
+whole pattern (an annotation name hardcoded as a literal, generalized only
+after the fact) was found by the project owner reading a diff and getting
+suspicious, not by this rule, not by the task's own definition-of-done
+checklist, and not by the agent noticing on its own. Treat "flagged on
+review" in a status note as meaning *a human read the diff*, not as evidence
+the process would have caught it without one — and don't skip that reading
+because a task reports itself done.
+
 ## Repository layout
 
 ## Repository layout

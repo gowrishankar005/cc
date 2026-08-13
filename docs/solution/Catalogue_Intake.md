@@ -53,6 +53,9 @@ test/claim-cell/scope-limitations diff isn't present is a reasonable
 escalation if drift is ever observed in practice — not built ahead of that
 need.
 
-**That trigger condition has arguably now been met** — see `BACKLOG.md`'s
-`Mechanical bug-fix generalization check` row. Recorded as a real candidate
-for escalation, not built speculatively ahead of confirmed drift.
+**That trigger condition has now been met, and not by the process
+self-correcting** — see `BACKLOG.md`'s `Mechanical bug-fix generalization
+check` row. A hardcoded fix passed an agent's own first-pass implementation;
+what caught it was the project owner finding the diff suspicious and tasking
+a dedicated review, not this document's rule or the task's own definition of
+done. Recorded as a real candidate for escalation on that basis.
