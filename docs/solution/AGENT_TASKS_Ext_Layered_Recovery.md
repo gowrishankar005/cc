@@ -7,10 +7,10 @@ The layered/multi-hop story — the problem that motivated the extension.
 **All `[B]` tasks are existing, already-evidenced backlog items and are cheaper
 than engine work. Do them first.**
 
-| Task | Depends on | Acceptance |
-|---|---|---|
-| **T-LR-1 `@Configuration` mis-typed `database`** `[B]` | — | A wiring class referencing a driver-import only as a factory-method parameter type is no longer a table owner. Cheap, general, ready-to-implement |
-| **T-LR-2 Direct-delegate bridge detection** `[B]` | — | Concrete service referenced directly with no interface layer resolves. **28 real candidates already found, 0 resolved** — that's the measurable bar |
+| Task | Status | Depends on | Acceptance |
+|---|---|---|---|
+| **T-LR-1 `@Configuration` mis-typed `database`** `[B]` | **Done** — `class-ownership-resolver.ts`'s new `classHasAnnotation`, wired into `graphify-import-strategy-detector.ts`, generic across every driver-import library. Real Fineract evidence (`AccountingJournalEntryConfiguration`) + synthetic fixture (`configuration-wiring-sample`) both regression-locked; `npm test` 91/0/0, coe-lab core gates unchanged. Row removed from `BACKLOG.md` per its own update rule. | — | A wiring class referencing a driver-import only as a factory-method parameter type is no longer a table owner. Cheap, general, ready-to-implement |
+| **T-LR-2 Direct-delegate bridge detection** `[B]` | Next | — | Concrete service referenced directly with no interface layer resolves. **28 real candidates already found, 0 resolved** — that's the measurable bar |
 | **T-LR-3 Plain-interface bridge detection** `[B]` | T-LR-2 | Interfaces with no framework marker sitting on a real service boundary. Needs its own evidence pass before building |
 | **T-LR-4 Bean-factory / stereotype-free wiring** `[B]` | T-LR-2 | Components wired via factory methods with no class-level stereotype produce signal |
 | **T-LR-5 CodeQL engine, generic** | T-P0-3 pass | Second `StructuralEngine`, one call site. Mechanism-class detector only — see expanded acceptance below |
@@ -21,7 +21,7 @@ already records a real evidence pass on this exact class, including signals
 that were **falsified** as discriminators. Re-deriving it wastes a day and
 risks re-adopting a signal already disproven.
 
-**Status, 2026-08-13:** T-LR-1 starting now. T-LR-2 next (already scoped in
+**Status, 2026-08-13:** T-LR-1 done. T-LR-2 next (already scoped in
 detail this session — no new evidence pass needed). T-LR-5's dependency
 (T-P0-3 pass) is now satisfied, but deliberately not started yet:
 `docs/solution/Engine_Capability_Research_Java_SpringBoot_JAXRS.md` §6

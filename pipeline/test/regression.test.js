@@ -386,6 +386,71 @@ test(
   }
 );
 
+const CONFIGURATION_WIRING_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/configuration-wiring-sample'); // checked-in
+
+test('T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via driver-import evidence") — synthetic fixture: a @Bean-factory wiring class produces no database unit; the real driver-importing class it wires still does', () => {
+  const { outDir, calm } = runPipeline([CONFIGURATION_WIRING_ROOT]);
+  try {
+    // The negative case — this is the fix: a @Configuration class whose only
+    // connection to a catalogued driver-import library (org.springframework.jdbc.core)
+    // is via a @Bean factory method's PARAMETER TYPE must never become a
+    // database unit — it wires JdbcTemplate for someone else to use, it
+    // never queries with it itself.
+    assert.equal(findNode(calm, 'WidgetConfiguration'), undefined, 'WidgetConfiguration must not be any kind of node — @Configuration wiring produces no signal at all today (no catalogue row for bare @Configuration), and must not be mis-typed database via driver-import evidence either');
+
+    // The positive control — confirms the exclusion is scoped to
+    // @Configuration specifically, not accidentally suppressing every class
+    // that imports the same library: WidgetReadServiceImpl genuinely queries
+    // via JdbcTemplate and carries no @Configuration annotation, so it must
+    // still become a real database unit, unaffected. Persistence-unit
+    // unique-ids are `path::ClassName` (graphify-import-strategy-detector.ts),
+    // so match on the class name, not the bare filename `findNode` usually
+    // takes for route-derived units.
+    const impl = findNode(calm, 'WidgetReadServiceImpl');
+    assert.ok(impl, 'WidgetReadServiceImpl must still be a database unit — the T-LR-1 exclusion must not over-suppress a real driver-importing class that has no @Configuration annotation');
+    assert.equal(impl['node-type'], 'database');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test(
+  'T-LR-1 real evidence: a reference Java/JAX-RS banking platform AccountingJournalEntryConfiguration (@Configuration, @Bean-wires JdbcTemplate) is no longer mis-typed database; its real driver-importing siblings still are',
+  { skip: !fs.existsSync(JAVA_SAMPLE_PROVIDER_ROOT) && 'spikes/fineract/repo/fineract-provider not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const { outDir, calm } = runPipeline([path.join(JAVA_SAMPLE_PROVIDER_ROOT, 'src/main/java/org/apache/fineract/accounting/journalentry')]);
+    try {
+      // The exact class the BACKLOG.md row and the Phase A memo both cite by
+      // name (soln/bug3-jdbc-ownership-phase-a-memo.md, Finding 2) — real
+      // evidence, not a synthetic repro of the same shape.
+      assert.equal(
+        findNode(calm, 'AccountingJournalEntryConfiguration'),
+        undefined,
+        'AccountingJournalEntryConfiguration (@Configuration, wires JdbcTemplate via @Bean factory methods) must not be a database node'
+      );
+
+      // Real siblings in the same directory that genuinely query via
+      // JdbcTemplate/JPA and carry no @Configuration annotation — must be
+      // unaffected by the exclusion. Matched on class name, not filename —
+      // see the synthetic fixture test above for why.
+      const readImpl = findNode(calm, 'JournalEntryReadPlatformServiceImpl');
+      assert.ok(readImpl, 'JournalEntryReadPlatformServiceImpl must still be a database unit');
+      assert.equal(readImpl['node-type'], 'database');
+      const balanceImpl = findNode(calm, 'JournalEntryRunningBalanceUpdateServiceImpl');
+      assert.ok(balanceImpl, 'JournalEntryRunningBalanceUpdateServiceImpl must still be a database unit');
+      assert.equal(balanceImpl['node-type'], 'database');
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
 test(
   'call-site control detection: a real reference Java/JAX-RS banking platform (fineract-charge module) ChargesApiResource gets security-rbac-002 with expression, at grep-verified lines',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },

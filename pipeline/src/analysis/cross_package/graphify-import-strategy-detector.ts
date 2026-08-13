@@ -2,7 +2,7 @@ import * as path from 'path';
 import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
 import { TypedUnit, Evidence } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
-import { classExtendsBaseClass } from '../../rules/class-ownership-resolver';
+import { classExtendsBaseClass, classHasAnnotation } from '../../rules/class-ownership-resolver';
 import { isTestPath } from '../../rules/test-path';
 
 /**
@@ -174,6 +174,18 @@ export function detectUnitsByImportStrategy(
       const matchedLibrary =
         fileEdges.find((e) => libraries.has(e.target))?.target ??
         fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined);
+
+      // T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
+      // driver-import evidence") — a class whose only relationship to a
+      // matched library is via `@Configuration`/`@Bean`-factory wiring is
+      // never a real owner/user of it, regardless of which library or which
+      // kind (database/topic/outbound-http-client) this detector instance
+      // is producing — it exists to WIRE the thing for something ELSE to
+      // use, not to use it itself. Generic, unconditional on
+      // ownerBaseClasses (unlike the Q13 check below, which only applies to
+      // specifically-configured libraries) — this exclusion is real for
+      // every driver-import library.
+      if (classHasAnnotation(path.join(resolved.root, resolved.relativeFilePath), classNode.source_location, 'Configuration', fileLineCache)) continue;
 
       // Q13 ontology fix — for a library that requires ownership proof
       // (e.g. @prisma/client), a plain import is no longer sufficient: THIS

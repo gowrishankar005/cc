@@ -50,3 +50,60 @@ export function classExtendsBaseClass(absoluteFilePath: string, classSourceLocat
   const extendsMatch = new RegExp(`\\bextends\\s+${baseClassName}\\b`).exec(header);
   return extendsMatch !== null;
 }
+
+/**
+ * T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
+ * driver-import evidence") — real evidence from Bug 3's Phase A pass
+ * (`soln/bug3-jdbc-ownership-phase-a-memo.md` Finding 2): a
+ * `@Configuration`/`@Bean`-wiring class referencing a driver-import library
+ * only as a factory-method parameter type (never actually querying with it)
+ * is architecturally never a table owner, regardless of which driver-import
+ * library its `@Bean` signatures happen to reference — generalizes past
+ * JDBC to any catalogued library (`AccountingJournalEntryConfiguration`,
+ * the memo's own cited real example, confirmed via a fresh Fineract clone:
+ * `@Configuration` sits on the line immediately above the class
+ * declaration, `fineract-provider/.../starter/AccountingJournalEntryConfiguration.java:60-61`).
+ *
+ * Same read-back technique as `classExtendsBaseClass` above, but scans
+ * BACKWARD from the class's own start line, not forward from it —
+ * annotations sit above a class declaration, never inside its header.
+ * Stops at the first non-blank, non-comment, non-annotation line (or the
+ * window bound), so a genuinely unrelated PRECEDING class/method's closing
+ * `}` can't be mistaken for this class's own annotations.
+ */
+export function classHasAnnotation(absoluteFilePath: string, classSourceLocation: string, annotationName: string, fileLineCache: Map<string, string[]>): boolean {
+  const startLine = parseInt(/^L(\d+)/.exec(classSourceLocation)?.[1] ?? '', 10);
+  if (!startLine) return false;
+
+  let lines = fileLineCache.get(absoluteFilePath);
+  if (!lines) {
+    try {
+      lines = fs.readFileSync(absoluteFilePath, 'utf8').split('\n');
+    } catch {
+      return false; // file no longer readable at this path — degrade to "no match", not a crash
+    }
+    fileLineCache.set(absoluteFilePath, lines);
+  }
+
+  // Real finding running this against Fineract: Graphify attributes a class
+  // node's source_location to the LAST annotation line directly above the
+  // class keyword when one is present, not to the `class X {` line itself
+  // (confirmed: AccountingJournalEntryConfiguration.java's real class node
+  // is 'L60', the `@Configuration` line — 'public class ...' is L61). So the
+  // reported line itself might be an annotation, OR the bare class
+  // declaration (whichever Graphify attributed it to) — checked first,
+  // without breaking the scan either way, before walking further up for any
+  // additional stacked annotations.
+  const annotationPattern = new RegExp(`^@${annotationName}\\b`);
+  const isSkippable = (line: string): boolean => line === '' || line.startsWith('//') || line.startsWith('*') || line.startsWith('/*');
+
+  for (let i = startLine - 1, scanned = 0; i >= 0 && scanned < MAX_HEADER_LINES; i--, scanned++) {
+    const line = (lines[i] ?? '').trim();
+    if (isSkippable(line)) continue; // blank/comment lines don't break the scan
+    if (annotationPattern.test(line)) return true;
+    if (line.startsWith('@')) continue; // a different stacked annotation — keep scanning upward
+    if (i === startLine - 1) continue; // the reported line itself may legitimately be the bare class declaration, not an annotation — not a break condition
+    break; // real code above the annotation block (a preceding class/method) — stop
+  }
+  return false;
+}
