@@ -13,7 +13,7 @@ than engine work. Do them first.**
 | **T-LR-2 Direct-delegate bridge detection** `[B]` | **Done** — `multi-hop-bridge-detector.ts` gains an `r2c` branch inside the existing `implementers.length === 0` case: reuses `importsBySource` unchanged, no new interface layer, 2-hop bound unaffected (`OOS-unbounded-multihop`). New confidence tier (6/3), below R2b's (8/5) — no `implements`-edge corroboration exists for this shape. Real evidence: Fineract synthetic-shape confirmed + **Waltz 3-module scan resolves 7 real direct-delegate chains, 0 fabricated** (the exact gap `waltz-multihop-genericity-probe.md` named — 26 of its 28 real candidates were this shape). Surfaced two separate, real, out-of-scope findings while building: (1) a second independent instance of the JDBC read-service-vs-owner ambiguity (`LegalEntityRelationshipKindService`, cross-referenced into that BACKLOG row); (2) a pre-existing `ctx.unitsByRoot`/`ctx.allUnits` confidence-floor divergence that can under-grade (never fabricate) a real relationship — filed as its own new BACKLOG row. Synthetic fixture (`r2c-direct-delegate-sample`, positive + ambiguity-refusal cases) + real-repo test both regression-locked; `npm test` 93/0/0. Row removed from `BACKLOG.md`. | — | Concrete service referenced directly with no interface layer resolves. **28 real candidates already found, 0 resolved** — that's the measurable bar |
 | **T-LR-3 Plain-interface bridge detection** `[B]` | **Unblocked** — DI-resolution experiment positive, `E1b-codeql-di-resolution-experiment.md`. Design not started. | T-LR-2 | Interfaces with no framework marker sitting on a real service boundary. Needs its own evidence pass before building |
 | **T-LR-4 Bean-factory / stereotype-free wiring** `[B]` | **Unblocked** — same experiment covers this shape directly (`bean-factory` mechanism, 774 real bindings). Design not started. | T-LR-2 | Components wired via factory methods with no class-level stereotype produce signal |
-| **T-LR-5 CodeQL engine, generic** | T-P0-3 pass | Second `StructuralEngine`, one call site. Mechanism-class detector only — see expanded acceptance below |
+| **T-LR-5 CodeQL engine, generic** | **Not started — 7-item checklist below, none done.** | T-P0-3 pass, `E1b-codeql-di-resolution-experiment.md` | Second `StructuralEngine`, one call site. Mechanism-class detector only — see expanded acceptance below |
 | **T-LR-6 Per-(engine, fact-type) trust tiers** | T-LR-5 | Matrix becomes evidence-earned per fact type, not config-declared per framework |
 
 **Prior evidence — read before starting T-LR-1:** `soln/bug3-jdbc-ownership-phase-a-memo.md`
@@ -65,6 +65,24 @@ of work with its own failure modes:
 5. **Trust tier, not blind trust** — lands in the engine-capability-matrix
    per `T-LR-6`, at whatever tier its measured precision/recall earns. Not
    automatically primary over the existing structural pair.
+6. **Second real-repo instance, per `Catalogue_Intake.md`'s bug-fix
+   generalization rule** — both experiments so far (`E1-codeql-engine-evaluation.md`'s
+   command-bus join, `E1b-codeql-di-resolution-experiment.md`'s DI
+   resolution) are Fineract-only. `spikes/waltz/repo` is already present
+   and already confirmed structurally different (real `@Autowired`
+   constructor injection, not Lombok's implicit-constructor convention —
+   see the earlier Waltz genericity probe) — the natural second instance,
+   not a new clone to source. Required before either capability counts as
+   a mechanism-class fix rather than a Fineract-instance patch, same bar
+   T-LR-1/T-LR-2 were both held to.
+7. **Scope decision: which capability ships first** — T-P0-3 (command-bus,
+   7 real edges, one narrow shape) and T-LR-3/T-LR-4's DI-resolution
+   experiment (2106 real edges, two shapes, materially stronger evidence)
+   are two different capabilities CodeQL happens to provide. Wiring both
+   into one `StructuralEngine` in one pass is real, avoidable scope
+   creep — state explicitly which capability (or both, and why both
+   together is still the smallest safe unit) this task ships, rather than
+   silently expanding to cover everything CodeQL has been shown to do.
 
 **Two landmines:**
 - **JDBC ownership:** a fix may only change `kind` from `database` to
