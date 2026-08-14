@@ -153,12 +153,18 @@ export interface TypedRelationship {
   // interface layer at all; a concrete class referenced directly imports
   // exactly one store itself. Every other relationship producer
   // (R0/R1/k8s/env-soft-graph) leaves this unset — absence means "not
-  // multi-hop-derived," never a fake default. Not one of
+  // multi-hop-derived," never a fake default.
+  // 'admitted-unresolved' added for T-P0-1 (E2, graded fact admission,
+  // BACKLOG.md's "Graded fact admission (dual-unit gate)" row) — a raw
+  // Graphify edge whose OTHER endpoint doesn't resolve to a real TypedUnit,
+  // admitted with a synthesized `kind: 'unresolved'` placeholder unit on
+  // that side instead of being silently dropped by
+  // graphify-reconciler.ts's `if (!from || !to) continue`. Not one of
   // Contract_Evolution_Policy.md §1's tracked closed unions (only
   // Evidence.source/category, TypedUnit.kind, TypedRelationship.kind,
   // IgnoredItem.reason are) — this field is advisory provenance no module's
   // core logic branches on, so widening it needs no CONTRACT_VERSION bump.
-  mechanism?: 'r2-phase1' | 'r2b' | 'r2c';
+  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'admitted-unresolved';
 }
 
 export interface IgnoredItem {

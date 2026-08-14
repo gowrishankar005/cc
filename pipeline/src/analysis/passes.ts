@@ -97,10 +97,17 @@ export const reconcilePass: AnalysisPass = {
   name: 'reconcile',
   run(ctx: AnalysisContext) {
     if (!ctx.graphifyRun) return; // Graphify pass didn't run or failed — already logged by detectPersistencePass
-    ctx.relationships = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot);
+    const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot);
+    ctx.relationships = relationships;
+    // T-P0-1 (E2) — graded-fact-admission placeholders (kind: 'unresolved').
+    // Pushed into ctx.allUnits (not ctx.unitsByRoot) since they're not real
+    // per-root architectural units — only relationship endpoints and CALM
+    // nodes. gradeRelationshipsPass (last pass) needs them in ctx.allUnits
+    // to see their kind and force 'structural' grading.
+    pushAll(ctx.allUnits, unresolvedUnits);
     const crossCount = ctx.relationships.filter((r) => r.crossPackage).length;
     console.log(
-      `[run-slice] graphify: ${ctx.relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${ctx.relationships.length - crossCount} same-package)`
+      `[run-slice] graphify: ${ctx.relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${ctx.relationships.length - crossCount} same-package)${unresolvedUnits.length > 0 ? `, ${unresolvedUnits.length} admitted via unresolved-endpoint placeholder` : ''}`
     );
   },
 };
