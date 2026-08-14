@@ -1,13 +1,24 @@
 # AGENT TASKS — Semantic Model Extension
 
 **Branch:** `feature/semantic-model-extension` (base `main` @ `370b7c7`)
-**Status (updated 2026-08-13):** P0 experiments in progress — T-P0-0/2a/2/3
-done (baseline captured, licensing resolved, E1/CodeQL evaluated positively —
-see `E1-codeql-engine-evaluation.md`); T-P0-1/E2 run twice and reverted both
-times, real design work needed before a third attempt — see
-`E2-graded-fact-admission-experiment.md`; T-P0-4/5/6 (E3/E4/E5) not started.
-No other lane has started. See `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
-for a deliberate research pause taken before continuing past P0. Lane files:
+**Status (updated 2026-08-14):** P0 — T-P0-0/2a/2/3 done (baseline captured,
+licensing resolved, E1/CodeQL command-bus dispatch evaluated positively, see
+`E1-codeql-engine-evaluation.md`); T-P0-1/E2 run twice and reverted both
+times, real design work needed before a third attempt, see
+`E2-graded-fact-admission-experiment.md`; **T-P0-4/5/6 (E3/E4/E5) still not
+started** — the P0 gate itself only required E1+E2 to report (both did), so
+this did not block moving into Layered Recovery, but it means 2 of the
+"five experiments from `docs/06` §4" this file's own §4 names as a unit have
+never run. Layered Recovery's `[B]` tasks (ungated, see the diagram note in
+§5 below) are the actual current focus: **T-LR-1 and T-LR-2 done and shipped**
+(`AGENT_TASKS_Ext_Layered_Recovery.md`); an additional, not-originally-planned
+CodeQL DI-resolution experiment (informally "E1b," motivated by T-LR-3/T-LR-4's
+own evidence-pass requirement) also ran positive, see
+`E1b-codeql-di-resolution-experiment.md` — T-LR-3/T-LR-4 are now unblocked
+but not started; T-LR-5/T-LR-6 (the actual engine integration) are scheduled
+with a 7-item checklist but not started. **Lens Modules — available,
+ungated, since day one — has never been touched.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
+records a deliberate research pause taken partway through. Lane files:
 `AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace
 (`codeintel/Architecture Model/docs/`), referenced by ID (`BR-*`, `NFR-*`,
@@ -145,6 +156,19 @@ tracked as rows in `BACKLOG.md` — not in a separate register.
    Lens Modules ◄────────────────────────────┴─────────────┘
    (independent — parallel from day one)
 ```
+
+**Diagram imprecision, found 2026-08-13 while auditing actual execution against
+this file:** the arrow from `Fact Semantics` into `Layered Recovery` above
+draws the whole lane as gated on Fact Semantics. It isn't — `AGENT_TASKS_Ext_Layered_Recovery.md`'s
+own header is more precise: **"Depends on: Fact Semantics (T-FS-2) for the
+engine work only."** Layered Recovery's `[B]`-marked tasks (already-evidenced
+backlog items, T-LR-1 through T-LR-4) are ungated, same as the table below
+already states — only the engine sub-tasks (T-LR-5/T-LR-6) wait on Fact
+Semantics. This diagram is illustrative, not authoritative — the table and
+each lane file's own header win on conflict, same rule
+`Architecture_as_Code_Solution_Design_v2.md` §0 already uses elsewhere in
+this repo. Not redrawn to avoid introducing a second imprecision under time
+pressure — this note is the correction.
 
 | Lane file | Gate | Parallel with |
 |---|---|---|
