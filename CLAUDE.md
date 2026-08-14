@@ -78,8 +78,6 @@ because a task reports itself done.
 
 ## Repository layout
 
-## Repository layout
-
 ```
 pipeline/       Node.js/TypeScript source — the real, running product
 docs/           Requirements, current solution design, capabilities, backlog
