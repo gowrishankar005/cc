@@ -765,6 +765,76 @@ test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixtu
   }
 });
 
+test('T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — synthetic fixture: a bridge with 2 real implementers resolves when exactly one carries the bare @Service stereotype, and the both-stereotyped ambiguity path still refuses to guess', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // Positive path: WidgetReadService has TWO real implementers in scanned
+    // roots (WidgetReadServiceImpl, WidgetReadServiceLegacyImpl) — before
+    // T-LR-3, ANY 2+-implementer bridge was unconditionally refused. Only
+    // WidgetReadServiceImpl carries a real `@Service` stereotype
+    // (spring-service-stereotype in signal-catalogue.yml), so it alone
+    // disambiguates the bridge; it is also @Entity, so the terminal check
+    // (kind database/topic) passes too.
+    const resource = findNode(calm, 'WidgetApiResource.java');
+    const impl = findNode(calm, 'WidgetReadServiceImpl.java');
+    assert.ok(resource, 'WidgetApiResource.java node missing');
+    assert.equal(resource['node-type'], 'service');
+    assert.ok(impl, 'WidgetReadServiceImpl.java node missing');
+    assert.equal(impl['node-type'], 'database');
+    assert.equal(findNode(calm, 'WidgetReadService.java'), undefined, 'bridge interface must not become its own CALM node');
+    // WidgetReadServiceLegacyImpl carries zero framework-recognized evidence
+    // of any kind (no stereotype, no persistence, nothing) — it correctly
+    // never becomes a unit, same as any other zero-evidence class.
+    assert.equal(findNode(calm, 'WidgetReadServiceLegacyImpl.java'), undefined, 'the non-stereotype implementer has no evidence of its own and must not become a node');
+
+    const stereotypeRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === resource['unique-id'] && conn.destination.node === impl['unique-id'];
+    });
+    assert.ok(stereotypeRel, 'expected a resolved stereotype-disambiguated relationship from WidgetApiResource to WidgetReadServiceImpl');
+    assert.equal(relMetadata(stereotypeRel, 'x-aac-relationship-grade'), 'architecture');
+    assert.equal(relMetadata(stereotypeRel, 'x-aac-confidence'), 12, 'r2-stereotype same-root confidence must sit strictly between R2 Phase 1 (15) and R2b (8)');
+    assert.ok(stereotypeRel.description.includes('calls'), 'r2-stereotype must use the calls kind, same as every other R2 branch');
+    assert.equal(
+      relMetadata(stereotypeRel, 'x-aac-mechanism'),
+      'r2-stereotype',
+      'T-LR-3: stereotype-disambiguated resolution must be distinguishable from r2-phase1/r2b/r2c without decoding the confidence value'
+    );
+
+    // Ambiguity path: GadgetReadService has TWO real implementers, BOTH
+    // carrying @Service — stereotype presence alone cannot disambiguate
+    // them, so this must still refuse to guess, same as the CodeQL
+    // DI-resolution experiment's own real refusal cases
+    // (E1b-codeql-di-resolution-experiment.md: Tasklet, ContentStoreService,
+    // etc. — 2+ stereotype-carrying implementers correctly never resolved).
+    const gadgetResource = findNode(calm, 'GadgetApiResource.java');
+    const gadgetRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === gadgetResource['unique-id'];
+    });
+    assert.equal(gadgetRel, undefined, 'both-stereotyped ambiguity case must NOT emit a fabricated relationship');
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const ambiguousItem = facts.ignoredItems.find((i) => i.detail?.startsWith('unresolved-multi-hop') && i.detail.includes('GadgetApiResource'));
+    assert.ok(ambiguousItem, 'expected an honest unresolved-multi-hop ignored-item for the both-stereotyped Gadget case');
+    assert.ok(ambiguousItem.detail.includes('2 candidate implementation'), `expected the item to name 2 implementers, got: ${ambiguousItem.detail}`);
+
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    assert.equal(coverage.relationshipsByMechanism['r2-stereotype'], 1, 'expected the stereotype-disambiguated edge counted under relationshipsByMechanism["r2-stereotype"]');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test(
   'T-LR-2 real evidence: a reference Java governance platform (Waltz), 3-module scan — 7 real direct-delegate chains resolve, 0 fabricated, closing the exact gap the waltz-multihop-genericity-probe finding named (26 of 28 real candidates were this shape)',
   {

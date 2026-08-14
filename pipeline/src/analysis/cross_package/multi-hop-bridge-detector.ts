@@ -47,6 +47,23 @@ const R2B_CROSS_ROOT_CONFIDENCE = 5;
 const R2C_SAME_ROOT_CONFIDENCE = 6;
 /** Weakest tier this pipeline produces — direct-delegate AND a root-boundary claim together. */
 const R2C_CROSS_ROOT_CONFIDENCE = 3;
+/**
+ * T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — a bridge with 2+
+ * real `implements` candidates, disambiguated to exactly one because only
+ * that one carries real `@Service` stereotype evidence
+ * (spring-service-stereotype in signal-catalogue.yml), and that sole
+ * stereotype-carrying candidate is itself a database/topic unit. Strictly
+ * below R2 Phase 1's tier (15/10): Phase 1's implementer was never
+ * ambiguous to begin with; this one genuinely had 2+ real candidates and
+ * needed an extra corroborating fact to narrow them. Strictly above R2b's
+ * tier (8/5): unlike R2b, this IS still a direct `implements`-corroborated
+ * terminal match, not a second-hop import chase — the extra uncertainty is
+ * "which of several real implementers," not "does the implementer even
+ * reach a store."
+ */
+const R2_STEREOTYPE_SAME_ROOT_CONFIDENCE = 12;
+/** Cross-root pairing for the stereotype-disambiguated tier above. */
+const R2_STEREOTYPE_CROSS_ROOT_CONFIDENCE = 7;
 
 export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
@@ -188,10 +205,42 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
         }
       }
 
+      // T-LR-3 — 2+ implementers is not automatically ambiguous when
+      // exactly one of them carries real, catalogue-recognized `@Service`
+      // stereotype evidence and the rest don't. This narrows genuine
+      // ambiguity using an extra real fact (the same disambiguation-by-
+      // corroboration approach the CodeQL DI-resolution experiment verified
+      // against real, messy Spring wiring, including cases with 2+
+      // stereotype-carrying implementers that correctly stay refused —
+      // E1b-codeql-di-resolution-experiment.md). Never applies to the
+      // implementers.length === 0 case above (there is nothing to
+      // disambiguate among).
+      if (implementers.length >= 2) {
+        const stereotypeImplementers = implementers
+          .map((id) => nodeToUnit.get(id))
+          .filter((m): m is NodeUnitMatch => !!m && m.unit.evidence.some((e) => e.signal === 'Service' && e.source === 'decorator'));
+        const uniqueStereotypeUnits = [...new Map(stereotypeImplementers.map((m) => [m.unit.id, m])).values()];
+        if (uniqueStereotypeUnits.length === 1) {
+          const stereotypeMatch = uniqueStereotypeUnits[0];
+          if (stereotypeMatch.unit.kind === 'database' || stereotypeMatch.unit.kind === 'topic') {
+            emitBridgeRelationship(fromMatch, stereotypeMatch, R2_STEREOTYPE_SAME_ROOT_CONFIDENCE, R2_STEREOTYPE_CROSS_ROOT_CONFIDENCE, 'r2-stereotype');
+            continue;
+          }
+          // Disambiguated to one real implementer, but it isn't itself a
+          // database/topic unit — deliberately does NOT also chase R2b's
+          // store-import hop here (see the mechanism field's doc comment
+          // in typed-facts.ts): stacking a second inferred hop onto an
+          // already-disambiguated edge goes beyond what E1b's evidence
+          // covers. Falls through to the same honest refusal below.
+        }
+      }
+
       // 0 (no implementer in scanned roots, AND (T-LR-2) not itself a
       // direct delegate either — the real single-module case seen in a
-      // reference Java/JAX-RS banking platform, per the design note) or
-      // 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
+      // reference Java/JAX-RS banking platform, per the design note), 2+
+      // with no stereotype disambiguation possible (T-LR-3), or 2+ with a
+      // disambiguated implementer that still isn't a store — never guess
+      // (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -253,7 +302,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     to: NodeUnitMatch,
     sameRootConfidence: number,
     crossRootConfidence: number,
-    mechanism: 'r2-phase1' | 'r2b' | 'r2c'
+    mechanism: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype'
   ): void {
     if (from.unit.id === to.unit.id) return; // degenerate: bridge resolves back to the source's own unit
     const dedupeKey = `${from.unit.id}|${to.unit.id}`;
