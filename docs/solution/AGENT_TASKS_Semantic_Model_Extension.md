@@ -4,19 +4,21 @@
 **Status (updated 2026-08-14):** P0 — T-P0-0/2a/2/3 done (baseline captured,
 licensing resolved, E1/CodeQL command-bus dispatch evaluated positively, see
 `E1-codeql-engine-evaluation.md`); **T-P0-1/E2 run three times — reverted
-twice, shipped on round 3** (93/93 `npm test`, every populated `spikes/`
-repo). Round 2 named three real architectural conflicts (reserved-territory
-racing with `multi-hop-bridge-detector.ts`, S1 grade-blindness, an
-`ctx.allUnits` ripple into unrelated consumers); round 3 designed and built
-the actual fixes rather than another carve-out, re-verified against real
-repos, and found the S1 conflict never reproduced and the "ripple" was
-mostly stale, over-broad test assertions written before E2 existed — see
+twice, shipped on round 3** (93/93 `npm test` at that commit, every
+populated `spikes/` repo). Independently re-verified after E4 (2026-08-14,
+`cd pipeline && npm test`): **94 pass / 0 fail / 0 skip**. Round 2 named
+three real architectural conflicts (reserved-territory racing with
+`multi-hop-bridge-detector.ts`, S1 grade-blindness, an `ctx.allUnits` ripple
+into unrelated consumers); round 3 designed and built the actual fixes
+rather than another carve-out, re-verified against real repos, and found
+the S1 conflict never reproduced and the "ripple" was mostly stale,
+over-broad test assertions written before E2 existed — see
 `E2-graded-fact-admission-experiment.md`'s "Round 3" section for the full
-disposition. **T-P0-4/5/6 (E3/E4/E5) still not
-started** — the P0 gate itself only required E1+E2 to report (both did), so
-this did not block moving into Layered Recovery, but it means 2 of the
-"five experiments from `docs/06` §4" this file's own §4 names as a unit have
-never run. Layered Recovery's `[B]` tasks (ungated, see the diagram note in
+disposition. **T-P0-5/E4 ran (MIXED) and T-P0-6/E5 ran (negative,
+`L3`/`L4` deprioritised); T-P0-4/E3 is explicitly deprioritised**, not
+unstarted — see `AGENT_TASKS_Ext_P0_Experiments.md`. The P0 gate itself
+only required E1+E2 to report (both did), so this did not block moving into
+Layered Recovery. Layered Recovery's `[B]` tasks (ungated, see the diagram note in
 §5 below) are the actual current focus: **T-LR-1 and T-LR-2 done and shipped**
 (`AGENT_TASKS_Ext_Layered_Recovery.md`); an additional, not-originally-planned
 CodeQL DI-resolution experiment (informally "E1b," motivated by T-LR-3/T-LR-4's

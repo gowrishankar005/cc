@@ -63,8 +63,26 @@ export function loadSignalCatalogue(catalogueDir: string = __dirname): SignalCat
  * first-match-wins order would silently attribute a Java signal to the
  * NestJS rule (same category/weight today, so no visible bug yet — but wrong
  * provenance, and a real bug the moment the two rules' weights or categories
- * ever diverge). Falls back to the first match if no candidate's `language`
- * matches, so this doesn't change existing single-match cases.
+ * ever diverge).
+ *
+ * T-P0-5 (E4, catalogue-as-data stress test) — a THIRD real case, found
+ * adding NestJS GraphQL resolver rows (`nestjs-graphql-field-decorator`,
+ * matchSignal "Query|Mutation"): Spring Data JPA's real `@Query(...)`
+ * annotation (a Java call-site fact, `ChargeRepository.java`) bare-word
+ * matches the same alternation. Unlike the JAX-RS/NestJS "get" case above,
+ * NO Java-language candidate exists for "Query" at all — the only match is
+ * the TypeScript-scoped GraphQL rule. The old fallback-to-`candidates[0]`
+ * behavior silently attributed this real Java persistence signal to a
+ * TypeScript web-framework rule (http-entry-point, calmNodeType: service),
+ * flipping `ChargeRepository`'s node type from `database` to `service` — a
+ * real corruption on real a reference Java/JAX-RS banking platform source, not synthetic. The
+ * fix: when `language` is given and NO candidate matches it, there is no
+ * correct rule to fall back to (every candidate is provably a different
+ * ecosystem's rule matching the same bare word by coincidence) — return
+ * undefined so the caller's own unknown-signal handling takes over, exactly
+ * as if `matchSignal` had matched nothing at all. Only changes behavior when
+ * a caller passes a `language` that matches zero candidates; every existing
+ * single-candidate and same-language-match case is unaffected.
  */
 export function findRule(
   catalogue: SignalCatalogue,
@@ -80,7 +98,7 @@ export function findRule(
   if (candidates.length === 0) return undefined;
   if (language) {
     const languageMatch = candidates.find((r) => r.language.toLowerCase() === language.toLowerCase());
-    if (languageMatch) return languageMatch;
+    return languageMatch; // undefined when no candidate matches this fact's own language — never fall back to a different ecosystem's rule
   }
   return candidates[0];
 }

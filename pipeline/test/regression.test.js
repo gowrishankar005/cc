@@ -3219,3 +3219,30 @@ test('Review fix (2026-08-09) — outbound-HTTP detector excludes /test/-path fi
   const testItem = items.find((i) => i.ref.startsWith('test/test_client.py'));
   assert.equal(testItem.reason, 'TEST_CODE', 'a test file importing an HTTP client must be re-categorized as TEST_CODE, not left as a genuine review candidate');
 });
+
+test('T-P0-5 (E4, catalogue-as-data stress) — findRule() never falls back to a different ecosystem\'s rule when the fact\'s own language has zero candidates', () => {
+  const { findRule } = require(path.join(PIPELINE_ROOT, 'dist/rules/rule-schema'));
+  // Real regression: adding a TypeScript-only "Query|Mutation" GraphQL
+  // catalogue row (E4's own test addition) caused a real Java fact — Spring
+  // Data JPA's `@Query(...)` on ChargeRepository.java, a reference
+  // Java/JAX-RS banking platform, real source — to silently resolve to that
+  // TypeScript rule (the only candidate matching the bare word "Query" at
+  // all), flipping ChargeRepository from `database` to `service`. The old
+  // fallback-to-candidates[0] behavior assumed "some match beats no match"
+  // even across ecosystems; it doesn't — a same-named rule from a language
+  // the fact isn't even written in is never correct.
+  const catalogue = {
+    version: 'test',
+    rules: [
+      { id: 'ts-only-rule', language: 'typescript', framework: 'nestjs-graphql', matchSignal: 'Query', matchSource: 'call', category: 'http-entry-point', weight: 40, calmNodeType: 'service' },
+    ],
+  };
+  const javaMatch = findRule(catalogue, 'Query', 'call', 'java');
+  assert.equal(javaMatch, undefined, 'a Java fact must never resolve to a TypeScript-only rule just because no Java candidate exists — should be treated as unmatched, not misattributed');
+
+  const tsMatch = findRule(catalogue, 'Query', 'call', 'typescript');
+  assert.equal(tsMatch?.id, 'ts-only-rule', 'the real, same-language match must still resolve normally');
+
+  const noLanguageMatch = findRule(catalogue, 'Query', 'call', undefined);
+  assert.equal(noLanguageMatch?.id, 'ts-only-rule', 'when no language is given at all (existing behavior, unaffected), falls back to the first match');
+});
