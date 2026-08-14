@@ -174,6 +174,12 @@ keeping regardless of that verdict:
   means the mechanism class was scoped wrong (see "Bug fixes are capability
   work" above) — stop, re-derive the mechanism class, then retry once, not
   indefinitely.
+- **Once a lane/task file exists and is current, point a session at it
+  directly — don't write a prompt paraphrasing it.** `AGENT_TASKS_Ext_*.md`
+  files are self-contained by design (they name what to read and what
+  "done" means); a bespoke kickoff prompt duplicates that content and can go
+  stale relative to it the moment either one changes — which has already
+  happened once, on this project's own extension work.
 - **Root cause before patch, every time.** Reproduce → isolate → identify the
   mechanism → fix, in that order. Skipping straight to a plausible-looking
   change is the most common route to the instance-specific patches this
