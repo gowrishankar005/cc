@@ -152,6 +152,33 @@ Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with 
 - New detection coverage should be a catalogue row plus one of the four proven extraction mechanisms, per the Simplicity First principle above — see [`docs/solution/Catalogue_Intake.md`](docs/solution/Catalogue_Intake.md) for the intake process (evidence + test + backlog entry required).
 - Before claiming a fix or a new detection works, run it against a real fixture and check the actual output — don't infer correctness from reading the code.
 
+## Session economy (no plugin required)
+
+Four cheap habits, adopted rather than any third-party workflow framework —
+evaluated and rejected as unnecessary overhead for this repo (`docs/06`
+convergence notes, research workspace), but these four ideas are worth
+keeping regardless of that verdict:
+
+- **One git worktree per active lane/task**, not one shared working tree
+  across parallel sessions. Removes the need to `git status`-check before
+  every commit to avoid sweeping up another session's in-progress work — a
+  real problem this project hit, not a hypothetical one.
+- **One task, one fresh session**, where practical. The lane files
+  (`AGENT_TASKS_Ext_*.md`) are written as self-contained briefs specifically
+  so this works — a session doesn't need prior conversation history if the
+  task file states what to read and what "done" means. Avoids carrying
+  irrelevant context forward and the fidelity loss a long session risks after
+  compaction.
+- **Two failed fix attempts on the same problem is a stop signal, not a cue
+  to try a third variation.** Repeated patching of the same symptom usually
+  means the mechanism class was scoped wrong (see "Bug fixes are capability
+  work" above) — stop, re-derive the mechanism class, then retry once, not
+  indefinitely.
+- **Root cause before patch, every time.** Reproduce → isolate → identify the
+  mechanism → fix, in that order. Skipping straight to a plausible-looking
+  change is the most common route to the instance-specific patches this
+  project's governance already exists to catch.
+
 ## Process discipline (from this project's build retrospective)
 
 The retrospective measured roughly **two lines of planning prose for every one
