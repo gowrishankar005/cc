@@ -1,0 +1,13 @@
+# See db-deployment-a.yaml — sibling deployment resolving to a DIFFERENT
+# engine token (mongodb), making this manifest set genuinely ambiguous.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-db-b
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: orders-db-b
+          image: mongo:6

@@ -1,0 +1,19 @@
+# T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources").
+# Real, evidenced shape: a deployment manifest naming ONE datastore engine
+# (mysql, via this Deployment's own container image) while the current,
+# live spring-config (test/fixtures/spring-config-sample/src/main/resources/
+# application.yml's spring.datasource.url=jdbc:postgresql://...) names a
+# DIFFERENT one — the classic "stale manifest vs. current config" shape.
+# Paired with test/fixtures/spring-config-sample as the package root under
+# test (--k8s-manifests test/fixtures/contradiction-manifests/conflicting).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-db
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: orders-db
+          image: mysql:8.0

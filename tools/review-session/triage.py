@@ -30,12 +30,34 @@ from __future__ import annotations
 #     scan" (real infra evidence, no code-side match -- per the design's own
 #     Tier C table, this is a rescan/OOS case, not something to invent an
 #     answer for).
+#   multi-hop-single-candidate-below-threshold -> Tier B
+#     "single-candidate-below-threshold" (T-FS-1, BACKLOG.md "Tier-B
+#     residual detection"). Real, distinguishable input this trigger map
+#     never had before: multi-hop-bridge-detector.ts found exactly ONE real
+#     database/topic candidate among a bridge interface's several syntactic
+#     implementers -- structurally different from the S1/low-architecture-
+#     coverage "many/zero real candidates" shape above (which stays Tier A,
+#     an architect judgment call with no single standout answer). A single
+#     obscured-but-real candidate is close enough to a draftable decision
+#     that Tier B (draft_tier_b.py's own architecture) is the right class --
+#     see draft_tier_b.py's module docstring, which named "no trigger
+#     produces Tier B yet" as a real, standing gap. This closes it.
+#   contradicting-evidence-force-review -> Tier A "contradicting-evidence"
+#     (T-FS-3, BACKLOG.md "Contradiction detection between evidence
+#     sources"). Deliberately Tier A, not B: draft_tier_b.py's own hard
+#     rule 4 (system prompt, §5.1) already refuses to pick between two
+#     equally-evidenced candidates ("cannot_decide: ambiguous between...")
+#     -- a genuine value-level contradiction between two real sources is
+#     exactly that shape, so it is never draftable, only an architect
+#     judgment call.
 _TRIGGER_MAP = {
     "S1-zero-service-touching-relationships": ("A", "multi-candidate-bridge"),
     "low-architecture-coverage": ("A", "multi-candidate-bridge"),
     "S2-http-without-security-control": ("A", "security-authority-policy"),
     "S5-zero-service-units-with-store-present": ("A", "ontology-judgment"),
     "S5-cfn-routes-found-but-unbound": ("C", "missing-intermediates-not-in-scan"),
+    "multi-hop-single-candidate-below-threshold": ("B", "single-candidate-below-threshold"),
+    "contradicting-evidence-force-review": ("A", "contradicting-evidence"),
 }
 
 

@@ -66,11 +66,42 @@ def _missing_intermediates_options(residual: dict, unit_index: dict) -> list[dic
     ]
 
 
+def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) -> list[dict]:
+    """T-FS-1 (Tier B): multi-hop-bridge-detector.ts found exactly ONE real
+    database/topic-typed candidate among a bridge interface's several
+    syntactic implementers -- a real, medium-confidence signal, distinct
+    from Tier A's multi-candidate-bridge class (no single candidate stands
+    out there). The candidate's own unit id is already named in the
+    residual's rationale text (the detector's own tier-b-single-candidate
+    ignored-item) -- this template never re-derives or invents one of its
+    own, same S5/S7 discipline every other template here follows."""
+    return [
+        {"key": "1", "label": "Accept the identified candidate", "detail": "promote to a real architecture relationship at the confidence named in the rationale above -- the one candidate this pipeline already found, not a new guess"},
+        {"key": "2", "label": "Reject -- not the right candidate", "detail": "the syntactic implementer count was misleading (e.g. a decoy/mock/legacy alternative implementation); document as such"},
+    ]
+
+
+def _contradicting_evidence_options(residual: dict, unit_index: dict) -> list[dict]:
+    """T-FS-3: two real evidence sources assert DIFFERENT values for the
+    same fact (e.g. a k8s deployment manifest names one datastore engine,
+    the live spring-config names another) -- contradiction-detector.ts
+    already named BOTH conflicting values in the rationale text above.
+    Never averaged, never auto-picked: the architect decides which source
+    is actually current."""
+    return [
+        {"key": "1", "label": "Trust the code-level config (spring-config)", "detail": "the deployment manifest is stale -- update it, or document the drift"},
+        {"key": "2", "label": "Trust the deployment manifest", "detail": "the code-level config is stale/wrong -- flag for a code fix"},
+        {"key": "3", "label": "Both are correct for different environments", "detail": "e.g. a per-profile override this run's evidence doesn't capture -- document as such, not a real contradiction"},
+    ]
+
+
 _CLASS_TEMPLATES = {
     "multi-candidate-bridge": _multi_candidate_bridge_options,
     "security-authority-policy": _security_authority_policy_options,
     "ontology-judgment": _ontology_judgment_options,
     "missing-intermediates-not-in-scan": _missing_intermediates_options,
+    "single-candidate-below-threshold": _single_candidate_below_threshold_options,
+    "contradicting-evidence": _contradicting_evidence_options,
 }
 
 

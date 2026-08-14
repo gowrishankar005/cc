@@ -64,7 +64,16 @@ function extractDatasource(file: SpringConfigFile): TypedUnit | undefined {
   const url = file.properties.get('spring.datasource.url');
   if (!url) return undefined;
   const scheme = jdbcScheme(url);
-  return buildUnit(file, 'spring-datasource', 'database', scheme ? `datasource (${scheme})` : 'datasource', `spring.datasource.url=${url}`, 'spring.datasource.url');
+  const unit = buildUnit(file, 'spring-datasource', 'database', scheme ? `datasource (${scheme})` : 'datasource', `spring.datasource.url=${url}`, 'spring.datasource.url');
+  // T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources") —
+  // the raw URL as the evidence's own literal source-line VALUE (Evidence.argument's
+  // documented purpose: "the literal source text at that one line," never a
+  // resolved runtime value — the URL text already IS that literal text for
+  // a structured-config fact). Lets contradiction-detector.ts compare this
+  // fact's engine against a k8s Deployment's image-engine without
+  // re-parsing the signal string.
+  unit.evidence[0].argument = url;
+  return unit;
 }
 
 /** T-SC-4 — Kafka/RabbitMQ/ActiveMQ broker config -> topic (network) unit. */

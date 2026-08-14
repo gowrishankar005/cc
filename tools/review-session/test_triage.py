@@ -34,6 +34,51 @@ class TestBuildResiduals(unittest.TestCase):
         self.assertEqual(residuals[0]["class"], "missing-intermediates-not-in-scan")
         self.assertEqual(residuals[0]["unitIds"], [])  # run-level, no unit
 
+    def test_tier_b_trigger_maps_to_tier_b_single_candidate(self):
+        """T-FS-1 (BACKLOG.md "Tier-B residual detection") — the first real
+        trigger that maps to Tier B, not Tier A/C. Real, distinguishable
+        input: multi-hop-bridge-detector.ts found exactly one real store
+        candidate among a bridge's several syntactic implementers."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "multi-hop-single-candidate-below-threshold",
+                    "unitId": "WidgetApiResource.java",
+                    "unitKind": "service",
+                    "confidence": 40,
+                    "rationale": 'tier-b-single-candidate: "WidgetApiResource.java" references bridge "..." exactly 1 ("WidgetReadServiceImpl.java") is itself a real database/topic unit...',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "B")
+        self.assertEqual(residuals[0]["class"], "single-candidate-below-threshold")
+        self.assertEqual(residuals[0]["unitIds"], ["WidgetApiResource.java"])
+
+    def test_contradiction_trigger_maps_to_tier_a_contradicting_evidence(self):
+        """T-FS-3 (BACKLOG.md "Contradiction detection between evidence
+        sources") — deliberately Tier A, not B: a genuine value-level
+        contradiction between two equally-real sources is never draftable
+        (draft_tier_b.py's own hard rule 4 refuses to pick between equally-
+        evidenced candidates)."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "contradicting-evidence-force-review",
+                    "unitId": "application.yml::spring-datasource",
+                    "unitKind": "database",
+                    "confidence": 40,
+                    "rationale": 'contradiction: "application.yml::spring-datasource"\'s spring-config evidence names datastore engine "postgresql", but deployment manifest "orders-db" names a DIFFERENT engine "mysql"...',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "A")
+        self.assertEqual(residuals[0]["class"], "contradicting-evidence")
+        self.assertEqual(residuals[0]["unitIds"], ["application.yml::spring-datasource"])
+
     def test_empty_queue_produces_empty_residuals(self):
         self.assertEqual(build_residuals({"items": []}), [])
 

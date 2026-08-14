@@ -704,6 +704,82 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
   }
 });
 
+test('T-FS-1 (BACKLOG.md "Tier-B residual detection") — synthetic fixture: a bridge with 2 syntactic implementers but exactly 1 real store candidate produces a distinguishable tier-b-single-candidate residual (never a fabricated edge); a genuinely ambiguous 2-real-store bridge in the SAME fixture still refuses with the original unresolved-multi-hop message', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2-tier-b-candidate-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // --- Positive path: WidgetReadService has 2 implementers, but only
+    // WidgetReadServiceImpl is a real store — the mock carries no evidence
+    // and never becomes a CALM node at all.
+    const widgetResource = findNode(calm, 'WidgetApiResource.java');
+    const widgetImpl = findNode(calm, 'WidgetReadServiceImpl.java');
+    assert.ok(widgetResource, 'WidgetApiResource.java node missing');
+    assert.equal(widgetResource['node-type'], 'service');
+    assert.ok(widgetImpl, 'WidgetReadServiceImpl.java node missing — it carries real @Entity evidence independent of the bridge mechanism');
+    assert.equal(widgetImpl['node-type'], 'database');
+    assert.equal(findNode(calm, 'WidgetReadService.java'), undefined, 'bridge interface must not become its own CALM node');
+    assert.equal(findNode(calm, 'WidgetReadServiceMock.java'), undefined, 'the no-evidence mock implementer must not become a CALM node either');
+
+    // Still "never guess": no relationship is fabricated even though a
+    // single strong candidate exists — that is exactly what makes this a
+    // REVIEW residual (a human decision) rather than an automatic edge.
+    const widgetRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === widgetResource['unique-id'];
+    });
+    assert.equal(widgetRel, undefined, 'tier-b single-candidate case must NOT emit a fabricated relationship — it is a review residual, not an automatic edge');
+
+    // --- Negative/second-instance path in the SAME fixture: SprocketReadService
+    // has 2 implementers and BOTH are real stores — genuine ambiguity, must
+    // stay on the ORIGINAL unresolved-multi-hop path, proving the new
+    // tier-b branch does not just always fire on implementers.length >= 2.
+    const sprocketImplA = findNode(calm, 'SprocketReadServiceImplA.java');
+    const sprocketImplB = findNode(calm, 'SprocketReadServiceImplB.java');
+    assert.ok(sprocketImplA && sprocketImplB, 'both real Sprocket store implementers must exist as CALM nodes (their own @Entity evidence)');
+    const sprocketResource = findNode(calm, 'SprocketApiResource.java');
+    const sprocketRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === sprocketResource['unique-id'];
+    });
+    assert.equal(sprocketRel, undefined, 'genuinely ambiguous 2-real-store case must NOT emit a fabricated relationship either');
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+    const tierBItem = facts.ignoredItems.find((i) => i.detail?.startsWith('tier-b-single-candidate: ') && i.detail.includes('WidgetApiResource'));
+    assert.ok(tierBItem, `expected a tier-b-single-candidate ignored-item for WidgetApiResource, got: ${facts.ignoredItems.map((i) => i.detail).join(' | ')}`);
+    assert.ok(tierBItem.detail.includes('WidgetReadServiceImpl'), `expected the real candidate named, got: ${tierBItem.detail}`);
+    assert.ok(tierBItem.detail.includes('2 candidate implementation'), `expected the raw implementer count (2) still named, got: ${tierBItem.detail}`);
+
+    const sprocketItem = facts.ignoredItems.find((i) => i.detail?.startsWith('unresolved-multi-hop') && i.detail.includes('SprocketApiResource'));
+    assert.ok(sprocketItem, `expected the ORIGINAL unresolved-multi-hop message for the genuinely ambiguous Sprocket case, got: ${facts.ignoredItems.map((i) => i.detail).join(' | ')}`);
+    assert.ok(sprocketItem.detail.includes('2 candidate implementation'), `expected 2 candidates named, got: ${sprocketItem.detail}`);
+    assert.ok(!sprocketItem.detail.startsWith('tier-b-single-candidate'), 'genuine 2-real-store ambiguity must NOT be misclassified as tier-b-single-candidate');
+
+    // hitl-review-trigger.ts must turn the tier-b ignored-item into a real,
+    // actionable review-queue item — the actual acceptance bar ("the
+    // review tooling can act on that class"), not just an internal detail
+    // string nobody reads.
+    const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    const queue = buildReviewQueue(facts, coverage);
+    const tierBQueueItems = queue.items.filter((i) => i.trigger === 'multi-hop-single-candidate-below-threshold');
+    assert.equal(tierBQueueItems.length, 1, `expected exactly 1 multi-hop-single-candidate-below-threshold review item, got: ${JSON.stringify(tierBQueueItems)}`);
+    assert.ok(tierBQueueItems[0].unitId.includes('WidgetApiResource.java'), `expected the source unit named, got: ${tierBQueueItems[0].unitId}`);
+    assert.equal(tierBQueueItems[0].unitKind, 'service');
+    assert.ok(!queue.items.some((i) => i.trigger === 'multi-hop-single-candidate-below-threshold' && i.unitId?.includes('SprocketApiResource')), 'the genuinely ambiguous Sprocket case must not also produce a tier-b review item');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixture: service -> concrete class (no interface at all) -> imported entity resolves, and the ambiguity path still refuses to guess', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2c-direct-delegate-sample');
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -1536,6 +1612,88 @@ test(
 test('K8s manifests absent — --k8s-manifests omitted entirely is a no-op, run completes normally (T-X5-1)', () => {
   const { calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
   assert.ok(!calm.relationships.some((r) => r.description?.startsWith('shares-secret')), 'no k8s trust relationship should appear when --k8s-manifests was never passed');
+});
+
+test('T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources") — a stale k8s deployment manifest naming one datastore engine (mysql) vs the live spring-config naming another (postgresql) forces a real review-queue item, never averaged into the unit\'s own confidence; an agreeing manifest produces no item; a genuinely ambiguous manifest set (2 different engines) also produces no item (never guess)', () => {
+  const springConfigRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample');
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+
+  // --- Positive path: conflicting engines.
+  {
+    const conflictingManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/conflicting');
+    const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', conflictingManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const datasourceUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application.yml'));
+      assert.ok(datasourceUnit, 'base application.yml datasource unit missing');
+      const confidenceBefore = datasourceUnit.confidence;
+
+      const contradictionItem = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === datasourceUnit.id);
+      assert.ok(contradictionItem, `expected a contradiction ignoredItem for ${datasourceUnit.id}, got: ${facts.ignoredItems.map((i) => i.detail).join(' | ')}`);
+      assert.ok(contradictionItem.detail.includes('postgresql'), `expected the config's own engine (postgresql) named, got: ${contradictionItem.detail}`);
+      assert.ok(contradictionItem.detail.includes('mysql'), `expected the manifest's engine (mysql) named, got: ${contradictionItem.detail}`);
+
+      // The unit's own confidence must be UNTOUCHED — never averaged, never
+      // silently lowered by this detector; only a NEW review-queue item is
+      // added on top of what springConfigPass already computed.
+      assert.equal(datasourceUnit.confidence, confidenceBefore, "the contradicted unit's own confidence must never be changed by this detector");
+
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      const queue = buildReviewQueue(facts, coverage);
+      const contradictionQueueItems = queue.items.filter((i) => i.trigger === 'contradicting-evidence-force-review');
+      assert.equal(contradictionQueueItems.length, 1, `expected exactly 1 contradicting-evidence-force-review review item, got: ${JSON.stringify(contradictionQueueItems)}`);
+      assert.equal(contradictionQueueItems[0].unitId, datasourceUnit.id);
+      assert.equal(contradictionQueueItems[0].unitKind, 'database');
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+
+  // --- Negative path: agreeing engines — must NOT be flagged. Scoped to
+  // the BASE application.yml unit specifically (postgresql, matching the
+  // manifest's postgres image): spring-config-sample's OWN sibling
+  // application-prod.yml deliberately declares a DIFFERENT engine (mysql,
+  // see the "T-PC1-8" test above) — that unit legitimately DOES still
+  // conflict with this same postgres manifest, which is correct, expected
+  // behavior, not a bug this negative path is testing.
+  {
+    const agreeingManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/agreeing');
+    const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', agreeingManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const baseUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application.yml'));
+      assert.ok(baseUnit, 'base application.yml datasource unit missing');
+      const baseContradiction = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === baseUnit.id);
+      assert.equal(baseContradiction, undefined, `agreeing manifest (postgres) vs base config (postgresql) must NOT be flagged as a contradiction, got: ${JSON.stringify(baseContradiction)}`);
+
+      // The sibling application-prod.yml unit (mysql) legitimately DOES
+      // still conflict with this same postgres manifest — real, expected
+      // signal, confirms this isn't accidentally suppressing everything.
+      const prodUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application-prod.yml'));
+      const prodContradiction = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === prodUnit?.id);
+      assert.ok(prodContradiction, 'expected the prod profile (mysql) to still legitimately conflict with the postgres manifest — confirms the negative path above is a real discrimination, not global suppression');
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+
+  // --- Never-guess path: the manifest set itself is ambiguous (2 real,
+  // DIFFERENT engine deployments) — must not pick either one to compare
+  // against, same "never guess" discipline as multi-hop-bridge-detector.ts.
+  {
+    const ambiguousManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/ambiguous');
+    const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', ambiguousManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const contradictionItems = facts.ignoredItems.filter((i) => i.detail?.startsWith('contradiction: '));
+      assert.deepEqual(contradictionItems, [], `a genuinely ambiguous manifest set (mysql + mongodb) must produce NO contradiction claim either way, got: ${JSON.stringify(contradictionItems)}`);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
 });
 
 test('--from-facts reconstruct-only mode — byte-identical output with no rescan, refuses incompatible contractVersion (T-X6-3)', () => {

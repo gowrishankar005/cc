@@ -48,7 +48,21 @@ export interface ReviewQueueItem {
     | 'S2-http-without-security-control'
     | 'low-architecture-coverage'
     | 'S5-zero-service-units-with-store-present'
-    | 'S5-cfn-routes-found-but-unbound';
+    | 'S5-cfn-routes-found-but-unbound'
+    // T-FS-1 (BACKLOG.md "Tier-B residual detection") — multi-hop-bridge-detector.ts's
+    // own 'tier-b-single-candidate' ignored-item class: exactly one real
+    // database/topic candidate found among a bridge's several syntactic
+    // implementers, distinct from genuine multi-candidate ambiguity (which
+    // still routes through S1/low-architecture-coverage above, unchanged).
+    | 'multi-hop-single-candidate-below-threshold'
+    // T-FS-3 (BACKLOG.md "Contradiction detection between evidence
+    // sources") — contradiction-detector.ts's own 'contradiction:'
+    // ignored-item class: two evidence sources assert DIFFERENT values for
+    // the same real-world fact (e.g. a k8s deployment manifest naming one
+    // datastore engine, the live spring-config naming another). Forces a
+    // review decision; the conflicting unit's own confidence is never
+    // touched or averaged by this trigger.
+    | 'contradicting-evidence-force-review';
   /** Absent for a genuinely run-level residual (S5-cfn-routes-found-but-unbound) — no unit was matched, so none can be named. */
   unitId?: string;
   unitKind?: TypedUnit['kind'];
@@ -189,6 +203,46 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
         rationale: `"${unit.id}" has HTTP-entry-point evidence but no security-control evidence found by this pipeline's catalogue (see AREC C-call for what is/isn't detected). Review whether real auth exists in source that this run's mechanisms don't cover.`,
       });
     }
+  }
+
+  // T-FS-1 (BACKLOG.md "Tier-B residual detection") — always surfaced when
+  // present, unlike S1/S2/S5 above: this is a real fact about ONE specific
+  // edge (multi-hop-bridge-detector.ts found exactly one real store
+  // candidate among several syntactic implementers), not a run-wide
+  // completeness gap that only matters when a silence flag also fired. The
+  // detail text is the review tooling's own actionable class distinction —
+  // "one high-confidence candidate obscured by noise" vs. "genuinely many
+  // candidates" (the latter stays under S1/low-architecture-coverage,
+  // unchanged) — the exact separation the backlog row asked for.
+  for (const item of facts.ignoredItems) {
+    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith('tier-b-single-candidate: "')) continue;
+    const sourceUnitId = item.detail.slice('tier-b-single-candidate: "'.length).split('"')[0];
+    const sourceUnit = facts.units.find((u) => u.id === sourceUnitId);
+    items.push({
+      trigger: 'multi-hop-single-candidate-below-threshold',
+      unitId: sourceUnitId,
+      unitKind: sourceUnit?.kind,
+      confidence: sourceUnit?.confidence,
+      rationale: item.detail,
+    });
+  }
+
+  // T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources")
+  // — same always-on convention as the tier-b block above: a real
+  // contradiction about one specific unit matters regardless of this run's
+  // overall silence-flag state. item.ref IS the contradicted unit's own id
+  // (contradiction-detector.ts sets it that way), so no text-parsing is
+  // needed to recover it, unlike the tier-b block above.
+  for (const item of facts.ignoredItems) {
+    if (item.reason !== 'AMBIGUOUS_BOUNDARY' || !item.detail?.startsWith('contradiction: ')) continue;
+    const unit = facts.units.find((u) => u.id === item.ref);
+    items.push({
+      trigger: 'contradicting-evidence-force-review',
+      unitId: item.ref,
+      unitKind: unit?.kind,
+      confidence: unit?.confidence,
+      rationale: item.detail,
+    });
   }
 
   return {

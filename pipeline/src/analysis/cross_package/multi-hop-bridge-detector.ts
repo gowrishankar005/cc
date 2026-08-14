@@ -188,10 +188,50 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
         }
       }
 
+      // T-FS-1 (Tier-B residual class, BACKLOG.md "Tier-B residual
+      // detection") — implementers.length >= 2 is SYNTACTIC ambiguity (N
+      // classes implement this bridge interface). That is not always
+      // SEMANTIC ambiguity: Phase 1's own terminal test (is the implementer
+      // itself a real database/topic TypedUnit?) already tells apart a real
+      // store implementation from a plain class with no persistence/
+      // messaging evidence of its own (a mock, a stub, an alternate
+      // in-memory implementation — a common real Java pattern). Reusing
+      // that existing test here, not a new extraction mechanism: if exactly
+      // ONE of the N syntactic implementers is itself a store unit, this is
+      // "one high-confidence candidate obscured by noise," a genuinely
+      // different, weaker-but-real signal than "N candidates, 2+ of them
+      // real stores" (true ambiguity — falls through to the generic refusal
+      // below, unchanged). Still never emits a relationship (the "never
+      // guess" rule is untouched) — this only changes what gets WRITTEN to
+      // ignoredItems, so a downstream reader (hitl-review-trigger.ts) can
+      // tell the two shapes apart and route the single-candidate case to a
+      // human decision instead of silence.
+      if (implementers.length >= 2) {
+        const storeImplementers = implementers
+          .map((implId) => nodeToUnit.get(implId))
+          .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
+        const uniqueStoreImplementers = [...new Map(storeImplementers.map((m) => [m.unit.id, m])).values()];
+        if (uniqueStoreImplementers.length === 1) {
+          const candidate = uniqueStoreImplementers[0];
+          const wouldBeConfidence = fromMatch.root === candidate.root ? R2_SAME_ROOT_CONFIDENCE : R2_CROSS_ROOT_CONFIDENCE;
+          const key = `${fromMatch.unit.id}|${bridgeNodeId}|tier-b-single-candidate`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            ignoredItems.push({
+              ref: `${fromMatch.unit.filePath}`,
+              reason: 'CROSS_DOMAIN_UNRESOLVED',
+              detail: `tier-b-single-candidate: "${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots, but exactly 1 ("${candidate.unit.id}") is itself a real database/topic unit — the other ${implementers.length - 1} carry no persistence/messaging evidence of their own. A single high-confidence candidate obscured by syntactic ambiguity, not genuine multi-candidate ambiguity (would resolve at confidence ${wouldBeConfidence}, r2-phase1 tier, if unambiguous) — needs a human decision, not an automatic edge, per R2's "never guess" rule.`,
+            });
+          }
+          continue;
+        }
+      }
+
       // 0 (no implementer in scanned roots, AND (T-LR-2) not itself a
       // direct delegate either — the real single-module case seen in a
       // reference Java/JAX-RS banking platform, per the design note) or
-      // 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
+      // 2+ real store candidates (genuinely ambiguous) — never guess
+      // (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);

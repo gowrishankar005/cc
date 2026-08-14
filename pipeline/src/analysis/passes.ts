@@ -15,6 +15,7 @@ import { envSoftGraphPass } from './env-soft-graph-pass';
 import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
 import { cfnRoutePass } from './cfn-route-pass';
+import { contradictionPass } from './contradiction-pass';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -183,5 +184,11 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   reconcilePass,
   k8sTrustPass,
   envSoftGraphPass,
+  // T-FS-3 — needs springConfigPass's database units (already final by this
+  // point) and k8sTrustPass's own manifests-dir convention; reads neither
+  // ctx.relationships nor multiHopExaminedPairs, so — same as its two
+  // neighbors above — its exact position here is otherwise free. Must
+  // still run before gradeRelationshipsPass, the true last pass.
+  contradictionPass,
   gradeRelationshipsPass,
 ];
