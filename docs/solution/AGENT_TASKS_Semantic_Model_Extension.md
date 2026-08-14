@@ -3,9 +3,16 @@
 **Branch:** `feature/semantic-model-extension` (base `main` @ `370b7c7`)
 **Status (updated 2026-08-14):** P0 — T-P0-0/2a/2/3 done (baseline captured,
 licensing resolved, E1/CodeQL command-bus dispatch evaluated positively, see
-`E1-codeql-engine-evaluation.md`); T-P0-1/E2 run twice and reverted both
-times, real design work needed before a third attempt, see
-`E2-graded-fact-admission-experiment.md`; **T-P0-4/5/6 (E3/E4/E5) still not
+`E1-codeql-engine-evaluation.md`); **T-P0-1/E2 run three times — reverted
+twice, shipped on round 3** (93/93 `npm test`, every populated `spikes/`
+repo). Round 2 named three real architectural conflicts (reserved-territory
+racing with `multi-hop-bridge-detector.ts`, S1 grade-blindness, an
+`ctx.allUnits` ripple into unrelated consumers); round 3 designed and built
+the actual fixes rather than another carve-out, re-verified against real
+repos, and found the S1 conflict never reproduced and the "ripple" was
+mostly stale, over-broad test assertions written before E2 existed — see
+`E2-graded-fact-admission-experiment.md`'s "Round 3" section for the full
+disposition. **T-P0-4/5/6 (E3/E4/E5) still not
 started** — the P0 gate itself only required E1+E2 to report (both did), so
 this did not block moving into Layered Recovery, but it means 2 of the
 "five experiments from `docs/06` §4" this file's own §4 names as a unit have
@@ -59,8 +66,8 @@ violated by a naive reading of the extension goal.
 | coe-lab fixtures + scripts | Present | Present, but found to produce **zero raw Graphify edges** even in a combined 7-root scan — too sparse to exercise cross-reference detection at all (a separate finding from the `graphifyy` question above) | E2 stage 1 |
 
 **Sequencing (original plan, now moot — both stages ran):** E1 evaluated
-positively (`E1-codeql-engine-evaluation.md`); E2 run twice, reverted twice
-(`E2-graded-fact-admission-experiment.md`).
+positively (`E1-codeql-engine-evaluation.md`); E2 run three times — reverted
+twice, shipped on round 3 (`E2-graded-fact-admission-experiment.md`).
 
 ## 2. Isolation (`CON-40`)
 

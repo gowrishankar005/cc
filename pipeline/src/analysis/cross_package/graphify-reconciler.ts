@@ -213,7 +213,36 @@ function buildPlaceholderMatch(
   return match;
 }
 
-export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): { relationships: TypedRelationship[]; unresolvedUnits: TypedUnit[] } {
+export function reconcileCrossPackageEdges(
+  run: GraphifyRun,
+  unitsByRoot: Map<string, TypedUnit[]>,
+  /**
+   * T-P0-1 (E2) round 3 — `${edge.source}|${edge.target}` pairs a more
+   * specialized detector (today: `multi-hop-bridge-detector.ts`) has
+   * already taken ownership of examining, whether it resolved or honestly
+   * refused. Real conflict found running E2 against both
+   * `r2b-implementer-hop-sample` (round 2) and `r2c-direct-delegate-sample`
+   * (round 3): this pass runs before that detector in the default pass
+   * order, so without this, admission reaches an edge first and admits a
+   * blunt, low-confidence fact for exactly the edge the specialized
+   * detector was about to examine far more carefully — never guess when a
+   * more specialized mechanism already owns the decision. Empty by default
+   * so every existing caller/test not yet updated is unaffected.
+   */
+  reservedPairs: Set<string> = new Set(),
+  /**
+   * T-P0-1 (E2) round 3 continued — source files of every bridge candidate
+   * `multi-hop-bridge-detector.ts` examined. `reservedPairs` alone proved
+   * insufficient against `r2c-direct-delegate-sample`: Graphify emits a
+   * SEPARATE `calls` edge straight to the bridge candidate's individual
+   * method node, distinct from the class-level `imports`/`references` edge
+   * the detector actually walks — that edge's target is never in
+   * reservedPairs. Deferring admission for the whole file (not just the
+   * exact examined edge) closes that gap, same file-level granularity
+   * `implementsTargetFiles` already uses above for a narrower case.
+   */
+  reservedFiles: Set<string> = new Set()
+): { relationships: TypedRelationship[]; unresolvedUnits: TypedUnit[] } {
   const nodeToUnit = buildNodeToUnitMap(run, unitsByRoot);
   const nodeById = new Map(run.graph.nodes.map((n) => [n.id, n]));
   const fileLineCache = new Map<string, string[]>();
@@ -221,7 +250,11 @@ export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<st
   const placeholders = new Map<string, NodeUnitMatch>();
   // T-P0-1 (E2) — file-level, not node-id-level; see buildPlaceholderMatch's
   // doc comment for why. Built from the same `implements` edges
-  // multi-hop-bridge-detector.ts's `implementersByTarget` uses.
+  // multi-hop-bridge-detector.ts's `implementersByTarget` uses. Kept
+  // alongside the new edge-pair-level `reservedPairs` check above, not
+  // replaced by it — the two catch overlapping but not identical risk
+  // shapes (this one is file-wide, the other is exact-edge and relation-scoped
+  // to what the specialized detector itself actually walks).
   const implementsTargetFiles = new Set(
     run.graph.edges
       .filter((e) => e.relation === 'implements')
@@ -237,9 +270,18 @@ export function reconcileCrossPackageEdges(run: GraphifyRun, unitsByRoot: Map<st
     // edge outright whenever EITHER side didn't resolve. Now: if exactly
     // one side is missing, try to admit it via a synthesized placeholder;
     // if BOTH are missing, there's no real endpoint to anchor a fact to at
-    // all — still dropped, unchanged from before.
+    // all — still dropped, unchanged from before. Never admits an edge a
+    // more specialized detector already claimed (reservedPairs).
     let admitted = false;
-    if (!from && to) {
+    const targetFile = !to ? nodeById.get(edge.target)?.source_file : undefined;
+    const sourceFile = !from ? nodeById.get(edge.source)?.source_file : undefined;
+    const reserved =
+      reservedPairs.has(`${edge.source}|${edge.target}`) ||
+      (targetFile !== undefined && reservedFiles.has(targetFile)) ||
+      (sourceFile !== undefined && reservedFiles.has(sourceFile));
+    if (reserved) {
+      // fall through to the normal !from || !to drop below, unchanged
+    } else if (!from && to) {
       from = buildPlaceholderMatch(edge.source, run, placeholders, implementsTargetFiles);
       admitted = !!from;
     } else if (from && !to) {

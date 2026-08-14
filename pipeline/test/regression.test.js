@@ -830,7 +830,17 @@ test(
       // 34 annotation-noise items an earlier version of this detector produced
       // before the isRealBridgeCandidate fix.
       assert.equal(multiHopItems.length, 2, `expected exactly 2 honest unresolved-multi-hop items, got ${multiHopItems.length}: ${multiHopItems.map((i) => i.detail).join(' | ')}`);
-      const r2Relationships = facts.relationships.filter((r) => r.kind === 'calls' && r.source === 'graphify' && r.confidence !== undefined);
+      // T-P0-1 (E2) round 3 — scoped to R2's own mechanism tags
+      // (r2-phase1/r2b/r2c), not every graphify 'calls' edge with a
+      // confidence value. E2's graded fact admission (mechanism:
+      // 'admitted-unresolved') legitimately produces its own
+      // low-confidence, structural-grade 'calls' facts elsewhere in this
+      // same module (e.g. Charge.java's enum-type references) — real
+      // signal from a different mechanism, not an R2 Phase 1 bridge
+      // resolution, so it must not trip this assertion.
+      const r2Relationships = facts.relationships.filter(
+        (r) => r.kind === 'calls' && r.source === 'graphify' && ['r2-phase1', 'r2b', 'r2c'].includes(r.mechanism)
+      );
       assert.equal(r2Relationships.length, 0, 'fineract-charge alone must NOT close its S1 gap via R2 Phase 1 — a real, honestly-predicted residual (design note §1), never a fabricated edge');
 
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
@@ -876,8 +886,16 @@ test(
       const graded = calm.relationships.filter((rel) => !rel['relationship-type']['composed-of']);
       assert.ok(graded.length > 0, 'expected real graded relationships from fineract-core');
 
-      const r2Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-confidence') !== undefined);
-      const r0Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-confidence') === undefined);
+      // T-P0-1 (E2) round 3 — scoped to R2's own mechanism tags, not "any
+      // confidence-bearing relationship": E2's graded fact admission
+      // (mechanism: 'admitted-unresolved') now also legitimately sets
+      // confidence on real, unrelated 'calls'/'imports' edges elsewhere in
+      // this module (structural-grade, correctly excluded from r0Graded's
+      // "must stay structural" check below since it's undefined-confidence
+      // only). Filtering r0Graded/r2Graded by mechanism instead keeps both
+      // checks accurate for what they actually mean to assert.
+      const r2Graded = graded.filter((rel) => ['r2b', 'r2c'].includes(relMetadata(rel, 'x-aac-mechanism')));
+      const r0Graded = graded.filter((rel) => relMetadata(rel, 'x-aac-mechanism') === undefined);
       // 85 pre-T-R1-3 -> 96 after: T-R1-3 added org.postgresql/org.jooq/
       // org.springframework.jdbc.core as real driver-import rows (previously
       // unreachable due to the Java symbol-vs-package Graphify gap), which
@@ -1472,13 +1490,19 @@ test(
 
       const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
-      // 1 real, expected warning as of the Q13 fix (was 0 before it): with
-      // AccessService correctly no longer a database node, AccessController
-      // has nothing left in this narrow scan to connect to — a real,
-      // honest `architecture-nodes-must-be-referenced` warning, not a bug.
-      // Removing a false-positive node can orphan a previously-connected
-      // real one; this is that trade-off made visible, not hidden.
-      assert.equal(warnings, 1);
+      // 0 as of T-P0-1 (E2, round 3) — was 1 after the Q13 fix alone (see
+      // history below), but E2's graded fact admission now legitimately
+      // admits access_module.ts's real NestJS wiring edge into
+      // access.controller.ts (a synthesized `unresolved:access_module`
+      // placeholder, since access_module.ts itself produces no TypedUnit in
+      // this narrow single-directory scan) — real signal, grep-verified
+      // (`@Module({ controllers: [AccessController] })`), that closes the
+      // orphan this test used to assert. History: with AccessService
+      // correctly no longer a database node (Q13), AccessController briefly
+      // had nothing left in this narrow scan to connect to — an honest
+      // `architecture-nodes-must-be-referenced` warning at the time, not a
+      // bug; E2 now supplies the missing edge instead.
+      assert.equal(warnings, 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -1503,10 +1527,16 @@ test(
 
       const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
-      // 1 real, expected warning — this narrow scan (services/prisma only)
-      // has exactly one node with nothing else in scope to connect to; an
-      // artifact of the deliberately small scan scope, not the Q13 fix.
-      assert.equal(warnings, 1);
+      // 0 as of T-P0-1 (E2, round 3) — was 1 (this narrow scan had exactly
+      // one node with nothing else in scope to connect to, an artifact of
+      // the deliberately small scan scope). E2's graded fact admission now
+      // legitimately admits prisma.module.ts's real NestJS wiring edge into
+      // PrismaService (a synthesized `unresolved:prisma_module` placeholder,
+      // since prisma.module.ts itself produces no TypedUnit in this narrow
+      // scan) — real signal, grep-verified (`@Module({ providers:
+      // [PrismaService] })`), that closes the orphan this test used to
+      // assert.
+      assert.equal(warnings, 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -2360,7 +2390,14 @@ test(
     {
       const { outDir, calm } = runPipeline(roots, ['--k8s-manifests', k8sManifestsDir]);
       try {
-        const envRels = calm.relationships.filter((r) => r.metadata?.some((m) => m.key === 'x-aac-confidence'));
+        // T-P0-1 (E2) round 3 — scoped to env-soft-graph's own fixed
+        // confidence value (20, env-soft-graph-detector.ts). E2's graded
+        // fact admission (mechanism: 'admitted-unresolved', confidence 2/3)
+        // now legitimately sets x-aac-confidence too, on completely
+        // unrelated relationships — real signal from a different mechanism,
+        // not env-soft-graph output, so "any x-aac-confidence present" is
+        // no longer a valid proxy for "env-soft-graph fired."
+        const envRels = calm.relationships.filter((r) => r.metadata?.some((m) => m.key === 'x-aac-confidence' && m.value === 20));
         assert.equal(envRels.length, 0, 'env soft-graph must be OFF by default even when --k8s-manifests is passed');
       } finally {
         fs.rmSync(outDir, { recursive: true, force: true });
@@ -2434,8 +2471,13 @@ test(
       // Scoped to the k8s-derived relationships only (shares-secret + x-aac-confidence env edges) —
       // Transaction.java legitimately appears as a same-package graphify connects target elsewhere
       // (LedgerWriterController -> Transaction.java is a real, correct, unrelated relationship).
+      // T-P0-1 (E2) round 3 — scoped to confidence===20 (env-soft-graph's
+      // own fixed value), same reasoning as the env-soft-graph-off-by-default
+      // test above: E2 also sets x-aac-confidence now (2/3, unrelated
+      // relationships), so bare presence of the metadata key is no longer a
+      // valid proxy for "this edge came from k8s correlation."
       const k8sDerivedEndpoints = calm.relationships
-        .filter((r) => r.description?.startsWith('shares-secret') || r.metadata?.some((m) => m.key === 'x-aac-confidence'))
+        .filter((r) => r.description?.startsWith('shares-secret') || r.metadata?.some((m) => m.key === 'x-aac-confidence' && m.value === 20))
         .flatMap((r) => {
           const c = r['relationship-type'].connects;
           return c ? [c.source.node, c.destination.node] : [];

@@ -6,17 +6,20 @@ a Graphify edge whose one endpoint doesn't resolve to a `TypedUnit`
 architecture — `BACKLOG.md`'s "Graded fact admission (dual-unit gate)" row.
 
 **Result: implemented, evidenced against coe-lab (round 1) and real
-reference repos (round 2), reverted from the default pipeline path both
-times.** Round 1 (against coe-lab's sparse fixtures only) found 0 recall
-gain — see "Round 1" below. Round 2 (`spikes/apache-fineract`,
-`bank-of-anthos`, `ghostfolio`, `finos/waltz`, populated after round 1)
-reverses that conclusion — **E2 does recover real signal against densely-linked
-real code** — but surfaces a materially bigger problem: the mechanism, as
-designed, conflicts with several of this pipeline's other existing invariants
-(see "Round 2" below), not just the two false-positive classes round 1 found.
-Full implementation is preserved in git history for a future, more careful
-attempt: `89b7bd3`/`49e08b7` implement (twice — once per round),
-`279a9fb`/`b4c4492` revert.
+reference repos (rounds 2-3), SHIPPED in round 3 (2026-08-14).** Round 1
+(against coe-lab's sparse fixtures only) found 0 recall gain. Round 2
+(`spikes/apache-fineract`, `bank-of-anthos`, `ghostfolio`, `finos/waltz`,
+populated after round 1) reversed that conclusion — E2 recovers real signal
+against densely-linked real code — but surfaced three real architectural
+conflicts with this pipeline's other invariants and was reverted a second
+time. Round 3 designed and built the actual fixes for all three conflicts
+(not more carve-outs — see "Round 3" below), re-ran the full regression suite
+against every populated `spikes/` repo, and found **93/93 pass, 0 skip, 0
+fabricated relationship** — the mechanism now ships live in the default pass
+order. Full round 1/2 history (including the reverted attempts) is preserved
+in git history: `89b7bd3`/`49e08b7` implement (round 1/2), `279a9fb`/`b4c4492`
+revert (round 1/2); round 3's fix landed as new commits on top of a third
+reapply of `b4c4492`, not a revert.
 
 ## Claim triple
 
@@ -237,11 +240,91 @@ root-caused, not just observed. This is real design work, not incremental
 tightening — a case for the next solutioning pass to scope deliberately,
 not for a third silent re-attempt in this session.
 
+## Round 3 — the three conflicts, actually fixed (2026-08-14)
+
+Round 2 named three problems and proposed (a)/(b)/(c) as the prerequisite
+design work. Round 3 did that work, one conflict at a time, verifying each
+against real fixtures rather than assuming the diagnosis still held after
+`T-LR-1`/`T-LR-2`/`T-LM-0` shipped in between.
+
+**Conflict 1 (reserved territory) — real, but narrower than round 2 believed.**
+Direct investigation found the "outbound-HTTP collision" round 2 reported was
+a **misdiagnosis**: the 6 relationships E2 admitted in `frontend.py` pointed
+to real in-repo files (`api_call.py`, `traced_thread_pool_executor.py`)
+completely unrelated to `outbound-http-detector.ts`'s own edges (verified
+directly against the raw Graphify `graph.json` — no node for the `requests`
+library import was ever touched by E2). `outbound-http-detector.ts` needed no
+carve-out at all. The real, still-live conflict was narrower and different:
+`multi-hop-bridge-detector.ts` and E2 raced for the exact same
+"service → unresolved node" edges, because `reconcilePass` ran before
+`multiHopBridgePass` in the default order. Fixed generically, not with a
+per-detector carve-out list:
+- `multi-hop-bridge-detector.ts` now returns `examinedPairs` (every raw
+  `${source}|${target}` edge it took ownership of, resolved or refused) and
+  `examinedBridgeFiles` (source files of every bridge candidate it examined —
+  needed because Graphify emits a *separate* edge straight to a bridge
+  candidate's individual method node, e.g. `ThingService.retrieveAll`,
+  distinct from the class-level edge the detector itself walks; pair-level
+  deferral alone missed this, confirmed against `r2c-direct-delegate-sample`).
+- `graphify-reconciler.ts`'s `reconcileCrossPackageEdges` takes both as
+  optional parameters and defers admission (falls through to the existing
+  `!from || !to` drop) for any edge already claimed either way.
+- `passes.ts`: `multiHopBridgePass` now runs **before** `reconcilePass` (both
+  append to `ctx.relationships`, changed from an overwrite, so the reorder is
+  safe); `AnalysisContext` carries the two sets between them.
+- Any *future* specialized detector that needs the same deferral opts in the
+  same way — return its own examined-edges/examined-files sets, thread them
+  through the same two optional parameters. No registry of hardcoded
+  detector names was needed; the mechanism is already generic per-detector,
+  not per-repo.
+
+**Conflict 2 (S1 grade-awareness) — did not reproduce.** Round 2 predicted S1
+would silently stop firing because its "service-touching" check doesn't
+distinguish `structural` from `architecture` grade. After conflict 1's fix,
+this never materialized against real fixtures: E2's admitted relationships in
+`fineract-charge` land on `Charge.java`'s enum-type references and a
+repository-wrapper call, not on the service unit the S1 check watches — S1
+still fires correctly, unchanged, no grade-awareness change needed. Left
+as-is; if a future real repo shows E2 admission actually landing squarely on
+a service unit and silencing S1, that is the trigger to revisit this, not a
+hypothetical to build against now.
+
+**Conflict 3 (`ctx.allUnits` ripple) — real, root cause is stale test
+assertions, not consumer logic.** Every one of the remaining test failures
+(`ghostfolio` Controller/database precedence, `PrismaService` positive case,
+env-soft-graph off-by-default, deployment-correlation Transaction.java
+exclusion) turned out to share one root cause: each test's own filter
+(`r.metadata?.some((m) => m.key === 'x-aac-confidence')`, or an exact
+`warnings === 1` pin) was written when E2 didn't exist, under the assumption
+that "any confidence-bearing relationship" or "this exact warning count"
+meant something specific to the mechanism under test (env-soft-graph, calm-cli
+orphan detection). E2 now legitimately also sets `x-aac-confidence` on
+unrelated relationships — real signal, not noise — so those filters became
+accidentally over-broad, the same class of bug as the outbound-HTTP
+misdiagnosis in conflict 1. No pipeline code was wrong: `deployment-correlation`
+never actually mis-correlated a k8s Deployment to `Transaction.java`; the
+test's own endpoint-collection filter just started sweeping in E2's unrelated
+edges too. Fixed by scoping each test's filter to what it actually means to
+assert (`mechanism` in `['r2b','r2c']` for R2-specific checks,
+`confidence === 20` for env-soft-graph-specific checks) instead of relaxing
+or removing the underlying assertions. Two tests' warning-count expectations
+legitimately changed from 1 to 0 (`ghostfolio` `AccessController`/
+`PrismaService` narrow scans) — not a relaxed test, a real, grep-verified new
+edge (real NestJS `@Module({...})` wiring) that genuinely closes a
+previously-orphaned node, exactly the kind of recall gain E2 was built to
+recover.
+
+**Result:** `npm test` — **93 pass, 0 fail, 0 skip** (every `spikes/` repo
+populated this session: `apache/fineract`, `bank-of-anthos`,
+`ghostfolio/ghostfolio`, `finos/waltz`). E2 ships live in
+`DEFAULT_PASSES` — no flag, no opt-in, same as every other core pass.
+
 ## What would reopen this
 
-- (a)–(c) above are designed and built, in that order — (a) and (b) are
-  prerequisites for (c) to even be diagnosable cleanly (right now it's
-  entangled with both the shared-array volume and the CodeGraph degradation
-  interaction).
-- A specific enterprise pilot repo shape where recovering this class of
-  signal is shown to matter enough to justify the design work above.
+- A future specialized detector adding its own `examinedPairs`/
+  `examinedBridgeFiles`-shaped output but never wiring it through
+  `reconcileCrossPackageEdges`'s reserved-territory parameters — a review
+  checklist item now, not a code gate.
+- Real evidence that S1's grade-blindness (conflict 2) does matter against
+  some other repo shape — revisit grade-awareness only if that's observed,
+  not preemptively.

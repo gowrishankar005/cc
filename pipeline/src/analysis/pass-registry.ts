@@ -61,6 +61,18 @@ export interface AnalysisContext {
   /** T-Y5-1 — set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
   cfnRouteBindingsFound?: number;
   cfnRouteBindingsBound?: number;
+  /**
+   * T-P0-1 (E2) round 3 — `${source}|${target}` raw-edge pairs
+   * multiHopBridgePass's detector already examined (resolved or honestly
+   * refused). Populated by multiHopBridgePass, which now runs BEFORE
+   * reconcilePass specifically so reconcilePass's graded-fact admission can
+   * defer to this set instead of racing the more specialized detector for
+   * the same edge. Absent/empty is safe — reconcileCrossPackageEdges
+   * defaults to an empty set when not passed.
+   */
+  multiHopExaminedPairs?: Set<string>;
+  /** T-P0-1 (E2) round 3 continued — see multiHopExaminedPairs; file-level companion (multi-hop-bridge-detector.ts's examinedBridgeFiles) covering edges into a bridge candidate's non-class-level nodes (e.g. its methods) that examinedPairs alone misses. */
+  multiHopExaminedFiles?: Set<string>;
 }
 
 export interface AnalysisPass {

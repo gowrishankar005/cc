@@ -51,12 +51,43 @@ const R2C_CROSS_ROOT_CONFIDENCE = 3;
 export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
   ignoredItems: IgnoredItem[];
+  /**
+   * T-P0-1 (E2) round 3 — every raw edge (`${edge.source}|${edge.target}`)
+   * this detector took ownership of examining, whether it went on to
+   * resolve (r2-phase1/r2b/r2c) or honestly refuse (an
+   * `unresolved-multi-hop` ignored item). Consumed by
+   * `reconcileCrossPackageEdges`'s graded-admission path so a blunter,
+   * earlier-running catch-all never races this detector's own careful,
+   * ambiguity-aware decision for the exact same edge — the generic fix for
+   * the real conflict found running E2 against `r2b-implementer-hop-sample`
+   * (round 2) and `r2c-direct-delegate-sample` (round 3): admission getting
+   * to an edge first and admitting a low-confidence fact for something this
+   * detector was about to examine far more carefully.
+   */
+  examinedPairs: Set<string>;
+  /**
+   * T-P0-1 (E2) round 3 continued — `examinedPairs` alone proved
+   * insufficient against `r2c-direct-delegate-sample`: Graphify emits a
+   * SEPARATE `calls` edge straight to the bridge candidate's individual
+   * METHOD node (e.g. `ThingService.retrieveAll`), distinct from the
+   * class-level `imports`/`references` edge this detector actually walks.
+   * That edge's target never appears in examinedPairs, so pair-level
+   * deferral missed it and E2 admitted it anyway. Source files of every
+   * bridge candidate this detector examined (resolved or refused) — the
+   * reconciler defers admission for ANY edge targeting a node in one of
+   * these files, the same file-level granularity `implementsTargetFiles`
+   * already used for a narrower case (BACKLOG.md "Direct-delegate bridge
+   * detection" evidence).
+   */
+  examinedBridgeFiles: Set<string>;
 }
 
 export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): MultiHopBridgeResult {
   const nodeToUnit = buildNodeToUnitMap(run, unitsByRoot);
   const relationships: TypedRelationship[] = [];
   const ignoredItems: IgnoredItem[] = [];
+  const examinedPairs = new Set<string>();
+  const examinedBridgeFiles = new Set<string>();
   const seen = new Set<string>(); // dedupe: a service can reference the same bridge from multiple AST sites/methods
 
   // Real finding while building this against a reference Java/JAX-RS banking
@@ -120,6 +151,12 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     const bridgeNodeId = edge.target;
     if (nodeToUnit.has(bridgeNodeId)) continue; // not a bridge — the imported thing already has its own evidence/unit (R1 handles this)
     if (!isRealBridgeCandidate(bridgeNodeId)) continue; // external/unresolved symbol (annotation type, out-of-root type) — not a real in-repo bridge, no ignored-item noise
+
+    // From here on, this edge is this detector's own territory — recorded
+    // regardless of what happens next (resolve or refuse).
+    examinedPairs.add(`${edge.source}|${edge.target}`);
+    const bridgeFile = nodeById.get(bridgeNodeId)?.source_file;
+    if (bridgeFile) examinedBridgeFiles.add(bridgeFile);
 
     const implementers = implementersByTarget.get(bridgeNodeId) ?? [];
     if (implementers.length !== 1) {
@@ -233,5 +270,5 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     });
   }
 
-  return { relationships, ignoredItems };
+  return { relationships, ignoredItems, examinedPairs, examinedBridgeFiles };
 }

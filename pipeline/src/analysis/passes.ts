@@ -97,17 +97,22 @@ export const reconcilePass: AnalysisPass = {
   name: 'reconcile',
   run(ctx: AnalysisContext) {
     if (!ctx.graphifyRun) return; // Graphify pass didn't run or failed — already logged by detectPersistencePass
-    const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot);
-    ctx.relationships = relationships;
+    // T-P0-1 (E2) round 3 — appends now, not overwrites, so it can run
+    // AFTER multiHopBridgePass without discarding what that pass already
+    // added; ctx.multiHopExaminedPairs (populated by that earlier pass)
+    // tells graded-fact admission which edges are already someone else's
+    // territory.
+    const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot, ctx.multiHopExaminedPairs, ctx.multiHopExaminedFiles);
+    pushAll(ctx.relationships, relationships);
     // T-P0-1 (E2) — graded-fact-admission placeholders (kind: 'unresolved').
     // Pushed into ctx.allUnits (not ctx.unitsByRoot) since they're not real
     // per-root architectural units — only relationship endpoints and CALM
     // nodes. gradeRelationshipsPass (last pass) needs them in ctx.allUnits
     // to see their kind and force 'structural' grading.
     pushAll(ctx.allUnits, unresolvedUnits);
-    const crossCount = ctx.relationships.filter((r) => r.crossPackage).length;
+    const crossCount = relationships.filter((r) => r.crossPackage).length;
     console.log(
-      `[run-slice] graphify: ${ctx.relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${ctx.relationships.length - crossCount} same-package)${unresolvedUnits.length > 0 ? `, ${unresolvedUnits.length} admitted via unresolved-endpoint placeholder` : ''}`
+      `[run-slice] graphify: ${relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${relationships.length - crossCount} same-package)${unresolvedUnits.length > 0 ? `, ${unresolvedUnits.length} admitted via unresolved-endpoint placeholder` : ''}`
     );
   },
 };
@@ -124,17 +129,20 @@ export const gradeRelationshipsPass: AnalysisPass = {
  * Default pass order. openApiPass (T-X4-1) added after mapSignalsPass —
  * independent of it (reads no shared state), grouped here since both are
  * "unit-producing" passes before persistence/reconcile. k8sTrustPass
- * (T-X5-1) MUST run LAST, after reconcilePass — reconcilePass does
- * `ctx.relationships = reconcileCrossPackageEdges(...)` (an overwrite, not
- * an append), so anything pushed to ctx.relationships before it runs would
- * be silently discarded. multiHopBridgePass (AREC T-C1, R2) is APPEND-only
- * and also needs the final ctx.unitsByRoot, so it must run after
- * reconcilePass too — placed right after it, before the other append-only
- * relationship passes (order among k8sTrust/envSoftGraph/multiHopBridge
- * doesn't matter, none of them read each other's output).
- * gradeRelationshipsPass MUST be the true last pass for the same reason, one
- * level further — it reads (not overwrites) ctx.relationships, so it has to
- * run after every pass that appends to it.
+ * (T-X5-1), envSoftGraphPass and multiHopBridgePass are all APPEND-only and
+ * need the final ctx.unitsByRoot, so they run after the unit-producing
+ * passes above. reconcilePass (T-P0-1, E2 round 3) now also appends rather
+ * than overwrites ctx.relationships, so its position relative to those three
+ * is no longer forced by an overwrite hazard — EXCEPT multiHopBridgePass
+ * must still run BEFORE reconcilePass specifically, so
+ * ctx.multiHopExaminedPairs is populated before reconcilePass's graded-fact
+ * admission logic runs and can defer to it instead of racing it for the same
+ * edge (see multi-hop-bridge-pass.ts's doc comment for the real fixtures
+ * that caught this). k8sTrust/envSoftGraph read neither ctx.relationships
+ * nor multiHopExaminedPairs, so their position among these five is
+ * otherwise free. gradeRelationshipsPass MUST be the true last pass — it
+ * reads (never appends to) ctx.relationships, so it has to run after every
+ * pass that appends to it.
  */
 export const DEFAULT_PASSES: AnalysisPass[] = [
   composeRoutesPass,
@@ -162,8 +170,8 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // Graphify-import-derived ones; before reconcile like its neighbors,
   // since it only mutates existing units' evidence, never relationships.
   cdxgenCorroborationPass,
-  reconcilePass,
   multiHopBridgePass,
+  reconcilePass,
   k8sTrustPass,
   envSoftGraphPass,
   gradeRelationshipsPass,
