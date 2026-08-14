@@ -26,10 +26,10 @@ unscored today.
 Consequence: a lens built now is **unmeasurable**, and under `BR-110` an
 unmeasured lens may *inform* but must **not gate** a governance decision.
 
-| Task | Acceptance |
-|---|---|
-| **T-LM-0 Module-output gold + scorer** | A gold shape and scoring path for module outputs exists, with `threat-signals` as the first subject (it already produces findings to score against). **Do this before, or with, the first new lens** — not after |
-| **T-LM-5 Per-lens fitness declaration** | Each lens result states its measured fitness, or is explicitly marked not-yet-fit-to-gate |
+| Task | Status | Acceptance |
+|---|---|---|
+| **T-LM-0 Module-output gold + scorer** | **Done, 2026-08-14** — `coe-lab/gold/modules/threat-signals/*.gold.json` (7 core/trap packages, each authored by reading fixture source directly — including catching a real cross-evidence-source case, `ts-nestjs-users`'s security control coming from its `openapi.yaml`, not the `.ts` file, that a naive gold author reading only the route file would have missed). `coe-lab/scripts/score-module-threat-signals.mjs` — verified to actually catch a mismatch (deliberately broke one gold file, confirmed FAIL + exit 1, restored). All 7 pass against real module output. `Claim_Register.md`'s new "Module fitness" section records `threat-signals` as `partial, now scored`; every other lens stays `specified-unbuilt`. | A gold shape and scoring path for module outputs exists, with `threat-signals` as the first subject (it already produces findings to score against). **Do this before, or with, the first new lens** — not after |
+| **T-LM-5 Per-lens fitness declaration** | Not started — natural next step once a second module exists to prove the declaration mechanism isn't threat-signals-specific | Each lens result states its measured fitness, or is explicitly marked not-yet-fit-to-gate |
 
 Authoring that gold is subject to `CON-40` isolation: gold is authored from
 fixture source, **never** from a module's own output.

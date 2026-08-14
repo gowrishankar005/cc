@@ -1,0 +1,10 @@
+{
+  "package": "ts-nestjs-users",
+  "module": "threat-signals",
+  "authoredFrom": [
+    "coe-lab/fixtures/monorepo/packages/ts-nestjs-users/src/users.controller.ts",
+    "coe-lab/fixtures/monorepo/packages/ts-nestjs-users/openapi.yaml"
+  ],
+  "reasoning": "UsersController carries @Controller/@Get/@Post (http-entry-point) and has NO decorator-level security annotation -- but this package's openapi.yaml declares a global `security: [bearerAuth]` requirement matched against a real `bearerAuth: {type: http, scheme: bearer}` securityScheme (Claim_Register.md's C-contract row), which attaches real security-control evidence via a different evidence source (OpenAPI, not a decorator). Has both -- must not be flagged. A naive gold author who only reads the .ts file misses this; the OpenAPI file is real, in-scope evidence for the same unit.",
+  "findings": []
+}

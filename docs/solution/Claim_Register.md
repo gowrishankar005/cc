@@ -91,3 +91,18 @@
 ## Architecture-relation evidence-completeness binding
 
 Architecture completeness claims also require the layered-story evidence discipline this program established. In short: R0 structural ≠ architecture L2; R2 + C-call (or OOS) before a layered-Java story goes green. **R2-gold-charge-single remains L2 expected-fail** (standing exam `E-charge-single-L2`); **R2-multi-root-access-terminal is mechanism-level PASS** for the layered-access story on the multi-root charge+provider root set (standing exam `E-charge-multi-story`) — see the three split R2 rows above, and `coe-lab/docs/standing-disconfirming-exams.md` for the frozen protocols. C-call remains `partial` (two vocabularies only) — a real relationship existing and a control being detected on the source/target service are still two independent claims; a relationship's existence does not imply its endpoints carry full control coverage.
+
+---
+
+## Module fitness (T-LM-0, `AGENT_TASKS_Ext_Lens_Modules.md`)
+
+Module outputs (`outDir/modules/<name>/`) are a **separate claim surface** from
+the architecture-level rows above — a module can be well-tested and still be
+`unevidenced` here if it has never been scored against real ground truth.
+Per `BR-110`: an unmeasured lens may *inform* but must never *gate* a
+governance decision.
+
+| Module | Status | Evidence | Validation allowed green | Notes |
+|---|---|---|---|---|
+| **threat-signals** | **partial, now scored** | `coe-lab/gold/modules/threat-signals/*.gold.json` (7 packages, authored from fixture source per `CON-40`, verified against real module output only after independent authoring) + `coe-lab/scripts/score-module-threat-signals.mjs` | L1-equivalent (exact finding-set match) for the 7 scored coe-lab core/trap packages | Findings themselves are still bounded by the same C-dec/C-call detection coverage every other control claim is (see the mechanism-class matrix above) — a clean score here means "correctly reflects what this pipeline's own catalogue can see," never "confirmed absence of authorization in source." No real (`spikes/`) repo scored yet — coe-lab-only so far. |
+| **Every other lens** (vulnerability, resilience, data-flow/lineage, green-engineering) | `specified-unbuilt` | — | None | Not built. `T-LM-0`'s own pre-flight names this as a blocking gap for any of them: build the gold+scorer path before or with the first one, not after. |

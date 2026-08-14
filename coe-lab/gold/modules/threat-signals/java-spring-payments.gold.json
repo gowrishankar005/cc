@@ -1,0 +1,13 @@
+{
+  "package": "java-spring-payments",
+  "module": "threat-signals",
+  "authoredFrom": "coe-lab/fixtures/monorepo/packages/java-spring-payments/src/main/java/lab/payments/PaymentController.java",
+  "reasoning": "PaymentController carries @RestController/@RequestMapping/@GetMapping/@PostMapping (real http-entry-point evidence) and no @PreAuthorize, no call-site auth check, and no OpenAPI spec in this package.",
+  "findings": [
+    {
+      "unitNameContains": "PaymentController",
+      "stride": "spoofing",
+      "reason": "HTTP-facing, no security-control evidence anywhere in the fixture"
+    }
+  ]
+}
