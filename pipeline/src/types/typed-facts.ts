@@ -46,6 +46,12 @@ export interface Evidence {
   // messaging unit — never a primary detection source on its own, always
   // weight-10 (corroboration tier), and only ever attached when exactly one
   // candidate unit exists in the root (never guessed under ambiguity).
+  // No new source value added in CONTRACT_VERSION 12.0.0 (T-LM-2, resilience
+  // lens) — retry annotations reuse the existing 'decorator' source (same
+  // extractFromSource()/decorates-ref mechanism @PreAuthorize/@KafkaListener
+  // already use) and timeout config reuses the existing 'structured-config'
+  // source (same spring-config-provider.ts flat-key read datasource/broker
+  // extraction already uses). Only Evidence.category gained a value.
   source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 — a Lambda
   // handler's `implements RequestHandler` clause. Deliberately NOT the same category
@@ -73,7 +79,18 @@ export interface Evidence {
     // host:port is not. `server.port` still becomes a real `tcp-host-port`
     // interface, but via a small dedicated function
     // (build-calm.ts's attachPortInterfaces), not this generic mechanism.
-    | 'spring-config';
+    | 'spring-config'
+    // 'resilience' added in CONTRACT_VERSION 12.0.0 (T-LM-2, Lens Modules
+    // lane) — a real, narrowly-scoped resilience-posture signal: a
+    // retry-annotation (Spring Retry `@Retryable`, Resilience4j `@Retry`,
+    // decorator-sourced) or a resilience4j timeout-duration config value
+    // (structured-config-sourced). Deliberately descriptive-only, same as
+    // 'spring-config' — never added to node-type-mapping.yml's
+    // interfaceCategories (a retry annotation is not a route). Falls
+    // through mapSignalsToUnits' kind-priority chain to the 'service'
+    // default when it's the only evidence on a file, same precedent as a
+    // security-control-only file (the proven DatatableWriteService shape).
+    | 'resilience';
   weight: number;
   ref: string; // file:line for code-sourced evidence; "relativeFilePath:paths"-style pointer for openapi (no line numbers available from a parsed YAML/JSON document)
   /**
@@ -266,7 +283,20 @@ export interface IgnoredItem {
 // ordered last like every other non-route-shaped source); threat-signals
 // filters on category only, unaffected by a new source value on an
 // already-existing category.
-export const CONTRACT_VERSION = '11.0.0';
+//
+// 12.0.0 (T-LM-2, Lens Modules lane, AGENT_TASKS_Ext_Lens_Modules.md):
+// Evidence.category gained 'resilience' — a closed-union extension, tier
+// (c), for the new resilience-lens module. No new Evidence.source (reuses
+// 'decorator' for retry annotations and 'structured-config' for timeout
+// values — both already-proven mechanisms, no third extraction path).
+// Both existing modules reviewed and bumped to supportedMajorVersion "12":
+// calm-generator's control-builder.ts filters on
+// `category === 'security-control'` only (unaffected); interface-builder.ts
+// never treats 'resilience' as route-shaped (not added to
+// node-type-mapping.yml's interfaceCategories, same as 'spring-config');
+// threat-signals filters on 'http-entry-point'/'security-control' only
+// (unaffected).
+export const CONTRACT_VERSION = '12.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

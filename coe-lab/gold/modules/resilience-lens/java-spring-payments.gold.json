@@ -1,0 +1,16 @@
+{
+  "package": "java-spring-payments",
+  "module": "resilience-lens",
+  "authoredFrom": [
+    "coe-lab/fixtures/monorepo/packages/java-spring-payments/src/main/java/lab/payments/PaymentController.java",
+    "coe-lab/fixtures/monorepo/packages/java-spring-payments/src/main/resources/application.yml"
+  ],
+  "reasoning": "PaymentController.get() carries a real Spring Retry @Retryable annotation (decorator evidence), and the package's application.yml sets a real resilience4j.timelimiter.instances.payments.timeout-duration (structured-config evidence). Both land on the same unit (one file == one unit, per mapSignalsToUnits' file-grouping) since PaymentController is also this package's sole service unit.",
+  "findings": [
+    {
+      "unitNameContains": "PaymentController",
+      "hasRetry": true,
+      "hasTimeout": true
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+resilience4j:
+  timelimiter:
+    instances:
+      orders:
+        timeout-duration: 2s

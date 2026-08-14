@@ -1,0 +1,7 @@
+{
+  "package": "java-rbac-datatable",
+  "module": "resilience-lens",
+  "authoredFrom": "coe-lab/fixtures/monorepo/packages/java-rbac-datatable/",
+  "reasoning": "Must-not-detect trap: this package's source has no retry annotation (Spring Retry @Retryable, Resilience4j @Retry) and no resilience4j timelimiter timeout-duration config anywhere -- confirmed by grep over the fixture source before authoring this file, not inferred from module output. A non-empty findings list here means resilience-lens is fabricating evidence, not that this package needs a fix.",
+  "findings": []
+}

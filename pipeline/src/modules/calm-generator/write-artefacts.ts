@@ -79,6 +79,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '11', // bumped for CONTRACT_VERSION 11.0.0 (T-CDX-2/3, B-cdxgen-reuse) — new 'dependency-manifest' Evidence.source only, no new category; interface-builder.ts's SOURCE_PRECEDENCE table gained the key (additive, never contributes interfaces)
+  supportedMajorVersion: '12', // bumped for CONTRACT_VERSION 12.0.0 (T-LM-2) — new 'resilience' Evidence.category only, no new source; control-builder.ts filters on 'security-control' only (unaffected); interface-builder.ts never treats 'resilience' as route-shaped (not in node-type-mapping.yml's interfaceCategories, same as 'spring-config')
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

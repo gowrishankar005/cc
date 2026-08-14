@@ -1,0 +1,10 @@
+{
+  "package": "lib-fintech-common",
+  "module": "resilience-lens",
+  "authoredFrom": [
+    "coe-lab/fixtures/monorepo/packages/lib-fintech-common/src/main/java/lab/common/Money.java",
+    "coe-lab/fixtures/monorepo/packages/lib-fintech-common/src/main/java/lab/common/StringUtils.java"
+  ],
+  "reasoning": "The same must-not-detect trap threat-signals' own gold file for this package already uses: Money and StringUtils are plain utility classes with zero framework markers, producing zero TypedUnits at all -- there is nothing for resilience-lens to even evaluate. A non-empty findings list here means the trap itself regressed (a bogus unit got created), not that this package needs a fix.",
+  "findings": []
+}

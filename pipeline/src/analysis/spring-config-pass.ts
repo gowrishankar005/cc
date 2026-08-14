@@ -161,6 +161,55 @@ function attachServerPort(ctx: AnalysisContext, root: string, file: SpringConfig
   });
 }
 
+/**
+ * T-LM-2 (Lens Modules lane) — resilience4j's real, documented Spring Boot
+ * property shape: `resilience4j.timelimiter.instances.<name>.timeout-duration`
+ * (the `<name>` segment is an arbitrary, user-chosen instance name, so this
+ * is a wildcard match over the flattened key map, not a fixed literal key
+ * like server.port). Same structured-file-ingestion mechanism as every
+ * other extraction in this file — spring-config-provider.ts already
+ * flattens the YAML/properties generically; no new parsing mechanism.
+ */
+const TIMELIMITER_TIMEOUT_KEY = /^resilience4j\.timelimiter\.instances\.[^.]+\.timeout-duration$/;
+
+/**
+ * Attaches a real timeout-config fact to the root's single `service` unit —
+ * same "never guess" discipline as attachServerPort just above: the fact is
+ * recorded as evidence ONLY when exactly one service unit already exists in
+ * this root (after mapSignals/openapi/cfnRoute have run); 0 or 2+
+ * candidates record a real IgnoredItem instead of guessing which unit owns
+ * the timeout. Weight 0 (descriptive-only, same as attachServerPort) — this
+ * pipeline never claims to know whether a timeout is well-tuned, only that
+ * one is configured; the resilience-lens module surfaces the raw fact for a
+ * human to judge.
+ */
+function attachResilienceTimeout(ctx: AnalysisContext, root: string, file: SpringConfigFile): void {
+  for (const [key, value] of file.properties) {
+    if (!TIMELIMITER_TIMEOUT_KEY.test(key)) continue;
+
+    const serviceUnits = (ctx.unitsByRoot.get(root) ?? []).filter((u) => u.kind === 'service');
+    if (serviceUnits.length !== 1) {
+      ctx.allIgnoredItems.push({
+        ref: `${file.filePath}:${key}`,
+        reason: 'AMBIGUOUS_BOUNDARY',
+        detail:
+          serviceUnits.length === 0
+            ? `${key}=${value} found but no service unit exists in this root to attach it to`
+            : `${key}=${value} found but ${serviceUnits.length} service units exist in this root — never guessing which one owns it`,
+      });
+      continue;
+    }
+
+    serviceUnits[0].evidence.push({
+      signal: `${key}=${value}`,
+      source: 'structured-config',
+      category: 'resilience',
+      weight: 0,
+      ref: `${file.filePath}:${key}`,
+    });
+  }
+}
+
 export const springConfigPass: AnalysisPass = {
   name: 'springConfig',
   run(ctx: AnalysisContext) {
@@ -184,6 +233,7 @@ export const springConfigPass: AnalysisPass = {
         }
 
         attachServerPort(ctx, root, file);
+        attachResilienceTimeout(ctx, root, file);
       }
     }
   },

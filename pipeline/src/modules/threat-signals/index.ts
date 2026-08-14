@@ -55,6 +55,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '11', // bumped for CONTRACT_VERSION 11.0.0 (T-CDX-2/3) — new 'dependency-manifest' source lands on the existing 'persistence'/'messaging' categories, neither of which this pass filters on ('http-entry-point'/'security-control' only) — reviewed, not just bumped
+  supportedMajorVersion: '12', // bumped for CONTRACT_VERSION 12.0.0 (T-LM-2) — new 'resilience' category, this pass filters on 'http-entry-point'/'security-control' only — reviewed, not just bumped
   run,
 };

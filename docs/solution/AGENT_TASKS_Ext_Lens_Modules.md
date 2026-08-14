@@ -10,10 +10,10 @@ it neither blocks nor is blocked by fact-semantics work.
 
 | Task | Depends on | Acceptance |
 |---|---|---|
-| **T-LM-1 Vulnerability lens** | A real SCA/dependency-scan feed on a real repo | Design driven by the real feed, not a hypothetical schema. Module + namespaced output |
-| **T-LM-2 Resilience lens** | Narrow capability definition first | Retry-annotation and timeout-config detection — not "resilience" scoped whole |
-| **T-LM-3 Data-flow / lineage lens** | — | Field-level lineage across transformations; start from existing flows + data classification |
-| **T-LM-4 Green-engineering lens** | Non-code cost evidence source | **Do not approximate cost from code metrics** (call counts, LOC) — that isn't what the requirement means. Needs cloud-billing/IaC input |
+| **T-LM-1 Vulnerability lens** | A real SCA/dependency-scan feed on a real repo | **Not started — checked, gate not met.** `cdxgen-provider.ts` produces a real CycloneDX SBOM (component name/version only, no CVE/advisory data); `grype`/`trivy` are not installed and no vulnerability-scan output exists anywhere in this repo or its fixtures. Building against a fabricated CVE schema would be exactly the "hypothetical schema" this gate forbids — deferred until a real feed exists. |
+| **T-LM-2 Resilience lens** | Narrow capability definition first | **Done, 2026-08-15.** Retry-annotation (Spring Retry `@Retryable`, Resilience4j `@Retry`) and timeout-config (resilience4j `timelimiter.instances.*.timeout-duration`) detection only — not "resilience" scoped whole. `resilience-lens` module + namespaced output (`outDir/modules/resilience-lens/`), `CONTRACT_VERSION` 12.0.0, gold+scorer built alongside per T-LM-0's pattern (`coe-lab/gold/modules/resilience-lens/*.gold.json` + `coe-lab/scripts/score-module-resilience-lens.mjs`, ALL PASS, verified to catch a real mismatch). `Claim_Register.md`'s Module fitness section records it `partial, now scored — narrow by design`. |
+| **T-LM-3 Data-flow / lineage lens** | — | Not started. Checked: no data-classification facts exist anywhere in `typed-facts.ts` today, so "start from existing flows + data classification already in the pipeline" is not yet true — field-level lineage across transformations would need real new extraction work, not a catalogue row alone. |
+| **T-LM-4 Green-engineering lens** | Non-code cost evidence source | Not started. Checked: `k8s-manifest-provider.ts` doesn't parse `resources.requests/limits` today, and no real cloud-billing feed exists in this environment — extending the k8s provider to read declared CPU/memory requests would still be a capacity-declaration proxy, not a real cost/billing figure, and risks being exactly the approximation this gate forbids. |
 
 ### Blocking gap found in pre-flight: these lenses have no ground truth
 
