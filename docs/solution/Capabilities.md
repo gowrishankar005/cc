@@ -50,6 +50,7 @@ Single reference for what is **built**, **partial**, or **backlog**. For scope (
 | Multi-root cross-package relationship detection | Built | A single combined structural pass across all given roots — required for cross-module edges to be possible at all |
 | Multi-hop architecture bridges (API → access-layer implementer → store) | Built (bounded) | Fixed, small hop bound by design — unbounded traversal risks connecting unrelated units through an accidental long chain |
 | Silence / completeness signal flags | Built | Flags when a service has HTTP-entry evidence but no security-control evidence, and other named completeness gaps, so an empty result reads as "checked, found nothing" rather than "not checked" |
+| Confidence-floor unit-set consistency | Built | `mapSignalsPass` writes the same floor-filtered set to `unitsByRoot` (relationship producers) and `allUnits` (grading + emission). Sub-floor units are IgnoredItems only — they cannot anchor a relationship |
 
 ## Governance & process docs worth knowing about
 

@@ -779,25 +779,15 @@ test(
       assert.ok(r2cRelationships.length >= 1, `expected at least 1 real r2c (direct-delegate) relationship, got ${r2cRelationships.length}`);
       for (const rel of r2cRelationships) {
         assert.ok([6, 3].includes(rel.confidence), `expected r2c confidence to be the same-root (6) or cross-root (3) tier, got ${rel.confidence}`);
-        // Real, pre-existing pipeline finding surfaced while building this
-        // (BACKLOG.md's own new row, not a T-LR-2 defect): passes.ts's
-        // mapSignalsPass writes the UNFILTERED unit list into
-        // ctx.unitsByRoot (consumed by buildNodeToUnitMap, shared by every
-        // relationship producer including this one), but only
-        // confidence-floor-passing units into ctx.allUnits (consumed by
-        // grading's kindById). A source unit below the floor (e.g.
-        // JWTAuthenticationFilter here — real, grep-verified, no
-        // stereotype, low-confidence evidence only) can anchor a real
-        // relationship that then grades 'structural' instead of
-        // 'architecture', because grading can't see it as 'service' at
-        // all. The endpoint and the store are both real and correct either
-        // way — this only affects the grade label, never fabricates a
-        // wrong target — so it's tolerated here, not treated as a failure.
-        assert.ok(['architecture', 'structural'].includes(rel.grade), `expected architecture or structural grade, got ${rel.grade}`);
+        // Floor-consistency fix (was BACKLOG.md unitsByRoot/allUnits
+        // divergence): a sub-floor source (the real Waltz case was
+        // JWTAuthenticationFilter) is no longer a relationship endpoint,
+        // so remaining r2c sources are emitted units and grade architecture.
+        assert.equal(rel.grade, 'architecture', `expected architecture grade on ${rel.from} -> ${rel.to}, got ${rel.grade}`);
       }
       assert.ok(
-        r2cRelationships.some((rel) => rel.grade === 'architecture'),
-        'expected at least one r2c relationship to grade architecture (most sources are floor-passing service units)'
+        !facts.relationships.some((r) => String(r.from).includes('JWTAuthenticationFilter')),
+        'sub-floor source JWTAuthenticationFilter must not anchor a relationship — it is an IgnoredItem, not an emitted unit'
       );
 
       // The exact real case grep-verified while building this: SettingsEndpoint
@@ -3245,4 +3235,63 @@ test('T-P0-5 (E4, catalogue-as-data stress) — findRule() never falls back to a
 
   const noLanguageMatch = findRule(catalogue, 'Query', 'call', undefined);
   assert.equal(noLanguageMatch?.id, 'ts-only-rule', 'when no language is given at all (existing behavior, unaffected), falls back to the first match');
+});
+
+test('mapSignalsPass: unitsByRoot and allUnits share the confidence floor — a sub-floor unit cannot anchor a relationship', () => {
+  // Mechanism class: analysis-stage unit-set consistency. Second instance
+  // of the Waltz JWTAuthenticationFilter class (low-confidence-only source
+  // that used to sit in unitsByRoot, get picked up by buildNodeToUnitMap,
+  // and then miss kindById because it was never in allUnits).
+  const { mapSignalsPass, CONFIDENCE_FLOOR } = require(path.join(PIPELINE_ROOT, 'dist/analysis/passes'));
+  const { loadSignalCatalogue } = require(path.join(PIPELINE_ROOT, 'dist/rules/rule-schema'));
+  const catalogue = loadSignalCatalogue(path.join(PIPELINE_ROOT, 'dist/rules'));
+  const ctx = {
+    packageRoots: ['/root'],
+    catalogue,
+    rawByRoot: new Map([
+      [
+        '/root',
+        {
+          nativeRoutes: [{ filePath: 'high_service.py', startLine: 1, name: 'GET /ok', qualifiedName: 'high.get' }],
+          decoratorFacts: [
+            {
+              referenceName: 'Controller',
+              fromNodeId: 'LowFilter',
+              filePath: 'low.filter.ts',
+              line: 1,
+              fromNodeKind: 'class',
+              fromNodeName: 'LowFilter',
+              language: 'typescript',
+            },
+          ],
+          callFacts: [],
+          typeReferenceFacts: [],
+          extendsFacts: [],
+          filesByExt: {},
+          deployableManifests: [],
+          excludedTestFiles: [],
+        },
+      ],
+    ]),
+    allUnits: [],
+    allIgnoredItems: [],
+    unitsByRoot: new Map(),
+    relationships: [],
+  };
+  mapSignalsPass.run(ctx);
+
+  const rootUnits = ctx.unitsByRoot.get('/root') ?? [];
+  assert.ok(rootUnits.every((u) => u.confidence >= CONFIDENCE_FLOOR), 'unitsByRoot must not contain sub-floor units');
+  const emittedIds = new Set(ctx.allUnits.map((u) => u.id));
+  assert.ok(
+    rootUnits.every((u) => emittedIds.has(u.id)),
+    'every relationship-eligible unit must also be an emitted unit (allUnits)'
+  );
+  assert.ok(ctx.allUnits.some((u) => u.filePath === 'high_service.py'), 'floor-passing native-route unit must be emitted');
+  assert.ok(!rootUnits.some((u) => u.filePath === 'low.filter.ts'), 'sub-floor Controller-only unit must not be relationship-eligible');
+  assert.ok(!ctx.allUnits.some((u) => u.filePath === 'low.filter.ts'), 'sub-floor Controller-only unit must not be emitted');
+  assert.ok(
+    ctx.allIgnoredItems.some((i) => i.reason === 'INSUFFICIENT_EVIDENCE' && String(i.detail).includes('below the review-queue threshold') && String(i.ref).includes('low.filter.ts')),
+    'sub-floor unit must be a visible IgnoredItem, never a silent drop'
+  );
 });

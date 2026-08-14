@@ -18,15 +18,19 @@ disposition. **T-P0-5/E4 ran (MIXED) and T-P0-6/E5 ran (negative,
 `L3`/`L4` deprioritised); T-P0-4/E3 is explicitly deprioritised**, not
 unstarted — see `AGENT_TASKS_Ext_P0_Experiments.md`. The P0 gate itself
 only required E1+E2 to report (both did), so this did not block moving into
-Layered Recovery. Layered Recovery's `[B]` tasks (ungated, see the diagram note in
-§5 below) are the actual current focus: **T-LR-1 and T-LR-2 done and shipped**
+Layered Recovery. Fact Semantics: **T-FS-2 done** (E2 already live; no separate productionise
+step); **T-FS-5 skipped** (E5 negative — parked in `BACKLOG.md` "Decided not
+to build"). The `unitsByRoot`/`allUnits` confidence-floor divergence (P1,
+surfaced by T-LR-2) is **closed** — one floor, both lists (`U-floor-consistency`).
+Layered Recovery's `[B]` tasks (ungated, see the diagram note in
+§5 below) remain the focus: **T-LR-1 and T-LR-2 done and shipped**
 (`AGENT_TASKS_Ext_Layered_Recovery.md`); an additional, not-originally-planned
 CodeQL DI-resolution experiment (informally "E1b," motivated by T-LR-3/T-LR-4's
 own evidence-pass requirement) also ran positive, see
 `E1b-codeql-di-resolution-experiment.md` — T-LR-3/T-LR-4 are now unblocked
 but not started; T-LR-5/T-LR-6 (the actual engine integration) are scheduled
-with a 7-item checklist but not started. **Lens Modules — available,
-ungated, since day one — has never been touched.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
+with a 7-item checklist but not started, and will be planned in a separate
+session. **Lens Modules — T-LM-0 done; T-LM-1..5 not started.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
 records a deliberate research pause taken partway through. Lane files:
 `AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace

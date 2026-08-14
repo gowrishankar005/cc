@@ -45,11 +45,20 @@ export const mapSignalsPass: AnalysisPass = {
   run(ctx: AnalysisContext) {
     for (const [root, raw] of ctx.rawByRoot) {
       const { units, ignoredItems } = mapSignalsToUnits(raw.nativeRoutes, raw.decoratorFacts, ctx.catalogue, raw.callFacts, raw.typeReferenceFacts, raw.extendsFacts);
+      // One emitted-unit set (BACKLOG.md "unitsByRoot/allUnits confidence-floor
+      // divergence"): relationship producers read unitsByRoot via
+      // buildNodeToUnitMap; grading and CALM emission read allUnits. A
+      // sub-floor unit in only the first set can anchor a real edge that
+      // then grades structural (kindById miss) and is dropped from CALM
+      // (relationship-builder requires both endpoints to be nodes). Same
+      // floor, both lists — sub-floor units stay IgnoredItems.
+      const emitted: typeof units = [];
       for (const u of units) {
         if (u.confidence < CONFIDENCE_FLOOR) {
           ctx.allIgnoredItems.push(ignoreLowConfidence(u.id, u.confidence));
         } else {
           ctx.allUnits.push(u);
+          emitted.push(u);
         }
       }
       pushAll(ctx.allIgnoredItems, ignoredItems);
@@ -58,8 +67,8 @@ export const mapSignalsPass: AnalysisPass = {
       for (const filePath of raw.excludedTestFiles) {
         ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: `Excluded from architectural extraction — matched a real test-path/filename convention (isTestPath())` });
       }
-      ctx.unitsByRoot.set(root, units);
-      console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${units.length} unit(s)${raw.excludedTestFiles.length > 0 ? `, ${raw.excludedTestFiles.length} test file(s) excluded` : ''}`);
+      ctx.unitsByRoot.set(root, emitted);
+      console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${emitted.length} unit(s)${raw.excludedTestFiles.length > 0 ? `, ${raw.excludedTestFiles.length} test file(s) excluded` : ''}`);
     }
   },
 };
