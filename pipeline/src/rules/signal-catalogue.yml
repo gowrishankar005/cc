@@ -75,16 +75,9 @@ rules:
     weight: 25
     calmNodeType: service
 
-  # --- TypeScript: NestJS GraphQL resolvers (@nestjs/graphql) ---
-  # T-P0-5 (E4, catalogue-as-data stress test) — a genuinely untested
-  # framework, added as catalogue rows only, zero builder code touched.
-  # CodeGraph's native NestJS route resolver already typed these as
-  # `kind: 'route'` (native-route evidence) BEFORE this row existed —
-  # confirmed by direct scan of a real `@Resolver()`/`@Query()`/`@Mutation()`
-  # fixture — so these rows add corroborating decorator-source evidence for
-  # the same shape @Controller/@Get/@Post already get, they do not newly
-  # enable detection. Same class-level-marker-vs-entry-point split as
-  # nestjs-controller-decorator/nestjs-verb-decorator above.
+  # NestJS GraphQL class marker only. @Query/@Mutation are not catalogued:
+  # the same TypeScript bare word matches TypeORM's @Query, and findRule()
+  # does not use `framework`. Operations stay native-route when CodeGraph types them.
   - id: nestjs-graphql-resolver-decorator
     language: typescript
     framework: nestjs-graphql
@@ -92,15 +85,6 @@ rules:
     matchSource: decorator
     category: framework-bootstrap
     weight: 25
-    calmNodeType: service
-
-  - id: nestjs-graphql-field-decorator
-    language: typescript
-    framework: nestjs-graphql
-    matchSignal: "Query|Mutation"
-    matchSource: decorator
-    category: http-entry-point
-    weight: 40
     calmNodeType: service
 
   - id: nestjs-verb-decorator

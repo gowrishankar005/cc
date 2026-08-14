@@ -1,0 +1,9 @@
+{
+  "name": "nestjs-graphql-sample-fixture",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Synthetic NestJS GraphQL resolver fixture for Catalogue_Intake of nestjs-graphql-resolver-decorator. Isolates the real @Resolver/@Query/@Mutation decorator shape; not a found-in-the-wild sample.",
+  "dependencies": {
+    "@nestjs/graphql": "^12.0.0"
+  }
+}

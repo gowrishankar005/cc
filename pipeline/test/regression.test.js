@@ -3210,6 +3210,39 @@ test('Review fix (2026-08-09) — outbound-HTTP detector excludes /test/-path fi
   assert.equal(testItem.reason, 'TEST_CODE', 'a test file importing an HTTP client must be re-categorized as TEST_CODE, not left as a genuine review candidate');
 });
 
+test('T-P0-5 Catalogue_Intake — NestJS GraphQL @Resolver is catalogue-corroborated bootstrap; Query/Mutation are not catalogued', () => {
+  const { findRule, loadSignalCatalogue } = require(path.join(PIPELINE_ROOT, 'dist/rules/rule-schema'));
+  const catalogue = loadSignalCatalogue(path.join(PIPELINE_ROOT, 'dist/rules'));
+  assert.equal(
+    findRule(catalogue, 'Resolver', 'decorator', 'typescript')?.id,
+    'nestjs-graphql-resolver-decorator',
+    'removing nestjs-graphql-resolver-decorator from the live catalogue must fail this test'
+  );
+  // Same-language collision class as the Java Spring Data @Query incident that
+  // forced the findRule() language-fallback fix: TypeORM also uses @Query.
+  assert.equal(findRule(catalogue, 'Query', 'decorator', 'typescript'), undefined, 'Query must not be a TypeScript catalogue match — would steal TypeORM @Query as http-entry-point');
+  assert.equal(findRule(catalogue, 'Mutation', 'decorator', 'typescript'), undefined, 'Mutation must not be a TypeScript catalogue match');
+
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-graphql-sample');
+  const { outDir } = runPipeline([fixtureRoot]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const unit = facts.units.find((u) => u.filePath.includes('accounts.resolver.ts'));
+    assert.ok(unit, `expected a unit for accounts.resolver.ts, got: ${facts.units.map((u) => u.filePath).join(', ') || '(none)'}`);
+    assert.equal(unit.kind, 'service');
+    assert.ok(
+      unit.evidence.some((e) => e.signal === 'Resolver' && e.source === 'decorator' && e.category === 'framework-bootstrap'),
+      `expected decorator evidence signal Resolver (catalogue row); got: ${unit.evidence.map((e) => `${e.source}:${e.signal}`).join(', ')}`
+    );
+    assert.ok(
+      !unit.evidence.some((e) => e.source === 'decorator' && (e.signal === 'Query' || e.signal === 'Mutation') && e.category === 'http-entry-point'),
+      'Query/Mutation must not attach as catalogued http-entry-point evidence'
+    );
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
 test('T-P0-5 (E4, catalogue-as-data stress) — findRule() never falls back to a different ecosystem\'s rule when the fact\'s own language has zero candidates', () => {
   const { findRule } = require(path.join(PIPELINE_ROOT, 'dist/rules/rule-schema'));
   // Real regression: adding a TypeScript-only "Query|Mutation" GraphQL

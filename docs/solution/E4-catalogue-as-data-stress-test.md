@@ -109,19 +109,22 @@ every future framework row, not a special case for "Query" or for GraphQL.
 
 | Criterion | Result |
 |---|---|
-| One untested framework added via catalogue row only | **Yes** — `nestjs-graphql-resolver-decorator` + `nestjs-graphql-field-decorator`, `signal-catalogue.yml` only, zero builder (`*-builder.ts`) files touched |
+| One untested framework added via catalogue row only | **Yes, then narrowed on review** — `nestjs-graphql-resolver-decorator` (`@Resolver`, bootstrap) stays, catalogue-only, zero builder files. `nestjs-graphql-field-decorator` (`Query\|Mutation`) was withdrawn: same TypeScript bare word as TypeORM `@Query`, and `findRule()` does not use `framework`. Operations stay native-route when CodeGraph types them. |
 | Passes only with zero builder code changes | **Builders: yes, untouched.** But the shared rule-matching primitive (`rule-schema.ts`, upstream of every builder) needed a real fix before the addition was safe — not a builder change, but not "zero code changes" either. Reporting this precisely rather than rounding to "passed" |
 | Falsifies or confirms the extensibility claim | **Both, precisely:** confirms the catalogue mechanism itself (rows alone define new detection/evidence, no new extraction code) once the shared matcher is correct; falsifies the stronger, implicit assumption that adding a row is *risk-free* to existing, unrelated packages — it triggered a real, latent bug in unrelated Java output |
 
 ## Disposition
 
-**Shipped.** Both catalogue rows and the `findRule()` fix are live;
-`pipeline/test` — 94/94 pass (93 existing + 1 new direct unit test for the
-fix). The new regression test (`findRule() never falls back to a different
-ecosystem's rule...`) is the standing exam for this mechanism class going
-forward — any future catalogue addition that reintroduces a same-bare-word,
-zero-same-language-candidate collision will be caught by the full regression
-suite the same way this one was, not silently.
+**Shipped, then intake-completed.** The `findRule()` language-fallback fix
+stays. `@Resolver` stays as a catalogue row with a checked-in synthetic
+fixture (`pipeline/test/fixtures/nestjs-graphql-sample`), a removal-sensitive
+regression, a `U-http` honesty note, and `scope-limitations.yml`
+`nestjs-graphql-resolver-bootstrap-only`. `@Query`/`@Mutation` were withdrawn
+rather than intake-completed: cataloguing them would recreate the same
+bare-word collision inside TypeScript (TypeORM `@Query`). The standing exam
+for the matcher is still `findRule() never falls back to a different
+ecosystem's rule...`; the standing exam for the remaining row is
+`T-P0-5 Catalogue_Intake — NestJS GraphQL @Resolver...`.
 
 ## What this changes about the "catalogue is safe by construction" claim
 
