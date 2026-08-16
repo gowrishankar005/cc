@@ -3405,3 +3405,35 @@ test('T-LM-2 second instance — Resilience4j @Retry (no HTTP route at all) fall
     fs.rmSync(outDir, { recursive: true, force: true });
   }
 });
+
+// Review fix (2026-08-16) — a dotted/quoted resilience4j timelimiter
+// instance name (e.g. YAML `instances: "payments.eu": ...`, which flattens
+// to `resilience4j.timelimiter.instances.payments.eu.timeout-duration`,
+// indistinguishable from a 3-segment path once flattened) used to fail the
+// strict single-segment regex and vanish with ZERO IgnoredItem — a real,
+// silent fact-drop, inconsistent with this same file's own
+// "never guess, never silently drop" discipline (attachServerPort's
+// ambiguous-boundary case always records one). Fixed: a loose regex catches
+// the multi-segment shape and records a real IgnoredItem instead.
+test('T-LM-2 review fix — a dotted/quoted resilience4j instance name is a real IgnoredItem, never a silent drop', () => {
+  const { springConfigPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/spring-config-pass'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-spring-resilience-dotted-'));
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDir, 'application.yml'),
+      'resilience4j:\n  timelimiter:\n    instances:\n      "payments.eu":\n        timeout-duration: 2s\n'
+    );
+
+    const svc = { id: 'svc', kind: 'service', name: 'svc', filePath: 'svc', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+    const ctx = { packageRoots: [fixtureDir], allUnits: [svc], allIgnoredItems: [], unitsByRoot: new Map([[fixtureDir, [svc]]]) };
+    springConfigPass.run(ctx);
+
+    assert.equal(svc.evidence.length, 0, 'a dotted instance name must never be guess-attached as evidence');
+    const dottedIgnored = ctx.allIgnoredItems.find((i) => String(i.ref).includes('timelimiter.instances.payments.eu.timeout-duration'));
+    assert.ok(dottedIgnored, 'expected a real IgnoredItem for the dotted instance name, not a silent drop');
+    assert.equal(dottedIgnored.reason, 'INSUFFICIENT_EVIDENCE');
+    assert.match(dottedIgnored.detail, /instance-name segment contains a dot/);
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
+});

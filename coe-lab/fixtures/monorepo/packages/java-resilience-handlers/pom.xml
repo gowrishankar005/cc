@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal manifest for CodeGraph detect() (lab fixture; not a full Spring Boot build).
+     T-LM-2 review fix (2026-08-16): a DEDICATED fixture package, deliberately
+     NOT reusing java-spring-payments (which already has its own checked-in
+     gold/calm plus gold/packages architecture-level gold, never touched by
+     this module-level gold). Not added to generate-calm.mjs's CORE list;
+     scored directly via its own package name, no coupling to the all-core
+     architecture gates. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>lab.fintech</groupId>
+  <artifactId>java-resilience-handlers</artifactId>
+  <version>0.1.0</version>
+  <dependencies>
+    <dependency>
+      <groupId>javax.ws.rs</groupId>
+      <artifactId>javax.ws.rs-api</artifactId>
+      <version>2.1.1</version>
+    </dependency>
+    <dependency>
+      <groupId>io.github.resilience4j</groupId>
+      <artifactId>resilience4j-spring-boot2</artifactId>
+      <version>1.7.1</version>
+    </dependency>
+  </dependencies>
+</project>

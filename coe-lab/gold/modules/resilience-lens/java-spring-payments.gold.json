@@ -1,16 +1,7 @@
 {
   "package": "java-spring-payments",
   "module": "resilience-lens",
-  "authoredFrom": [
-    "coe-lab/fixtures/monorepo/packages/java-spring-payments/src/main/java/lab/payments/PaymentController.java",
-    "coe-lab/fixtures/monorepo/packages/java-spring-payments/src/main/resources/application.yml"
-  ],
-  "reasoning": "PaymentController.get() carries a real Spring Retry @Retryable annotation (decorator evidence), and the package's application.yml sets a real resilience4j.timelimiter.instances.payments.timeout-duration (structured-config evidence). Both land on the same unit (one file == one unit, per mapSignalsToUnits' file-grouping) since PaymentController is also this package's sole service unit.",
-  "findings": [
-    {
-      "unitNameContains": "PaymentController",
-      "hasRetry": true,
-      "hasTimeout": true
-    }
-  ]
+  "authoredFrom": "coe-lab/fixtures/monorepo/packages/java-spring-payments/",
+  "reasoning": "Must-not-detect trap: this package's source has no retry annotation (Spring Retry @Retryable, Resilience4j @Retry) and no resilience4j timelimiter timeout-duration config anywhere -- confirmed by grep over the fixture source before authoring this file, not inferred from module output. Review fix (2026-08-16): this fixture is DELIBERATELY untouched by resilience-lens gold authoring -- it already carries its own gold/calm/ + gold/packages/ architecture-level gold from before this module existed, and coupling a module-level gold to it risked a spurious mismatch on unrelated scoring paths. The real positive case lives in a dedicated package instead (java-resilience-handlers.gold.json). A non-empty findings list here means resilience-lens is fabricating evidence, not that this package needs a fix.",
+  "findings": []
 }

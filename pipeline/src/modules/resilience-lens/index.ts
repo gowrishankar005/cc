@@ -24,32 +24,30 @@ import { Module, ModuleContext } from '../registry';
  * module's findings are descriptive facts for a human to read, not a
  * verdict — a unit with retry evidence and no timeout evidence is not
  * automatically "misconfigured"; a unit with neither is not automatically
- * "fragile." This module has no gold-scored fitness declaration of its own
- * yet (see coe-lab/gold/modules/resilience-lens/ — authored alongside this
- * module, not after, following T-LM-0's own "do this before/with the first
- * new lens" instruction) but the SCOPE of what it detects (2 retry
- * annotations, 1 timeout-config shape) is narrow enough that its output is
- * measurable now, unlike a lens with no ground truth path at all.
+ * "fragile." This module DOES have a gold-scored fitness declaration
+ * (`coe-lab/gold/modules/resilience-lens/*.gold.json` +
+ * `coe-lab/scripts/score-module-resilience-lens.mjs`, built alongside this
+ * module per T-LM-0's own "do this before/with the first new lens"
+ * instruction) — see `docs/solution/Claim_Register.md`'s Module fitness
+ * section for the current measured status.
  */
 function run(facts: TypedFacts, ctx: ModuleContext): void {
+  // Review fix (2026-08-16) — restructured to this file's sibling module's
+  // own idiom (threat-signals/index.ts: filter, then filter, then map),
+  // instead of map-then-filter with a manual NonNullable cast.
   const findings = facts.units
+    .filter((u) => u.evidence.some((e) => e.category === 'resilience'))
     .map((u) => {
       const resilienceEvidence = u.evidence.filter((e) => e.category === 'resilience');
-      if (resilienceEvidence.length === 0) return undefined;
-
-      const hasRetry = resilienceEvidence.some((e) => e.source === 'decorator');
-      const hasTimeout = resilienceEvidence.some((e) => e.source === 'structured-config');
-
       return {
         unitId: u.id,
-        hasRetry,
-        hasTimeout,
+        hasRetry: resilienceEvidence.some((e) => e.source === 'decorator'),
+        hasTimeout: resilienceEvidence.some((e) => e.source === 'structured-config'),
         rationale:
           'This pipeline found retry-annotation and/or timeout-config evidence for this unit — a descriptive fact, not a verdict. Coverage is narrow (Spring Retry @Retryable, Resilience4j @Retry, resilience4j timelimiter timeout-duration only); see docs/solution/Claim_Register.md for what is and is not detected.',
         evidenceRefs: resilienceEvidence.map((e) => e.ref),
       };
-    })
-    .filter((f): f is NonNullable<typeof f> => f !== undefined);
+    });
 
   // Namespaced (Module_Authoring_Guide.md's "output — namespace your files"),
   // same convention threat-signals already established.

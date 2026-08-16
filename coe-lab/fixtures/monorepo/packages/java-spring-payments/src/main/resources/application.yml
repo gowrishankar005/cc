@@ -1,8 +1,0 @@
-# Lab fixture — T-LM-2 (Lens Modules lane): real resilience4j Spring Boot
-# timeout-duration property, paired with PaymentController's @Retryable for
-# resilience-lens gold.
-resilience4j:
-  timelimiter:
-    instances:
-      payments:
-        timeout-duration: 3s
