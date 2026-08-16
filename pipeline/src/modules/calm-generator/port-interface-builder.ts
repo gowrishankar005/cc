@@ -1,5 +1,9 @@
 import { TypedUnit } from '../../types/typed-facts';
 import { CalmNode, CalmInterface } from '../../types/calm';
+import { jdbcScheme } from '../../analysis/jdbc-url';
+
+/** The property-key prefixes spring-config-pass.ts's extractDatasource() can emit a signal under — kept as one list so a third key form is a one-line addition here too, not a silent miss. */
+const DATASOURCE_SIGNAL_PREFIXES = ['spring.datasource.url=', 'spring.datasource.hikari.jdbcUrl='];
 
 /**
  * T-PC1-6/T-SC-6 (B-formal-interface-port) — server.port -> a real
@@ -80,7 +84,24 @@ export function springConfigProtocolBySignal(units: TypedUnit[]): Map<string, st
   const map = new Map<string, string>();
   for (const unit of units) {
     for (const e of unit.evidence) {
-      if (e.category !== 'spring-config' || !e.signal.startsWith('spring.datasource.url=jdbc:')) continue;
+      if (e.category !== 'spring-config') continue;
+      const prefix = DATASOURCE_SIGNAL_PREFIXES.find((p) => e.signal.startsWith(p));
+      if (!prefix) continue;
+      // Real bug fixed on code review (2026-08-16): this used to be a bare
+      // `e.signal.startsWith('...=jdbc:')` prefix check — a real, simple
+      // string match that DRIFTED OUT OF SYNC the moment jdbcScheme() (the
+      // shared, single-source-of-truth resolver, jdbc-url.ts) was taught to
+      // unwrap Spring's `${VAR:jdbc:...}` colon-default placeholder syntax
+      // in this same change: a signal like
+      // "spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://...}"
+      // (apache/fineract's own real shape) never starts with "...=jdbc:"
+      // literally, so this check silently stopped populating `protocol`
+      // for exactly the real case the placeholder fix targeted — verified
+      // live against the real Fineract fixture. Now reuses the SAME shared
+      // resolver every other JDBC-scheme consumer uses, instead of its own
+      // independent prefix check.
+      const rawValue = e.signal.slice(prefix.length);
+      if (!jdbcScheme(rawValue)) continue; // not a resolvable jdbc: URL (directly, or via a literal colon-default).
       // Matches persistence-detection-catalogue.yml's own convention (e.g.
       // org.postgresql -> protocol: JDBC): the real CALM protocol value is
       // the literal string "JDBC" for any JDBC connection string,

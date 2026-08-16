@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TypedFacts, TypedUnit } from '../../types/typed-facts';
 import { CoverageReport } from '../coverage-report';
+import { UNRESOLVED_MULTI_HOP_PREFIX, TIER_B_SINGLE_CANDIDATE_PREFIX } from '../cross_package/multi-hop-bridge-detector';
+import { CONTRADICTION_PREFIX } from '../cross_package/contradiction-detector';
 
 /**
  * AREC Wave 3 T-E5 (review-flow-capability-map.md's own "Decision: empty-
@@ -104,6 +106,14 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   const items: ReviewQueueItem[] = [];
   const silenceFlags = coverage.completeness.silenceFlags;
 
+  // Real perf/style fix (code review 2026-08-16): built once here and
+  // reused by every block below that needs "look up a unit by id" — the
+  // tier-b and contradiction blocks previously called `facts.units.find()`
+  // INSIDE a loop over facts.ignoredItems (O(n×m)), when this exact
+  // Map-based O(1) pattern already existed a few lines below for the
+  // analogous unresolved-multi-hop case. One lookup structure, reused.
+  const unitsById = new Map(facts.units.map((u) => [u.id, u]));
+
   // A real S1 unit often already has a SPECIFIC, named reason on file: the multi-hop
   // detector's own honest `unresolved-multi-hop` ignored-item (bridge id,
   // candidate count). Surfacing that specific detail instead of a generic
@@ -112,8 +122,8 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   // hand — no new detection, just reading a fact this run already produced.
   const unresolvedMultiHopByUnitId = new Map<string, string>();
   for (const item of facts.ignoredItems) {
-    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith('unresolved-multi-hop: "')) continue;
-    const unitId = item.detail.slice('unresolved-multi-hop: "'.length).split('"')[0];
+    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith(UNRESOLVED_MULTI_HOP_PREFIX)) continue;
+    const unitId = item.detail.slice(UNRESOLVED_MULTI_HOP_PREFIX.length).split('"')[0];
     if (unitId && !unresolvedMultiHopByUnitId.has(unitId)) {
       unresolvedMultiHopByUnitId.set(unitId, item.detail);
     }
@@ -215,9 +225,9 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   // candidates" (the latter stays under S1/low-architecture-coverage,
   // unchanged) — the exact separation the backlog row asked for.
   for (const item of facts.ignoredItems) {
-    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith('tier-b-single-candidate: "')) continue;
-    const sourceUnitId = item.detail.slice('tier-b-single-candidate: "'.length).split('"')[0];
-    const sourceUnit = facts.units.find((u) => u.id === sourceUnitId);
+    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith(TIER_B_SINGLE_CANDIDATE_PREFIX)) continue;
+    const sourceUnitId = item.detail.slice(TIER_B_SINGLE_CANDIDATE_PREFIX.length).split('"')[0];
+    const sourceUnit = unitsById.get(sourceUnitId);
     items.push({
       trigger: 'multi-hop-single-candidate-below-threshold',
       unitId: sourceUnitId,
@@ -234,8 +244,8 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   // (contradiction-detector.ts sets it that way), so no text-parsing is
   // needed to recover it, unlike the tier-b block above.
   for (const item of facts.ignoredItems) {
-    if (item.reason !== 'AMBIGUOUS_BOUNDARY' || !item.detail?.startsWith('contradiction: ')) continue;
-    const unit = facts.units.find((u) => u.id === item.ref);
+    if (item.reason !== 'AMBIGUOUS_BOUNDARY' || !item.detail?.startsWith(CONTRADICTION_PREFIX)) continue;
+    const unit = unitsById.get(item.ref);
     items.push({
       trigger: 'contradicting-evidence-force-review',
       unitId: item.ref,

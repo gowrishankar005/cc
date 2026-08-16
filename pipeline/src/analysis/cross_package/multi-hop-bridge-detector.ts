@@ -3,6 +3,19 @@ import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-fac
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 
 /**
+ * Shared ignoredItem-detail prefixes, exported so a reader (hitl-review-
+ * trigger.ts) can recover the source unit id it needs without re-deriving
+ * or hardcoding a second copy of the literal text this file emits. Real
+ * bug class named on code review (2026-08-16): a free-text detail string
+ * with no shared constant is one accidental copy-edit away from silently
+ * breaking id recovery (a `facts.units.find()` that just stops matching,
+ * no error) — applies to BOTH the pre-existing `unresolved-multi-hop`
+ * prefix and the newer tier-b one, not only the one this review named.
+ */
+export const UNRESOLVED_MULTI_HOP_PREFIX = 'unresolved-multi-hop: "';
+export const TIER_B_SINGLE_CANDIDATE_PREFIX = 'tier-b-single-candidate: "';
+
+/**
  * Produces architecture-grade relationships for the layered shape R0/R1
  * structurally cannot see: a `service` unit
  * references a BRIDGE (an interface/type with zero TypedUnits of its own —
@@ -220,7 +233,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
             ignoredItems.push({
               ref: `${fromMatch.unit.filePath}`,
               reason: 'CROSS_DOMAIN_UNRESOLVED',
-              detail: `tier-b-single-candidate: "${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots, but exactly 1 ("${candidate.unit.id}") is itself a real database/topic unit — the other ${implementers.length - 1} carry no persistence/messaging evidence of their own. A single high-confidence candidate obscured by syntactic ambiguity, not genuine multi-candidate ambiguity (would resolve at confidence ${wouldBeConfidence}, r2-phase1 tier, if unambiguous) — needs a human decision, not an automatic edge, per R2's "never guess" rule.`,
+              detail: `${TIER_B_SINGLE_CANDIDATE_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots, but exactly 1 ("${candidate.unit.id}") is itself a real database/topic unit — the other ${implementers.length - 1} carry no persistence/messaging evidence of their own. A single high-confidence candidate obscured by syntactic ambiguity, not genuine multi-candidate ambiguity (would resolve at confidence ${wouldBeConfidence}, r2-phase1 tier, if unambiguous) — needs a human decision, not an automatic edge, per R2's "never guess" rule.`,
             });
           }
           continue;
@@ -238,7 +251,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
         ignoredItems.push({
           ref: `${fromMatch.unit.filePath}`,
           reason: 'CROSS_DOMAIN_UNRESOLVED',
-          detail: `unresolved-multi-hop: "${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots (need exactly 1) — no architecture relationship emitted, per R2's "never guess" rule.`,
+          detail: `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots (need exactly 1) — no architecture relationship emitted, per R2's "never guess" rule.`,
         });
       }
       continue;
@@ -283,7 +296,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
       ignoredItems.push({
         ref: `${fromMatch.unit.filePath}`,
         reason: 'CROSS_DOMAIN_UNRESOLVED',
-        detail: `unresolved-multi-hop: "${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
+        detail: `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
       });
     }
   }
