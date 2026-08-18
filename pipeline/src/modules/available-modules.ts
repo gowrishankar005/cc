@@ -1,6 +1,7 @@
 import { Module } from './registry';
 import { calmGeneratorModule } from './calm-generator/write-artefacts';
 import { threatSignalsModule } from './threat-signals';
+import { resilienceLensModule } from './resilience-lens';
 
 /**
  * The built-in name -> Module lookup. Before this, adding a
@@ -17,9 +18,10 @@ import { threatSignalsModule } from './threat-signals';
 export const AVAILABLE_MODULES: Record<string, Module> = {
   'calm-generator': calmGeneratorModule,
   'threat-signals': threatSignalsModule,
+  'resilience-lens': resilienceLensModule,
 };
 
-export const DEFAULT_MODULE_NAMES = ['calm-generator', 'threat-signals'];
+export const DEFAULT_MODULE_NAMES = ['calm-generator', 'threat-signals', 'resilience-lens'];
 
 /** Resolves module names to Module objects. Throws with a clear message on an unknown name, per T-M1's acceptance criterion — never silently drops one. */
 export function resolveModules(names: string[]): Module[] {

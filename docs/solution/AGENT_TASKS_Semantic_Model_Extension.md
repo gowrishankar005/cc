@@ -30,7 +30,10 @@ own evidence-pass requirement) also ran positive, see
 `E1b-codeql-di-resolution-experiment.md` — T-LR-3/T-LR-4 are now unblocked
 but not started; T-LR-5/T-LR-6 (the actual engine integration) are scheduled
 with a 7-item checklist but not started, and will be planned in a separate
-session. **Lens Modules — T-LM-0 done; T-LM-1..5 not started.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
+session. **Lens Modules — T-LM-0, T-LM-2 done (2026-08-15, resilience lens: retry-annotation +
+timeout-config detection, gold+scorer built with it); T-LM-1 checked and deferred (no real
+SCA/vulnerability feed in this environment — cdxgen produces an SBOM, not vuln data);
+T-LM-3/4/5 not started.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
 records a deliberate research pause taken partway through. Lane files:
 `AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace

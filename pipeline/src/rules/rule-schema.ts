@@ -18,7 +18,9 @@ export interface CatalogueRule {
   // 'extends' added AREC Wave 3 T-E3 — a class/interface's supertype
   // (referenceKind: 'extends'), e.g. `extends JpaRepository<Charge, Long>`.
   matchSource: 'native-route' | 'decorator' | 'call' | 'field-type' | 'extends';
-  category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control';
+  // 'resilience' added T-LM-2 (CONTRACT_VERSION 12.0.0) — retry-annotation
+  // rows (Spring Retry `@Retryable`, Resilience4j `@Retry`).
+  category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control' | 'resilience';
   weight: number;
   calmNodeType: 'service' | 'database' | 'topic'; // 'topic' added T-X7-2, for messaging-consumer decorator rules (@KafkaListener/@JmsListener) — same CONTRACT_VERSION 4.0.0 bump as TypedUnit.kind's own 'topic' addition
   // T-LR-3 — OPTIONAL, defaults to false/absent. Marks a row as usable by

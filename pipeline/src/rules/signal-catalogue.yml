@@ -427,3 +427,34 @@ rules:
     category: messaging
     weight: 40
     calmNodeType: topic
+
+  # --- T-LM-2 (Lens Modules lane): retry-annotation resilience evidence ---
+  # Two real, independently-published Java resilience libraries' retry
+  # annotations — decorator-detected via the SAME proven
+  # extractFromSource()/decorates-ref mechanism as every other Java signal
+  # above (C-dec's @PreAuthorize precedent), no new extraction mechanism.
+  # Weighted 40 ("sufficient alone" tier, same as jpa-entity/spring-preauthorize):
+  # a real `@Retryable`/`@Retry` annotation is decisive, first-party evidence
+  # of a resilience-aware class, matching the DatatableWriteService precedent
+  # (a security-control-only file with no HTTP route is still a real service
+  # unit — a resilience-control-only file is the same shape). Deliberately
+  # narrow to RETRY annotations only, per the lane file's own gate ("not
+  # 'resilience' scoped whole") — circuit-breaker/bulkhead/rate-limiter
+  # annotations are a related but separate mechanism instance, not built here.
+  - id: spring-retryable
+    language: java
+    framework: spring-retry
+    matchSignal: "Retryable"
+    matchSource: decorator
+    category: resilience
+    weight: 40
+    calmNodeType: service
+
+  - id: resilience4j-retry
+    language: java
+    framework: resilience4j
+    matchSignal: "Retry"
+    matchSource: decorator
+    category: resilience
+    weight: 40
+    calmNodeType: service

@@ -39,6 +39,8 @@ const JAXRS_MULTICLASS_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/jaxrs-mult
 const PACKAGE_JSON_MANIFEST_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/package-json-manifest-sample'); // checked-in — reproduces the real package.json manifest false-positive bug shape
 const STEREOTYPE_BARE_COLLISION_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-bare-collision-sample'); // checked-in — reproduces the real @Component/@Entity bare-identifier collision bug shape
 const DUPLICATE_RELATIONSHIP_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/duplicate-relationship-sample'); // checked-in — a class that both references (field) AND calls (method) the same other unit, reproducing the real duplicate-relationship-object bug shape
+const RESILIENCE_LENS_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/resilience-lens-sample'); // checked-in — T-LM-2: Spring Retry @Retryable on the sole http-entry-point unit + resilience4j timeout-duration config
+const RESILIENCE4J_RETRY_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/resilience4j-retry-sample'); // checked-in — T-LM-2 second-instance verification: Resilience4j's own @Retry, a different library, no HTTP route at all
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
@@ -3501,4 +3503,111 @@ test('mapSignalsPass: unitsByRoot and allUnits share the confidence floor — a 
     ctx.allIgnoredItems.some((i) => i.reason === 'INSUFFICIENT_EVIDENCE' && String(i.detail).includes('below the review-queue threshold') && String(i.ref).includes('low.filter.ts')),
     'sub-floor unit must be a visible IgnoredItem, never a silent drop'
   );
+});
+
+// T-LM-2 (AGENT_TASKS_Ext_Lens_Modules.md, Lens Modules lane) — the
+// resilience-lens module end to end: real Spring Retry @Retryable
+// (decorator) + real resilience4j timelimiter timeout-duration
+// (structured-config) evidence, both landing on CONTRACT_VERSION 12.0.0's
+// new Evidence.category: 'resilience', surfaced by the new module's
+// namespaced report.
+test('T-LM-2 (resilience-lens) — @Retryable + resilience4j timeout-duration attach to the sole service unit, module report reflects both, calm validate 0 errors', () => {
+  const { outDir, calm } = runPipeline([RESILIENCE_LENS_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    assert.equal(facts.contractVersion, '12.0.0');
+
+    const serviceUnit = facts.units.find((u) => u.kind === 'service');
+    assert.ok(serviceUnit, 'expected a real JAX-RS service unit');
+
+    const retryEvidence = serviceUnit.evidence.find((e) => e.category === 'resilience' && e.source === 'decorator');
+    assert.ok(retryEvidence, 'expected real @Retryable evidence on the service unit');
+    assert.equal(retryEvidence.signal, 'Retryable');
+
+    const timeoutEvidence = serviceUnit.evidence.find((e) => e.category === 'resilience' && e.source === 'structured-config');
+    assert.ok(timeoutEvidence, 'expected real resilience4j timeout-duration evidence on the service unit');
+    assert.equal(timeoutEvidence.signal, 'resilience4j.timelimiter.instances.orders.timeout-duration=2s');
+    assert.equal(facts.ignoredItems.length, 0, 'the single-service case must not produce an ambiguous-timeout ignored item');
+
+    const reportPath = path.join(outDir, 'modules', 'resilience-lens', 'resilience-lens-report.json');
+    assert.ok(fs.existsSync(reportPath), 'resilience-lens must write its namespaced report under outDir/modules/resilience-lens/');
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    assert.equal(report.findings.length, 1);
+    assert.equal(report.findings[0].unitId, serviceUnit.id);
+    assert.equal(report.findings[0].hasRetry, true);
+    assert.equal(report.findings[0].hasTimeout, true);
+
+    // Deliberately not asserting warnings === 0 here: this fixture has
+    // exactly one node and zero relationships by design (isolating the
+    // resilience-evidence assertions above from any relationship-detection
+    // mechanism), which correctly trips calm-cli's own unrelated
+    // `architecture-nodes-must-be-referenced` spectral warning — a real,
+    // orthogonal completeness lint, not a defect this test exists to check.
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0, 'calm validate must report 0 errors on resilience-evidence-bearing output');
+    assert.ok(calm.nodes.length > 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+// Second-instance verification (Catalogue_Intake.md's stated requirement,
+// CLAUDE.md's "bug fixes are capability work" discipline applied to new
+// detection too): Resilience4j's own @Retry — a different, independently
+// published library from Spring Retry's @Retryable — must ALSO be detected
+// by the same decorator-extraction mechanism, proving this is a mechanism
+// class (retry-annotation detection), not one library's instance.
+test('T-LM-2 second instance — Resilience4j @Retry (no HTTP route at all) falls through to a real service unit, same DatatableWriteService-shaped precedent as C-dec', () => {
+  const { outDir } = runPipeline([RESILIENCE4J_RETRY_ROOT]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const unit = facts.units.find((u) => u.filePath.endsWith('PaymentGatewayClient.java'));
+    assert.ok(unit, 'expected a real unit for the @Retry-annotated class');
+    assert.equal(unit.kind, 'service', 'resilience-only evidence (no http-entry-point) must fall through to the service default');
+    assert.ok(!unit.evidence.some((e) => e.category === 'http-entry-point'), 'sanity: this class genuinely has no HTTP route');
+
+    const retryEvidence = unit.evidence.find((e) => e.category === 'resilience' && e.source === 'decorator');
+    assert.ok(retryEvidence, 'expected real Resilience4j @Retry evidence');
+    assert.equal(retryEvidence.signal, 'Retry');
+
+    const reportPath = path.join(outDir, 'modules', 'resilience-lens', 'resilience-lens-report.json');
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    assert.equal(report.findings.length, 1);
+    assert.equal(report.findings[0].hasRetry, true);
+    assert.equal(report.findings[0].hasTimeout, false, 'this fixture has no application.yml at all — no timeout evidence to find');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+// Review fix (2026-08-16) — a dotted/quoted resilience4j timelimiter
+// instance name (e.g. YAML `instances: "payments.eu": ...`, which flattens
+// to `resilience4j.timelimiter.instances.payments.eu.timeout-duration`,
+// indistinguishable from a 3-segment path once flattened) used to fail the
+// strict single-segment regex and vanish with ZERO IgnoredItem — a real,
+// silent fact-drop, inconsistent with this same file's own
+// "never guess, never silently drop" discipline (attachServerPort's
+// ambiguous-boundary case always records one). Fixed: a loose regex catches
+// the multi-segment shape and records a real IgnoredItem instead.
+test('T-LM-2 review fix — a dotted/quoted resilience4j instance name is a real IgnoredItem, never a silent drop', () => {
+  const { springConfigPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/spring-config-pass'));
+  const fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-spring-resilience-dotted-'));
+  try {
+    fs.writeFileSync(
+      path.join(fixtureDir, 'application.yml'),
+      'resilience4j:\n  timelimiter:\n    instances:\n      "payments.eu":\n        timeout-duration: 2s\n'
+    );
+
+    const svc = { id: 'svc', kind: 'service', name: 'svc', filePath: 'svc', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+    const ctx = { packageRoots: [fixtureDir], allUnits: [svc], allIgnoredItems: [], unitsByRoot: new Map([[fixtureDir, [svc]]]) };
+    springConfigPass.run(ctx);
+
+    assert.equal(svc.evidence.length, 0, 'a dotted instance name must never be guess-attached as evidence');
+    const dottedIgnored = ctx.allIgnoredItems.find((i) => String(i.ref).includes('timelimiter.instances.payments.eu.timeout-duration'));
+    assert.ok(dottedIgnored, 'expected a real IgnoredItem for the dotted instance name, not a silent drop');
+    assert.equal(dottedIgnored.reason, 'INSUFFICIENT_EVIDENCE');
+    assert.match(dottedIgnored.detail, /instance-name segment contains a dot/);
+  } finally {
+    fs.rmSync(fixtureDir, { recursive: true, force: true });
+  }
 });

@@ -125,6 +125,31 @@ function extractRedis(file: SpringConfigFile): TypedUnit | undefined {
 }
 
 /**
+ * Review fix (2026-08-16) — extracted from attachServerPort/
+ * attachResilienceTimeout, which each independently recomputed and
+ * duplicated this exact "exactly one service unit, or record a real
+ * AMBIGUOUS_BOUNDARY IgnoredItem, never guess" block. `keyForRef` is the
+ * property key that motivated this lookup, used only for the ignored-item's
+ * ref/detail text — the lookup itself never depends on which key triggered
+ * it. Returns the sole real service unit, or undefined when the caller
+ * should not attach anything (0 or 2+ candidates, already recorded).
+ */
+function resolveSoleServiceUnit(ctx: AnalysisContext, root: string, file: SpringConfigFile, keyForRef: string, valueForDetail: string): TypedUnit | undefined {
+  const serviceUnits = (ctx.unitsByRoot.get(root) ?? []).filter((u) => u.kind === 'service');
+  if (serviceUnits.length === 1) return serviceUnits[0];
+
+  ctx.allIgnoredItems.push({
+    ref: `${unitFileKey(file)}:${keyForRef}`,
+    reason: 'AMBIGUOUS_BOUNDARY',
+    detail:
+      serviceUnits.length === 0
+        ? `${keyForRef}=${valueForDetail} found but no service unit exists in this root to attach it to`
+        : `${keyForRef}=${valueForDetail} found but ${serviceUnits.length} service units exist in this root — never guessing which one owns it`,
+  });
+  return undefined;
+}
+
+/**
  * T-SC-6 — server.port -> a tcp-host-port interface on the root's single
  * `service` unit. Never guesses when 0 or 2+ candidates exist (same "never
  * guess" discipline as openapi-pass.ts's route-overlap merge check) — the
@@ -139,26 +164,81 @@ function attachServerPort(ctx: AnalysisContext, root: string, file: SpringConfig
   const port = file.properties.get('server.port');
   if (!port) return;
 
-  const serviceUnits = (ctx.unitsByRoot.get(root) ?? []).filter((u) => u.kind === 'service');
-  if (serviceUnits.length !== 1) {
-    ctx.allIgnoredItems.push({
-      ref: `${file.filePath}:server.port`,
-      reason: 'AMBIGUOUS_BOUNDARY',
-      detail:
-        serviceUnits.length === 0
-          ? `server.port=${port} found but no service unit exists in this root to attach it to`
-          : `server.port=${port} found but ${serviceUnits.length} service units exist in this root — never guessing which one owns it`,
-    });
-    return;
-  }
+  const unit = resolveSoleServiceUnit(ctx, root, file, 'server.port', port);
+  if (!unit) return;
 
-  serviceUnits[0].evidence.push({
+  unit.evidence.push({
     signal: `server.port=${port}`,
     source: 'structured-config',
     category: 'spring-config',
     weight: 0, // descriptive-only — never meant to move a unit's own confidence, only to carry the port fact through to build-calm.ts
-    ref: `${file.filePath}:server.port`,
+    ref: `${unitFileKey(file)}:server.port`,
   });
+}
+
+/**
+ * T-LM-2 (Lens Modules lane) — resilience4j's real, documented Spring Boot
+ * property shape: `resilience4j.timelimiter.instances.<name>.timeout-duration`
+ * (the `<name>` segment is an arbitrary, user-chosen instance name, so this
+ * is a wildcard match over the flattened key map, not a fixed literal key
+ * like server.port). Same structured-file-ingestion mechanism as every
+ * other extraction in this file — spring-config-provider.ts already
+ * flattens the YAML/properties generically; no new parsing mechanism.
+ *
+ * Review fix (2026-08-16) — the original STRICT-only regex (`[^.]+`, no
+ * dots in the instance-name segment) silently `continue`'d past a
+ * legitimate quoted/dotted instance name (e.g. a YAML key
+ * `instances."payments.eu".timeout-duration`, which flattenYaml joins into
+ * `...instances.payments.eu.timeout-duration` — indistinguishable from a
+ * 3-segment path once flattened) with ZERO IgnoredItem, inconsistent with
+ * this file's own "never guess, never silently drop" discipline
+ * (resolveSoleServiceUnit's ambiguous-boundary case, right above, always
+ * records one). Fixed: a LOOSE regex additionally catches the multi-segment
+ * shape; a LOOSE-but-not-STRICT match now records a real IgnoredItem
+ * (INSUFFICIENT_EVIDENCE — this pipeline cannot losslessly recover where a
+ * dotted/quoted instance name ends once the key is flattened) instead of
+ * silently vanishing. See scope-limitations.yml's
+ * resilience-lens-retry-timeout-only entry for the disclosed residual.
+ */
+const TIMELIMITER_TIMEOUT_KEY_STRICT = /^resilience4j\.timelimiter\.instances\.[^.]+\.timeout-duration$/;
+const TIMELIMITER_TIMEOUT_KEY_LOOSE = /^resilience4j\.timelimiter\.instances\..+\.timeout-duration$/;
+
+/**
+ * Attaches a real timeout-config fact to the root's single `service` unit —
+ * same "never guess" discipline as attachServerPort just above: the fact is
+ * recorded as evidence ONLY when exactly one service unit already exists in
+ * this root (after mapSignals/openapi/cfnRoute have run); 0 or 2+
+ * candidates record a real IgnoredItem instead of guessing which unit owns
+ * the timeout. Weight 0 (descriptive-only, same as attachServerPort) — this
+ * pipeline never claims to know whether a timeout is well-tuned, only that
+ * one is configured; the resilience-lens module surfaces the raw fact for a
+ * human to judge.
+ */
+function attachResilienceTimeout(ctx: AnalysisContext, root: string, file: SpringConfigFile): void {
+  for (const [key, value] of file.properties) {
+    const strictMatch = TIMELIMITER_TIMEOUT_KEY_STRICT.test(key);
+    if (!strictMatch) {
+      if (TIMELIMITER_TIMEOUT_KEY_LOOSE.test(key)) {
+        ctx.allIgnoredItems.push({
+          ref: `${unitFileKey(file)}:${key}`,
+          reason: 'INSUFFICIENT_EVIDENCE',
+          detail: `${key}=${value} looks like a resilience4j timelimiter timeout-duration key but its instance-name segment contains a dot (a quoted/dotted instance name) — this pipeline cannot losslessly recover where the instance name ends once the key is flattened, so it is not attached as evidence, never guessed`,
+        });
+      }
+      continue;
+    }
+
+    const unit = resolveSoleServiceUnit(ctx, root, file, key, value);
+    if (!unit) continue;
+
+    unit.evidence.push({
+      signal: `${key}=${value}`,
+      source: 'structured-config',
+      category: 'resilience',
+      weight: 0,
+      ref: `${unitFileKey(file)}:${key}`,
+    });
+  }
 }
 
 export const springConfigPass: AnalysisPass = {
@@ -184,6 +264,7 @@ export const springConfigPass: AnalysisPass = {
         }
 
         attachServerPort(ctx, root, file);
+        attachResilienceTimeout(ctx, root, file);
       }
     }
   },

@@ -1,0 +1,16 @@
+{
+  "package": "java-resilience-handlers",
+  "module": "resilience-lens",
+  "authoredFrom": [
+    "coe-lab/fixtures/monorepo/packages/java-resilience-handlers/src/main/java/lab/resilience/CurrencyRateResource.java",
+    "coe-lab/fixtures/monorepo/packages/java-resilience-handlers/src/main/resources/application.yml"
+  ],
+  "reasoning": "CurrencyRateResource.list() carries a real Resilience4j @Retry(name = ..., fallbackMethod = ...) annotation (decorator evidence) -- the exact real shape independently confirmed in a real, reference Java/JAX-RS banking platform's core module under spikes/ (49 files use this same @Retry(name=..., fallbackMethod=...) signature; verified via a real run-slice scan of that module, 7 real units detected). The package's application.yml sets a real resilience4j.timelimiter.instances.currencyRateLookup.timeout-duration (structured-config evidence) -- a real, documented resilience4j property NOT independently found in any of the 4 available spikes/ reference repos (see scope-limitations.yml's resilience-lens-retry-timeout-only entry for the honest disclosure of that gap). Both land on the same unit since CurrencyRateResource is this package's sole unit. This is a DEDICATED fixture package, deliberately not java-spring-payments (which carries its own pre-existing architecture-level gold/calm + gold/packages files this module-level gold must never couple to).",
+  "findings": [
+    {
+      "unitNameContains": "CurrencyRateResource",
+      "hasRetry": true,
+      "hasTimeout": true
+    }
+  ]
+}
