@@ -706,6 +706,82 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
   }
 });
 
+test('T-FS-1 (BACKLOG.md "Tier-B residual detection") — synthetic fixture: a bridge with 2 syntactic implementers but exactly 1 real store candidate produces a distinguishable tier-b-single-candidate residual (never a fabricated edge); a genuinely ambiguous 2-real-store bridge in the SAME fixture still refuses with the original unresolved-multi-hop message', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2-tier-b-candidate-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // --- Positive path: WidgetReadService has 2 implementers, but only
+    // WidgetReadServiceImpl is a real store — the mock carries no evidence
+    // and never becomes a CALM node at all.
+    const widgetResource = findNode(calm, 'WidgetApiResource.java');
+    const widgetImpl = findNode(calm, 'WidgetReadServiceImpl.java');
+    assert.ok(widgetResource, 'WidgetApiResource.java node missing');
+    assert.equal(widgetResource['node-type'], 'service');
+    assert.ok(widgetImpl, 'WidgetReadServiceImpl.java node missing — it carries real @Entity evidence independent of the bridge mechanism');
+    assert.equal(widgetImpl['node-type'], 'database');
+    assert.equal(findNode(calm, 'WidgetReadService.java'), undefined, 'bridge interface must not become its own CALM node');
+    assert.equal(findNode(calm, 'WidgetReadServiceMock.java'), undefined, 'the no-evidence mock implementer must not become a CALM node either');
+
+    // Still "never guess": no relationship is fabricated even though a
+    // single strong candidate exists — that is exactly what makes this a
+    // REVIEW residual (a human decision) rather than an automatic edge.
+    const widgetRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === widgetResource['unique-id'];
+    });
+    assert.equal(widgetRel, undefined, 'tier-b single-candidate case must NOT emit a fabricated relationship — it is a review residual, not an automatic edge');
+
+    // --- Negative/second-instance path in the SAME fixture: SprocketReadService
+    // has 2 implementers and BOTH are real stores — genuine ambiguity, must
+    // stay on the ORIGINAL unresolved-multi-hop path, proving the new
+    // tier-b branch does not just always fire on implementers.length >= 2.
+    const sprocketImplA = findNode(calm, 'SprocketReadServiceImplA.java');
+    const sprocketImplB = findNode(calm, 'SprocketReadServiceImplB.java');
+    assert.ok(sprocketImplA && sprocketImplB, 'both real Sprocket store implementers must exist as CALM nodes (their own @Entity evidence)');
+    const sprocketResource = findNode(calm, 'SprocketApiResource.java');
+    const sprocketRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === sprocketResource['unique-id'];
+    });
+    assert.equal(sprocketRel, undefined, 'genuinely ambiguous 2-real-store case must NOT emit a fabricated relationship either');
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+    const tierBItem = facts.ignoredItems.find((i) => i.detail?.startsWith('tier-b-single-candidate: ') && i.detail.includes('WidgetApiResource'));
+    assert.ok(tierBItem, `expected a tier-b-single-candidate ignored-item for WidgetApiResource, got: ${facts.ignoredItems.map((i) => i.detail).join(' | ')}`);
+    assert.ok(tierBItem.detail.includes('WidgetReadServiceImpl'), `expected the real candidate named, got: ${tierBItem.detail}`);
+    assert.ok(tierBItem.detail.includes('2 candidate implementation'), `expected the raw implementer count (2) still named, got: ${tierBItem.detail}`);
+
+    const sprocketItem = facts.ignoredItems.find((i) => i.detail?.startsWith('unresolved-multi-hop') && i.detail.includes('SprocketApiResource'));
+    assert.ok(sprocketItem, `expected the ORIGINAL unresolved-multi-hop message for the genuinely ambiguous Sprocket case, got: ${facts.ignoredItems.map((i) => i.detail).join(' | ')}`);
+    assert.ok(sprocketItem.detail.includes('2 candidate implementation'), `expected 2 candidates named, got: ${sprocketItem.detail}`);
+    assert.ok(!sprocketItem.detail.startsWith('tier-b-single-candidate'), 'genuine 2-real-store ambiguity must NOT be misclassified as tier-b-single-candidate');
+
+    // hitl-review-trigger.ts must turn the tier-b ignored-item into a real,
+    // actionable review-queue item — the actual acceptance bar ("the
+    // review tooling can act on that class"), not just an internal detail
+    // string nobody reads.
+    const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    const queue = buildReviewQueue(facts, coverage);
+    const tierBQueueItems = queue.items.filter((i) => i.trigger === 'multi-hop-single-candidate-below-threshold');
+    assert.equal(tierBQueueItems.length, 1, `expected exactly 1 multi-hop-single-candidate-below-threshold review item, got: ${JSON.stringify(tierBQueueItems)}`);
+    assert.ok(tierBQueueItems[0].unitId.includes('WidgetApiResource.java'), `expected the source unit named, got: ${tierBQueueItems[0].unitId}`);
+    assert.equal(tierBQueueItems[0].unitKind, 'service');
+    assert.ok(!queue.items.some((i) => i.trigger === 'multi-hop-single-candidate-below-threshold' && i.unitId?.includes('SprocketApiResource')), 'the genuinely ambiguous Sprocket case must not also produce a tier-b review item');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixture: service -> concrete class (no interface at all) -> imported entity resolves, and the ambiguity path still refuses to guess', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2c-direct-delegate-sample');
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -1701,6 +1777,224 @@ test(
 test('K8s manifests absent — --k8s-manifests omitted entirely is a no-op, run completes normally (T-X5-1)', () => {
   const { calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
   assert.ok(!calm.relationships.some((r) => r.description?.startsWith('shares-secret')), 'no k8s trust relationship should appear when --k8s-manifests was never passed');
+});
+
+test('T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources") — a stale k8s deployment manifest naming one datastore engine (mysql) vs the live spring-config naming another (postgresql) forces a real review-queue item, never averaged into the unit\'s own confidence; an agreeing manifest produces no item; a genuinely ambiguous manifest set (2 different engines) also produces no item (never guess)', () => {
+  const springConfigRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample');
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+
+  // --- Positive path: conflicting engines.
+  {
+    const conflictingManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/conflicting');
+    const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', conflictingManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const datasourceUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application.yml'));
+      assert.ok(datasourceUnit, 'base application.yml datasource unit missing');
+      const confidenceBefore = datasourceUnit.confidence;
+
+      const contradictionItem = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === datasourceUnit.id);
+      assert.ok(contradictionItem, `expected a contradiction ignoredItem for ${datasourceUnit.id}, got: ${facts.ignoredItems.map((i) => i.detail).join(' | ')}`);
+      assert.ok(contradictionItem.detail.includes('postgresql'), `expected the config's own engine (postgresql) named, got: ${contradictionItem.detail}`);
+      assert.ok(contradictionItem.detail.includes('mysql'), `expected the manifest's engine (mysql) named, got: ${contradictionItem.detail}`);
+
+      // The unit's own confidence must be UNTOUCHED — never averaged, never
+      // silently lowered by this detector; only a NEW review-queue item is
+      // added on top of what springConfigPass already computed.
+      assert.equal(datasourceUnit.confidence, confidenceBefore, "the contradicted unit's own confidence must never be changed by this detector");
+
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      const queue = buildReviewQueue(facts, coverage);
+      const contradictionQueueItems = queue.items.filter((i) => i.trigger === 'contradicting-evidence-force-review');
+      assert.equal(contradictionQueueItems.length, 1, `expected exactly 1 contradicting-evidence-force-review review item, got: ${JSON.stringify(contradictionQueueItems)}`);
+      assert.equal(contradictionQueueItems[0].unitId, datasourceUnit.id);
+      assert.equal(contradictionQueueItems[0].unitKind, 'database');
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+
+  // --- Negative path: agreeing engines — must NOT be flagged. Scoped to
+  // the BASE application.yml unit specifically (postgresql, matching the
+  // manifest's postgres image): spring-config-sample's OWN sibling
+  // application-prod.yml deliberately declares a DIFFERENT engine (mysql,
+  // see the "T-PC1-8" test above) — that unit legitimately DOES still
+  // conflict with this same postgres manifest, which is correct, expected
+  // behavior, not a bug this negative path is testing.
+  {
+    const agreeingManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/agreeing');
+    const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', agreeingManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const baseUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application.yml'));
+      assert.ok(baseUnit, 'base application.yml datasource unit missing');
+      const baseContradiction = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === baseUnit.id);
+      assert.equal(baseContradiction, undefined, `agreeing manifest (postgres) vs base config (postgresql) must NOT be flagged as a contradiction, got: ${JSON.stringify(baseContradiction)}`);
+
+      // The sibling application-prod.yml unit (mysql) legitimately DOES
+      // still conflict with this same postgres manifest — real, expected
+      // signal, confirms this isn't accidentally suppressing everything.
+      const prodUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application-prod.yml'));
+      const prodContradiction = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === prodUnit?.id);
+      assert.ok(prodContradiction, 'expected the prod profile (mysql) to still legitimately conflict with the postgres manifest — confirms the negative path above is a real discrimination, not global suppression');
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+
+  // --- Never-guess path: the manifest set itself is ambiguous (2 real,
+  // DIFFERENT engine deployments) — must not pick either one to compare
+  // against, same "never guess" discipline as multi-hop-bridge-detector.ts.
+  {
+    const ambiguousManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/ambiguous');
+    const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', ambiguousManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+      const contradictionItems = facts.ignoredItems.filter((i) => i.detail?.startsWith('contradiction: '));
+      assert.deepEqual(contradictionItems, [], `a genuinely ambiguous manifest set (mysql + mongodb) must produce NO contradiction claim either way, got: ${JSON.stringify(contradictionItems)}`);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test(
+  'T-FS-3 real-instance verification — a reference Java/JAX-RS banking platform\'s OWN checked-in kubernetes/ manifests (fineractmysql-deployment.yml, image mariadb:12.2) genuinely conflict with its OWN checked-in application.properties default (spring.datasource.hikari.jdbcUrl default jdbc:postgresql://...) — a real, unforced "stale manifest vs current config" instance, not constructed. Also the real second-instance find that surfaced two real gaps this synthetic-fixture-only pass had missed: (1) the real config key is spring.datasource.hikari.jdbcUrl, not spring.datasource.url — fixed by widening extractDatasource\'s key fallback; (2) the real default value is wrapped in a ${VAR:default} placeholder — fixed by teaching jdbcScheme/jdbcSchemeEngine to unwrap a literal jdbc: colon-default, narrowly (never general placeholder resolution). A second real config file in the SAME repo (application-test.properties, literal jdbc:mariadb://... with no placeholder) legitimately AGREES with the manifest and must NOT be flagged — confirms this is real discrimination, not blanket suppression.',
+  { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const fineractProviderRoot = path.join(JAVA_SAMPLE_ROOT, 'fineract-provider');
+    const fineractK8sManifests = path.join(JAVA_SAMPLE_ROOT, 'kubernetes');
+    const { outDir } = runPipeline([fineractProviderRoot], ['--k8s-manifests', fineractK8sManifests]);
+    try {
+      const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+      const mainUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('src/main/resources/application.properties'));
+      assert.ok(mainUnit, 'expected a real spring-datasource unit from fineract-provider\'s main application.properties (spring.datasource.hikari.jdbcUrl fallback key)');
+      const confidenceBefore = mainUnit.confidence;
+
+      const realContradiction = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === mainUnit.id);
+      assert.ok(
+        realContradiction,
+        `expected a real contradiction between fineract's own checked-in kubernetes/fineractmysql-deployment.yml (mariadb) and application.properties' postgresql default, got ignoredItems: ${facts.ignoredItems
+          .filter((i) => i.detail?.startsWith('contradiction'))
+          .map((i) => i.detail)
+          .join(' | ')}`
+      );
+      assert.ok(realContradiction.detail.includes('postgresql'), `expected the real config engine (postgresql) named, got: ${realContradiction.detail}`);
+      assert.ok(realContradiction.detail.includes('mariadb'), `expected the real manifest engine (mariadb) named, got: ${realContradiction.detail}`);
+      assert.equal(mainUnit.confidence, confidenceBefore, "the contradicted unit's own confidence must never be changed by this detector, real repo included");
+
+      // Real negative-discrimination check: application-test.properties'
+      // OWN literal (non-placeholder) mariadb value genuinely agrees with
+      // the manifest and must not also be flagged.
+      const testUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('src/test/resources/application-test.properties'));
+      if (testUnit) {
+        const testContradiction = facts.ignoredItems.find((i) => i.detail?.startsWith('contradiction: ') && i.ref === testUnit.id);
+        assert.equal(testContradiction, undefined, 'application-test.properties\' own literal mariadb value genuinely agrees with the mariadb manifest and must not be flagged');
+      }
+
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+      const queue = buildReviewQueue(facts, coverage);
+      const realQueueItem = queue.items.find((i) => i.trigger === 'contradicting-evidence-force-review' && i.unitId === mainUnit.id);
+      assert.ok(realQueueItem, 'expected the real contradiction to reach the actual review-queue trigger, not just the raw ignoredItems array');
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test('Code review fix (2026-08-16) — imageEngine() handles a private registry with an explicit port and a multi-segment official image where the engine name is not the last path segment', () => {
+  const { imageEngine } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/contradiction-detector'));
+  // Real bug 1: a naive `image.split(':')[0]` mistook the registry's own
+  // port for a tag boundary.
+  assert.equal(imageEngine('localhost:5000/postgres:14-alpine'), 'postgresql', 'a private registry with an explicit port must not corrupt engine detection');
+  // Real bug 2: checking only the FINAL path segment missed real official
+  // multi-segment images where the engine name sits earlier in the path.
+  assert.equal(imageEngine('mcr.microsoft.com/mssql/server:2022-latest'), 'sqlserver', 'the engine name (mssql) must be found even when it is not the last path segment');
+  // Regression guards: the already-working simple cases must stay correct.
+  assert.equal(imageEngine('postgres:14-alpine'), 'postgresql');
+  assert.equal(imageEngine('docker.io/library/postgres:14-alpine'), 'postgresql');
+  assert.equal(imageEngine('myorg/orders-service:1.4'), undefined, 'an unrelated app image must never be guessed as a datastore engine');
+});
+
+test('Code review fix (2026-08-16) — jdbc-url.ts resolveJdbcUrlLiteral/jdbcScheme: nested ${FOO:${BAR:jdbc:...}} placeholders are left UNRESOLVED, never corrupted with a stray trailing brace', () => {
+  const { resolveJdbcUrlLiteral, jdbcScheme } = require(path.join(PIPELINE_ROOT, 'dist/analysis/jdbc-url'));
+  // Real bug: the original single-regex unwrap greedily matched through a
+  // nested placeholder and appended the inner "}" into the captured URL.
+  const nested = '${FOO:${BAR:jdbc:postgresql://host}}';
+  assert.equal(resolveJdbcUrlLiteral(nested), nested, 'a nested placeholder must be left exactly as-is, not partially unwrapped with a corrupted capture');
+  assert.equal(jdbcScheme(nested), undefined, 'a nested placeholder must never resolve to a scheme — it is genuinely unresolved, not guessed at');
+
+  // The real, evidenced, non-nested apache/fineract shape must still unwrap correctly.
+  const real = '${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}';
+  assert.equal(resolveJdbcUrlLiteral(real), 'jdbc:postgresql://localhost:5432/fineract_tenants');
+  assert.equal(jdbcScheme(real), 'postgresql');
+
+  // A placeholder with no default at all stays unresolved (unchanged, pre-existing scope).
+  assert.equal(jdbcScheme('${SOME_VAR}'), undefined);
+  // An already-literal (non-placeholder) URL is untouched.
+  assert.equal(jdbcScheme('jdbc:mysql://host:3306/db'), 'mysql');
+});
+
+test('Code review fix (2026-08-16) — contradiction-detector.ts scopes "never guess" PER UNIT, not globally across the whole manifest set: a Postgres deployment for this unit\'s own store, alongside an unrelated Redis deployment for a different concern, must still let the Postgres comparison through', () => {
+  const { detectValueContradictions } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/contradiction-detector'));
+
+  const deployments = [
+    { name: 'orders-db', namespace: 'default', image: 'postgres:14-alpine', configMapNames: [], secretMounts: [], sourceFile: 'db.yaml' },
+    { name: 'cache', namespace: 'default', image: 'redis:7-alpine', configMapNames: [], secretMounts: [], sourceFile: 'cache.yaml' },
+  ];
+  const agreeingUnit = {
+    id: 'application.yml::spring-datasource',
+    kind: 'database',
+    name: 'datasource (postgresql)',
+    filePath: 'application.yml',
+    startLine: 1,
+    endLine: 1,
+    evidence: [
+      {
+        signal: 'spring.datasource.url=jdbc:postgresql://db-host:5432/orders',
+        source: 'structured-config',
+        category: 'spring-config',
+        weight: 40,
+        ref: 'application.yml:spring.datasource.url',
+        argument: 'jdbc:postgresql://db-host:5432/orders',
+      },
+    ],
+    confidence: 40,
+  };
+
+  // Real bug: the OLD global gate saw 2 distinct engines across the whole
+  // manifest set (postgresql, redis) and bailed out for the ENTIRE run —
+  // even though this unit's own engine (postgresql) is directly
+  // corroborated by a real deployment. A co-present, unrelated Redis
+  // deployment must never suppress that.
+  const { ignoredItems: noneExpected } = detectValueContradictions(deployments, [agreeingUnit]);
+  assert.deepEqual(noneExpected, [], `an agreeing deployment must clear this unit even with an unrelated Redis deployment also present, got: ${JSON.stringify(noneExpected)}`);
+
+  // A different unit whose own config disagrees with the SOLE real
+  // datastore-shaped deployment (no co-present unrelated engine in this
+  // sub-case) must still correctly fire — the per-unit fix must not have
+  // traded the false-negative bug for a false-negative-everywhere one.
+  const conflictingUnit = { ...agreeingUnit, id: 'application-prod.yml::spring-datasource', filePath: 'application-prod.yml', evidence: [{ ...agreeingUnit.evidence[0], signal: 'spring.datasource.url=jdbc:mysql://prod-host:3306/orders', argument: 'jdbc:mysql://prod-host:3306/orders' }] };
+  const { ignoredItems: oneExpected } = detectValueContradictions([deployments[0]], [conflictingUnit]);
+  assert.equal(oneExpected.length, 1, `expected the real mysql-vs-postgres conflict to still fire per-unit, got: ${JSON.stringify(oneExpected)}`);
+  assert.ok(oneExpected[0].detail.includes('mysql') && oneExpected[0].detail.includes('postgresql'));
+
+  // Same conflicting unit, but now WITH the unrelated Redis deployment also
+  // present and NEITHER deployment agreeing with this unit's own mysql
+  // engine: genuinely ambiguous which of the two (if either) is the real
+  // rival claim for THIS unit — correctly stays "never guess," the same
+  // conservative call this pipeline already makes for 2+ real disagreeing
+  // candidates everywhere else (e.g. multi-hop-bridge-detector.ts).
+  const { ignoredItems: ambiguousExpected } = detectValueContradictions(deployments, [conflictingUnit]);
+  assert.deepEqual(ambiguousExpected, [], `2 distinct non-agreeing deployment engines must not guess which is the real rival, got: ${JSON.stringify(ambiguousExpected)}`);
 });
 
 test('--from-facts reconstruct-only mode — byte-identical output with no rescan, refuses incompatible contractVersion (T-X6-3)', () => {
@@ -2992,6 +3286,59 @@ test('Review fix (2026-08-09) — springConfigProtocolBySignal actually populate
   const rel = calm.relationships.find((r) => r['relationship-type']?.connects?.destination?.node === 'application.yml::spring-datasource');
   assert.ok(rel, 'expected a real relationship pointing at the spring-config-derived unit');
   assert.equal(rel.protocol, 'JDBC', 'protocol must be populated from the spring-config datasource evidence, end-to-end through build-calm.ts');
+});
+
+test('Code review fix (2026-08-16) — springConfigProtocolBySignal recognizes the Hikari-key + placeholder-wrapped-default shape too (the exact real apache/fineract signal), not just the plain spring.datasource.url= form', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const facts = {
+    contractVersion: '10.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'FineractProviderService.java',
+        kind: 'service',
+        name: 'FineractProviderService',
+        filePath: 'FineractProviderService.java',
+        startLine: 1,
+        endLine: 10,
+        evidence: [{ signal: 'GET /loans', source: 'native-route', category: 'http-entry-point', weight: 40, ref: 'FineractProviderService.java:1' }],
+        confidence: 100,
+      },
+      {
+        // Real signal shape found on review (2026-08-16): the ORIGINAL fix
+        // only taught jdbcScheme() to unwrap the placeholder — it never
+        // updated port-interface-builder.ts's own separate prefix check,
+        // so this exact real Fineract shape silently never got `protocol`
+        // populated even though it's a real, resolvable jdbc: URL.
+        id: 'application.properties::spring-datasource',
+        kind: 'database',
+        name: 'datasource (postgresql)',
+        filePath: 'application.properties',
+        startLine: 1,
+        endLine: 1,
+        evidence: [
+          {
+            signal: 'spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}',
+            source: 'structured-config',
+            category: 'spring-config',
+            weight: 40,
+            ref: 'application.properties:spring.datasource.hikari.jdbcUrl',
+            argument: '${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}',
+          },
+        ],
+        confidence: 40,
+      },
+    ],
+    relationships: [{ from: 'FineractProviderService.java', to: 'application.properties::spring-datasource', kind: 'connects', crossPackage: false, source: 'codegraph' }],
+    ignoredItems: [],
+  };
+
+  const calm = buildCalm(facts);
+  const rel = calm.relationships.find((r) => r['relationship-type']?.connects?.destination?.node === 'application.properties::spring-datasource');
+  assert.ok(rel, 'expected a real relationship pointing at the Hikari-keyed spring-config-derived unit');
+  assert.equal(rel.protocol, 'JDBC', 'protocol must be populated even when the signal is the Hikari key wrapped in a ${VAR:default} placeholder — the exact real apache/fineract shape');
 });
 
 test('T-CDX-2/3 (B-cdxgen-reuse) — real cdxgen dependency corroboration raises confidence on an existing persistence unit, real requirements.txt, no network/install', () => {

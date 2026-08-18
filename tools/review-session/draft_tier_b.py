@@ -4,16 +4,21 @@
 Gated behind a real bar: the human apply path must work without an LLM
 first. That bar is met (proven end-to-end).
 
-REAL, HONEST LIMIT NAMED UP FRONT (not hidden): `triage.py`'s current
-trigger map never classifies any residual as Tier B — every
-trigger it knows about (S1, S2, S5x2, low-architecture-coverage) maps to
-Tier A or Tier C. So this tool has zero real production input to act on
-today. It's built and tested against the design's own trap fixtures
-(§5.1), matching this task's own fixture-based exit bar — not proven
-end-to-end against a real Tier B residual, because none exists yet
-anywhere in this pipeline's real output. A future session adding a real
-Tier B classifier to triage.py is what would make this genuinely useful,
-not a change to this file.
+UPDATE (T-FS-1, BACKLOG.md "Tier-B residual detection"): `triage.py`'s
+trigger map now has one real Tier B producer —
+`multi-hop-single-candidate-below-threshold`, sourced from
+`multi-hop-bridge-detector.ts`'s own `tier-b-single-candidate` ignored-item
+(exactly one real database/topic candidate found among a bridge
+interface's several syntactic implementers). This file's own drafting
+logic and guardrails are unchanged by that — a real Tier B residual now
+reaches this tool, but end-to-end proof still needs a real
+ANTHROPIC_API_KEY run (see the second honest limit below, also still
+true). Still built and tested primarily against the design's own trap
+fixtures (§5.1); a Tier B residual card from a real multi-hop scan is
+exercised via `pipeline`'s own regression test
+(`multi-hop-bridge-detector.ts`'s new fixture) and `tools/review-session`'s
+own `test_triage.py`/`test_cards.py`, not (yet) an end-to-end
+`draft_tier_b.py` run against a live model.
 
 SECOND HONEST LIMIT: no ANTHROPIC_API_KEY is set in the environment this
 was built in, and no live-model call has ever been exercised here — same
@@ -205,7 +210,7 @@ def main() -> int:
     tier_b = [r for r in residuals if r.get("tier") == "B" and r.get("status") == "open"]
 
     if not tier_b:
-        print("[draft_tier_b] no open Tier B residuals in this pack — nothing to draft. (Note: no trigger in this pipeline currently classifies as Tier B — see this file's own module docstring.)")
+        print("[draft_tier_b] no open Tier B residuals in this pack — nothing to draft this run. (T-FS-1 added a real Tier B producer, multi-hop-single-candidate-below-threshold; this pack's own scan just didn't trigger it.)")
         return 0
 
     unit_index = json.loads((session_dir / "evidence" / "unit-index.json").read_text()) if (session_dir / "evidence" / "unit-index.json").exists() else {}

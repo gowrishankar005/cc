@@ -49,8 +49,55 @@ class TestCardDeterminism(unittest.TestCase):
             self.assertNotIn("relationship_add", o["label"].lower() + o["detail"].lower())
             self.assertNotIn("connect to", o["label"].lower())
 
+    def test_single_candidate_below_threshold_offers_accept_reject_never_invents_candidate(self):
+        """T-FS-1 (Tier B): the card template must never re-derive or invent
+        a candidate id of its own — the candidate is already named in the
+        residual's own rationale text (multi-hop-bridge-detector.ts's
+        tier-b-single-candidate ignored-item), not something cards.py
+        generates. Only two real options: accept the already-found
+        candidate, or reject it — no fabricated relationship_add target."""
+        residual = {
+            "id": "R-001",
+            "tier": "B",
+            "class": "single-candidate-below-threshold",
+            "unitIds": ["WidgetApiResource.java"],
+            "rationale": 'tier-b-single-candidate: "WidgetApiResource.java" references bridge "..." which has 2 candidate implementation(s)... exactly 1 ("WidgetReadServiceImpl.java") is itself a real database/topic unit...',
+        }
+        options = build_options(residual, {})
+        labels = [o["label"] for o in options]
+        self.assertIn("Accept the identified candidate", labels)
+        self.assertIn("Reject -- not the right candidate", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+    def test_contradicting_evidence_never_auto_picks_a_winner(self):
+        """T-FS-3: the card must offer real choices (trust config / trust
+        manifest / both-correct-for-different-envs) but never silently
+        auto-resolve the conflict itself — same S6 non-fabricate discipline
+        as every other template, applied to 'don't average or auto-pick'
+        instead of 'don't invent a node'."""
+        residual = {
+            "id": "R-001",
+            "tier": "A",
+            "class": "contradicting-evidence",
+            "unitIds": ["application.yml::spring-datasource"],
+            "rationale": 'contradiction: ... names "postgresql" ... names a DIFFERENT engine "mysql" ...',
+        }
+        options = build_options(residual, {})
+        labels = [o["label"] for o in options]
+        self.assertIn("Trust the code-level config (spring-config)", labels)
+        self.assertIn("Trust the deployment manifest", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
     def test_every_card_ends_with_leave_open_or_none_and_other(self):
-        for cls in ("multi-candidate-bridge", "security-authority-policy", "ontology-judgment", "missing-intermediates-not-in-scan", "unclassified"):
+        for cls in (
+            "multi-candidate-bridge",
+            "security-authority-policy",
+            "ontology-judgment",
+            "missing-intermediates-not-in-scan",
+            "single-candidate-below-threshold",
+            "contradicting-evidence",
+            "unclassified",
+        ):
             residual = {"id": "R-001", "tier": "A", "class": cls, "unitIds": [], "rationale": "r"}
             options = build_options(residual, {})
             self.assertEqual(options[-1]["key"], "other", f"class {cls} must always end with Other")

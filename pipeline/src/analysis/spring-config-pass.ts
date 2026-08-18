@@ -3,6 +3,7 @@ import { CONFIDENCE_FLOOR } from './passes';
 import { discoverSpringConfigFiles, SpringConfigFile } from '../scanner/spring-config-provider';
 import { Evidence, TypedUnit } from '../types/typed-facts';
 import { scoreConfidence } from './confidence-scorer';
+import { jdbcScheme } from './jdbc-url';
 
 /**
  * T-PC1-3…6 (B-spring-config) — turns spring-config-provider.ts's raw flat
@@ -23,10 +24,6 @@ import { scoreConfidence } from './confidence-scorer';
  * both real facts honestly is safer than guessing one.
  */
 const CONFIG_WEIGHT = 40; // "sufficient alone" tier, same as jpa-entity's weight in signal-catalogue.yml — a config-file fact is as decisive as a decorator
-
-function jdbcScheme(url: string): string | undefined {
-  return /^jdbc:([a-z0-9+]+):/i.exec(url)?.[1]?.toLowerCase();
-}
 
 /**
  * Review finding (2026-08-09) — a physical file can now produce MORE THAN
@@ -59,12 +56,48 @@ function buildUnit(file: SpringConfigFile, suffix: string, kind: TypedUnit['kind
   };
 }
 
-/** T-SC-3 — spring.datasource.url -> database unit + JDBC scheme (feeds build-calm.ts's protocol population). */
+/**
+ * T-SC-3 — spring.datasource.url -> database unit + JDBC scheme (feeds
+ * build-calm.ts's protocol population).
+ *
+ * T-FS-3 real-instance verification (2026-08-15) found a real, generic
+ * second key: Spring Boot's default connection pool (HikariCP since Boot
+ * 2.0) binds `spring.datasource.hikari.jdbcUrl` (Hikari's own native
+ * property name is `jdbcUrl`, not `url`) as an ALTERNATE way a real repo
+ * declares this fact — confirmed against a real, non-synthetic source,
+ * not guessed from memory: `apache/fineract`'s
+ * fineract-provider/src/main/resources/application.properties:468
+ * (`spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}`).
+ * `spring.datasource.url` is checked first (the more common, already-mined
+ * convention per spring-config-property-vocabulary.md); the Hikari key is
+ * only a fallback when it's absent, same "real, non-obvious key form"
+ * precedent this file's redis extraction already sets for the
+ * spring.redis.* / spring.data.redis.* pair.
+ */
 function extractDatasource(file: SpringConfigFile): TypedUnit | undefined {
-  const url = file.properties.get('spring.datasource.url');
+  // Real bug found on code review (2026-08-16): a PRESENCE check
+  // (`.has(...)`) on the primary key, not a VALUE check, meant an
+  // empty-string `spring.datasource.url` (a real, if unusual, shape —
+  // e.g. a property declared but left blank) would win key selection,
+  // then fail the truthy check on `url` below and return undefined —
+  // silently losing a real, populated `hikari.jdbcUrl` fact the fallback
+  // branch would otherwise have caught. Must select on the VALUE's own
+  // truthiness, not merely whether the key exists in the map.
+  const primaryUrl = file.properties.get('spring.datasource.url');
+  const key = primaryUrl ? 'spring.datasource.url' : 'spring.datasource.hikari.jdbcUrl';
+  const url = primaryUrl || file.properties.get('spring.datasource.hikari.jdbcUrl');
   if (!url) return undefined;
   const scheme = jdbcScheme(url);
-  return buildUnit(file, 'spring-datasource', 'database', scheme ? `datasource (${scheme})` : 'datasource', `spring.datasource.url=${url}`, 'spring.datasource.url');
+  const unit = buildUnit(file, 'spring-datasource', 'database', scheme ? `datasource (${scheme})` : 'datasource', `${key}=${url}`, key);
+  // T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources") —
+  // the raw URL as the evidence's own literal source-line VALUE (Evidence.argument's
+  // documented purpose: "the literal source text at that one line," never a
+  // resolved runtime value — the URL text already IS that literal text for
+  // a structured-config fact). Lets contradiction-detector.ts compare this
+  // fact's engine against a k8s Deployment's image-engine without
+  // re-parsing the signal string.
+  unit.evidence[0].argument = url;
+  return unit;
 }
 
 /** T-SC-4 — Kafka/RabbitMQ/ActiveMQ broker config -> topic (network) unit. */

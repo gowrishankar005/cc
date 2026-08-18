@@ -3,6 +3,19 @@ import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-fac
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 
 /**
+ * Shared ignoredItem-detail prefixes, exported so a reader (hitl-review-
+ * trigger.ts) can recover the source unit id it needs without re-deriving
+ * or hardcoding a second copy of the literal text this file emits. Real
+ * bug class named on code review (2026-08-16): a free-text detail string
+ * with no shared constant is one accidental copy-edit away from silently
+ * breaking id recovery (a `facts.units.find()` that just stops matching,
+ * no error) — applies to BOTH the pre-existing `unresolved-multi-hop`
+ * prefix and the newer tier-b one, not only the one this review named.
+ */
+export const UNRESOLVED_MULTI_HOP_PREFIX = 'unresolved-multi-hop: "';
+export const TIER_B_SINGLE_CANDIDATE_PREFIX = 'tier-b-single-candidate: "';
+
+/**
  * Produces architecture-grade relationships for the layered shape R0/R1
  * structurally cannot see: a `service` unit
  * references a BRIDGE (an interface/type with zero TypedUnits of its own —
@@ -261,7 +274,10 @@ export function detectMultiHopBridgeRelationships(
       // stereotype-carrying implementers that correctly stay refused —
       // E1b-codeql-di-resolution-experiment.md). Never applies to the
       // implementers.length === 0 case above (there is nothing to
-      // disambiguate among).
+      // disambiguate among). Runs BEFORE T-FS-1's tier-b check below: this
+      // branch can auto-resolve a real relationship (stronger evidence);
+      // T-FS-1's check only ever produces a human-review item, so it must
+      // never shadow an auto-resolvable case.
       //
       // disambiguatedNonTerminal, set only in the exactly-one-stereotype
       // case below, exists so the ignored-item message can honestly say
@@ -305,18 +321,62 @@ export function detectMultiHopBridgeRelationships(
         }
       }
 
+      // T-FS-1 (Tier-B residual class, BACKLOG.md "Tier-B residual
+      // detection") — implementers.length >= 2 is SYNTACTIC ambiguity (N
+      // classes implement this bridge interface). That is not always
+      // SEMANTIC ambiguity: Phase 1's own terminal test (is the implementer
+      // itself a real database/topic TypedUnit?) already tells apart a real
+      // store implementation from a plain class with no persistence/
+      // messaging evidence of its own (a mock, a stub, an alternate
+      // in-memory implementation — a common real Java pattern). Reusing
+      // that existing test here, not a new extraction mechanism: if exactly
+      // ONE of the N syntactic implementers is itself a store unit, this is
+      // "one high-confidence candidate obscured by noise," a genuinely
+      // different, weaker-but-real signal than "N candidates, 2+ of them
+      // real stores" (true ambiguity — falls through to the generic refusal
+      // below, unchanged). Still never emits a relationship (the "never
+      // guess" rule is untouched) — this only changes what gets WRITTEN to
+      // ignoredItems, so a downstream reader (hitl-review-trigger.ts) can
+      // tell the two shapes apart and route the single-candidate case to a
+      // human decision instead of silence. Reached only when T-LR-3's
+      // stereotype disambiguation above did NOT already auto-resolve a
+      // relationship (checked on the raw implementers list either way —
+      // the two checks look at different evidence, stereotype vs.
+      // store-kind, and can legitimately disagree on which single
+      // candidate they each single out).
+      if (implementers.length >= 2) {
+        const storeImplementers = implementers
+          .map((implId) => nodeToUnit.get(implId))
+          .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
+        const uniqueStoreImplementers = [...new Map(storeImplementers.map((m) => [m.unit.id, m])).values()];
+        if (uniqueStoreImplementers.length === 1) {
+          const candidate = uniqueStoreImplementers[0];
+          const wouldBeConfidence = fromMatch.root === candidate.root ? R2_SAME_ROOT_CONFIDENCE : R2_CROSS_ROOT_CONFIDENCE;
+          const key = `${fromMatch.unit.id}|${bridgeNodeId}|tier-b-single-candidate`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            ignoredItems.push({
+              ref: `${fromMatch.unit.filePath}`,
+              reason: 'CROSS_DOMAIN_UNRESOLVED',
+              detail: `${TIER_B_SINGLE_CANDIDATE_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots, but exactly 1 ("${candidate.unit.id}") is itself a real database/topic unit — the other ${implementers.length - 1} carry no persistence/messaging evidence of their own. A single high-confidence candidate obscured by syntactic ambiguity, not genuine multi-candidate ambiguity (would resolve at confidence ${wouldBeConfidence}, r2-phase1 tier, if unambiguous) — needs a human decision, not an automatic edge, per R2's "never guess" rule.`,
+            });
+          }
+          continue;
+        }
+      }
+
       // 0 (no implementer in scanned roots, AND (T-LR-2) not itself a
       // direct delegate either — the real single-module case seen in a
       // reference Java/JAX-RS banking platform, per the design note), 2+
-      // with no stereotype disambiguation possible (T-LR-3), or 2+ with a
-      // disambiguated implementer that still isn't a store — never guess
-      // (§2.2/§2.4.1).
+      // with no stereotype disambiguation possible (T-LR-3) and no single
+      // store candidate (T-FS-1), or 2+ with a disambiguated implementer
+      // that still isn't a store — never guess (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);
         const detail = disambiguatedNonTerminal
-          ? `unresolved-multi-hop: "${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which stereotype-disambiguation narrowed to a sole real implementer ("${disambiguatedNonTerminal.unit.id}", kind: ${disambiguatedNonTerminal.unit.kind}) among ${implementers.length} candidates — but that implementer is not itself a database/topic unit, and the implementer-import hop is not chased after disambiguation — no architecture relationship emitted, per R2's "never guess" rule.`
-          : `unresolved-multi-hop: "${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots (need exactly 1) — no architecture relationship emitted, per R2's "never guess" rule.`;
+          ? `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which stereotype-disambiguation narrowed to a sole real implementer ("${disambiguatedNonTerminal.unit.id}", kind: ${disambiguatedNonTerminal.unit.kind}) among ${implementers.length} candidates — but that implementer is not itself a database/topic unit, and the implementer-import hop is not chased after disambiguation — no architecture relationship emitted, per R2's "never guess" rule.`
+          : `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots (need exactly 1) — no architecture relationship emitted, per R2's "never guess" rule.`;
         ignoredItems.push({
           ref: `${fromMatch.unit.filePath}`,
           reason: 'CROSS_DOMAIN_UNRESOLVED',
@@ -365,7 +425,7 @@ export function detectMultiHopBridgeRelationships(
       ignoredItems.push({
         ref: `${fromMatch.unit.filePath}`,
         reason: 'CROSS_DOMAIN_UNRESOLVED',
-        detail: `unresolved-multi-hop: "${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
+        detail: `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
       });
     }
   }

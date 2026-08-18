@@ -1,0 +1,15 @@
+# Negative-path fixture for T-FS-3: the deployment's image names the SAME
+# engine (postgresql/postgres) the paired application.yml's
+# spring.datasource.url already names — must NOT be flagged as a
+# contradiction (agreement is not evidence of disagreement).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-db
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: orders-db
+          image: postgres:14-alpine
