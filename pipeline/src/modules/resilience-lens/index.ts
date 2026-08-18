@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TypedFacts } from '../../types/typed-facts';
 import { Module, ModuleContext } from '../registry';
+import { loadModuleFitness } from '../fitness';
 
 /**
  * T-LM-2 (AGENT_TASKS_Ext_Lens_Modules.md, Lens Modules lane) — the second
@@ -28,8 +29,10 @@ import { Module, ModuleContext } from '../registry';
  * (`coe-lab/gold/modules/resilience-lens/*.gold.json` +
  * `coe-lab/scripts/score-module-resilience-lens.mjs`, built alongside this
  * module per T-LM-0's own "do this before/with the first new lens"
- * instruction) — see `docs/solution/Claim_Register.md`'s Module fitness
- * section for the current measured status.
+ * instruction) — surfaced machine-readably in this module's own report
+ * (`fitness.json`/`fitness.ts`, T-LM-5), not only as Claim_Register.md
+ * prose. See `docs/solution/Claim_Register.md`'s Module fitness section for
+ * the full narrative.
  */
 function run(facts: TypedFacts, ctx: ModuleContext): void {
   // Review fix (2026-08-16) — restructured to this file's sibling module's
@@ -53,7 +56,10 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
   // same convention threat-signals already established.
   const moduleDir = path.join(ctx.outDir, 'modules', 'resilience-lens');
   fs.mkdirSync(moduleDir, { recursive: true });
-  fs.writeFileSync(path.join(moduleDir, 'resilience-lens-report.json'), JSON.stringify({ findings }, null, 2));
+  // T-LM-5 (BR-110) — same machine-readable fitness declaration mechanism
+  // as threat-signals; the second module proving it isn't module-specific.
+  const fitness = loadModuleFitness('resilience-lens');
+  fs.writeFileSync(path.join(moduleDir, 'resilience-lens-report.json'), JSON.stringify({ findings, fitness }, null, 2));
   if (findings.length > 0) {
     console.log(`[resilience-lens] ${findings.length} unit(s) with real retry-annotation/timeout-config evidence`);
   }

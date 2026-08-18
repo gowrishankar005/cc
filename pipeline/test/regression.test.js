@@ -3372,17 +3372,25 @@ test('T-CDX-2/3 (B-cdxgen-reuse) — real cdxgen dependency corroboration raises
   }
 });
 
-test('T-CDX-3 (B-cdxgen-reuse) — never guesses which unit a corroborating dependency belongs to when 0 or 2+ candidates exist', () => {
+test('T-CDX-3/T-FS-4 (B-cdxgen-reuse, BACKLOG.md "Secondary sources may introduce facts") — zero candidates + exactly one real match introduces a fact instead of staying mute; 2+ candidates still never guesses', () => {
   const { cdxgenCorroborationPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'));
   const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
   if (!fs.existsSync(cdxgenBin)) return;
 
-  // Zero candidates: real dependency present, but no persistence/messaging unit in the root at all.
+  // T-FS-4 — zero candidates, but the real fixture's requirements.txt has
+  // exactly ONE matching dependency (psycopg2): must introduce a new unit
+  // at its own tier, not stay mute.
   const zeroCtx = { packageRoots: [CDXGEN_SAMPLE_ROOT], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map() };
   cdxgenCorroborationPass.run(zeroCtx);
-  assert.equal(zeroCtx.allIgnoredItems.length, 1);
-  assert.equal(zeroCtx.allIgnoredItems[0].reason, 'AMBIGUOUS_BOUNDARY');
-  assert.match(zeroCtx.allIgnoredItems[0].detail, /no persistence\/messaging unit exists/);
+  assert.equal(zeroCtx.allIgnoredItems.length, 0, 'an unambiguous match must introduce a fact, not an ignored item');
+  assert.equal(zeroCtx.allUnits.length, 1);
+  const introduced = zeroCtx.allUnits[0];
+  assert.equal(introduced.kind, 'database');
+  assert.equal(introduced.confidence, 10, 'introduced-fact tier is the corroboration weight alone — never inflated');
+  assert.equal(introduced.evidence.length, 1);
+  assert.equal(introduced.evidence[0].source, 'dependency-manifest');
+  assert.equal(introduced.evidence[0].signal, 'cdxgen:psycopg2@2.9.9', 'must cite the real, pinned version from the fixture\'s own requirements.txt');
+  assert.deepEqual(zeroCtx.unitsByRoot.get(CDXGEN_SAMPLE_ROOT), [introduced]);
 
   // Two candidates: never guess which one owns the real corroborating dependency.
   const dbA = { id: 'a', kind: 'database', name: 'a', filePath: 'a', startLine: 1, endLine: 1, evidence: [], confidence: 20 };
@@ -3393,6 +3401,26 @@ test('T-CDX-3 (B-cdxgen-reuse) — never guesses which unit a corroborating depe
   assert.match(twoCtx.allIgnoredItems[0].detail, /2 persistence\/messaging units exist/);
   assert.equal(dbA.evidence.length, 0, 'must not guess-attach to either candidate');
   assert.equal(dbB.evidence.length, 0, 'must not guess-attach to either candidate');
+});
+
+test('T-FS-4 — zero candidates AND 2+ real matches stays a named ignored item, never introduces a guessed fact', () => {
+  const cdxgenProvider = require(path.join(PIPELINE_ROOT, 'dist/scanner/cdxgen-provider'));
+  const originalDiscover = cdxgenProvider.discoverCdxgenComponents;
+  cdxgenProvider.discoverCdxgenComponents = () => [
+    { name: 'psycopg2', version: '2.9.9' },
+    { name: 'pymongo', version: '4.6.0' },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'))];
+  const { cdxgenCorroborationPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'));
+  try {
+    const ctx = { packageRoots: ['/fake/root'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map() };
+    cdxgenCorroborationPass.run(ctx);
+    assert.equal(ctx.allUnits.length, 0, 'must never guess which of 2+ real matches to introduce a fact for');
+    assert.equal(ctx.allIgnoredItems.length, 1);
+    assert.match(ctx.allIgnoredItems[0].detail, /2 real corroborating dependencies/);
+  } finally {
+    cdxgenProvider.discoverCdxgenComponents = originalDiscover;
+  }
 });
 
 test('T-CDX-2 (B-cdxgen-reuse) — no lockfile/manifest -> graceful empty result, never a crash (checked-in NestJS fixture has no package-lock.json)', () => {
@@ -3967,8 +3995,12 @@ test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives 
   const medConfUnit = { id: 'MedConf.java', kind: 'service', name: 'MedConf.java', filePath: 'MedConf.java', startLine: 1, endLine: 1, evidence: [{ signal: 'Service', source: 'decorator', category: 'framework-bootstrap', weight: 40, ref: 'MedConf.java:1' }], confidence: 40 };
   const openApiUnit = { id: 'ContractBacked.java', kind: 'service', name: 'ContractBacked.java', filePath: 'ContractBacked.java', startLine: 1, endLine: 1, evidence: [{ signal: 'GET /x', source: 'openapi', category: 'http-entry-point', weight: 40, ref: 'openapi.yaml:paths./x.get' }], confidence: 100 };
   const contradictedUnit = { id: 'Contradicted.java', kind: 'database', name: 'Contradicted.java', filePath: 'Contradicted.java', startLine: 1, endLine: 1, evidence: [{ signal: 'spring.datasource.url', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:1' }], confidence: 80 };
+  // T-FS-4 — a fact cdxgen-corroboration-pass.ts introduced with NO code
+  // evidence at all must stay requires-review permanently, never promoted
+  // by its own (low) confidence value alone.
+  const introducedUnit = { id: 'cdxgen:root:mysql-connector-java', kind: 'database', name: 'mysql-connector-java', filePath: 'dependency-manifest:mysql-connector-java', startLine: 1, endLine: 1, evidence: [{ signal: 'cdxgen:mysql-connector-java@8.0.33', source: 'dependency-manifest', category: 'persistence', weight: 10, ref: 'root:cdxgen:mysql-connector-java' }], confidence: 10 };
 
-  const units = [unresolvedUnit, highConfUnit, medConfUnit, openApiUnit, contradictedUnit];
+  const units = [unresolvedUnit, highConfUnit, medConfUnit, openApiUnit, contradictedUnit, introducedUnit];
   const ignoredItems = [{ ref: 'Contradicted.java', reason: 'AMBIGUOUS_BOUNDARY', detail: 'contradiction: "Contradicted.java" names a different engine' }];
   const relationships = [
     // Direct R0/R1 reconciler edge — no confidence field at all.
@@ -3991,6 +4023,7 @@ test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives 
   assert.equal(medConfUnit.status, 'inferred');
   assert.equal(openApiUnit.status, 'externally-verified');
   assert.equal(contradictedUnit.status, 'requires-review');
+  assert.equal(introducedUnit.status, 'requires-review', 'a fact introduced from dependency-manifest evidence alone must never auto-promote, regardless of its own confidence value');
 
   assert.equal(relationships[0].status, 'observed', 'direct R0/R1 edge, no confidence field -> observed');
   assert.equal(relationships[1].status, 'inferred', 'multi-hop bridge edge, real but low fixed confidence -> inferred');
@@ -4106,5 +4139,51 @@ test('T-FS-6: override-applier stamps x-aac-status "reviewed" on every applied o
     assert.equal(calm.nodes[0]['node-type'], 'service');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T-LM-5 (AGENT_TASKS_Ext_Lens_Modules.md, BR-110) — loadModuleFitness reads real checked-in declarations, defaults honestly to not-yet-fit-to-gate for an unmeasured module', () => {
+  const { loadModuleFitness } = require(path.join(PIPELINE_ROOT, 'dist/modules/fitness'));
+
+  const threatSignalsFitness = loadModuleFitness('threat-signals');
+  assert.equal(threatSignalsFitness.status, 'measured');
+  assert.equal(threatSignalsFitness.exactMatchRate, 1);
+  assert.equal(threatSignalsFitness.goldSampleSize, 7);
+  assert.ok(threatSignalsFitness.lastMeasuredAt);
+
+  const resilienceLensFitness = loadModuleFitness('resilience-lens');
+  assert.equal(resilienceLensFitness.status, 'measured');
+  assert.equal(resilienceLensFitness.exactMatchRate, 1);
+  assert.equal(resilienceLensFitness.goldSampleSize, 8);
+
+  // BR-110's own hard rule: no measurement -> must not silently claim one.
+  // A hypothetical third module with no fitness.json at all must default to
+  // the honest unmeasured marker, never an error and never a fake pass.
+  const unmeasured = loadModuleFitness('some-future-lens-with-no-declaration-yet');
+  assert.deepEqual(unmeasured, { status: 'not-yet-fit-to-gate' });
+});
+
+test('T-LM-5 real-repo wiring: threat-signals and resilience-lens both surface a real fitness declaration in their own report JSON (lab java-resilience-handlers, single run, both modules fire)', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-resilience-handlers');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    const threatSignalsReport = JSON.parse(fs.readFileSync(path.join(outDir, 'modules/threat-signals/threat-signals-report.json'), 'utf8'));
+    assert.equal(threatSignalsReport.fitness.status, 'measured');
+    assert.equal(threatSignalsReport.fitness.goldSampleSize, 7);
+
+    const resilienceLensReport = JSON.parse(fs.readFileSync(path.join(outDir, 'modules/resilience-lens/resilience-lens-report.json'), 'utf8'));
+    assert.equal(resilienceLensReport.fitness.status, 'measured');
+    assert.equal(resilienceLensReport.fitness.goldSampleSize, 8);
+
+    // Second module (T-LM-5's own acceptance bar: prove the mechanism isn't
+    // threat-signals-specific) carries a DIFFERENT real sample size than
+    // the first — proves this isn't one hardcoded declaration reused
+    // everywhere, but each module's own real, distinct fitness.json.
+    assert.notEqual(threatSignalsReport.fitness.goldSampleSize, resilienceLensReport.fitness.goldSampleSize);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
   }
 });

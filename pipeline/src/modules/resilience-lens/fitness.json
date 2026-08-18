@@ -1,0 +1,7 @@
+{
+  "status": "measured",
+  "lastMeasuredAt": "2026-08-18",
+  "exactMatchRate": 1.0,
+  "goldSampleSize": 8,
+  "evidence": "coe-lab/gold/modules/resilience-lens/*.gold.json + coe-lab/scripts/score-module-resilience-lens.mjs, ALL PASS (8/8 exact match)"
+}

@@ -225,7 +225,8 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // corroboration candidates (persistence/messaging units) include
   // spring-config-derived database/topic units too, not just
   // Graphify-import-derived ones; before reconcile like its neighbors,
-  // since it only mutates existing units' evidence, never relationships.
+  // since it only mutates existing units' evidence or (T-FS-4) introduces a
+  // new one — never relationships.
   cdxgenCorroborationPass,
   multiHopBridgePass,
   reconcilePass,

@@ -1,0 +1,7 @@
+{
+  "status": "measured",
+  "lastMeasuredAt": "2026-08-18",
+  "exactMatchRate": 1.0,
+  "goldSampleSize": 7,
+  "evidence": "coe-lab/gold/modules/threat-signals/*.gold.json + coe-lab/scripts/score-module-threat-signals.mjs, ALL PASS (7/7 exact match)"
+}
