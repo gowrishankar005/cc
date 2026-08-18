@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass, existingServiceFilePaths, pushAll } from './pass-registry';
+import { AnalysisContext, AnalysisPass, existingServiceFilePaths, overridableServiceFilePaths, pushAll } from './pass-registry';
 import { composeRoutesForFile } from './route-composer-registry';
 import { mapSignalsToUnits } from './signal-mapper';
 import { runGraphifyPass } from '../scanner/graphify-provider';
@@ -80,9 +80,39 @@ export const detectPersistencePass: AnalysisPass = {
     if (ctx.packageRoots.length === 0) return;
     try {
       ctx.graphifyRun = runGraphifyPass(ctx.packageRoots);
-      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx));
+      // T-LR-3 real-data finding — overridableServiceFilePaths(ctx) names
+      // files whose ONLY existing 'service' unit evidence is a bare,
+      // weak stereotype (no real route/security-control signal of its
+      // own). detectPersistenceUnits still builds its own unit for those
+      // files (see graphify-import-strategy-detector.ts's own doc comment);
+      // the replace loop below swaps the weak unit out for the real
+      // persistence one, merging the stereotype evidence onto it, rather
+      // than the two ever coexisting as separate CALM nodes for one real
+      // class (the exact regression a real reference Java/JAX-RS banking
+      // platform class surfaced: real `@Service` AND real `JdbcTemplate`
+      // usage on the same file).
+      const overridable = overridableServiceFilePaths(ctx);
+      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx), overridable);
       for (const [root, persistenceUnits] of persistenceUnitsByRoot) {
         console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via graphify`);
+        let replacedCount = 0;
+        for (const pu of persistenceUnits) {
+          if (!overridable.has(pu.filePath)) continue;
+          const weakUnitIndex = ctx.allUnits.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
+          if (weakUnitIndex === -1) continue;
+          // Merge the weak unit's own evidence (the bare stereotype fact)
+          // onto the persistence unit before replacing — the real fact
+          // stays visible, just no longer determines this unit's kind.
+          pushAll(pu.evidence, ctx.allUnits[weakUnitIndex].evidence);
+          ctx.allUnits.splice(weakUnitIndex, 1);
+          const rootUnitList = ctx.unitsByRoot.get(root) ?? [];
+          const weakRootIndex = rootUnitList.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
+          if (weakRootIndex !== -1) rootUnitList.splice(weakRootIndex, 1);
+          replacedCount++;
+        }
+        if (replacedCount > 0) {
+          console.log(`[run-slice] ${root}: ${replacedCount} weak bare-stereotype unit(s) replaced by real persistence evidence for the same file (never coexisting as two nodes)`);
+        }
         pushAll(ctx.allUnits, persistenceUnits);
         const rootUnits: typeof persistenceUnits = [];
         pushAll(rootUnits, ctx.unitsByRoot.get(root) ?? []);

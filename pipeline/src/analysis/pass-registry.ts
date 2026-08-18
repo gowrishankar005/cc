@@ -93,11 +93,53 @@ export async function runPasses(passes: AnalysisPass[], ctx: AnalysisContext): P
  * so a Controller importing an ORM's generated TYPES for its own DTOs
  * (real finding, a reference Node/NestJS wealth-management app's `@prisma/client` type imports)
  * doesn't also become a competing database/topic unit for the same file.
- * Lives here (not in passes.ts) so both passes.ts and messaging-pass.ts can
- * import it without a circular dependency between the two.
+ * Deliberately unconditional on evidence category — narrowing this set
+ * itself (tried and reverted, see `overridableServiceFilePaths` below) lets
+ * the import-based detectors independently create a SECOND, competing unit
+ * for the same file under a different id scheme (`file::ClassName` vs
+ * `file`), which is worse than the single-wrong-kind problem it was meant
+ * to fix: two CALM nodes for one real class. Lives here (not in passes.ts)
+ * so both passes.ts and messaging-pass.ts can import it without a circular
+ * dependency between the two.
  */
 export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
   return new Set(ctx.allUnits.filter((u) => u.kind === 'service').map((u) => u.filePath));
+}
+
+/**
+ * T-LR-3 real-data finding (2026-08-16): a SUBSET of `existingServiceFilePaths`
+ * — files whose `service` unit's ENTIRE evidence set is `framework-bootstrap`
+ * category only (a bare class-level stereotype like `@Service`, no real
+ * route or security-control evidence of its own). Real regression surfaced
+ * against a reference Java/JAX-RS banking platform: `spring-service-stereotype`
+ * (signal-catalogue.yml, T-LR-3) correctly makes a bare-`@Service` class a
+ * `service` unit, but `existingServiceFilePaths`'s original, unconditional
+ * exclusion then used that fact to suppress persistence detection entirely
+ * for the same file — silently flipping a real, previously-verified
+ * `database`-kind class (real `@Service` AND real `JdbcTemplate` usage) to
+ * `service`, contradicting this project's own documented finding that a
+ * bare stereotype does NOT indicate non-ownership (`BACKLOG.md`'s JDBC-
+ * ownership row, `soln/bug3-jdbc-ownership-phase-a-memo.md`) and the
+ * standing rule that a fix here may only ever change `kind` from `database`
+ * to `service`, never suppress unit creation.
+ *
+ * Consumed by `detectPersistencePass`/`detectMessagingPass` (passes.ts /
+ * messaging-pass.ts) as an "override-eligible" set, distinct from a
+ * narrower exclusion: files in this set still let the import-based
+ * detector build its own persistence/messaging unit as normal, and the
+ * calling pass then REPLACES the weak bare-stereotype unit with it (merging
+ * the stereotype evidence on, kind from the import detector, never both as
+ * two competing nodes) — never independently narrows
+ * `existingServiceFilePaths` itself, which stays unconditional so the
+ * ORIGINAL bug this filter fixes (a Controller with real `http-entry-point`
+ * evidence) is completely unaffected.
+ */
+export function overridableServiceFilePaths(ctx: AnalysisContext): Set<string> {
+  return new Set(
+    ctx.allUnits
+      .filter((u) => u.kind === 'service' && u.evidence.every((e) => e.category === 'framework-bootstrap'))
+      .map((u) => u.filePath)
+  );
 }
 
 /**

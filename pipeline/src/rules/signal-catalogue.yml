@@ -196,6 +196,13 @@ rules:
     category: framework-bootstrap
     weight: 40
     calmNodeType: service
+    # T-LR-3 — this row is ALSO the sole source of which stereotype names
+    # multi-hop-bridge-detector.ts's disambiguation branch treats as
+    # corroborating evidence (rule-schema.ts's bridgeStereotypeSignals()).
+    # Never a second, hardcoded copy of "Service" in the detector itself —
+    # extending disambiguation to a new stereotype later is this one flag on
+    # a new/existing row, not a code change.
+    bridgeStereotype: true
 
   # --- Java: Spring Security control evidence (requirements v0.10 §0 / v0.11) ---
   # Real evidence: spikes/fineract/repo/fineract-core/.../DatatableWriteService.java

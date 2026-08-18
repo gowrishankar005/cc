@@ -136,7 +136,19 @@ export function detectUnitsByImportStrategy(
    * however many entries this list has, from zero to many, across any
    * language `classHasAnnotation`'s `@`-prefixed-annotation scan covers.
    */
-  wiringOnlyAnnotations: string[] = []
+  wiringOnlyAnnotations: string[] = [],
+  /**
+   * T-LR-3 real-data finding — a SUBSET of `existingServiceFilePaths`
+   * (`pass-registry.ts`'s `overridableServiceFilePaths`): files whose only
+   * `service` unit evidence is a bare, weak class-level stereotype (no real
+   * route/security-control signal of its own). For these files, this
+   * detector still builds its own unit as normal (does NOT skip via the
+   * `existingServiceFilePaths` check below) — the calling pass
+   * (detectPersistencePass/detectMessagingPass) then REPLACES the weak
+   * unit with this one, rather than the two ever coexisting as separate
+   * competing CALM nodes for one real class.
+   */
+  overridableServiceFilePaths: Set<string> = new Set()
 ): ImportStrategyResult {
   const { graph } = run;
   const unitsByRoot = new Map<string, TypedUnit[]>();
@@ -157,7 +169,12 @@ export function detectUnitsByImportStrategy(
       excludedTestFiles.push(resolved.relativeFilePath);
       continue;
     }
-    if (existingServiceFilePaths.has(resolved.relativeFilePath)) continue; // already established as a service — don't also emit a competing database/topic unit for the same file
+    // T-LR-3 real-data finding — a file whose ONLY service evidence is a
+    // weak, bare stereotype (overridableServiceFilePaths) is NOT skipped
+    // here; the calling pass replaces that weak unit with whatever this
+    // detector produces below, instead of silently losing real persistence/
+    // messaging evidence for it.
+    if (existingServiceFilePaths.has(resolved.relativeFilePath) && !overridableServiceFilePaths.has(resolved.relativeFilePath)) continue;
 
     const fileNodeId = graph.nodes.find((n) => n.source_file === file && n.source_location === 'L1')?.id;
     if (!fileNodeId) continue;

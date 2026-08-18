@@ -26,7 +26,11 @@ import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-im
  * (post-MVP consolidation — all three were independently-written copies of
  * the identical two-step algorithm before this).
  */
-export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): ImportStrategyResult {
+export function detectPersistenceUnits(
+  run: GraphifyRun,
+  existingServiceFilePaths: Set<string> = new Set(),
+  overridableServiceFilePaths: Set<string> = new Set()
+): ImportStrategyResult {
   const rulesDir = path.join(__dirname, '..', '..', 'rules');
   const catalogue = loadPersistenceDetectionCatalogue(rulesDir);
   const libraries = driverImportLibraries(catalogue);
@@ -45,6 +49,7 @@ export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePath
     },
     existingServiceFilePaths,
     ownerBaseClasses,
-    wiringOnlyAnnotations
+    wiringOnlyAnnotations,
+    overridableServiceFilePaths
   );
 }
