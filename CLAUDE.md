@@ -117,7 +117,7 @@ cd ../tools/review-session && python3 -m unittest discover -s . -p "test_*.py"  
 
 ## Pipeline architecture
 
-Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with `typed-facts.json` (`pipeline/src/types/typed-facts.ts`) as the fixed, versioned contract between Analysis and any downstream module. `calm-generator` and `threat-signals` are the two built modules.
+Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with `typed-facts.json` (`pipeline/src/types/typed-facts.ts`) as the fixed, versioned contract between Analysis and any downstream module. `calm-generator`, `threat-signals`, and `resilience-lens` are the three built modules.
 
 **Dual-engine scanner** — each tool doing what it's verified good at:
 - **CodeGraph** (`scanner/codegraph-provider.ts`) — per-package indexing; native `route` typing where its resolver covers the framework, plus `extractFromSource()`-based decorator/annotation facts for frameworks it doesn't natively type (e.g. JAX-RS, JPA).
