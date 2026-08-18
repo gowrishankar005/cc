@@ -13,6 +13,10 @@ export function attachNodeMetadata(units: TypedUnit[], nodes: CalmNode[], facts:
       { key: 'x-aac-confidence', value: unit.confidence },
       { key: 'x-aac-provenance', value: unit.evidence.map((e) => e.ref) },
       { key: 'x-aac-run-version', value: facts.runVersion },
+      // T-FS-6 — absent, not a fake default, for a unit assignStatuses()
+      // hasn't run over (only ever true for a typed-facts.json predating
+      // this field, never a live run).
+      ...(unit.status !== undefined ? [{ key: 'x-aac-status', value: unit.status }] : []),
     ];
   }
 }

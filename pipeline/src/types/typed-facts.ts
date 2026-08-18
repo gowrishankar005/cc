@@ -105,6 +105,35 @@ export interface Evidence {
   argument?: string;
 }
 
+/**
+ * T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — fixed review-state
+ * vocabulary, alongside (not replacing) the existing confidence/grade/band
+ * scoring: 'observed' (direct high-confidence static evidence, no inference
+ * hop) · 'inferred' (a deterministic rule or a multi-hop mechanism —
+ * real, but one or more inference steps removed from direct evidence) ·
+ * 'requires-review' (a genuine disagreement, ambiguity, or an unclassified
+ * counterpart — a human must confirm) · 'reviewed' (human-confirmed via an
+ * ACTIVE Decision Record/Override — the only status a formerly
+ * requires-review fact can be promoted out of, set only by
+ * override-applier.ts, never by any Analysis pass) · 'externally-verified'
+ * (confirmed against an artifact independent of this run's own code
+ * reading — a published API contract or a real deployed manifest, not a
+ * static-analysis inference). Don't extend this vocabulary without a real
+ * evidenced trigger for the new value — same discipline as any other
+ * catalogue-adjacent enum in this codebase.
+ *
+ * Hard rule (not a heuristic, enforced in status-assignment.ts): a
+ * `kind: 'unresolved'` unit — this pipeline's placeholder for a real call
+ * site whose counterpart could not be classified into a real architectural
+ * kind, the closest analog this model has to an "external system" whose
+ * identity code evidence alone cannot confirm — never receives 'observed'
+ * or 'externally-verified' from code evidence. It carries no Evidence at
+ * all by construction, so this holds structurally, not just by convention;
+ * status-assignment.ts still asserts it explicitly rather than leaving it
+ * implicit.
+ */
+export type FactStatus = 'observed' | 'inferred' | 'requires-review' | 'reviewed' | 'externally-verified';
+
 export interface TypedUnit {
   id: string; // stable id, derived from qualifiedName or file+line
   // 'topic' added in CONTRACT_VERSION 4.0.0 (T-X7-1) — executes the dry run
@@ -118,6 +147,15 @@ export interface TypedUnit {
   endLine: number;
   evidence: Evidence[];
   confidence: number; // 0-100, weighted confidence bands
+  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no
+  // CONTRACT_VERSION bump — not one of §1's tracked closed unions). Set by
+  // status-assignment.ts (the true last Analysis pass) from this unit's own
+  // already-computed kind/confidence/evidence — no new extraction. Bumped
+  // to 'reviewed' only by override-applier.ts, strictly after Analysis, on
+  // the CALM element this unit produced — Analysis itself never writes
+  // 'reviewed', preserving the "Analysis concludes, Override corrects"
+  // separation the Decision Record mechanism depends on.
+  status?: FactStatus;
 }
 
 export interface TypedRelationship {
@@ -197,6 +235,10 @@ export interface TypedRelationship {
   // advisory provenance no module's core logic branches on, so widening it
   // needs no CONTRACT_VERSION bump.
   mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved';
+  // T-FS-6 — same FactStatus vocabulary and same status-assignment.ts /
+  // override-applier.ts split as TypedUnit.status (see that field's own doc
+  // comment). Additive OPTIONAL, no CONTRACT_VERSION bump.
+  status?: FactStatus;
 }
 
 export interface IgnoredItem {

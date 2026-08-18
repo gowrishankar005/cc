@@ -16,6 +16,7 @@ import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
 import { cfnRoutePass } from './cfn-route-pass';
 import { contradictionPass } from './contradiction-pass';
+import { assignStatuses } from './status-assignment';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -166,6 +167,19 @@ export const gradeRelationshipsPass: AnalysisPass = {
 };
 
 /**
+ * T-FS-6 — the true LAST pass, after gradeRelationshipsPass: reads
+ * ctx.allUnits/ctx.relationships/ctx.allIgnoredItems, never appends to any
+ * of them, so it must run after every producer of all three, including
+ * contradictionPass (whose ignored-items this pass cross-references).
+ */
+export const assignStatusPass: AnalysisPass = {
+  name: 'assignStatus',
+  run(ctx: AnalysisContext) {
+    assignStatuses(ctx.allUnits, ctx.relationships, ctx.allIgnoredItems);
+  },
+};
+
+/**
  * Default pass order. openApiPass (T-X4-1) added after mapSignalsPass —
  * independent of it (reads no shared state), grouped here since both are
  * "unit-producing" passes before persistence/reconcile. k8sTrustPass
@@ -180,9 +194,12 @@ export const gradeRelationshipsPass: AnalysisPass = {
  * edge (see multi-hop-bridge-pass.ts's doc comment for the real fixtures
  * that caught this). k8sTrust/envSoftGraph read neither ctx.relationships
  * nor multiHopExaminedPairs, so their position among these five is
- * otherwise free. gradeRelationshipsPass MUST be the true last pass — it
- * reads (never appends to) ctx.relationships, so it has to run after every
- * pass that appends to it.
+ * otherwise free. gradeRelationshipsPass reads (never appends to)
+ * ctx.relationships, so it has to run after every pass that appends to it.
+ * T-FS-6's assignStatusPass is now the true final pass — it reads
+ * ctx.allIgnoredItems (including contradictionPass's own output) and
+ * ctx.relationships' final `grade`/`confidence`/`mechanism`, so it must run
+ * after every producer of all three, gradeRelationshipsPass included.
  */
 export const DEFAULT_PASSES: AnalysisPass[] = [
   composeRoutesPass,
@@ -221,4 +238,5 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // still run before gradeRelationshipsPass, the true last pass.
   contradictionPass,
   gradeRelationshipsPass,
+  assignStatusPass,
 ];

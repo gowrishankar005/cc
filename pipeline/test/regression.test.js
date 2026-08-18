@@ -3958,3 +3958,153 @@ test('T-LM-2 review fix — a dotted/quoted resilience4j instance name is a real
     fs.rmSync(fixtureDir, { recursive: true, force: true });
   }
 });
+
+test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives every FactStatus value from already-computed signals, hard rule holds', () => {
+  const { assignStatuses } = require(path.join(PIPELINE_ROOT, 'dist/analysis/status-assignment'));
+
+  const unresolvedUnit = { id: 'unresolved:x', kind: 'unresolved', name: 'x', filePath: 'x', startLine: 0, endLine: 0, evidence: [], confidence: 3 };
+  const highConfUnit = { id: 'HighConf.java', kind: 'service', name: 'HighConf.java', filePath: 'HighConf.java', startLine: 1, endLine: 1, evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'HighConf.java:1' }], confidence: 80 };
+  const medConfUnit = { id: 'MedConf.java', kind: 'service', name: 'MedConf.java', filePath: 'MedConf.java', startLine: 1, endLine: 1, evidence: [{ signal: 'Service', source: 'decorator', category: 'framework-bootstrap', weight: 40, ref: 'MedConf.java:1' }], confidence: 40 };
+  const openApiUnit = { id: 'ContractBacked.java', kind: 'service', name: 'ContractBacked.java', filePath: 'ContractBacked.java', startLine: 1, endLine: 1, evidence: [{ signal: 'GET /x', source: 'openapi', category: 'http-entry-point', weight: 40, ref: 'openapi.yaml:paths./x.get' }], confidence: 100 };
+  const contradictedUnit = { id: 'Contradicted.java', kind: 'database', name: 'Contradicted.java', filePath: 'Contradicted.java', startLine: 1, endLine: 1, evidence: [{ signal: 'spring.datasource.url', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:1' }], confidence: 80 };
+
+  const units = [unresolvedUnit, highConfUnit, medConfUnit, openApiUnit, contradictedUnit];
+  const ignoredItems = [{ ref: 'Contradicted.java', reason: 'AMBIGUOUS_BOUNDARY', detail: 'contradiction: "Contradicted.java" names a different engine' }];
+  const relationships = [
+    // Direct R0/R1 reconciler edge — no confidence field at all.
+    { from: 'HighConf.java', to: 'MedConf.java', kind: 'calls', crossPackage: false, source: 'graphify' },
+    // Multi-hop bridge edge — always sets a real but low, fixed confidence.
+    { from: 'HighConf.java', to: 'ContractBacked.java', kind: 'calls', crossPackage: false, source: 'graphify', confidence: 8, mechanism: 'r2b' },
+    // Graded fact admission — anchors to a synthesized unresolved placeholder.
+    { from: 'HighConf.java', to: 'unresolved:x', kind: 'calls', crossPackage: false, source: 'graphify', mechanism: 'admitted-unresolved' },
+    // k8s shares-secret — confirmed against a real deployed manifest.
+    { from: 'HighConf.java', to: 'MedConf.java', kind: 'shares-secret', crossPackage: false, source: 'k8s' },
+    // Touches the contradicted unit — must inherit requires-review even with no confidence field of its own.
+    { from: 'HighConf.java', to: 'Contradicted.java', kind: 'calls', crossPackage: false, source: 'graphify' },
+  ];
+
+  assignStatuses(units, relationships, ignoredItems);
+
+  // Hard rule: an unclassified counterpart never auto-promotes on code evidence alone.
+  assert.equal(unresolvedUnit.status, 'requires-review');
+  assert.equal(highConfUnit.status, 'observed');
+  assert.equal(medConfUnit.status, 'inferred');
+  assert.equal(openApiUnit.status, 'externally-verified');
+  assert.equal(contradictedUnit.status, 'requires-review');
+
+  assert.equal(relationships[0].status, 'observed', 'direct R0/R1 edge, no confidence field -> observed');
+  assert.equal(relationships[1].status, 'inferred', 'multi-hop bridge edge, real but low fixed confidence -> inferred');
+  assert.equal(relationships[2].status, 'requires-review', 'admitted-unresolved mechanism -> requires-review');
+  assert.equal(relationships[3].status, 'externally-verified', 'k8s-sourced shares-secret -> externally-verified');
+  assert.equal(relationships[4].status, 'requires-review', 'touches a contradicted unit -> requires-review even with no confidence field');
+});
+
+test('T-FS-6 real-repo wiring: stereotype-disambiguation-sample end to end through run-slice.js and CALM x-aac-status metadata', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+
+    // Real confidence-40 (medium band) unit -> inferred; real confidence-80/90 (high band) units -> observed.
+    const apiResource = facts.units.find((u) => u.id.endsWith('WidgetApiResource.java'));
+    const readServiceImpl = facts.units.find((u) => u.id.endsWith('WidgetReadServiceImpl.java'));
+    assert.ok(apiResource, 'WidgetApiResource unit missing');
+    assert.ok(readServiceImpl, 'WidgetReadServiceImpl unit missing');
+    assert.equal(apiResource.status, 'inferred', `expected medium-band confidence (${apiResource.confidence}) -> inferred`);
+    assert.equal(readServiceImpl.status, 'observed', `expected high-band confidence (${readServiceImpl.confidence}) -> observed`);
+
+    // The r2-stereotype relationship itself always carries a real but low,
+    // fixed confidence value (12/7) -> inferred, same as every other
+    // multi-hop mechanism.
+    const stereotypeRel = facts.relationships.find((r) => r.mechanism === 'r2-stereotype');
+    assert.ok(stereotypeRel, 'expected the r2-stereotype relationship to be present');
+    assert.equal(stereotypeRel.status, 'inferred');
+
+    // Same values must survive into the generated CALM's x-aac-status metadata.
+    const apiResourceNode = calm.nodes.find((n) => n['unique-id'].endsWith('WidgetApiResource.java'));
+    assert.equal(apiResourceNode.metadata.find((m) => m.key === 'x-aac-status')?.value, 'inferred');
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-FS-6 real-repo wiring: contradiction-flagged unit gets requires-review status (spring-config + contradiction-manifests fixtures)', () => {
+  const springConfigRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-sample');
+  const conflictingManifests = path.join(PIPELINE_ROOT, 'test/fixtures/contradiction-manifests/conflicting');
+  const { outDir } = runPipeline([springConfigRoot], ['--k8s-manifests', conflictingManifests]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const datasourceUnit = facts.units.find((u) => u.id.endsWith('::spring-datasource') && u.filePath.endsWith('application.yml'));
+    assert.ok(datasourceUnit, 'base application.yml datasource unit missing');
+    assert.equal(datasourceUnit.status, 'requires-review', 'a real, unresolved contradiction must override the confidence-band default');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-FS-6 real-repo wiring: openapi-corroborated unit gets externally-verified status (lab ts-nestjs-users)', () => {
+  const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-nestjs-users');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+    const serviceNode = calm.nodes.find((n) => n['node-type'] === 'service');
+    assert.ok(serviceNode, 'expected the merged service node');
+    assert.equal(
+      serviceNode.metadata.find((m) => m.key === 'x-aac-status')?.value,
+      'externally-verified',
+      'a unit corroborated by a real published OpenAPI contract must read externally-verified, not just observed'
+    );
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-FS-6: override-applier stamps x-aac-status "reviewed" on every applied override, replacing (not duplicating) the analysis-time status', () => {
+  const { applyOverrides } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/override-applier'));
+  const baseCalm = {
+    nodes: [{ 'unique-id': 'flagged.py', 'node-type': 'database', name: 'flagged.py', description: 'x', metadata: [{ key: 'x-aac-status', value: 'requires-review' }] }],
+    relationships: [],
+  };
+  const decisionRecord = (id) => ({
+    decision_id: id,
+    module: 'architecture',
+    target_type: 'node',
+    target_ref: 'flagged.py',
+    final_decision: { action: 'overridden', new_value: 'service' },
+    rationale: 'human confirmed this is really a service, test fixture',
+    reviewer: 'test',
+    reviewed_at: new Date().toISOString(),
+    status: 'active',
+  });
+  const typeChangeOverride = (id, drId) => ({
+    override_id: id,
+    module: 'architecture',
+    target_ref: 'flagged.py',
+    override_type: 'type_change',
+    new_value: 'service',
+    decision_record_ref: drId,
+    status: 'active',
+    created_by: 'test',
+    created_at: new Date().toISOString(),
+  });
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-status-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-status-1')));
+    fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(typeChangeOverride('ov-status-1', 'dr-status-1')));
+    const { calm, result } = applyOverrides(baseCalm, dir);
+    assert.equal(result.applied.length, 1);
+    const statusEntries = calm.nodes[0].metadata.filter((m) => m.key === 'x-aac-status');
+    assert.equal(statusEntries.length, 1, 'must replace, not duplicate, the existing x-aac-status entry');
+    assert.equal(statusEntries[0].value, 'reviewed', 'a successfully applied override must promote status to reviewed');
+    assert.equal(calm.nodes[0]['node-type'], 'service');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
