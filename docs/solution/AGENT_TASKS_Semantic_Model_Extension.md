@@ -187,11 +187,14 @@ pressure — this note is the correction.
 |---|---|---|
 | `AGENT_TASKS_Ext_P0_Experiments.md` | none — runs first | Lens Modules |
 | `AGENT_TASKS_Ext_Fact_Semantics.md` | E2, E5 report | Lens Modules, Layered `[B]` tasks |
-| `AGENT_TASKS_Ext_Layered_Recovery.md` | `[B]` tasks: none. Engine: E1 pass | Fact Semantics, Lens Modules |
-| `AGENT_TASKS_Ext_Lens_Modules.md` | **none — fully independent** | everything |
-| `AGENT_TASKS_Ext_Contract_Lifecycle.md` | Fact Semantics | Lens Modules |
+| `AGENT_TASKS_Ext_Layered_Recovery.md` | `[B]` tasks: none. **Session C = T-LR-3/4 only** | Fact Semantics, Lens Modules |
+| `AGENT_TASKS_Ext_CodeQL_Engine.md` | After Session C; E1/E1b + 7-item checklist | Not Session C |
+| `AGENT_TASKS_Ext_Lens_Modules.md` | **none — fully independent. Session A = T-LM-1…4** | everything |
+| `AGENT_TASKS_Ext_Remaining_Lenses.md` | After Session A | — |
+| `AGENT_TASKS_Ext_Contract_Lifecycle.md` | T-CL-5 now; T-CL-1…4 after T-FS-6 | Lens Modules |
 | `AGENT_TASKS_Ext_Review_Throughput.md` | T-FS-1 | Layered Recovery |
-| `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-CL-2 | Lens Modules |
+| `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-MR-3/5 now; T-MR-1/2 after T-CL-2 | Lens Modules |
+| `AGENT_TASKS_Ext_Execution_Order.md` | — | The due-list and wave order |
 
 **Two lanes can start immediately:** P0 experiments, and Lens Modules —
 modules consume `typed-facts.json` only, so they neither block nor are blocked
