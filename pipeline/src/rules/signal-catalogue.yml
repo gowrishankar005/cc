@@ -160,6 +160,50 @@ rules:
     weight: 10
     calmNodeType: database
 
+  # --- T-LR-3 (BACKLOG.md "Plain-interface bridge detection"): bare Spring
+  # @Service stereotype (requirements v0.10-era gap, named directly in
+  # Architect_Pilot_Feedback_Notes.md Entry 13). Real evidence: a reference
+  # Java/JAX-RS banking platform's PortfolioCommandSourceWritePlatformServiceImpl
+  # carries a bare `@Service` with no other framework marker (no `@Path`,
+  # no `@Entity`, no `@PreAuthorize`) — before this row, signal-catalogue.yml
+  # had no rule watching for `@Service`/`@Component`/`@Repository` at all
+  # (confirmed by a direct catalogue read before writing this row, not
+  # assumed), so a real Spring-managed bean like this produced zero
+  # evidence and zero units, invisible even to `multi-hop-bridge-detector.ts`'s
+  # implementer-disambiguation. Same decorator-extraction mechanism as
+  # `jpa-entity`/`spring-preauthorize` above — no new extraction code, a
+  # missing vocabulary row. Weighted 40 (sufficient alone, same tier as
+  # those two rows): a bare stereotype is Spring's own declaration that a
+  # class is a managed service bean, not weaker evidence than a route or a
+  # persistence annotation.
+  #
+  # Deliberately scoped to `@Service` ONLY, not also `@Component`/
+  # `@Repository` — only `@Service` has a real, cited evidence sample
+  # (Entry 13). `@Component` is Spring's generic stereotype (used for many
+  # non-service-shaped beans too — configuration helpers, converters); a
+  # class-forming rule for it needs its own real evidence sample before
+  # shipping, not "it seems likely," per `Catalogue_Intake.md`.
+  # `@Repository` already has real evidence but for a DIFFERENT extraction
+  # path (`spring-data-repository-extends`, an `extends JpaRepository<...>`
+  # structural match) — adding `@Repository` here as a bare-decorator match
+  # too would need its own separate evidence sample distinguishing it from
+  # that existing row, not bundled in speculatively.
+  - id: spring-service-stereotype
+    language: java
+    framework: spring
+    matchSignal: "Service"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 40
+    calmNodeType: service
+    # T-LR-3 — this row is ALSO the sole source of which stereotype names
+    # multi-hop-bridge-detector.ts's disambiguation branch treats as
+    # corroborating evidence (rule-schema.ts's bridgeStereotypeSignals()).
+    # Never a second, hardcoded copy of "Service" in the detector itself —
+    # extending disambiguation to a new stereotype later is this one flag on
+    # a new/existing row, not a code change.
+    bridgeStereotype: true
+
   # --- Java: Spring Security control evidence (requirements v0.10 §0 / v0.11) ---
   # Real evidence: spikes/fineract/repo/fineract-core/.../DatatableWriteService.java
   # — a pure Java `interface` with @PreAuthorize on every method, NO @Path/

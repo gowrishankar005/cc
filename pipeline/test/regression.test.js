@@ -765,8 +765,78 @@ test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixtu
   }
 });
 
+test('T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — synthetic fixture: a bridge with 2 real implementers resolves when exactly one carries the bare @Service stereotype, and the both-stereotyped ambiguity path still refuses to guess', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    // Positive path: WidgetReadService has TWO real implementers in scanned
+    // roots (WidgetReadServiceImpl, WidgetReadServiceLegacyImpl) — before
+    // T-LR-3, ANY 2+-implementer bridge was unconditionally refused. Only
+    // WidgetReadServiceImpl carries a real `@Service` stereotype
+    // (spring-service-stereotype in signal-catalogue.yml), so it alone
+    // disambiguates the bridge; it is also @Entity, so the terminal check
+    // (kind database/topic) passes too.
+    const resource = findNode(calm, 'WidgetApiResource.java');
+    const impl = findNode(calm, 'WidgetReadServiceImpl.java');
+    assert.ok(resource, 'WidgetApiResource.java node missing');
+    assert.equal(resource['node-type'], 'service');
+    assert.ok(impl, 'WidgetReadServiceImpl.java node missing');
+    assert.equal(impl['node-type'], 'database');
+    assert.equal(findNode(calm, 'WidgetReadService.java'), undefined, 'bridge interface must not become its own CALM node');
+    // WidgetReadServiceLegacyImpl carries zero framework-recognized evidence
+    // of any kind (no stereotype, no persistence, nothing) — it correctly
+    // never becomes a unit, same as any other zero-evidence class.
+    assert.equal(findNode(calm, 'WidgetReadServiceLegacyImpl.java'), undefined, 'the non-stereotype implementer has no evidence of its own and must not become a node');
+
+    const stereotypeRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === resource['unique-id'] && conn.destination.node === impl['unique-id'];
+    });
+    assert.ok(stereotypeRel, 'expected a resolved stereotype-disambiguated relationship from WidgetApiResource to WidgetReadServiceImpl');
+    assert.equal(relMetadata(stereotypeRel, 'x-aac-relationship-grade'), 'architecture');
+    assert.equal(relMetadata(stereotypeRel, 'x-aac-confidence'), 12, 'r2-stereotype same-root confidence must sit strictly between R2 Phase 1 (15) and R2b (8)');
+    assert.ok(stereotypeRel.description.includes('calls'), 'r2-stereotype must use the calls kind, same as every other R2 branch');
+    assert.equal(
+      relMetadata(stereotypeRel, 'x-aac-mechanism'),
+      'r2-stereotype',
+      'T-LR-3: stereotype-disambiguated resolution must be distinguishable from r2-phase1/r2b/r2c without decoding the confidence value'
+    );
+
+    // Ambiguity path: GadgetReadService has TWO real implementers, BOTH
+    // carrying @Service — stereotype presence alone cannot disambiguate
+    // them, so this must still refuse to guess, same as the CodeQL
+    // DI-resolution experiment's own real refusal cases
+    // (E1b-codeql-di-resolution-experiment.md: Tasklet, ContentStoreService,
+    // etc. — 2+ stereotype-carrying implementers correctly never resolved).
+    const gadgetResource = findNode(calm, 'GadgetApiResource.java');
+    const gadgetRel = calm.relationships.find((rel) => {
+      const conn = rel['relationship-type']?.connects;
+      return conn && conn.source.node === gadgetResource['unique-id'];
+    });
+    assert.equal(gadgetRel, undefined, 'both-stereotyped ambiguity case must NOT emit a fabricated relationship');
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const ambiguousItem = facts.ignoredItems.find((i) => i.detail?.startsWith('unresolved-multi-hop') && i.detail.includes('GadgetApiResource'));
+    assert.ok(ambiguousItem, 'expected an honest unresolved-multi-hop ignored-item for the both-stereotyped Gadget case');
+    assert.ok(ambiguousItem.detail.includes('2 candidate implementation'), `expected the item to name 2 implementers, got: ${ambiguousItem.detail}`);
+
+    const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+    assert.equal(coverage.relationshipsByMechanism['r2-stereotype'], 1, 'expected the stereotype-disambiguated edge counted under relationshipsByMechanism["r2-stereotype"]');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test(
-  'T-LR-2 real evidence: a reference Java governance platform (Waltz), 3-module scan — 7 real direct-delegate chains resolve, 0 fabricated, closing the exact gap the waltz-multihop-genericity-probe finding named (26 of 28 real candidates were this shape)',
+  'T-LR-2/T-LR-3 real evidence: a reference Java governance platform (Waltz), 3-module scan — the real direct-delegate chains this test used to see via r2c now resolve as real direct R1 edges instead (T-LR-3 real-data update, 2026-08-16), 0 fabricated',
   {
     skip: !fs.existsSync(JAVA_SAMPLE2_SERVICE_ROOT) && 'spikes/waltz/repo/waltz-service not present (scratch clone, see CLAUDE.md)',
     timeout: 180_000,
@@ -775,27 +845,37 @@ test(
     const { outDir, calm } = runPipeline([JAVA_SAMPLE2_WEB_ROOT, JAVA_SAMPLE2_SERVICE_ROOT, JAVA_SAMPLE2_DATA_ROOT], [], ['--max-old-space-size=8192']);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
-      const r2cRelationships = facts.relationships.filter((r) => r.mechanism === 'r2c');
-      assert.ok(r2cRelationships.length >= 1, `expected at least 1 real r2c (direct-delegate) relationship, got ${r2cRelationships.length}`);
-      for (const rel of r2cRelationships) {
-        assert.ok([6, 3].includes(rel.confidence), `expected r2c confidence to be the same-root (6) or cross-root (3) tier, got ${rel.confidence}`);
-        // Floor-consistency fix (was BACKLOG.md unitsByRoot/allUnits
-        // divergence): a sub-floor source (the real Waltz case was
-        // JWTAuthenticationFilter) is no longer a relationship endpoint,
-        // so remaining r2c sources are emitted units and grade architecture.
-        assert.equal(rel.grade, 'architecture', `expected architecture grade on ${rel.from} -> ${rel.to}, got ${rel.grade}`);
-      }
+      // T-LR-3 real-data update: 7 -> 0 real r2c relationships on this real
+      // scan — NOT a loss of signal, verified via direct investigation
+      // (not assumed). The new bare-`@Service` catalogue row gives classes
+      // like SettingsService their own first-class 'service' unit for the
+      // first time (previously invisible, hence eligible as an r2c bridge
+      // candidate under the old `nodeToUnit.has(bridgeNodeId)` gate). Once
+      // such a class has its own unit, it's no longer bridge-eligible at
+      // all — it now produces TWO real direct R1 edges instead of one
+      // weak, uncorroborated r2c edge: strictly stronger evidence for the
+      // same real chain, confirmed against real source before updating
+      // this test.
+      assert.equal(facts.relationships.filter((r) => r.mechanism === 'r2c').length, 0, 'expected 0 r2c relationships — the real candidates this mechanism used to catch are now real first-class service nodes with their own direct edges');
       assert.ok(
         !facts.relationships.some((r) => String(r.from).includes('JWTAuthenticationFilter')),
         'sub-floor source JWTAuthenticationFilter must not anchor a relationship — it is an IgnoredItem, not an emitted unit'
       );
 
       // The exact real case grep-verified while building this: SettingsEndpoint
-      // (waltz-web) references SettingsDao (waltz-data) directly — no
-      // interface, no ambiguity, confirmed via real source before writing
-      // this assertion.
-      const settingsRel = facts.relationships.find((r) => r.mechanism === 'r2c' && r.from.endsWith('SettingsEndpoint.java') && r.to.includes('SettingsDao'));
-      assert.ok(settingsRel, `expected SettingsEndpoint -> SettingsDao to resolve via r2c; got r2c relationships: ${r2cRelationships.map((r) => `${r.from} -> ${r.to}`).join(' | ')}`);
+      // (waltz-web) references SettingsService (waltz-service, a real,
+      // now-visible bare-`@Service` class, no interface) which itself
+      // directly imports SettingsDao (waltz-data) — no ambiguity. Both hops
+      // now resolve as real, direct, architecture-grade R1 edges (Graphify
+      // reconciler, mechanism: undefined) rather than one inferred r2c hop.
+      const endpointToService = facts.relationships.find(
+        (r) => r.from.endsWith('SettingsEndpoint.java') && r.to.endsWith('SettingsService.java') && r.grade === 'architecture'
+      );
+      const serviceToDao = facts.relationships.find(
+        (r) => r.from.endsWith('SettingsService.java') && r.to.includes('SettingsDao') && r.grade === 'architecture'
+      );
+      assert.ok(endpointToService, `expected SettingsEndpoint -> SettingsService to resolve as a real direct edge; got relationships from SettingsEndpoint: ${facts.relationships.filter((r) => r.from.endsWith('SettingsEndpoint.java')).map((r) => r.to).join(' | ')}`);
+      assert.ok(serviceToDao, `expected SettingsService -> SettingsDao to resolve as a real direct edge; got relationships from SettingsService: ${facts.relationships.filter((r) => r.from.endsWith('SettingsService.java')).map((r) => r.to).join(' | ')}`);
 
       const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
       assert.equal(errors, 0);
@@ -806,20 +886,37 @@ test(
 );
 
 test(
-  'R2 multi-hop bridge: a real reference Java/JAX-RS banking platform (fineract-charge module) produces ZERO fabricated relationships and exactly 2 honest unresolved-multi-hop items (design note §1 prediction confirmed)',
+  'R2 multi-hop bridge: a real reference Java/JAX-RS banking platform (fineract-charge module) produces ZERO fabricated relationships and exactly 7 honest unresolved-multi-hop items (T-LR-3 real-data update, each one individually verified against real source)',
   { skip: !fs.existsSync(JAVA_SAMPLE_ROOT) && 'spikes/fineract/repo not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { outDir } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
       const multiHopItems = facts.ignoredItems.filter((i) => i.detail?.startsWith('unresolved-multi-hop'));
-      // Real a reference Java/JAX-RS banking platform-charge alone: ChargesApiResource's ChargeReadPlatformService
-      // bridge has 0 candidate implementers in scope (the real implementer
-      // lives in fineract-provider, a third module — see the design note §1)
-      // and a ChargeRequest DTO bridge also resolves to 0 — exactly 2, not the
-      // 34 annotation-noise items an earlier version of this detector produced
-      // before the isRealBridgeCandidate fix.
-      assert.equal(multiHopItems.length, 2, `expected exactly 2 honest unresolved-multi-hop items, got ${multiHopItems.length}: ${multiHopItems.map((i) => i.detail).join(' | ')}`);
+      // Was exactly 2 (ChargesApiResource's ChargeReadPlatformService bridge
+      // — real implementer lives in fineract-provider, a third module, see
+      // the design note §1 — and a ChargeRequest DTO bridge), both still
+      // present and unaffected below. T-LR-3's new bare-`@Service`
+      // catalogue row (signal-catalogue.yml) makes 4 more real classes in
+      // this module into bridge SOURCES for the first time — each of the 5
+      // new items verified against real source before updating this count,
+      // not just bumped to make the test pass (CLAUDE.md's own "run it
+      // against a real fixture and check the actual output" rule):
+      // - 3 real command handlers (CreateChargeDefinitionCommandHandler,
+      //   DeleteChargeDefinitionCommandHandler, UpdateChargeDefinitionCommandHandler)
+      //   each reference ChargeWritePlatformService, the exact same
+      //   "real implementer lives in a third module" shape as the flagship
+      //   case above — correct, honest new coverage, not noise.
+      // - 2 items (ChargeRepositoryWrapper referencing the two exception
+      //   types it throws) are real but architecturally meaningless noise:
+      //   an exception class is not a service-layer bridge. A genuine,
+      //   pre-existing gap in isRealBridgeCandidate (it excludes annotation-
+      //   type/out-of-root noise, not exception-shaped references), newly
+      //   SURFACED (not introduced) because ChargeRepositoryWrapper was
+      //   never a bridge SOURCE before this catalogue row existed — filed
+      //   as its own BACKLOG row ("Exception classes mistaken for multi-hop
+      //   bridge candidates"), not silently absorbed into this count.
+      assert.equal(multiHopItems.length, 7, `expected exactly 7 honest unresolved-multi-hop items, got ${multiHopItems.length}: ${multiHopItems.map((i) => i.detail).join(' | ')}`);
       // T-P0-1 (E2) round 3 — scoped to R2's own mechanism tags
       // (r2-phase1/r2b/r2c), not every graphify 'calls' edge with a
       // confidence value. E2's graded fact admission (mechanism:
@@ -833,11 +930,29 @@ test(
       );
       assert.equal(r2Relationships.length, 0, 'fineract-charge alone must NOT close its S1 gap via R2 Phase 1 — a real, honestly-predicted residual (design note §1), never a fabricated edge');
 
+      // T-LR-3 real-data update (2026-08-16): S1 ("zero service-touching
+      // relationships") no longer fires for fineract-charge alone — a real,
+      // separate finding from the R2-Phase-1 residual checked above. The new
+      // bare-`@Service` catalogue row gives ChargeRepositoryWrapper its own
+      // real 'service' unit (previously invisible), and it genuinely
+      // touches persistence directly WITHIN this single module — real
+      // `ChargeRepositoryWrapper -> ChargeRepository`/`-> Charge` edges,
+      // both grading 'architecture', confirmed via a direct scan before
+      // updating this assertion, not assumed. S1 was never a claim that NO
+      // real service-touching signal could exist in this module — only that
+      // none was VISIBLE before this catalogue row existed. The R2
+      // Phase 1/2b/2c residual above (ChargesApiResource's own bridge still
+      // unresolved, real implementer in fineract-provider) is untouched and
+      // still the honest multi-hop residual this design note predicted.
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
       assert.ok(
-        coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
-        'S1 must still fire — this IS the honest residual, not a regression'
+        !coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
+        'S1 must NOT fire anymore — ChargeRepositoryWrapper is now a real, visible service-touching-persistence unit within this module alone'
       );
+      const wrapperRel = facts.relationships.find(
+        (r) => r.from.endsWith('ChargeRepositoryWrapper.java') && r.to.endsWith('ChargeRepository.java') && r.grade === 'architecture'
+      );
+      assert.ok(wrapperRel, 'expected a real ChargeRepositoryWrapper -> ChargeRepository architecture-grade edge, confirming S1 closed for a real reason, not a scoring bug');
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -926,9 +1041,40 @@ test(
       // degraded-run value (60-64) and far above a real "detection broke"
       // signal (would show as near-zero).
       assert.ok(r0Graded.length >= 50, `expected at least 50 direct-reconciler relationships (floor, not the old brittle exact-94 pin — see 2026-08-13 comment above), got ${r0Graded.length}`);
+      // T-LR-3 real-data update (2026-08-16): grading (relationship-grading.ts)
+      // has always been `fromKind === 'service' || toKind === 'service' ?
+      // 'architecture' : 'structural'` — this test's OLD blanket "every
+      // r0Graded relationship must be structural" assertion was only ever
+      // true because no r0Graded edge's endpoints resolved to a real
+      // 'service' unit. T-LR-3's new bare-`@Service` catalogue row makes a
+      // real, common Fineract convention — a thin "RepositoryWrapper"
+      // service-layer class wrapping a Spring Data repository
+      // (GLAccountRepositoryWrapper, CodeValueRepositoryWrapper,
+      // OfficeRepositoryWrapper, AppUserRepositoryWrapper, and more,
+      // grep-verified real `@Service` classes) — visible as real 'service'
+      // units for the first time, so their real, pre-existing
+      // direct-reconciler edges to their own repository/entity now
+      // CORRECTLY grade 'architecture' instead of being lumped into
+      // structural entity-mesh noise. Verified against real output before
+      // updating this assertion, not assumed: grading is checked against
+      // each relationship's OWN resolved endpoint kinds, not a fixed count.
+      const nodeKindById = new Map(calm.nodes.map((n) => [n['unique-id'], n['node-type']]));
       for (const rel of r0Graded) {
-        assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural', `expected structural grade on ${rel['unique-id']} (entity<->entity, no service endpoint)`);
+        const conn = rel['relationship-type']?.connects;
+        const endpointIsService = conn && (nodeKindById.get(conn.source.node) === 'service' || nodeKindById.get(conn.destination.node) === 'service');
+        const expectedGrade = endpointIsService ? 'architecture' : 'structural';
+        assert.equal(
+          relMetadata(rel, 'x-aac-relationship-grade'),
+          expectedGrade,
+          `expected ${expectedGrade} grade on ${rel['unique-id']} (${endpointIsService ? 'a real service endpoint' : 'entity<->entity, no service endpoint'})`
+        );
       }
+      // Positive proof this real new coverage actually fired, not just that
+      // grading didn't crash: a specific, grep-verified real edge.
+      const glAccountWrapperRel = r0Graded.find(
+        (rel) => rel['relationship-type']?.connects?.source.node?.endsWith('GLAccountRepositoryWrapper.java') && relMetadata(rel, 'x-aac-relationship-grade') === 'architecture'
+      );
+      assert.ok(glAccountWrapperRel, 'expected GLAccountRepositoryWrapper (real bare-@Service RepositoryWrapper) -> its repository/entity to grade architecture, confirming the new catalogue row is real new coverage, not just a non-regression');
 
       // T-LR-2 (2026-08-13) — real, new finding while adding direct-delegate
       // detection: InternalExternalEventsApiResource references
@@ -969,18 +1115,24 @@ test(
     const { outDir } = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
-      // This IS the documented baseline (coe-lab/docs/fineract-gold-vs-platform-finding.md):
-      // ChargesApiResource (service) + Charge (database) both present, 0
-      // relationships touch a service unit — dual-unit Graphify gate +
-      // multi-hop layering (AREC R2, not yet built). If R2 ships and this
-      // starts failing, that's real progress — update this test then, don't
-      // silently leave S1 unasserted.
+      // T-LR-3 real-data update (2026-08-16): the original baseline here
+      // (coe-lab/docs/fineract-gold-vs-platform-finding.md) predated the
+      // bare-`@Service` catalogue row and its own comment named exactly
+      // this update as expected progress, not a regression to guard
+      // against: "If R2 ships and this starts failing, that's real
+      // progress — update this test then." ChargeRepositoryWrapper (a real,
+      // bare-`@Service` class, grep-verified) now gets its own 'service'
+      // unit and has real direct edges to ChargeRepository/Charge within
+      // this module alone — 3 real architecture-grade relationships (2
+      // distinct target pairs, one duplicated `connects`+`calls` edge for
+      // the ChargeRepository target), confirmed via a direct scan before
+      // updating this count. S1 correctly no longer fires for THIS module.
       assert.ok(coverage.completeness.serviceUnitCount >= 1, 'expected at least one service unit');
       assert.ok(coverage.completeness.databaseUnitCount >= 1, 'expected at least one database unit');
-      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 0, 'expected 0 service-touching relationships (pre-R2 baseline)');
+      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 3, 'expected 3 real service-touching relationships from ChargeRepositoryWrapper (T-LR-3 real new coverage)');
       assert.ok(
-        coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
-        'expected S1 silence flag to be raised'
+        !coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
+        'S1 must NOT fire — real service-touching connectivity now exists in this module alone'
       );
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
@@ -1023,9 +1175,20 @@ test(
     const charge = runPipeline([path.join(JAVA_SAMPLE_ROOT, 'fineract-charge')]);
     try {
       const coverage = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'coverage-report.json'), 'utf8'));
-      assert.equal(coverage.completeness.serviceUnitCount, 1);
-      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 0, 'the R2 residual means ChargesApiResource has no architecture-grade outbound edge');
-      assert.equal(coverage.completeness.architectureOutboundCoverage, 0, 'expected 0% architecture coverage for the fineract-charge residual');
+      // T-LR-3 real-data update (2026-08-16): 1 -> 5 service units —
+      // ChargesApiResource plus 4 real bare-`@Service` classes the new
+      // catalogue row makes visible for the first time (ChargeRepositoryWrapper,
+      // CreateChargeDefinitionCommandHandler, DeleteChargeDefinitionCommandHandler,
+      // UpdateChargeDefinitionCommandHandler). Of those, exactly 1
+      // (ChargeRepositoryWrapper) has a real architecture-grade outbound
+      // edge within this module alone (-> ChargeRepository/Charge,
+      // confirmed via direct scan); the other 4 (ChargesApiResource + the 3
+      // command handlers) still hit the same honest R2 residual as before
+      // (their real implementer/target lives in fineract-provider, a third
+      // module) — real progress on one shape, the other residual unchanged.
+      assert.equal(coverage.completeness.serviceUnitCount, 5);
+      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 1, 'ChargeRepositoryWrapper now has a real architecture-grade outbound edge; the other 4 services still hit the cross-module R2 residual');
+      assert.equal(coverage.completeness.architectureOutboundCoverage, 0.2, 'expected 20% architecture coverage (1/5 services) for fineract-charge alone');
     } finally {
       fs.rmSync(charge.outDir, { recursive: true, force: true });
     }
@@ -2500,15 +2663,26 @@ test(
       const facts = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'typed-facts.json'), 'utf8'));
       const coverage = JSON.parse(fs.readFileSync(path.join(charge.outDir, 'coverage-report.json'), 'utf8'));
       const queue = buildReviewQueue(facts, coverage);
-      // Real baseline: fineract-charge has 1 service + 2 database units, 0
-      // service-touching relationships -> S1 fires for all 3.
-      assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 3);
+      // T-LR-3 real-data update (2026-08-16): S1 no longer fires at all —
+      // ChargeRepositoryWrapper's real architecture-grade edges (see the
+      // silence-metrics test above) mean this module no longer has ZERO
+      // service-touching relationships, so the OLD "1 service + 2 database,
+      // 0 service-touching -> S1x3" baseline no longer holds. Instead,
+      // run-wide architecture coverage sits at 20% (1/5 services with a
+      // real outbound edge), below the 50% review threshold, so
+      // 'low-architecture-coverage' fires for the 4 services with no
+      // outbound edge — a different, real trigger for the same underlying
+      // honest residual (ChargesApiResource's real implementer still lives
+      // in fineract-provider, a third module), confirmed via a direct scan.
+      assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0);
+      assert.equal(queue.items.filter((i) => i.trigger === 'low-architecture-coverage').length, 4);
       assert.ok(queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')));
-      // T-L3-3 — this unit has a real, named unresolved-multi-hop residual
-      // on file (T-C1); the review-queue rationale must surface that
-      // specific detail, not just a generic "see AREC R2" pointer.
       const chargesApiItem = queue.items.find((i) => i.unitId.endsWith('ChargesApiResource.java'));
-      assert.ok(chargesApiItem.rationale.includes('unresolved-multi-hop'), `expected the specific unresolved-multi-hop detail in the rationale, got: ${chargesApiItem.rationale}`);
+      assert.equal(chargesApiItem.trigger, 'low-architecture-coverage');
+      assert.ok(
+        chargesApiItem.rationale.includes('no real outbound architecture-grade relationship'),
+        `expected the low-architecture-coverage rationale naming the missing outbound edge, got: ${chargesApiItem.rationale}`
+      );
       // S2 must NOT fire here — ChargesApiResource has real security-rbac-002
       // call-site control evidence (T-D1), so it correctly has no S2 item.
       assert.equal(queue.items.filter((i) => i.trigger === 'S2-http-without-security-control').length, 0);

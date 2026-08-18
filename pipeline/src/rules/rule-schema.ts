@@ -21,6 +21,18 @@ export interface CatalogueRule {
   category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control';
   weight: number;
   calmNodeType: 'service' | 'database' | 'topic'; // 'topic' added T-X7-2, for messaging-consumer decorator rules (@KafkaListener/@JmsListener) — same CONTRACT_VERSION 4.0.0 bump as TypedUnit.kind's own 'topic' addition
+  // T-LR-3 — OPTIONAL, defaults to false/absent. Marks a row as usable by
+  // multi-hop-bridge-detector.ts's stereotype-disambiguation branch (a
+  // bridge with 2+ real `implements` candidates resolves when exactly one
+  // carries one of these signals). Read directly off the SAME row that
+  // already defines the signal name (spring-service-stereotype) rather than
+  // duplicating the name into a second catalogue — the one prior precedent
+  // for this class of fix (T-LR-1's `wiring-annotation-catalogue.yml`)
+  // needed a separate catalogue because no signal-catalogue.yml row already
+  // existed for `@Configuration`; here one already does, so a second literal
+  // copy of "Service" would itself be the drift risk this pattern exists to
+  // avoid.
+  bridgeStereotype?: boolean;
 }
 
 export interface SignalCatalogue {
@@ -105,4 +117,18 @@ export function findRule(
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * T-LR-3 — every raw signal name usable for multi-hop-bridge-detector.ts's
+ * stereotype-disambiguation branch, read directly from signal-catalogue.yml's
+ * `bridgeStereotype: true` rows (catalogue-driven, never a hardcoded name in
+ * the detector itself — same discipline `wiringAnnotationNames`
+ * (wiring-annotation-schema.ts) already established for T-LR-1). A row's
+ * `matchSignal` may itself be a `|`-separated alternation (rule-schema.ts's
+ * own convention), so this splits and flattens rather than assuming one
+ * name per row.
+ */
+export function bridgeStereotypeSignals(catalogue: SignalCatalogue): string[] {
+  return catalogue.rules.filter((r) => r.bridgeStereotype === true).flatMap((r) => r.matchSignal.split('|'));
 }

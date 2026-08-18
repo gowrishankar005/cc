@@ -26,7 +26,11 @@ import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-im
  * silently assumed safe — the existing unique-id-uniqueness regression
  * test (T-X2-1) would catch it the moment a real fixture triggers it.
  */
-export function detectMessagingUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): ImportStrategyResult {
+export function detectMessagingUnits(
+  run: GraphifyRun,
+  existingServiceFilePaths: Set<string> = new Set(),
+  overridableServiceFilePaths: Set<string> = new Set()
+): ImportStrategyResult {
   const rulesDir = path.join(__dirname, '..', '..', 'rules');
   const catalogue = loadMessagingDetectionCatalogue(rulesDir);
   const libraries = importOnlyMessagingLibraries(catalogue);
@@ -44,6 +48,7 @@ export function detectMessagingUnits(run: GraphifyRun, existingServiceFilePaths:
     },
     existingServiceFilePaths,
     new Map(),
-    wiringOnlyAnnotations
+    wiringOnlyAnnotations,
+    overridableServiceFilePaths
   );
 }

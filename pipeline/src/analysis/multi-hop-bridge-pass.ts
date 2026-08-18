@@ -1,5 +1,6 @@
 import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { detectMultiHopBridgeRelationships } from './cross_package/multi-hop-bridge-detector';
+import { bridgeStereotypeSignals } from '../rules/rule-schema';
 
 /**
  * AREC Wave 3 T-C1 (R2). Reuses the SAME ctx.graphifyRun detectPersistencePass
@@ -20,7 +21,11 @@ export const multiHopBridgePass: AnalysisPass = {
   name: 'multiHopBridge',
   run(ctx: AnalysisContext) {
     if (!ctx.graphifyRun) return;
-    const { relationships, ignoredItems, examinedPairs, examinedBridgeFiles } = detectMultiHopBridgeRelationships(ctx.graphifyRun, ctx.unitsByRoot);
+    const { relationships, ignoredItems, examinedPairs, examinedBridgeFiles } = detectMultiHopBridgeRelationships(
+      ctx.graphifyRun,
+      ctx.unitsByRoot,
+      bridgeStereotypeSignals(ctx.catalogue)
+    );
     if (relationships.length > 0) {
       console.log(`[run-slice] multi-hop bridge (R2): ${relationships.length} architecture relationship(s) resolved`);
     }

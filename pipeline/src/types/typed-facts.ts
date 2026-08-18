@@ -159,12 +159,27 @@ export interface TypedRelationship {
   // Graphify edge whose OTHER endpoint doesn't resolve to a real TypedUnit,
   // admitted with a synthesized `kind: 'unresolved'` placeholder unit on
   // that side instead of being silently dropped by
-  // graphify-reconciler.ts's `if (!from || !to) continue`. Not one of
-  // Contract_Evolution_Policy.md §1's tracked closed unions (only
-  // Evidence.source/category, TypedUnit.kind, TypedRelationship.kind,
-  // IgnoredItem.reason are) — this field is advisory provenance no module's
-  // core logic branches on, so widening it needs no CONTRACT_VERSION bump.
-  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'admitted-unresolved';
+  // graphify-reconciler.ts's `if (!from || !to) continue`.
+  // 'r2-stereotype' added for T-LR-3 (BACKLOG.md "Plain-interface bridge
+  // detection") — a bridge with 2+ real `implements` candidates (previously
+  // always refused as ambiguous) resolves when exactly ONE of them carries
+  // real, catalogue-recognized `@Service` stereotype evidence
+  // (spring-service-stereotype in signal-catalogue.yml) and the terminal
+  // check (implementer IS itself a database/topic unit) also passes —
+  // the same disambiguation-by-corroboration mechanism the CodeQL
+  // DI-resolution experiment verified at real scale
+  // (E1b-codeql-di-resolution-experiment.md's own "stereotype" mechanism).
+  // Deliberately does NOT also chase the r2b store-import hop after
+  // disambiguating — compounding an ambiguity-resolution step with a second
+  // inferred hop in the same edge would stack two layers of inference
+  // beyond what E1b's own evidence covers; 0 or 2+ stereotype-carrying
+  // implementers still refuses, same "never guess" discipline as every
+  // other branch. Not one of Contract_Evolution_Policy.md §1's tracked
+  // closed unions (only Evidence.source/category, TypedUnit.kind,
+  // TypedRelationship.kind, IgnoredItem.reason are) — this field is
+  // advisory provenance no module's core logic branches on, so widening it
+  // needs no CONTRACT_VERSION bump.
+  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved';
 }
 
 export interface IgnoredItem {
