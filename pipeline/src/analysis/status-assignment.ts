@@ -32,16 +32,20 @@ function statusForUnit(unit: TypedUnit, contradictedUnitIds: Set<string>): FactS
   // never 'observed'/'externally-verified' from code alone.
   if (unit.kind === 'unresolved') return 'requires-review';
   // T-FS-4 (BACKLOG.md "Secondary sources may introduce facts, not only
-  // corroborate") — a unit cdxgen-corroboration-pass.ts introduced with NO
-  // primary/code evidence at all (its entire evidence array is
-  // 'dependency-manifest'-sourced) stays at its own tier permanently, never
-  // promoted by a confidence-band computation alone: introducing a fact
+  // corroborate") / T-LR-5 — a unit a secondary/tertiary source introduced
+  // with NO primary/code evidence at all (its entire evidence array comes
+  // from a source that only ever CORROBORATES or INTRODUCES, never a
+  // primary detection mechanism: cdxgen's SBOM reading, or CodeQL's
+  // whole-database DI resolution) stays at its own tier permanently, never
+  // promoted by a confidence-band computation alone — introducing a fact
   // this way is explicitly weaker than even a single low-confidence code
-  // signal, since no file:line exists to point a human at. Checked BEFORE
-  // the openapi check below: a dependency-manifest-only unit by definition
-  // has no openapi evidence either, so this never actually shadows it —
-  // stated for the reader, not because the two conditions can both fire.
-  if (unit.evidence.every((e) => e.source === 'dependency-manifest')) return 'requires-review';
+  // signal, since no file:line this pipeline's own extraction actually
+  // walked exists to point a human at. Checked BEFORE the openapi check
+  // below: a unit matching this condition by definition has no openapi
+  // evidence either, so this never actually shadows it — stated for the
+  // reader, not because the two conditions can both fire.
+  const SECONDARY_ONLY_SOURCES = ['dependency-manifest', 'codeql-di'];
+  if (unit.evidence.every((e) => SECONDARY_ONLY_SOURCES.includes(e.source))) return 'requires-review';
   // T-FS-3 — a real, unresolved disagreement between two evidence sources
   // about the same fact overrides the confidence band: the band measures
   // HOW MUCH evidence exists, not whether it agrees with itself.

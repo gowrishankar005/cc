@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass, existingServiceFilePaths, overridableServiceFilePaths, pushAll } from './pass-registry';
+import { AnalysisContext, AnalysisPass, existingServiceFilePaths, overridableServiceFilePaths, findOverridableServiceUnit, pushAll } from './pass-registry';
 import { composeRoutesForFile } from './route-composer-registry';
 import { mapSignalsToUnits } from './signal-mapper';
 import { runGraphifyPass } from '../scanner/graphify-provider';
@@ -17,6 +17,7 @@ import { multiHopBridgePass } from './multi-hop-bridge-pass';
 import { cfnRoutePass } from './cfn-route-pass';
 import { contradictionPass } from './contradiction-pass';
 import { assignStatuses } from './status-assignment';
+import { codeqlDiPass } from './codeql-di-pass';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -58,6 +59,17 @@ export const mapSignalsPass: AnalysisPass = {
       for (const u of units) {
         if (u.confidence < CONFIDENCE_FLOOR) {
           ctx.allIgnoredItems.push(ignoreLowConfidence(u.id, u.confidence));
+          // T-LR-3 follow-up bugfix — same "service, framework-bootstrap-only"
+          // criterion overridableServiceFilePaths uses, kept even sub-floor so
+          // detectPersistencePass/detectMessagingPass can still merge this
+          // stereotype's evidence onto a real unit they build for the same
+          // file (see AnalysisContext.subFloorServiceUnits doc comment). This
+          // unit is NEVER added to allUnits/unitsByRoot/CALM output on its
+          // own — the confidence floor is unaffected.
+          if (u.kind === 'service' && u.evidence.every((e) => e.category === 'framework-bootstrap')) {
+            if (!ctx.subFloorServiceUnits) ctx.subFloorServiceUnits = [];
+            ctx.subFloorServiceUnits.push(u);
+          }
         } else {
           ctx.allUnits.push(u);
           emitted.push(u);
@@ -100,16 +112,19 @@ export const detectPersistencePass: AnalysisPass = {
         let replacedCount = 0;
         for (const pu of persistenceUnits) {
           if (!overridable.has(pu.filePath)) continue;
-          const weakUnitIndex = ctx.allUnits.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
-          if (weakUnitIndex === -1) continue;
+          const found = findOverridableServiceUnit(ctx, pu.filePath);
+          if (!found) continue;
           // Merge the weak unit's own evidence (the bare stereotype fact)
           // onto the persistence unit before replacing — the real fact
           // stays visible, just no longer determines this unit's kind.
-          pushAll(pu.evidence, ctx.allUnits[weakUnitIndex].evidence);
-          ctx.allUnits.splice(weakUnitIndex, 1);
-          const rootUnitList = ctx.unitsByRoot.get(root) ?? [];
-          const weakRootIndex = rootUnitList.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
-          if (weakRootIndex !== -1) rootUnitList.splice(weakRootIndex, 1);
+          pushAll(pu.evidence, found.unit.evidence);
+          if (found.inAllUnits) {
+            const weakUnitIndex = ctx.allUnits.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
+            if (weakUnitIndex !== -1) ctx.allUnits.splice(weakUnitIndex, 1);
+            const rootUnitList = ctx.unitsByRoot.get(root) ?? [];
+            const weakRootIndex = rootUnitList.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
+            if (weakRootIndex !== -1) rootUnitList.splice(weakRootIndex, 1);
+          }
           replacedCount++;
         }
         if (replacedCount > 0) {
@@ -238,6 +253,12 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // neighbors above — its exact position here is otherwise free. Must
   // still run before gradeRelationshipsPass, the true last pass.
   contradictionPass,
+  // T-LR-5 — must run after reconcilePass/multiHopBridgePass (so its
+  // trust-tier "never contest an existing edge" check sees every relationship
+  // an earlier, more-established mechanism already produced) and before
+  // gradeRelationshipsPass/assignStatusPass (so any relationship or unit it
+  // introduces still gets graded/statused like every other real fact).
+  codeqlDiPass,
   gradeRelationshipsPass,
   assignStatusPass,
 ];

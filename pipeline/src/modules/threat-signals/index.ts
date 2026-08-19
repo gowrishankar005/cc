@@ -61,6 +61,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '12', // bumped for CONTRACT_VERSION 12.0.0 (T-LM-2) — new 'resilience' category, this pass filters on 'http-entry-point'/'security-control' only — reviewed, not just bumped
+  supportedMajorVersion: '13', // bumped for CONTRACT_VERSION 13.0.0 (T-LR-5) — new 'codeql-di'/'codeql' source values, this pass filters on 'http-entry-point'/'security-control' category only — reviewed, not just bumped
   run,
 };

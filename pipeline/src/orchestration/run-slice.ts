@@ -89,7 +89,9 @@ async function runSlice(
   strictOverrides = false,
   includeSystemNode = true,
   enableEnvSoftGraph = false,
-  cfnManifestsDir?: string
+  cfnManifestsDir?: string,
+  codeqlSourceRoot?: string,
+  codeqlBuildCommand?: string
 ): Promise<void> {
   const catalogue = loadSignalCatalogue(path.join(__dirname, '..', 'rules'));
   logEngineCapabilitySummary(loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner')));
@@ -156,6 +158,8 @@ async function runSlice(
     k8sManifestsDir,
     enableEnvSoftGraph,
     cfnManifestsDir,
+    codeqlSourceRoot,
+    codeqlBuildCommand,
   };
   await runPasses(DEFAULT_PASSES, ctx);
   logMem('after runPasses');
@@ -269,6 +273,8 @@ const KNOWN_FLAGS = [
   '--no-system-node',
   '--enable-env-soft-graph',
   '--from-facts',
+  '--codeql-source-root',
+  '--codeql-build-command',
 ];
 
 // Flags that consume the NEXT token as their value — that token must never
@@ -276,7 +282,7 @@ const KNOWN_FLAGS = [
 // version of this function checked every token including flag VALUES, so a
 // real invocation like `--overrides -tmp/session-drafts` would have wrongly
 // rejected a legitimate, if unusually-named, directory argument).
-const VALUE_TAKING_FLAGS = ['--out', '--overrides', '--modules', '--k8s-manifests', '--cfn-manifests', '--from-facts'];
+const VALUE_TAKING_FLAGS = ['--out', '--overrides', '--modules', '--k8s-manifests', '--cfn-manifests', '--from-facts', '--codeql-source-root', '--codeql-build-command'];
 
 function checkForUnknownFlags(args: string[]): void {
   for (let i = 0; i < args.length; i++) {
@@ -303,7 +309,7 @@ function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error(
-      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph]\n' +
+      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>]\n' +
         '   or: run-slice --from-facts <typed-facts.json> [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--no-snippets] [--strict-overrides] [--no-system-node]'
     );
     process.exit(1);
@@ -337,10 +343,14 @@ function main() {
   const cfnManifestsDir = cfnManifestsIdx >= 0 ? path.resolve(args[cfnManifestsIdx + 1]) : undefined;
   const enableEnvSoftGraph = args.includes('--enable-env-soft-graph');
   const enableEnvSoftGraphIdx = args.indexOf('--enable-env-soft-graph');
-  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const codeqlSourceRootIdx = args.indexOf('--codeql-source-root');
+  const codeqlSourceRoot = codeqlSourceRootIdx >= 0 ? path.resolve(args[codeqlSourceRootIdx + 1]) : undefined;
+  const codeqlBuildCommandIdx = args.indexOf('--codeql-build-command');
+  const codeqlBuildCommand = codeqlBuildCommandIdx >= 0 ? args[codeqlBuildCommandIdx + 1] : undefined;
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
-  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir).catch((err) => {
+  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand).catch((err) => {
     console.error('[run-slice] FAILED:', err);
     process.exit(1);
   });

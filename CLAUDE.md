@@ -149,6 +149,8 @@ Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with 
 - `npm test` (from `pipeline/`) is the real regression suite — exact-value assertions against checked-in fixtures, not smoke tests. Some tests reference sample repos that are only present locally for manual testing (see `.gitignore`'s `spikes/` entry) and skip gracefully when absent.
 - New detection coverage should be a catalogue row plus one of the four proven extraction mechanisms, per the Simplicity First principle above — see [`docs/solution/Catalogue_Intake.md`](docs/solution/Catalogue_Intake.md) for the intake process (evidence + test + backlog entry required).
 - Before claiming a fix or a new detection works, run it against a real fixture and check the actual output — don't infer correctness from reading the code.
+- **A new `run-slice` CLI flag is not done until it's a row in `README.md`'s CLI reference table.** A flag that only exists in `run-slice.ts`'s `KNOWN_FLAGS` array and a doc comment is invisible to anyone deciding what the product can actually do — code comments answer "how does this work," not "what can I run." Same for a materially new run-time behavior an existing flag gains.
+- **A new `DEFAULT_PASSES` entry is not done until it's a row in `README.md`'s "What runs by default vs. what needs a flag" table.** Whether a mechanism is always-on or opt-in is exactly the fact that gets buried in code if it isn't stated somewhere a reader can scan in one pass — don't make them read `passes.ts`'s pass-ordering comments to find out.
 
 ## Session economy (no plugin required)
 

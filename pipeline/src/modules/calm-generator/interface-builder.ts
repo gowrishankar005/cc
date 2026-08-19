@@ -36,6 +36,7 @@ const SOURCE_PRECEDENCE: Record<Evidence['source'], number> = {
   extends: 7, // AREC T-E3 — persistence category only, never interface-building for the JPA/spring-data/serverless-entry-point rows; ordered last for the same reason
   'structured-config': 8, // T-PC1-7 — spring-config category only, never listed in any interfaceCategories row (attachPortInterfaces handles server.port separately); ordered last for the same reason as the rows above
   'dependency-manifest': 9, // T-CDX-2/3 — persistence/messaging category only, corroboration-weight-only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
+  'codeql-di': 10, // T-LR-5 — DI-resolution evidence only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
 };
 
 export function attachInterfaces(units: TypedUnit[], nodes: CalmNode[], mapping: NodeTypeMapping): void {

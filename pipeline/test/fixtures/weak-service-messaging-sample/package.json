@@ -1,0 +1,10 @@
+{
+  "name": "weak-service-messaging-sample",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Synthetic fixture for the T-LR-3 follow-up: a bare framework-bootstrap stereotype plus an import-only messaging client must not produce two CALM nodes. Isolates the shape; not a found-in-the-wild sample.",
+  "dependencies": {
+    "@nestjs/common": "^10.0.0",
+    "@aws-sdk/client-sqs": "^3.0.0"
+  }
+}

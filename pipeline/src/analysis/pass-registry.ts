@@ -58,6 +58,9 @@ export interface AnalysisContext {
   enableEnvSoftGraph?: boolean;
   /** T-Y4-1 — set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
   cfnManifestsDir?: string;
+  /** T-LR-5 — set by run-slice.ts from --enable-codeql-di <sourceRoot> <buildCommand>; codeqlDiPass is a no-op unless both this and codeqlBuildCommand are set — same opt-in convention as k8sManifestsDir. Real, non-trivial cost (a real compile + CodeQL database build) and a real license constraint (free-tier CodeQL CLI cannot run in this pipeline's own CI against a non-Open-Source codebase) are why this is never a default-on pass. */
+  codeqlSourceRoot?: string;
+  codeqlBuildCommand?: string;
   /** T-Y5-1 — set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
   cfnRouteBindingsFound?: number;
   cfnRouteBindingsBound?: number;
@@ -73,6 +76,22 @@ export interface AnalysisContext {
   multiHopExaminedPairs?: Set<string>;
   /** T-P0-1 (E2) round 3 continued — see multiHopExaminedPairs; file-level companion (multi-hop-bridge-detector.ts's examinedBridgeFiles) covering edges into a bridge candidate's non-class-level nodes (e.g. its methods) that examinedPairs alone misses. */
   multiHopExaminedFiles?: Set<string>;
+  /**
+   * T-LR-3 follow-up bugfix — units mapSignalsPass rejected as sub-`CONFIDENCE_FLOOR`
+   * (never added to `allUnits`/`unitsByRoot`, only recorded as an `IgnoredItem`
+   * with just a ref string, no evidence) but which are still a bare `service`
+   * stereotype (framework-bootstrap-only evidence) eligible for the same
+   * "replace with a later real detector's unit, merging evidence" treatment
+   * `overridableServiceFilePaths` already gives to units that DID clear the
+   * floor. Real finding: NestJS's bare `@Controller()` decorator
+   * (`nestjs-controller-decorator`, signal-catalogue.yml) has weight 25, under
+   * the 40 floor — a Controller-only file that also imports a messaging
+   * client was silently losing its stereotype evidence entirely, because the
+   * merge logic only ever looked in `allUnits`, where a sub-floor unit never
+   * appears. Without this, `overridableServiceFilePaths` is blind to any
+   * override candidate whose OWN confidence happens to be sub-floor.
+   */
+  subFloorServiceUnits?: TypedUnit[];
 }
 
 export interface AnalysisPass {
@@ -135,11 +154,31 @@ export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
  * evidence) is completely unaffected.
  */
 export function overridableServiceFilePaths(ctx: AnalysisContext): Set<string> {
-  return new Set(
-    ctx.allUnits
-      .filter((u) => u.kind === 'service' && u.evidence.every((e) => e.category === 'framework-bootstrap'))
-      .map((u) => u.filePath)
-  );
+  const paths = ctx.allUnits
+    .filter((u) => u.kind === 'service' && u.evidence.every((e) => e.category === 'framework-bootstrap'))
+    .map((u) => u.filePath);
+  // Sub-floor stereotypes (see AnalysisContext.subFloorServiceUnits) are
+  // already filtered to this same "service, framework-bootstrap-only"
+  // criterion by mapSignalsPass, so they're included unconditionally here.
+  const subFloorPaths = (ctx.subFloorServiceUnits ?? []).map((u) => u.filePath);
+  return new Set([...paths, ...subFloorPaths]);
+}
+
+/**
+ * Finds a weak stereotype unit eligible for replacement at `filePath` —
+ * either a real (floor-cleared) unit still in `ctx.allUnits`, or a sub-floor
+ * one that only exists in `ctx.subFloorServiceUnits` (see that field's doc
+ * comment). Callers merge the returned unit's evidence onto their own new
+ * unit, then splice it out of `allUnits`/`unitsByRoot` ONLY if it was found
+ * there — a sub-floor unit was never in either list, so there's nothing to
+ * splice for it.
+ */
+export function findOverridableServiceUnit(ctx: AnalysisContext, filePath: string): { unit: TypedUnit; inAllUnits: boolean } | undefined {
+  const inAllUnits = ctx.allUnits.find((u) => u.filePath === filePath && u.kind === 'service');
+  if (inAllUnits) return { unit: inAllUnits, inAllUnits: true };
+  const subFloor = (ctx.subFloorServiceUnits ?? []).find((u) => u.filePath === filePath);
+  if (subFloor) return { unit: subFloor, inAllUnits: false };
+  return undefined;
 }
 
 /**

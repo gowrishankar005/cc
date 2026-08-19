@@ -41,6 +41,7 @@ const STEREOTYPE_BARE_COLLISION_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/s
 const DUPLICATE_RELATIONSHIP_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/duplicate-relationship-sample'); // checked-in — a class that both references (field) AND calls (method) the same other unit, reproducing the real duplicate-relationship-object bug shape
 const RESILIENCE_LENS_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/resilience-lens-sample'); // checked-in — T-LM-2: Spring Retry @Retryable on the sole http-entry-point unit + resilience4j timeout-duration config
 const RESILIENCE4J_RETRY_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/resilience4j-retry-sample'); // checked-in — T-LM-2 second-instance verification: Resilience4j's own @Retry, a different library, no HTTP route at all
+const WEAK_SERVICE_MESSAGING_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/weak-service-messaging-sample'); // checked-in — T-LR-3 follow-up: bare stereotype + SQS import must not emit two nodes
 
 function runPipeline(roots, extraArgs = [], nodeArgs = []) {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-test-'));
@@ -1374,6 +1375,48 @@ test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging doubl
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
+test('T-LR-3 follow-up — weak bare-stereotype + messaging import is one topic node, not two (synthetic; persistence already proved the Java half)', () => {
+  const { outDir, calm } = runPipeline([WEAK_SERVICE_MESSAGING_ROOT]);
+  try {
+    const ids = calm.nodes.map((n) => n['unique-id']);
+    assert.equal(new Set(ids).size, ids.length, 'duplicate unique-id — weak-service/messaging collision regression');
+
+    const publisher = findNode(calm, 'OrdersPublisher');
+    assert.ok(publisher, 'OrdersPublisher node missing');
+    assert.equal(publisher['node-type'], 'network', 'bare @Controller + SQS import must become a topic/network node, replacing the weak service unit');
+    const publisherDupes = calm.nodes.filter((n) => (n.name === 'OrdersPublisher' || n['unique-id'].includes('orders.publisher')) && n['unique-id'] !== publisher['unique-id']);
+    assert.equal(publisherDupes.length, 0, `expected exactly one node for orders.publisher.ts, also found: ${publisherDupes.map((n) => n['unique-id']).join(', ')}`);
+
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const publisherUnits = facts.units.filter((u) => u.filePath === 'src/orders.publisher.ts' || u.filePath.endsWith('orders.publisher.ts'));
+    assert.equal(publisherUnits.length, 1, `expected one typed-facts unit for orders.publisher.ts, got ${publisherUnits.length}`);
+    assert.equal(publisherUnits[0].kind, 'topic');
+    assert.ok(publisherUnits[0].evidence.some((e) => e.category === 'messaging'));
+    assert.ok(
+      publisherUnits[0].evidence.some((e) => e.category === 'framework-bootstrap'),
+      'stereotype evidence must merge onto the messaging unit, not be dropped'
+    );
+
+    // Decorator-created service units use `filePath` as unique-id (no
+    // class-name suffix — see messaging-pass.ts's own doc comment), unlike
+    // the import-strategy `filePath::ClassName` units findNode's suffix
+    // match is shaped for — so OrdersApi must be looked up by name.
+    const api = calm.nodes.find((n) => n.name === 'OrdersApi');
+    assert.ok(api, 'OrdersApi node missing');
+    assert.equal(api['node-type'], 'service', 'a real HTTP entry that also imports SQS must stay service-kind');
+    const apiUnits = facts.units.filter((u) => u.filePath === 'src/orders.api.ts' || u.filePath.endsWith('orders.api.ts'));
+    assert.equal(apiUnits.length, 1, `expected one typed-facts unit for orders.api.ts, got ${apiUnits.length}`);
+    assert.equal(apiUnits[0].kind, 'service');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(WEAK_SERVICE_MESSAGING_ROOT, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
@@ -3890,7 +3933,12 @@ test('T-LM-2 (resilience-lens) — @Retryable + resilience4j timeout-duration at
   const { outDir, calm } = runPipeline([RESILIENCE_LENS_ROOT]);
   try {
     const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
-    assert.equal(facts.contractVersion, '12.0.0');
+    // T-LR-5 bumped CONTRACT_VERSION to 13.0.0 (new Evidence.source 'codeql-di',
+    // TypedRelationship.source 'codeql') — this test only cares that
+    // 'resilience' evidence exists, not the exact version string, so assert
+    // the major-version-agnostic fact instead of pinning a version this
+    // test doesn't actually depend on.
+    assert.ok(parseInt(facts.contractVersion, 10) >= 12, `expected contractVersion major >= 12 (introduced Evidence.category 'resilience'), got ${facts.contractVersion}`);
 
     const serviceUnit = facts.units.find((u) => u.kind === 'service');
     assert.ok(serviceUnit, 'expected a real JAX-RS service unit');
@@ -4186,4 +4234,199 @@ test('T-LM-5 real-repo wiring: threat-signals and resilience-lens both surface a
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
   }
+});
+
+test('T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — CodeQL binary absent degrades to an empty result, never a crash', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  cp.execFileSync = () => {
+    throw new Error('spawn codeql ENOENT');
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+  try {
+    const { runCodeQLDiResolution } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
+    const bindings = runCodeQLDiResolution('/fake/source-root', './gradlew compileJava');
+    assert.deepEqual(bindings, [], 'missing codeql binary must degrade to an empty result, matching graphifyy/cdxgen\'s own absence-handling convention');
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+  }
+});
+
+test('T-LR-5 — parseDiResolutionCsv parses di_resolution.ql\'s real 7-column output shape (real rows copied from a live run against Fineract, 2026-08-19)', () => {
+  const { parseDiResolutionCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
+  // Real rows, copied verbatim from a real `codeql bqrs decode --format=csv`
+  // run against a real CodeQL database built from spikes/fineract/repo
+  // (fineract-charge + fineract-provider), 2026-08-19 — the same flagship
+  // chain Architect_Pilot_Feedback_Notes.md traced by hand and
+  // E1b-codeql-di-resolution-experiment.md first found at whole-codebase
+  // scale (2106 total real bindings that same run).
+  const realCsv = [
+    '"injectingClass","fieldName","interfaceType","resolvedImpl","mechanism","injectingFile","implFile"',
+    '"ChargesApiResource","readPlatformService","ChargeReadPlatformService","ChargeReadPlatformServiceImpl","bean-factory","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java","fineract-provider/src/main/java/org/apache/fineract/portfolio/charge/service/ChargeReadPlatformServiceImpl.java"',
+    '"ChargesApiResource","commandsSourceWritePlatformService","PortfolioCommandSourceWritePlatformService","PortfolioCommandSourceWritePlatformServiceImpl","stereotype","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java","fineract-core/src/main/java/org/apache/fineract/commands/service/PortfolioCommandSourceWritePlatformServiceImpl.java"',
+  ].join('\n');
+  const bindings = parseDiResolutionCsv(realCsv);
+  assert.equal(bindings.length, 2);
+  const flagship = bindings.find((b) => b.injectingClass === 'ChargesApiResource' && b.mechanism === 'bean-factory');
+  assert.ok(flagship, 'expected the real bean-factory flagship binding to parse');
+  assert.equal(flagship.resolvedImpl, 'ChargeReadPlatformServiceImpl');
+  assert.equal(flagship.implFile, 'fineract-provider/src/main/java/org/apache/fineract/portfolio/charge/service/ChargeReadPlatformServiceImpl.java');
+  assert.equal(bindings[1].mechanism, 'stereotype');
+
+  // Header-only / empty CSV -> 0 real bindings, not an error.
+  assert.deepEqual(parseDiResolutionCsv('"injectingClass","fieldName","interfaceType","resolvedImpl","mechanism","injectingFile","implFile"'), []);
+  assert.deepEqual(parseDiResolutionCsv(''), []);
+});
+
+test('T-LR-5 — codeqlDiPass introduces a unit + relationship at its own tier, never contests an existing edge (trust tier), never crosses an unscanned root boundary', () => {
+  const codeqlDiProvider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
+  const originalRun = codeqlDiProvider.runCodeQLDiResolution;
+
+  const injectingUnit = {
+    id: 'ChargesApiResource.java',
+    kind: 'service',
+    name: 'ChargesApiResource',
+    filePath: 'src/main/java/example/ChargesApiResource.java',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }],
+    confidence: 40,
+  };
+
+  codeqlDiProvider.runCodeQLDiResolution = () => [
+    {
+      injectingClass: 'ChargesApiResource',
+      fieldName: 'readPlatformService',
+      interfaceType: 'ChargeReadPlatformService',
+      resolvedImpl: 'ChargeReadPlatformServiceImpl',
+      mechanism: 'bean-factory',
+      injectingFile: 'root/src/main/java/example/ChargesApiResource.java',
+      implFile: 'root/src/main/java/example/ChargeReadPlatformServiceImpl.java',
+    },
+    // Same injecting class, a SECOND binding whose target is OUTSIDE the
+    // scanned root entirely — must be skipped, never guessed at.
+    {
+      injectingClass: 'ChargesApiResource',
+      fieldName: 'otherService',
+      interfaceType: 'OtherService',
+      resolvedImpl: 'OtherServiceImpl',
+      mechanism: 'stereotype',
+      injectingFile: 'root/src/main/java/example/ChargesApiResource.java',
+      implFile: 'unscanned-root/src/main/java/example/OtherServiceImpl.java',
+    },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'))];
+  const { codeqlDiPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'));
+
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [injectingUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [injectingUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlDiPass.run(ctx);
+
+    // The out-of-root binding must never introduce a unit or relationship.
+    assert.equal(ctx.allUnits.length, 2, 'expected exactly 1 new unit introduced (the in-root binding), the out-of-root one skipped');
+    const introduced = ctx.allUnits.find((u) => u.id !== injectingUnit.id);
+    assert.equal(introduced.kind, 'service');
+    assert.equal(introduced.name, 'ChargeReadPlatformServiceImpl');
+    assert.equal(introduced.confidence, 10);
+    assert.equal(introduced.evidence.length, 1);
+    assert.equal(introduced.evidence[0].source, 'codeql-di');
+
+    assert.equal(ctx.relationships.length, 1, 'expected exactly 1 new relationship (the out-of-root binding produced none)');
+    const rel = ctx.relationships[0];
+    assert.equal(rel.from, injectingUnit.id);
+    assert.equal(rel.to, introduced.id);
+    assert.equal(rel.source, 'codeql');
+    assert.equal(rel.mechanism, 'codeql-di-bean-factory');
+    assert.equal(rel.confidence, 7);
+    assert.equal(rel.crossPackage, false);
+
+    // Trust tier: running the SAME pass again over a context that already
+    // has this exact relationship must never duplicate it.
+    codeqlDiProvider.runCodeQLDiResolution = () => [
+      {
+        injectingClass: 'ChargesApiResource',
+        fieldName: 'readPlatformService',
+        interfaceType: 'ChargeReadPlatformService',
+        resolvedImpl: 'ChargeReadPlatformServiceImpl',
+        mechanism: 'bean-factory',
+        injectingFile: 'root/src/main/java/example/ChargesApiResource.java',
+        implFile: 'root/src/main/java/example/ChargeReadPlatformServiceImpl.java',
+      },
+    ];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'))];
+    const { codeqlDiPass: codeqlDiPass2 } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'));
+    codeqlDiPass2.run(ctx);
+    assert.equal(ctx.relationships.length, 1, 'must never duplicate a relationship this same pass already produced for the same (from, to) pair');
+  } finally {
+    codeqlDiProvider.runCodeQLDiResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'))];
+  }
+});
+
+test('T-LR-5 — a binding with an empty resolvedImpl (real edge case: CodeQL\'s RefType.getName() on an anonymous implementation class, found running a live scan against fineract-provider 2026-08-19) never introduces an empty-name unit', () => {
+  const codeqlDiProvider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
+  const originalRun = codeqlDiProvider.runCodeQLDiResolution;
+  const injectingUnit = { id: 'AdhocQueryConfiguration.java', kind: 'service', name: 'x', filePath: 'src/main/java/example/AdhocQueryConfiguration.java', startLine: 1, endLine: 1, evidence: [{ signal: 'Configuration', source: 'decorator', category: 'framework-bootstrap', weight: 40, ref: 'x:1' }], confidence: 40 };
+  codeqlDiProvider.runCodeQLDiResolution = () => [
+    {
+      injectingClass: 'AdhocQueryConfiguration',
+      fieldName: 'x',
+      interfaceType: 'SomeInterface',
+      resolvedImpl: '', // real, observed value for an anonymous `new SomeInterface() { ... }` implementation
+      mechanism: 'bean-factory',
+      injectingFile: 'root/src/main/java/example/AdhocQueryConfiguration.java',
+      implFile: 'root/src/main/java/example/AdhocQueryConfiguration.java',
+    },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'))];
+  const { codeqlDiPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'));
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [injectingUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [injectingUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlDiPass.run(ctx);
+    assert.equal(ctx.allUnits.length, 1, 'an empty-name binding must never introduce a unit — CALM\'s own schema forbids empty string properties');
+    assert.equal(ctx.relationships.length, 0);
+  } finally {
+    codeqlDiProvider.runCodeQLDiResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'))];
+  }
+});
+
+test('T-LR-5 — codeqlDiPass is a no-op unless BOTH codeqlSourceRoot and codeqlBuildCommand are set (opt-in only, never a default-on path)', () => {
+  const { codeqlDiPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-di-pass'));
+  const ctx1 = { packageRoots: ['/fake'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), relationships: [] };
+  codeqlDiPass.run(ctx1);
+  assert.equal(ctx1.relationships.length, 0);
+
+  const ctx2 = { packageRoots: ['/fake'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), relationships: [], codeqlSourceRoot: '/fake' };
+  codeqlDiPass.run(ctx2); // build command missing -> still a no-op
+  assert.equal(ctx2.relationships.length, 0);
+});
+
+test('T-LR-5 — a codeql-di-introduced unit and the relationship pointing at it both read requires-review (T-FS-6\'s "introduced, never promoted" hard rule extended)', () => {
+  const { assignStatuses } = require(path.join(PIPELINE_ROOT, 'dist/analysis/status-assignment'));
+  const injectingUnit = { id: 'ChargesApiResource.java', kind: 'service', name: 'x', filePath: 'x', startLine: 1, endLine: 1, evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }], confidence: 40 };
+  const introducedUnit = { id: 'codeql-di:root:Impl.java', kind: 'service', name: 'Impl', filePath: 'Impl.java', startLine: 1, endLine: 1, evidence: [{ signal: 'codeql-di:bean-factory', source: 'codeql-di', category: 'framework-bootstrap', weight: 10, ref: 'Impl.java:1' }], confidence: 10 };
+  const rel = { from: injectingUnit.id, to: introducedUnit.id, kind: 'calls', crossPackage: false, source: 'codeql', confidence: 7, mechanism: 'codeql-di-bean-factory' };
+  assignStatuses([injectingUnit, introducedUnit], [rel], []);
+  assert.equal(introducedUnit.status, 'requires-review');
+  assert.equal(rel.status, 'requires-review', 'a relationship anchored to a not-yet-promoted introduced unit must itself read requires-review');
 });

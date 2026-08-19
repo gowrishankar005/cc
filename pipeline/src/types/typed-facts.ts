@@ -52,7 +52,7 @@ export interface Evidence {
   // already use) and timeout config reuses the existing 'structured-config'
   // source (same spring-config-provider.ts flat-key read datasource/broker
   // extraction already uses). Only Evidence.category gained a value.
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest';
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest' | 'codeql-di';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 — a Lambda
   // handler's `implements RequestHandler` clause. Deliberately NOT the same category
   // as 'http-entry-point' even though it must win the same kind tie-break
@@ -173,7 +173,7 @@ export interface TypedRelationship {
   // 'k8s' added alongside 'shares-secret' in the same 3.0.0 bump — the k8s
   // manifest provider (scanner/k8s-manifest-provider.ts) is a third
   // relationship-evidence source, distinct from codegraph/graphify.
-  source: 'codegraph' | 'graphify' | 'k8s';
+  source: 'codegraph' | 'graphify' | 'k8s' | 'codeql';
   // T-X9-1 — additive OPTIONAL field (Contract_Evolution_Policy.md §2(b),
   // no CONTRACT_VERSION bump needed: an unknown optional field is harmless
   // to any existing module). Set only by the env soft-graph detector today
@@ -234,7 +234,16 @@ export interface TypedRelationship {
   // TypedRelationship.kind, IgnoredItem.reason are) — this field is
   // advisory provenance no module's core logic branches on, so widening it
   // needs no CONTRACT_VERSION bump.
-  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved';
+  // 'codeql-di-bean-factory' / 'codeql-di-stereotype' added for T-LR-5
+  // (AGENT_TASKS_Ext_CodeQL_Engine.md) — codeql-di-pass.ts's two branches,
+  // matching di_resolution.ql's own 'mechanism' column exactly: a
+  // @Bean-factory-wired interface->impl binding, or a stereotype-resolved
+  // one CodeQL's whole-database join found but this pipeline's own
+  // Graphify-based r2-stereotype/r2c branches did not reach (different
+  // reach, not a duplicate of those mechanisms — trust-tier-gated,
+  // codeql-di-pass.ts never overrides an edge an earlier mechanism already
+  // produced for the same pair).
+  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved' | 'codeql-di-bean-factory' | 'codeql-di-stereotype';
   // T-FS-6 — same FactStatus vocabulary and same status-assignment.ts /
   // override-applier.ts split as TypedUnit.status (see that field's own doc
   // comment). Additive OPTIONAL, no CONTRACT_VERSION bump.
@@ -353,7 +362,26 @@ export interface IgnoredItem {
 // node-type-mapping.yml's interfaceCategories, same as 'spring-config');
 // threat-signals filters on 'http-entry-point'/'security-control' only
 // (unaffected).
-export const CONTRACT_VERSION = '12.0.0';
+// 13.0.0 (T-LR-5, AGENT_TASKS_Ext_CodeQL_Engine.md): Evidence.source gained
+// 'codeql-di' and TypedRelationship.source gained 'codeql' — both closed-union
+// extensions, tier (c), for the new codeql-di-provider.ts + codeql-di-pass.ts.
+// A second real StructuralEngine-class source (CodeQL's Java data-flow
+// analysis), not a Graphify/CodeGraph variant: it resolves a Spring interface
+// field to its real implementation via two mechanisms neither existing engine
+// can see at all (bean-factory wiring, stereotype-annotated implementers with
+// 2+ syntactic candidates) — see E1b-codeql-di-resolution-experiment.md.
+// 'codeql-di' Evidence.source is used ONLY when codeql-di-pass.ts introduces
+// a placeholder unit for a resolved implementation class with no existing
+// TypedUnit (same "secondary source introduces a fact at its own tier"
+// pattern T-FS-4 established for dependency-manifest evidence — see
+// status-assignment.ts's hard rule, generalized to cover this source too).
+// Both existing modules + resilience-lens reviewed and bumped to
+// supportedMajorVersion "13": none filter on TypedRelationship.source or
+// Evidence.source in a way a new value could silently break (calm-generator's
+// interface-builder.ts SOURCE_PRECEDENCE table gained 'codeql-di', ordered
+// last like every other non-route-shaped source; relationship-builder.ts
+// treats TypedRelationship.source as pass-through provenance metadata only).
+export const CONTRACT_VERSION = '13.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

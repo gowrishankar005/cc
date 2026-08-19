@@ -157,6 +157,78 @@ node dist/orchestration/run-slice.js rootA rootB --out /path/to/out
 npm run validate -- /path/to/out/architecture.calm.json -f pretty
 ```
 
+### What runs by default vs. what needs a flag
+
+Every detection mechanism in the pipeline, classified — kept in sync with
+`analysis/passes.ts`'s `DEFAULT_PASSES` list (source of truth for what
+actually executes) and the CLI reference table below it. **When a new
+Analysis pass is added, add its row here too** — a pass that's silently
+always-on or silently opt-in is exactly the kind of buried capability this
+table exists to prevent.
+
+| Mechanism | Runs by default? | How to reach it |
+|---|---|---|
+| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
+| OpenAPI/Swagger ingestion | **Always** | No flag — auto-discovers `openapi.yaml`/`.json` at each package root |
+| Spring config file reading (`application.yml`/`.properties`) | **Always** | No flag — auto-discovers config files at each package root |
+| Dependency-manifest (SBOM) corroboration + secondary-source introduction | **Always** | No flag — auto-detects `@cyclonedx/cdxgen` on `PATH` and a committed lockfile; a no-op (not an error) when either is absent |
+| CloudFormation/SAM route binding | Opt-in | `--cfn-manifests <dir>` |
+| Kubernetes shared-secret trust relationships | Opt-in | `--k8s-manifests <dir>` |
+| Contradiction detection (k8s manifest vs. Spring config) | Opt-in | `--k8s-manifests <dir>` (same flag, no separate one) |
+| Env-key-name soft-graph correlation | Opt-in | `--enable-env-soft-graph` (also requires `--k8s-manifests`) |
+| CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>` — real, non-trivial cost (a real compile + CodeQL database build), never on by default |
+| Decision Record/Override application | Opt-in | `--overrides <dir>` |
+| calm-generator, threat-signals, resilience-lens modules | **All three, by default** | `--modules <name>,<name>,...` to run a different set |
+
+### `run-slice` CLI reference
+
+Every flag `run-slice.js` accepts, kept in sync with `orchestration/run-slice.ts`'s
+own `KNOWN_FLAGS` list — an unrecognized flag fails loudly rather than being
+silently ignored. **When a change adds or renames a flag, update this table in
+the same change** — a flag that only exists in code comments is invisible to
+anyone deciding what the product can do.
+
+| Flag | Takes a value | Default | What it does |
+|---|---|---|---|
+| `--out <dir>` | Yes | `./calm-output` | Output directory for `typed-facts.json`, `architecture.calm.json`, and module outputs |
+| `--overrides <dir>` | Yes | — (off) | Apply Decision Record/Override pairs from this directory as a final pass after deterministic CALM construction |
+| `--modules <name>,<name>,...` | Yes | `calm-generator,threat-signals,resilience-lens` | Which modules to run — see `docs/solution/Module_Authoring_Guide.md` |
+| `--strict-detect` | No | off | Exit non-zero when routes were expected (grep-verified usage) but zero were found — turns a silent CodeGraph detect-gate failure into a loud one |
+| `--no-snippets` | No | snippets included | Omit source-snippet content from the IR/output (redaction-adjacent; excludes snippet bodies, not evidence pointers) |
+| `--k8s-manifests <dir>` | Yes | — (off) | Read flat/pre-rendered Kubernetes manifests for shared-Secret/ConfigMap trust relationships. **Also activates contradiction detection** (a k8s Deployment image naming a different datastore engine than a Spring-config-sourced unit's own JDBC scheme forces that unit to `requires-review`) — no separate flag for this |
+| `--enable-env-soft-graph` | No | off | Env-key-name-correlation relationships — requires `--k8s-manifests` too; always low, fixed confidence |
+| `--cfn-manifests <dir>` | Yes | — (off) | Read CloudFormation/SAM templates to bind API Gateway routes to their Lambda handlers |
+| `--strict-overrides` | No | off | Fail the run if any Override is rejected (orphaned target, malformed value, inactive Decision Record) instead of reporting and continuing |
+| `--no-system-node` | No | system node included | Omit the synthetic root `system` node and its `composed-of` edges from CALM output |
+| `--from-facts <typed-facts.json>` | Yes | — | Reconstruct CALM output from a previously-generated, frozen `typed-facts.json` — no rescan. Refuses an incompatible `contractVersion` rather than attempting reconstruction |
+| `--codeql-source-root <dir>` | Yes | — (off) | T-LR-5: the real, compilable root CodeQL should index (must be a common ancestor of every `--modules`-relevant package root). Requires `--codeql-build-command` too. See the CodeQL section below — real, non-trivial cost and a real license constraint, never on by default |
+| `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile** — an up-to-date/cached build never re-invokes the compiler, so CodeQL's tracer observes nothing and the database silently comes back empty (a real failure mode found building this, not a hypothetical) |
+
+#### Optional: CodeQL DI-resolution (`--codeql-source-root` / `--codeql-build-command`)
+
+Resolves a Spring interface field to its real implementation via two shapes
+neither CodeGraph nor Graphify can see at all: a `@Bean`-factory method
+inside a `@Configuration` class, or 2+ real `implements` candidates
+disambiguated by a stereotype annotation — see
+[`docs/solution/E1b-codeql-di-resolution-experiment.md`](./docs/solution/E1b-codeql-di-resolution-experiment.md)
+for the real, whole-codebase-scale evidence (2106 real bindings on a real
+reference Java/Spring monorepo).
+
+```bash
+# Requires the CodeQL CLI on PATH and a real, successful compile of the
+# target — real cost (minutes, not seconds), not a default-on path.
+node dist/orchestration/run-slice.js /path/to/module \
+  --codeql-source-root /path/to/repo-root \
+  --codeql-build-command "./gradlew :my-module:compileJava --rerun-tasks"
+```
+
+**Free-tier CodeQL CLI license note:** automated/CI use is only permitted
+against an Open Source Codebase, or under a paid GHAS license — this
+pipeline's own CI does not run this flag. See
+`soln/codeql-licensing-check-memo.md`'s durable summary in
+`docs/solution/AGENT_TASKS_Ext_P0_Experiments.md` before enabling this
+against a private repository in an automated context.
+
 ### Evaluation harness
 
 ```bash

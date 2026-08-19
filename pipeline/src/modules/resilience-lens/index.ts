@@ -67,6 +67,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const resilienceLensModule: Module = {
   name: 'resilience-lens',
-  supportedMajorVersion: '12', // CONTRACT_VERSION 12.0.0 — the version that introduced Evidence.category: 'resilience' this module depends on
+  supportedMajorVersion: '13', // bumped for CONTRACT_VERSION 13.0.0 (T-LR-5) — new 'codeql-di'/'codeql' source values, this module filters on category === 'resilience' only — reviewed, not just bumped
   run,
 };
