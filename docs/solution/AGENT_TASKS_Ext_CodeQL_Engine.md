@@ -1,8 +1,8 @@
 # AGENT TASKS — CodeQL StructuralEngine (T-LR-5 / T-LR-6)
 
 **Lane:** after Session C · **Not** part of Session C (`T-LR-3` / `T-LR-4`)
-**Owner (2026-08-19):** a separate session is executing T-LR-5. Do not start
-a second copy here.
+**Owner (2026-08-19):** T-LR-5 shipped (`6173b36`). Do **not** start a second
+DI engine. Remainder here is **T-LR-6**.
 **Governance/DoD:** `AGENT_TASKS_Semantic_Model_Extension.md`
 **Prior evidence:** `E1-codeql-engine-evaluation.md`,
 `E1b-codeql-di-resolution-experiment.md`, T-P0-2a licensing summary in

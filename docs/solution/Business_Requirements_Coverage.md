@@ -16,7 +16,7 @@ Do not reopen these three as in-flight work. Leftovers stay gated.
 |---|---|---|
 | **A — Lens Modules** | `T-LM-0`, `T-LM-2`, `T-LM-5` | `T-LM-1` no CVE feed; `T-LM-3` no classification facts; `T-LM-4` no cost feed |
 | **B — Fact Semantics** | `T-FS-1`, `T-FS-2`, `T-FS-3`, `T-FS-4`, `T-FS-6` | `T-FS-5` skipped (E5 negative) |
-| **C — Layered Recovery** | `T-LR-1`, `T-LR-2`, `T-LR-3` | `T-LR-4` confirmed blocked on `T-LR-5` |
+| **C — Layered Recovery** | `T-LR-1`, `T-LR-2`, `T-LR-3`; `T-LR-4` closed via T-LR-5 | Exception-as-bridge noise stays BACKLOG |
 
 **Now unblocked (see `AGENT_TASKS_Ext_Execution_Order.md`):**
 
@@ -25,7 +25,7 @@ Do not reopen these three as in-flight work. Leftovers stay gated.
 | `T-CL-1`…`T-CL-4` Contract & Lifecycle | T-FS-6 done — BR-70 / NFR-20 critical path |
 | `T-CL-5` Emission-coverage | No gate |
 | `T-RT-1`, `T-RT-2` Review Throughput | T-FS-1 and T-FS-6 done |
-| `T-LR-5` / `T-LR-6` CodeQL engine + trust tiers | Reserved for the CodeQL file, not Session C |
+| `T-LR-6` Per-(engine, fact-type) trust tiers | T-LR-5 done; this is the remainder in the CodeQL file |
 | `T-MR-3`, `T-MR-5` | Independent `[B]` items |
 | `T-LM-8` Pattern-conformance stance | Written decision; do not wait for T-LM-1/3/4 |
 
@@ -134,7 +134,7 @@ Pick at most one. Authoritative order: `AGENT_TASKS_Ext_Execution_Order.md`.
 1. **T-CL-1 → 2 → 3 → 4** — highest BR leverage now that status vocabulary exists (BR-70 / NFR-20).
 2. **T-RT-1 then T-RT-2** — NFR-80, both gates green.
 3. **T-CL-5** — smallest, parallel with either of the above.
-4. **T-LR-5** — next *engine* session (unlocks T-LR-4). GHAS before private-repo production.
+4. **T-LR-6** — remaining CodeQL work (per-fact-type trust matrix). Do not start a second DI engine. GHAS before private-repo production use of T-LR-5.
 5. **Do not start:** NFR-50/60 (deferred), T-FS-5 (skipped), E3 (deprioritised), T-LM-1/3/4 without a real feed, T-MR-1/2 or T-CL-6 before T-CL-2.
 
 ---

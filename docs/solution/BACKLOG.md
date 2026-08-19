@@ -44,7 +44,7 @@ What's left to build. For what's already built, see [`Capabilities.md`](./Capabi
 
 ## Phase 2 — needs research, inputs, and validation
 
-Session A leftover lenses and Session B's remaining confidence question. **Not current-phase execution.** Do not start a build session against a hypothetical feed or a combination formula E5 already rejected. T-LR-4 / CodeQL (`T-LR-5`) stay current-phase — another session owns that gap.
+Session A leftover lenses and Session B's remaining confidence question. **Not current-phase execution.** Do not start a build session against a hypothetical feed or a combination formula E5 already rejected. T-LR-5 (CodeQL DI) and T-LR-4 (bean-factory, via that engine) shipped in `6173b36`. Remaining CodeQL work is `T-LR-6` (trust matrix), not a second DI session.
 
 | Item | Why Phase 2 | Revisit trigger |
 |---|---|---|
