@@ -58,7 +58,7 @@ export interface AnalysisContext {
   enableEnvSoftGraph?: boolean;
   /** T-Y4-1 — set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
   cfnManifestsDir?: string;
-  /** T-LR-5 — set by run-slice.ts from --enable-codeql-di <sourceRoot> <buildCommand>; codeqlDiPass is a no-op unless both this and codeqlBuildCommand are set — same opt-in convention as k8sManifestsDir. Real, non-trivial cost (a real compile + CodeQL database build) and a real license constraint (free-tier CodeQL CLI cannot run in this pipeline's own CI against a non-Open-Source codebase) are why this is never a default-on pass. */
+  /** T-LR-5 — set by run-slice.ts from --codeql-source-root / --codeql-build-command; codeqlDiPass is registered in DEFAULT_PASSES but a no-op unless both fields are set — never a default-on path. Real, non-trivial cost (a real compile + CodeQL database build) and a real license constraint (free-tier CodeQL CLI cannot run in this pipeline's own CI against a non-Open-Source codebase) are why this is never a default-on path. */
   codeqlSourceRoot?: string;
   codeqlBuildCommand?: string;
   /** T-Y5-1 — set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */

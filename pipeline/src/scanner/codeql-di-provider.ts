@@ -19,8 +19,10 @@ import * as os from 'os';
  * `E1b-codeql-di-resolution-experiment.md` (2106 real DI bindings on
  * Fineract, real ambiguity found and correctly refused).
  *
- * Deliberately opt-in only (`--enable-codeql-di`), never in DEFAULT_PASSES:
- * building a CodeQL database requires a real, successful compile of the
+ * Deliberately opt-in only (`--codeql-source-root` + `--codeql-build-command`).
+ * The pass is registered in DEFAULT_PASSES so grade/status still see any
+ * facts it produces, but it is a no-op unless both flags are set — never a
+ * default-on path. Building a CodeQL database requires a real, successful compile of the
  * target (a materially different, non-trivial cost from this pipeline's
  * normal buildless path — E1b measured ~65s build + ~50s database creation
  * for one real module), and the CodeQL CLI's free license does not permit
