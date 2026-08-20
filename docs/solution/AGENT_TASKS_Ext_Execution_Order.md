@@ -41,7 +41,7 @@ Use this to pick the next session.
 | **4** | `AGENT_TASKS_Ext_CodeQL_Engine.md` | Start the 7-item checklist; ship **DI first** | Do not also rebuild T-LR-4 in Graphify. GHAS before private-repo production | **BR-60**, unblocks **T-LR-4** / bean-factory |
 | — | `AGENT_TASKS_Ext_Lens_Modules.md` | **T-LM-5 done, 2026-08-18** — fitness declaration, `Claim_Register.md`'s Module fitness section | `T-LM-1/3/4` stay gated on a real feed / new extraction. Do not invent schemas | **BR-110 closed** |
 | **6** | `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | **T-MR-3** `deployed-in`, **T-MR-5** boundary overrides | **T-MR-1/2** after T-CL-2. **T-MR-4** after CodeQL or as a careful catalogue-only pass | BR-10 residual; **BR-20** later |
-| **7** | `AGENT_TASKS_Ext_Remaining_Lenses.md` | **T-LM-8** written decision (recommend external `calm validate -p`) | **T-LM-6 / T-LM-7** after T-LM-8 and a real consumer; same gold/CON-40 bar as A | **BR-50** remaining three lenses |
+| **7** | `AGENT_TASKS_Ext_Remaining_Lenses.md` | **T-LM-8 done (2026-08-20)** — decided external `calm validate -p`, see `Claim_Register.md` | **T-LM-6 / T-LM-7** after a real consumer and gold; same gold/CON-40 bar as A | **BR-50** remaining three lenses |
 
 **Session B's file is now fully closed** — T-FS-1/2/3/4/6 all done (T-FS-5 skipped with a written trigger).
 
@@ -67,7 +67,7 @@ Do not open T-LM-6/7 or T-MR-1/2 before their gates.
 | BR-20 | Unchanged — multi-root only | MultiRepo after T-CL-2 |
 | BR-30 | Built | — |
 | BR-40 | **Built** — confidence + review-status vocab (T-FS-6, 2026-08-18) | — |
-| BR-50 | Security + **resilience** scored. Vuln/lineage/green still gated. Workflow/obs/pattern still unbuilt | Remaining Lenses |
+| BR-50 | Security + **resilience** scored. Vuln/lineage/green still gated. Pattern-conformance decided (external, T-LM-8 done). Workflow/obs still unbuilt | Remaining Lenses |
 | BR-60 | Contradiction **done**. Secondary-source introduction **done**. CodeQL still not wired | CodeQL |
 | BR-70 / NFR-20 | Still unbuilt, now unblocked (T-FS-6 done) | T-CL-1…4 |
 | BR-80 | Still OOS on core path | T-RT-4 after T-RT-1/2 |

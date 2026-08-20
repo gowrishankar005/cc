@@ -101,6 +101,27 @@ Architecture completeness claims also require the layered-story evidence discipl
 
 ---
 
+## Pattern-conformance stance (T-LM-8, `AGENT_TASKS_Ext_Remaining_Lenses.md`)
+
+**Decided 2026-08-20: external (a).** BR-50 names "architectural-pattern
+conformance" as one of eight minimum lenses. Weaver does **not** implement a
+pattern-matching engine. Consumers evaluate `architecture.calm.json` against
+FINOS CALM patterns via the external `calm validate -p` tool. This matches
+`OOS-pattern-conformance-engine` in `OOS_Registry.md` and the non-goal
+already stated in `README.md` ("a CALM pattern-governance product").
+
+**Claim language:** May say "Weaver generates CALM output that external
+pattern-governance tooling (`calm validate -p`) can validate." Must **not**
+say "Weaver checks/enforces architectural-pattern conformance" — no such
+mechanism exists or is planned under this decision.
+
+**Reversal condition:** see `OOS-pattern-conformance-engine`'s revisit
+trigger — a real consumer needing conformance evaluated inside the
+generation pipeline itself, not merely "would be convenient." If that fires,
+scope is `T-LM-8b`, a new task, not a reopening of this row.
+
+---
+
 ## Module fitness (T-LM-0, `AGENT_TASKS_Ext_Lens_Modules.md`)
 
 Module outputs (`outDir/modules/<name>/`) are a **separate claim surface** from
