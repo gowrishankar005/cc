@@ -1,6 +1,7 @@
 import { GraphifyRun } from '../../scanner/graphify-provider';
 import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-facts';
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
+import { relationshipTrust } from '../fact-trust-matrix';
 
 /**
  * Shared ignoredItem-detail prefixes, exported so a reader (hitl-review-
@@ -32,51 +33,15 @@ export const TIER_B_SINGLE_CANDIDATE_PREFIX = 'tier-b-single-candidate: "';
  * it `implements`-ed by exactly one persistence/messaging unit.
  */
 
-/** Below every R1 same-package confidence value this pipeline emits — R2 is one inference layer removed from a direct import, must never look as certain as one. */
-const R2_SAME_ROOT_CONFIDENCE = 15;
-/** Lower again — the bridge's implementer was resolved in a DIFFERENT scanned root than the source service, a larger, Q11-labeled claim. */
-const R2_CROSS_ROOT_CONFIDENCE = 10;
 /**
- * The second-hop case: the sole
- * implementer is itself not a database/topic unit (a plain service/JDBC/
- * RowMapper-shaped class, real layered-Java shape), but it imports/references
- * EXACTLY ONE database/topic unit directly. Two inference layers deep (bridge
- * resolution + implementer-import chase), so below BOTH Phase 1 tiers.
+ * The actual confidence values for r2-phase1/r2b/r2c/r2-stereotype
+ * (same-root and cross-root) live in `fact-trust-matrix.ts` (T-LR-6), not as
+ * local constants here — the ordering this file's mechanisms rely on (R2
+ * below R1's implicit primary tier; R2-stereotype above R2b above R2c;
+ * cross-root always below its same-root pairing) is asserted there, in one
+ * place, alongside CodeQL's own tier, rather than recoverable only by
+ * reading prose comments scattered across producer files.
  */
-const R2B_SAME_ROOT_CONFIDENCE = 8;
-/** Deepest, most-inferred tier this pipeline produces — implementer-import chase AND a root-boundary claim together. */
-const R2B_CROSS_ROOT_CONFIDENCE = 5;
-/**
- * T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — a concrete class
- * referenced directly, with no `implements`-based interface layer at all,
- * that itself imports/references exactly one database/topic unit. Real
- * evidence: 28 candidates found in a real public-sample scan, 0 resolved
- * before this. Below R2b's tier, deliberately: R2b's implementer is at
- * least corroborated by a real `implements` type-system fact (this class
- * genuinely implements that interface); a direct delegate has no such
- * corroboration at all — only "referenced directly, imports exactly one
- * store," a strictly weaker structural signal.
- */
-const R2C_SAME_ROOT_CONFIDENCE = 6;
-/** Weakest tier this pipeline produces — direct-delegate AND a root-boundary claim together. */
-const R2C_CROSS_ROOT_CONFIDENCE = 3;
-/**
- * T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — a bridge with 2+
- * real `implements` candidates, disambiguated to exactly one because only
- * that one carries real `@Service` stereotype evidence
- * (spring-service-stereotype in signal-catalogue.yml), and that sole
- * stereotype-carrying candidate is itself a database/topic unit. Strictly
- * below R2 Phase 1's tier (15/10): Phase 1's implementer was never
- * ambiguous to begin with; this one genuinely had 2+ real candidates and
- * needed an extra corroborating fact to narrow them. Strictly above R2b's
- * tier (8/5): unlike R2b, this IS still a direct `implements`-corroborated
- * terminal match, not a second-hop import chase — the extra uncertainty is
- * "which of several real implementers," not "does the implementer even
- * reach a store."
- */
-const R2_STEREOTYPE_SAME_ROOT_CONFIDENCE = 12;
-/** Cross-root pairing for the stereotype-disambiguated tier above. */
-const R2_STEREOTYPE_CROSS_ROOT_CONFIDENCE = 7;
 
 export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
@@ -260,7 +225,7 @@ export function detectMultiHopBridgeRelationships(
           .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
         const uniqueDelegateStores = dedupeByUnitId(delegateStoreCandidates);
         if (uniqueDelegateStores.length === 1) {
-          emitBridgeRelationship(fromMatch, uniqueDelegateStores[0], R2C_SAME_ROOT_CONFIDENCE, R2C_CROSS_ROOT_CONFIDENCE, 'r2c');
+          emitBridgeRelationship(fromMatch, uniqueDelegateStores[0], 'r2c');
           continue;
         }
       }
@@ -307,7 +272,7 @@ export function detectMultiHopBridgeRelationships(
         if (uniqueStereotypeUnits.length === 1) {
           const stereotypeMatch = uniqueStereotypeUnits[0];
           if (stereotypeMatch.unit.kind === 'database' || stereotypeMatch.unit.kind === 'topic') {
-            emitBridgeRelationship(fromMatch, stereotypeMatch, R2_STEREOTYPE_SAME_ROOT_CONFIDENCE, R2_STEREOTYPE_CROSS_ROOT_CONFIDENCE, 'r2-stereotype');
+            emitBridgeRelationship(fromMatch, stereotypeMatch, 'r2-stereotype');
             continue;
           }
           // Disambiguated to one real implementer, but it isn't itself a
@@ -351,7 +316,7 @@ export function detectMultiHopBridgeRelationships(
         const uniqueStoreImplementers = [...new Map(storeImplementers.map((m) => [m.unit.id, m])).values()];
         if (uniqueStoreImplementers.length === 1) {
           const candidate = uniqueStoreImplementers[0];
-          const wouldBeConfidence = fromMatch.root === candidate.root ? R2_SAME_ROOT_CONFIDENCE : R2_CROSS_ROOT_CONFIDENCE;
+          const wouldBeConfidence = relationshipTrust('graphify', 'r2-phase1', fromMatch.root === candidate.root ? 'same-root' : 'cross-root');
           const key = `${fromMatch.unit.id}|${bridgeNodeId}|tier-b-single-candidate`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -388,7 +353,7 @@ export function detectMultiHopBridgeRelationships(
 
     const implMatch = nodeToUnit.get(implementers[0]);
     if (implMatch && (implMatch.unit.kind === 'database' || implMatch.unit.kind === 'topic')) {
-      emitBridgeRelationship(fromMatch, implMatch, R2_SAME_ROOT_CONFIDENCE, R2_CROSS_ROOT_CONFIDENCE, 'r2-phase1');
+      emitBridgeRelationship(fromMatch, implMatch, 'r2-phase1');
       continue;
     }
 
@@ -412,7 +377,7 @@ export function detectMultiHopBridgeRelationships(
     const uniqueStoreUnits = dedupeByUnitId(storeCandidates);
 
     if (uniqueStoreUnits.length === 1) {
-      emitBridgeRelationship(fromMatch, uniqueStoreUnits[0], R2B_SAME_ROOT_CONFIDENCE, R2B_CROSS_ROOT_CONFIDENCE, 'r2b');
+      emitBridgeRelationship(fromMatch, uniqueStoreUnits[0], 'r2b');
       continue;
     }
 
@@ -430,24 +395,19 @@ export function detectMultiHopBridgeRelationships(
     }
   }
 
-  function emitBridgeRelationship(
-    from: NodeUnitMatch,
-    to: NodeUnitMatch,
-    sameRootConfidence: number,
-    crossRootConfidence: number,
-    mechanism: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype'
-  ): void {
+  function emitBridgeRelationship(from: NodeUnitMatch, to: NodeUnitMatch, mechanism: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype'): void {
     if (from.unit.id === to.unit.id) return; // degenerate: bridge resolves back to the source's own unit
     const dedupeKey = `${from.unit.id}|${to.unit.id}`;
     if (seen.has(dedupeKey)) return;
     seen.add(dedupeKey);
+    const sameRoot = from.root === to.root;
     relationships.push({
       from: from.unit.id,
       to: to.unit.id,
       kind: 'calls', // distinct from R1's 'imports'/'connects' — this is an inferred call chain through a bridge, not a direct import (§2.2)
-      crossPackage: from.root !== to.root,
+      crossPackage: !sameRoot,
       source: 'graphify',
-      confidence: from.root === to.root ? sameRootConfidence : crossRootConfidence,
+      confidence: relationshipTrust('graphify', mechanism, sameRoot ? 'same-root' : 'cross-root'), // T-LR-6, fact-trust-matrix.ts — the single source of truth for this tier
       mechanism, // T-L2-1 — r2-phase1 vs r2b, distinguishable without decoding the confidence value
     });
   }

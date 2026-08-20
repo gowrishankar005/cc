@@ -2,6 +2,7 @@ import * as path from 'path';
 import { GraphifyRun, GraphifyEdge, parseSourceLocation } from '../../scanner/graphify-provider';
 import { TypedUnit, TypedRelationship } from '../../types/typed-facts';
 import { findJavaImportForBareName, getJavaPackageDeclaration } from '../../rules/java-import-resolver';
+import { relationshipTrust } from '../fact-trust-matrix';
 
 /**
  * Maps each Graphify node to the CodeGraph-typed unit it refers to (which
@@ -41,8 +42,11 @@ export interface NodeUnitMatch {
 // admitted edge is weaker evidence than a 2-hop bridge inference — it's a
 // raw structural reference to a target this pipeline could not classify at
 // all, not an inference chained through units it DID classify.
-export const ADMITTED_SAME_ROOT_CONFIDENCE = 3;
-export const ADMITTED_CROSS_ROOT_CONFIDENCE = 2;
+// Values live in `fact-trust-matrix.ts` (T-LR-6, mechanism 'admitted-unresolved')
+// — re-exported here so this is the only import site that changes if the
+// tier moves, not a second hardcoded copy of the number.
+export const ADMITTED_SAME_ROOT_CONFIDENCE = relationshipTrust('graphify', 'admitted-unresolved', 'same-root');
+export const ADMITTED_CROSS_ROOT_CONFIDENCE = relationshipTrust('graphify', 'admitted-unresolved', 'cross-root');
 
 /**
  * AREC Wave 3 T-C1 — extracted so multi-hop-bridge-detector.ts (R2) can
