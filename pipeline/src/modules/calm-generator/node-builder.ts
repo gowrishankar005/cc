@@ -1,6 +1,7 @@
 import { TypedUnit } from '../../types/typed-facts';
 import { CalmNode } from '../../types/calm';
 import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapping-schema';
+import { EmissionCoverageGap } from './emission-coverage';
 
 /**
  * Catalogue-driven node construction (Solution Design v2 §5.2/§5.4).
@@ -12,7 +13,7 @@ import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapp
  * interfaces/metadata are attached by their own builders (interface-builder,
  * metadata-builder), operating on the same node objects.
  */
-export function buildNodes(units: TypedUnit[], mapping: NodeTypeMapping): CalmNode[] {
+export function buildNodes(units: TypedUnit[], mapping: NodeTypeMapping, gaps: EmissionCoverageGap[] = []): CalmNode[] {
   const nodes: CalmNode[] = [];
   for (const unit of units) {
     const rule = findNodeTypeMapping(mapping, unit.kind);
@@ -20,7 +21,9 @@ export function buildNodes(units: TypedUnit[], mapping: NodeTypeMapping): CalmNo
       // No catalogue row for this unit kind — this is what §5.2 is meant to
       // prevent: fail loudly (skip + let it be visible) rather than silently
       // mis-cast, so a missing mapping row shows up as a missing node, not a
-      // wrong node-type in generated CALM.
+      // wrong node-type in generated CALM. T-CL-5 — also recorded as a real
+      // emission-coverage gap, not just visible-by-absence.
+      gaps.push({ stage: 'node', factId: unit.id, reason: `no node-type-mapping row for unit kind '${unit.kind}'` });
       continue;
     }
     nodes.push({

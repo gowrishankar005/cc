@@ -6,6 +6,7 @@ import { Module } from '../registry';
 import { buildCalm } from './build-calm';
 import { applyOverrides } from './override-applier';
 import { logMem } from '../../util/debug-mem';
+import { buildEmissionCoverageReport, EmissionCoverageGap } from './emission-coverage';
 
 /**
  * Output layout (Wave M T-M2 — namespaced module outputs, so a second/third
@@ -23,14 +24,32 @@ import { logMem } from '../../util/debug-mem';
  *   private copy, per the new convention).
  * - `overrides-applied-report.json` is genuinely calm-generator-private (no
  *   other module applies overrides) — namespaced only, no top-level copy.
+ * - `emission-coverage-report.json` (T-CL-5) is also calm-generator-private
+ *   — only this module's own builders decide CALM representability, unlike
+ *   `coverage-report.json`/`unmapped-signals-report.json` (analysis-time,
+ *   pre-CALM completeness, written as top-level platform artefacts by
+ *   `orchestration/platform-artefacts.ts` since every module reads them).
  */
 export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?: string, includeSystemNode = true): void {
   fs.mkdirSync(outDir, { recursive: true });
   const moduleDir = path.join(outDir, 'modules', 'calm-generator');
   fs.mkdirSync(moduleDir, { recursive: true });
 
-  let calm: CalmDocument = buildCalm(facts, includeSystemNode);
+  const emissionGaps: EmissionCoverageGap[] = [];
+  let calm: CalmDocument = buildCalm(facts, includeSystemNode, emissionGaps);
   logMem('write-artefacts after buildCalm');
+
+  // T-CL-5 — "what the representation could not carry, and why" as a
+  // required emission output, computed from the same gaps the builders
+  // recorded inline above (never re-derived independently). Written before
+  // overrides are applied: overrides patch already-emitted CALM output and
+  // never change what the deterministic builders concluded, so they can't
+  // create or resolve an emission-coverage gap.
+  const emissionCoverage = buildEmissionCoverageReport(facts.units, facts.relationships, emissionGaps);
+  fs.writeFileSync(path.join(moduleDir, 'emission-coverage-report.json'), JSON.stringify(emissionCoverage, null, 2));
+  console.log(
+    `[write-artefacts] emission coverage: ${(emissionCoverage.coverageRatio * 100).toFixed(1)}% (${emissionCoverage.gaps.length} gap(s) — see modules/calm-generator/emission-coverage-report.json)`
+  );
 
   // Solution Design v2 §5.4: a
   // final, auditable pass over the DETERMINISTIC output above — never

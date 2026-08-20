@@ -5285,3 +5285,177 @@ test('T-MR-2 — crossRepoJoinPass is a no-op unless --repo-manifests is passed 
     fs.rmSync(outDir, { recursive: true, force: true });
   }
 });
+
+test('T-CL-5 (emission-coverage rule) — buildCalm records a real gap, with a real reason, for each of the three independent drop mechanisms: an unmapped unit kind, a dangling relationship endpoint, and an unmapped security-control signal', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const { buildEmissionCoverageReport } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/emission-coverage'));
+  const facts = {
+    contractVersion: '16.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'OrderService.java',
+        kind: 'service',
+        name: 'OrderService',
+        filePath: 'OrderService.java',
+        startLine: 1,
+        endLine: 10,
+        evidence: [
+          { signal: 'GET /orders', source: 'native-route', category: 'http-entry-point', weight: 40, ref: 'OrderService.java:1' },
+          // A real security-control signal with no control-requirement-catalogue row (unlike 'PreAuthorize', which IS mapped) —
+          // must be recorded as a real, dropped control-evidence gap, not silently omitted from node.controls.
+          { signal: 'NoSuchControlAnnotation', source: 'decorator', category: 'security-control', weight: 30, ref: 'OrderService.java:2' },
+        ],
+        confidence: 100,
+      },
+      {
+        // No node-type-mapping.yml row exists for this kind — must produce a real 'node' gap, and cascade into a real 'relationship' gap below.
+        id: 'Widget.java',
+        kind: 'no-such-unit-kind',
+        name: 'Widget',
+        filePath: 'Widget.java',
+        startLine: 1,
+        endLine: 5,
+        evidence: [],
+        confidence: 50,
+      },
+    ],
+    relationships: [{ from: 'OrderService.java', to: 'Widget.java', kind: 'connects', crossPackage: false, source: 'codegraph' }],
+    ignoredItems: [],
+  };
+
+  const gaps = [];
+  const calm = buildCalm(facts, false, gaps);
+
+  assert.equal(calm.nodes.length, 1, 'the unmapped-kind unit must not produce a node');
+  assert.equal(calm.relationships.length, 0, 'the relationship whose destination node was dropped must not survive either');
+  const orderNode = calm.nodes.find((n) => n['unique-id'] === 'OrderService.java');
+  assert.ok(!orderNode.controls, 'the unmapped security-control signal must not produce a controls entry');
+
+  const nodeGap = gaps.find((g) => g.stage === 'node');
+  assert.ok(nodeGap, 'expected a real node-stage gap');
+  assert.equal(nodeGap.factId, 'Widget.java');
+  assert.match(nodeGap.reason, /no-such-unit-kind/);
+
+  const relGap = gaps.find((g) => g.stage === 'relationship');
+  assert.ok(relGap, 'expected a real relationship-stage gap');
+  assert.match(relGap.reason, /Widget\.java/);
+
+  const controlGap = gaps.find((g) => g.stage === 'control');
+  assert.ok(controlGap, 'expected a real control-stage gap');
+  assert.match(controlGap.reason, /NoSuchControlAnnotation/);
+
+  const report = buildEmissionCoverageReport(facts.units, facts.relationships, gaps);
+  assert.equal(report.units.total, 2);
+  assert.equal(report.units.dropped, 1);
+  assert.equal(report.relationships.total, 1);
+  assert.equal(report.relationships.dropped, 1);
+  assert.equal(report.controlEvidence.total, 1, 'exactly one evidence entry has category security-control across both units');
+  assert.equal(report.controlEvidence.dropped, 1);
+  // 2 units + 1 relationship + 1 control-evidence = 4 considered, 3 dropped (node, relationship, control) -> 1/4 represented.
+  assert.equal(report.coverageRatio, 0.25);
+  assert.equal(report.gaps.length, 3);
+});
+
+test('T-CL-5 (emission-coverage rule), review fix — a security-control evidence entry on a unit that was ITSELF dropped at the node stage must still count as a real control-stage gap, not be silently counted as represented', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const { buildEmissionCoverageReport } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/emission-coverage'));
+  const facts = {
+    contractVersion: '16.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        // Unmapped kind (no node emitted) AND carries security-control
+        // evidence — the exact shape control-builder.ts used to skip
+        // entirely via `if (!node) continue` before ever looking at the
+        // unit's evidence, so this evidence was counted in
+        // controlEvidenceTotal but never produced a gap.
+        id: 'Gadget.java',
+        kind: 'no-such-unit-kind',
+        name: 'Gadget',
+        filePath: 'Gadget.java',
+        startLine: 1,
+        endLine: 5,
+        evidence: [{ signal: 'PreAuthorize', source: 'decorator', category: 'security-control', weight: 30, ref: 'Gadget.java:1', language: 'java' }],
+        confidence: 50,
+      },
+    ],
+    relationships: [],
+    ignoredItems: [],
+  };
+
+  const gaps = [];
+  const calm = buildCalm(facts, false, gaps);
+  assert.equal(calm.nodes.length, 0, 'the unmapped-kind unit must not produce a node');
+
+  const controlGap = gaps.find((g) => g.stage === 'control');
+  assert.ok(controlGap, 'expected a real control-stage gap for the dropped unit\'s security-control evidence, not just a node-stage gap');
+  assert.match(controlGap.reason, /never emitted as a node/);
+
+  const report = buildEmissionCoverageReport(facts.units, facts.relationships, gaps);
+  assert.equal(report.controlEvidence.total, 1);
+  assert.equal(report.controlEvidence.dropped, 1, 'the evidence must not be silently counted as represented just because its owning unit was dropped for an unrelated reason');
+  assert.equal(report.coverageRatio, 0, '1 unit + 1 control-evidence = 2 considered, both dropped -> 0');
+});
+
+test('T-CL-5 (emission-coverage rule), second instance — a security-control signal that DOES have a catalogue row (PreAuthorize) produces no control-stage gap, and a fully-representable fact set reports 100% coverage', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const { buildEmissionCoverageReport } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/emission-coverage'));
+  const facts = {
+    contractVersion: '16.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'DatatableWriteService.java',
+        kind: 'service',
+        name: 'DatatableWriteService',
+        filePath: 'DatatableWriteService.java',
+        startLine: 1,
+        endLine: 10,
+        evidence: [
+          { signal: 'GET /datatables', source: 'native-route', category: 'http-entry-point', weight: 40, ref: 'DatatableWriteService.java:1' },
+          { signal: 'PreAuthorize', source: 'decorator', category: 'security-control', weight: 30, ref: 'DatatableWriteService.java:2', language: 'java' },
+        ],
+        confidence: 100,
+      },
+    ],
+    relationships: [],
+    ignoredItems: [],
+  };
+
+  const gaps = [];
+  const calm = buildCalm(facts, false, gaps);
+  assert.equal(calm.nodes.length, 1);
+  assert.ok(calm.nodes[0].controls, 'expected a real controls entry from the mapped PreAuthorize signal');
+  assert.equal(gaps.length, 0, 'a fully-mapped fact set must produce zero emission-coverage gaps');
+
+  const report = buildEmissionCoverageReport(facts.units, facts.relationships, gaps);
+  assert.equal(report.coverageRatio, 1);
+  assert.deepEqual(report.gaps, []);
+});
+
+test('T-CL-5 (emission-coverage rule), end-to-end — a real run-slice invocation against the checked-in nestjs-sample fixture writes modules/calm-generator/emission-coverage-report.json with the required shape', () => {
+  const { outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
+  try {
+    const reportPath = path.join(outDir, 'modules', 'calm-generator', 'emission-coverage-report.json');
+    assert.ok(fs.existsSync(reportPath), 'expected a real emission-coverage-report.json under the module-namespaced output directory');
+    const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+    for (const section of ['units', 'relationships', 'controlEvidence']) {
+      assert.ok(typeof report[section].total === 'number');
+      assert.ok(typeof report[section].represented === 'number');
+      assert.ok(typeof report[section].dropped === 'number');
+      assert.equal(report[section].represented + report[section].dropped, report[section].total);
+    }
+    assert.ok(typeof report.coverageRatio === 'number' && report.coverageRatio >= 0 && report.coverageRatio <= 1);
+    assert.ok(Array.isArray(report.gaps));
+    assert.equal(report.gaps.length, report.units.dropped + report.relationships.dropped + report.controlEvidence.dropped);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});

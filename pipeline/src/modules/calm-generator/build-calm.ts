@@ -12,6 +12,7 @@ import { buildSystemNode } from './system-node-builder';
 import { buildK8sNamespaceNodes } from './k8s-namespace-node-builder';
 import { buildCrossRepoNodes } from './external-repo-node-builder';
 import { attachPortInterfaces, springConfigProtocolBySignal } from './port-interface-builder';
+import { EmissionCoverageGap } from './emission-coverage';
 
 /**
  * typed-facts.json -> CALM 1.2. Thin orchestrator over catalogue-driven
@@ -27,7 +28,7 @@ import { attachPortInterfaces, springConfigProtocolBySignal } from './port-inter
  * Left out honestly rather than stubbed to look complete. control-builder
  * IS wired in (below) — real evidence, real catalogue, real code, not a stub.
  */
-export function buildCalm(facts: TypedFacts, includeSystemNode = true): CalmDocument {
+export function buildCalm(facts: TypedFacts, includeSystemNode = true, gaps: EmissionCoverageGap[] = []): CalmDocument {
   const rulesDir = path.join(__dirname, '..', '..', 'rules');
   const nodeTypeMapping = loadNodeTypeMapping(rulesDir);
   const relationshipTypeMapping = loadRelationshipTypeMapping(rulesDir);
@@ -41,7 +42,7 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true): CalmDocu
   // other kind. No special-case filtering left in this file.
   const units = facts.units;
 
-  const nodes = buildNodes(units, nodeTypeMapping);
+  const nodes = buildNodes(units, nodeTypeMapping, gaps);
   // T-MR-3 — synthetic k8s-namespace nodes, built BEFORE buildRelationships
   // (unlike system-node-builder's system node, which runs after): a
   // 'deployed-in' TypedRelationship's `to` must already be a real node id or
@@ -54,10 +55,10 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true): CalmDocu
   nodes.push(...buildCrossRepoNodes(facts.relationships));
   attachInterfaces(units, nodes, nodeTypeMapping);
   attachPortInterfaces(units, nodes); // T-PC1-6/B-formal-interface-port
-  attachControls(units, nodes, controlRequirementCatalogue);
+  attachControls(units, nodes, controlRequirementCatalogue, gaps);
   attachNodeMetadata(units, nodes, facts);
 
-  const relationships = buildRelationships(facts.relationships, nodes, relationshipTypeMapping, units, protocolBySignal);
+  const relationships = buildRelationships(facts.relationships, nodes, relationshipTypeMapping, units, protocolBySignal, gaps);
 
   // T-X7-3 — after every other node/relationship is built, so the system
   // node's composed-of lists the FINAL node set (including any that

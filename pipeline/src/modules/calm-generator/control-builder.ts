@@ -1,6 +1,7 @@
 import { TypedUnit } from '../../types/typed-facts';
 import { CalmNode } from '../../types/calm';
 import { ControlRequirementCatalogue, findControlRequirement } from '../../rules/construct-mapping-schema';
+import { EmissionCoverageGap } from './emission-coverage';
 
 /**
  * T-R2-3 (C-rich structured authority, Robustness Phase R2). Beyond the raw
@@ -47,15 +48,27 @@ function extractAuthorityRef(expression: string | undefined): string | undefined
  * same-language match. There is only one control row today, so this isn't
  * exercised yet, but the mechanism is in place before a second row needs it.
  */
-export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue: ControlRequirementCatalogue): void {
+export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue: ControlRequirementCatalogue, gaps: EmissionCoverageGap[] = []): void {
   const nodesById = new Map(nodes.map((n) => [n['unique-id'], n]));
 
   for (const unit of units) {
     const node = nodesById.get(unit.id);
-    if (!node) continue;
 
     for (const ev of unit.evidence) {
       if (ev.category !== 'security-control') continue;
+
+      // T-CL-5 — the unit itself was never emitted as a node (a
+      // node-builder.ts gap already recorded why): its security-control
+      // evidence can't be attached to anything either. Recorded here too —
+      // buildEmissionCoverageReport's controlEvidenceTotal counts this
+      // evidence regardless of whether the owning unit has a node, so
+      // silently `continue`-ing past it here (the old behavior) would have
+      // let it count as "represented" in the coverage math without ever
+      // producing a gap for it.
+      if (!node) {
+        gaps.push({ stage: 'control', factId: `${unit.id}::${ev.ref}`, reason: `unit '${unit.id}' was never emitted as a node, so its security-control evidence has nothing to attach to` });
+        continue;
+      }
 
       // signal-mapper.ts derives Evidence.signal from the raw decorator
       // referenceName (e.g. "PreAuthorize") for decorator-sourced evidence —
@@ -66,7 +79,13 @@ export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue:
       const language = unit.filePath.endsWith('.java') ? 'java' : unit.filePath.endsWith('.py') ? 'python' : unit.filePath.endsWith('.ts') ? 'typescript' : undefined;
 
       const rule = findControlRequirement(catalogue, ev.signal, language);
-      if (!rule) continue; // no catalogue row for this signal — not every security-control-category signal is necessarily mapped yet
+      if (!rule) {
+        // no catalogue row for this signal — not every security-control-category
+        // signal is necessarily mapped yet. T-CL-5 — a real security-control
+        // fact was found and dropped here; recorded, not silent.
+        gaps.push({ stage: 'control', factId: `${unit.id}::${ev.ref}`, reason: `no control-requirement-catalogue row for security-control signal '${ev.signal}'` });
+        continue;
+      }
 
       if (!node.controls) node.controls = {};
       if (!node.controls[rule.controlId]) {

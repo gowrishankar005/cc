@@ -2,6 +2,7 @@ import { TypedRelationship, TypedUnit } from '../../types/typed-facts';
 import { CalmNode, CalmRelationship, CalmRelationshipTypeShape } from '../../types/calm';
 import { RelationshipTypeMapping, findRelationshipTypeMapping } from '../../rules/construct-mapping-schema';
 import { computeRelationshipId } from '../../analysis/fact-identity';
+import { EmissionCoverageGap } from './emission-coverage';
 
 /**
  * B-duplicate-relationship-objects — identifies a relationship by its FINAL
@@ -97,7 +98,8 @@ export function buildRelationships(
   nodes: CalmNode[],
   mapping: RelationshipTypeMapping,
   units: TypedUnit[] = [],
-  protocolBySignal: Map<string, string> = new Map()
+  protocolBySignal: Map<string, string> = new Map(),
+  gaps: EmissionCoverageGap[] = []
 ): CalmRelationship[] {
   const nodeIds = new Set(nodes.map((n) => n['unique-id']));
   const nodeTypeById = new Map(nodes.map((n) => [n['unique-id'], n['node-type']]));
@@ -113,8 +115,28 @@ export function buildRelationships(
     return undefined;
   };
 
-  const built = relationships
-    .filter((r) => nodeIds.has(r.from) && nodeIds.has(r.to))
+  // T-CL-5 — a dangling endpoint (usually cascading from node-builder.ts
+  // dropping the endpoint unit for lacking a node-type-mapping row, but
+  // recorded independently of that cause) is a real emission-coverage gap,
+  // not just a silent filter.
+  const survivingRelationships = relationships.filter((r) => {
+    if (nodeIds.has(r.from) && nodeIds.has(r.to)) return true;
+    const missingFrom = !nodeIds.has(r.from);
+    const missingTo = !nodeIds.has(r.to);
+    gaps.push({
+      stage: 'relationship',
+      factId: r.id ?? computeRelationshipId(r),
+      reason:
+        missingFrom && missingTo
+          ? `both endpoints '${r.from}' and '${r.to}' were never emitted as nodes`
+          : missingFrom
+            ? `source endpoint '${r.from}' was never emitted as a node`
+            : `target endpoint '${r.to}' was never emitted as a node`,
+    });
+    return false;
+  });
+
+  const built = survivingRelationships
     .map((rel) => {
       const sourceType = nodeTypeById.get(rel.from)!;
       const targetType = nodeTypeById.get(rel.to)!;
