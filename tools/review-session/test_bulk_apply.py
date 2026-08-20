@@ -232,6 +232,31 @@ class TestBulkApplyEndToEnd(unittest.TestCase):
         self.assertEqual(len(decision_files), 1)
         self.assertEqual(json.loads(decision_files[0].read_text())["target_ref"], "b.py")
 
+    def test_refuses_malformed_anchor_decision_cleanly_not_a_crash(self):
+        """Real bug found on review: build_replica used to index
+        anchor_decision fields directly with no upfront shape check — a
+        malformed anchor (missing a required field) crashed with a raw
+        KeyError AFTER the confirmation prompt was already shown/answered,
+        rather than refusing cleanly before anything was printed."""
+        decision = json.loads((self.session_dir / "drafts" / "decisions" / "D-001.json").read_text())
+        del decision["module"]
+        (self.session_dir / "drafts" / "decisions" / "D-001.json").write_text(json.dumps(decision))
+        run = self._run()
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("missing required field", run.stderr)
+        self.assertIn("module", run.stderr)
+        self.assertNotIn("Traceback", run.stderr, "must refuse cleanly, never crash with a raw traceback")
+        self.assertEqual(run.stdout, "", "must refuse BEFORE printing the affected-units list or confirmation prompt")
+
+    def test_refuses_malformed_anchor_override_cleanly_not_a_crash(self):
+        override = json.loads((self.session_dir / "drafts" / "overrides" / "O-001.json").read_text())
+        del override["created_by"]
+        (self.session_dir / "drafts" / "overrides" / "O-001.json").write_text(json.dumps(override))
+        run = self._run()
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("missing required field", run.stderr)
+        self.assertNotIn("Traceback", run.stderr)
+
     def test_refuses_non_replicable_override_type(self):
         override = json.loads((self.session_dir / "drafts" / "overrides" / "O-001.json").read_text())
         override["override_type"] = "relationship_add"

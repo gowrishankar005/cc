@@ -48,6 +48,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cards import group_by_class  # noqa: E402
+from validate_drafts import REQUIRED_DECISION_FIELDS, REQUIRED_OVERRIDE_FIELDS  # noqa: E402
 
 REPLICABLE_OVERRIDE_TYPES = {"type_change"}
 
@@ -98,6 +99,24 @@ def find_anchor_override(overrides: dict[str, dict], anchor_decision: dict) -> d
     if len(matches) > 1:
         raise SystemExit(f"[bulk_apply] {len(matches)} active Overrides reference anchor decision '{anchor_decision['decision_id']}' — ambiguous, refusing to guess which one to replicate")
     return matches[0] if matches else None
+
+
+def validate_anchor_shape(anchor_decision: dict, anchor_override: dict | None) -> None:
+    """Real bug found on review: build_replica indexes anchor_decision/
+    anchor_override fields directly (anchor_decision["module"], etc.) —
+    a malformed anchor draft (a hand-authored file missing a required
+    field) used to reach that unchecked, AFTER the confirmation prompt had
+    already been shown and answered, crashing with a raw KeyError instead
+    of a clean refusal. Same "never trust a stale prior validation"
+    discipline apply.py's own docstring already states — checked here,
+    before anything is printed or confirmed, not after."""
+    missing_decision = REQUIRED_DECISION_FIELDS.keys() - anchor_decision.keys()
+    if missing_decision:
+        raise SystemExit(f"[bulk_apply] anchor Decision Record '{anchor_decision.get('decision_id', '<missing id>')}' is missing required field(s) {sorted(missing_decision)} — refusing to use as a bulk-apply template")
+    if anchor_override is not None:
+        missing_override = REQUIRED_OVERRIDE_FIELDS.keys() - anchor_override.keys()
+        if missing_override:
+            raise SystemExit(f"[bulk_apply] anchor Override '{anchor_override.get('override_id', '<missing id>')}' is missing required field(s) {sorted(missing_override)} — refusing to use as a bulk-apply template")
 
 
 def select_targets(residuals_by_id: dict[str, dict], anchor_id: str, requested: list[str] | None) -> list[dict]:
@@ -239,6 +258,7 @@ def main() -> int:
 
     anchor_decision = find_anchor_decision(decisions, anchor_residual)
     anchor_override = find_anchor_override(overrides, anchor_decision)
+    validate_anchor_shape(anchor_decision, anchor_override)
 
     if anchor_override is not None and anchor_override["override_type"] not in REPLICABLE_OVERRIDE_TYPES:
         print(
