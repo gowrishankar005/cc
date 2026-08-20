@@ -3,7 +3,7 @@
 Offline tooling that turns a `run-slice` output directory into an architect-friendly **Session Pack** for reviewing what a scan left open (S1/S2/S5/low-architecture-coverage residuals), then applies decisions back through Weaver's existing Decision Record + Override mechanism.
 
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
-**Status:** The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. Tier B drafting's PRIMARY path is in-chat — Copilot Chat's own `editFiles` tool, bound by the §5.1 rules in `.github/chatmodes/residual-review.chatmode.md`; `draft_tier_b.py` is a secondary, headless/scripted alternative, not the default. T-FS-1 (`docs/solution/AGENT_TASKS_Ext_Fact_Semantics.md`, `BACKLOG.md` "Tier-B residual detection") gave `triage.py` its first real Tier B producer — `multi-hop-single-candidate-below-threshold`, from `multi-hop-bridge-detector.ts`'s own `tier-b-single-candidate` ignored-item (one real store candidate among a bridge's several syntactic implementers). `draft_tier_b.py`'s live-model path is still unexercised against a real API key — see its own module docstring. Hardening/portability work is next — see the design doc for what's built vs. not yet.
+**Status:** The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. Tier B drafting's PRIMARY path is in-chat — Copilot Chat's own `editFiles` tool, bound by the §5.1 rules in `.github/chatmodes/residual-review.chatmode.md`; `draft_tier_b.py` is a secondary, headless/scripted alternative, not the default. T-FS-1 (`docs/solution/AGENT_TASKS_Ext_Fact_Semantics.md`, `BACKLOG.md` "Tier-B residual detection") gave `triage.py` its first real Tier B producer — `multi-hop-single-candidate-below-threshold`, from `multi-hop-bridge-detector.ts`'s own `tier-b-single-candidate` ignored-item (one real store candidate among a bridge's several syntactic implementers). `draft_tier_b.py`'s live-model path is still unexercised against a real API key — see its own module docstring. T-RT-1 (`bulk_apply.py`, replicate one answered residual across its similar-class siblings) and T-RT-2 (`consequence.py`/`queue_rank.py`, consequence-ranked backlog) are done — see `docs/solution/Claim_Register.md`'s `T-RT-1-bulk-residual-authoring` / `T-RT-2-consequence-ranked-queue` rows for evidence and honest scope limits (bulk-apply not yet run against a real multi-residual scan; consequence signals are named proxies, not a real PII detector). Hardening/portability work is next — see the design doc for what's built vs. not yet.
 
 ## Non-negotiable rules (S1–S12 — do not violate, do not skip)
 
@@ -46,6 +46,12 @@ tools/review-session/
   test_apply.py           (5 real end-to-end tests) real type_change applies, calm validate 0 errors, refuses without confirmation, refuses on validation failure, decision+override filename collision handled correctly (regression test for a real bug found+fixed on review)
   draft_tier_b.py         SECONDARY/headless Tier B drafting path — §5.1 system prompt, stdlib-only network call, a fully-testable guardrail. The PRIMARY path is in-chat: Copilot Chat's own editFiles tool, bound by the same §5.1 rules embedded in .github/chatmodes/residual-review.chatmode.md — use this script only for scripted/batch runs outside a chat session. No key -> reports what it would attempt, writes nothing. Real, named gap: no trigger in triage.py produces Tier B yet, so neither path has real production input today; this script's live-model path has never run against a real API here (no key set) — the in-chat path doesn't need one, since Copilot Chat supplies its own model
   test_draft_tier_b.py    (14 tests) all 6 named trap fixtures (100% on refusal cases) + 6 more guardrail tests, all against synthetic responses (no live model call) + real CLI no-key-path tests
+  bulk_apply.py           T-RT-1 (BACKLOG.md "Bulk residual-decision authoring") — replicates one already-drafted anchor Decision Record (+ Override, if any) across every OTHER open residual in the same (tier, class) group (cards.py's own group_by_class, the same grouping shown on every card as "Similar residuals this session"). Still writes ONE Decision Record per residual (never a blanket batch record, per design §2.1's own "bulk-apply integrity" rule / README rule 9), each with its own target's real evidence, never the anchor's; lists every affected unit id before commit and requires explicit confirmation. Only replicates a type_change override or a no-override leave-open/accepted decision — an anchor naming a specific other unit as part of its own answer (relationship_add/node_add/node_remove/node_rename/boundary_change) is refused outright, not guessed at
+  test_bulk_apply.py      (19 tests) anchor lookup by target_ref, sibling grouping, ambiguous/collision targets skipped and reported never silently dropped, non-replicable override types refused for the whole batch, real subprocess end-to-end run against a synthetic multi-residual pack
+  consequence.py          T-RT-2 (BACKLOG.md "Consequence-ranked queue") — computes a real, deterministic consequence field (signals + score) per residual from facts already produced (TypedUnit.kind, TypedRelationship.kind) — pii-proxy/external-system-identity/trust-boundary-edge, each a named PROXY for this project's own already-documented closest analog, never a new PII/data-classification mechanism (see the module's own docstring for the honest limits). pack.py attaches it to every residual in residuals.json (additive field)
+  test_consequence.py     (11 tests) each signal independently and in combination, deterministic, calls/imports never mistaken for shares-secret
+  queue_rank.py            reads a Session Pack's residuals.json and ranks the OPEN backlog highest-consequence-first; reports backlog size; with --history <prior-session-dir> ..., reports real residual age via the same (trigger, unitIds) signature triage.py's own apply_baseline() uses — honestly "unknown" (never a fabricated zero) without a history match
+  test_queue_rank.py      (12 tests) ranking/tie-break/exclusion rules, age lookup takes the oldest matching history pack, real subprocess end-to-end JSON + markdown output
 ```
 
 `triage.py`'s `apply_baseline()` is real too — `pack.py --baseline <prior-session-dir>` carries forward already-decided residuals (never re-asked) and flags real drift as `reconfirm` (never silently overwritten). See `test_triage.py`'s `TestApplyBaseline` for the unit tests.
@@ -57,7 +63,7 @@ Session Packs are written to `review-sessions/<run-id>/` at the repo root (gitig
 ```bash
 # all unit tests + real end-to-end (needs pipeline/dist built)
 cd tools/review-session
-python3 -m unittest test_redact test_triage test_cards test_pack test_chatmode_safety test_validate_drafts test_effective_ir test_apply test_draft_tier_b -v
+python3 -m unittest discover -s . -p "test_*.py" -v
 
 # build a real pack from a real run-slice out-dir
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
@@ -79,6 +85,13 @@ python3 effective_ir.py --calm /tmp/my-run-reviewed/architecture.calm.json --ses
 # Tier B drafting: normally happens IN Copilot Chat (editFiles tool, no key needed — see the
 # chat-mode file). draft_tier_b.py is only for a headless/scripted run outside a chat session:
 python3 draft_tier_b.py --session-dir ../../review-sessions/my-run  # needs ANTHROPIC_API_KEY
+
+# bulk-apply: author ONE residual's answer the normal way (examples/README.md), then replicate
+# it across every similar open residual in the same pack:
+python3 bulk_apply.py --session-dir ../../review-sessions/my-run --anchor R-014 --i-confirm-bulk-apply
+
+# consequence-ranked queue: highest-consequence-first, backlog size, and (given prior packs) age
+python3 queue_rank.py --session-dir ../../review-sessions/my-run --history ../../review-sessions/my-run-prior
 ```
 
 `pack.py` refuses to overwrite a session dir that already has unapplied drafts (fails loud, exit code 1) — apply or discard first.
