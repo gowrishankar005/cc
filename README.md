@@ -88,7 +88,9 @@ Authoritative detail: [`docs/solution/Claim_Register.md`](./docs/solution/Claim_
 
 ## Features
 
-**Scanning & analysis** — hybrid dual-engine scanning (per-package native typing + a combined cross-package structural pass); JAX-RS/Spring MVC/Flask/NestJS route composition; JPA/import-based persistence detection; messaging consumer/producer detection; outbound-HTTP client detection; OpenAPI ingestion; Spring configuration file reading; dependency-manifest (SBOM) corroboration; multi-hop bridge resolution across layered access classes; Kubernetes shared-secret trust relationships and manifest-vs-config contradiction detection; CloudFormation/SAM API-Gateway-to-Lambda route binding; an opt-in CodeQL DI-resolution engine for Spring wiring shapes neither structural engine can see; completeness/silence metrics that flag when a result looks empty because nothing was checked vs. genuinely checked-and-clean. See [What runs by default vs. what needs a flag](#what-runs-by-default-vs-what-needs-a-flag) for which of these are always-on.
+**Scanning & analysis** — hybrid dual-engine scanning (per-package native typing + a combined cross-package structural pass); JAX-RS/Spring MVC/Flask/NestJS route composition; JPA/import-based persistence detection; messaging consumer/producer detection; outbound-HTTP client detection; OpenAPI ingestion; Spring configuration file reading; dependency-manifest (SBOM) corroboration; multi-hop bridge resolution across layered access classes; Kubernetes shared-secret trust relationships, `deployed-in` runtime-placement relationships, and manifest-vs-config contradiction detection; CloudFormation/SAM API-Gateway-to-Lambda route binding; ranked cross-repo joins against another repo's own manifest. See [What runs by default vs. what needs a flag](#what-runs-by-default-vs-what-needs-a-flag) for which of these are always-on.
+
+**CodeQL DI-resolution (opt-in)** — a third structural engine, reserved for the two Spring wiring shapes neither CodeGraph nor Graphify's structural passes can see at all: a `@Bean`-factory method inside a `@Configuration` class, and 2+ real `implements` candidates disambiguated only by a stereotype annotation. Verified at real whole-codebase scale, not on a toy sample: **2105 real DI bindings, 731 new relationships, 56 new units introduced** on a real multi-module Java/Spring monorepo, `calm validate` clean. Its confidence is evidence-earned and centrally ranked against every other detection mechanism (`fact-trust-matrix.ts`) — structurally never the most-trusted source for a fact type another mechanism also produces. See the dedicated CodeQL section below for real cost/setup and the license constraint that keeps it opt-in-only.
 
 **CALM generation** — catalogue-driven builders (nodes, interfaces, relationships, controls, system boundary, metadata); schema-correct relationship shapes; decorator- and call-site-based security controls with file:line evidence; a Decision Record/Override mechanism for human correction after a scan, including boundary-change overrides (reassigning a node's `composed-of` container membership); a human-readable intermediate representation rendered from the same facts as the CALM output; incremental merge against a prior run's `typed-facts.json` in the same `--out` directory, so a human-`reviewed` status is never silently lost on rerun.
 
@@ -285,6 +287,23 @@ node dist/orchestration/run-slice.js /path/to/module \
   --codeql-source-root /path/to/repo-root \
   --codeql-build-command "./gradlew :my-module:compileJava --rerun-tasks"
 ```
+
+Real output from an actual `run-slice` invocation with this flag on, against
+a real multi-module Java/Spring monorepo (`Claim_Register.md`'s
+`T-LR-5-codeql-di` row has the full evidence):
+
+```text
+[codeql-di] 2105 real DI binding(s) resolved by CodeQL; 731 new relationship(s), 56 new unit(s) introduced
+```
+
+`calm validate` clean (0 errors/0 warnings) on that same output. Every
+introduced relationship's confidence is looked up from
+`analysis/fact-trust-matrix.ts` (T-LR-6) — the single, evidence-cited
+ranking every detection mechanism's confidence now reads from — placed
+deliberately between two of Graphify's own multi-hop tiers, never the
+strongest source for a fact type another mechanism also produces
+("CodeQL is never automatically primary," enforced structurally, not just
+by convention).
 
 **Free-tier CodeQL CLI license note:** automated/CI use is only permitted
 against an Open Source Codebase, or under a paid GHAS license — this
