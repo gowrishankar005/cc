@@ -13,11 +13,15 @@
 # real-repo evidence. See docs/solution/Claim_Register.md for the
 # authoritative per-mechanism status this file must stay aligned with.
 
-version: "0.21.0"
+version: "0.22.0"
 
 limitations:
   - id: k8s-manifests-opt-in-only
-    text: "Kubernetes manifests are only read when --k8s-manifests <dir> is explicitly passed (opt-in, off by default) — shared-Secret/ConfigMap trust relationships (shares-secret) and env-key-name soft-graph correlation are detected when enabled; deployment image/namespace-as-decorator metadata is not."
+    text: "Kubernetes manifests are only read when --k8s-manifests <dir> is explicitly passed (opt-in, off by default) — shared-Secret/ConfigMap trust relationships (shares-secret), env-key-name soft-graph correlation, and runtime-placement relationships (deployed-in, T-MR-3: the resolved Deployment's namespace) are detected when enabled; deployment IMAGE-as-decorator metadata is still not (a Deployment's image is read for trust-detector correlation input but never surfaced as its own node/decorator)."
+  - id: k8s-deployed-in-single-container-and-unresolved-only
+    text: "T-MR-3 (deployed-in): DeploymentManifest.image/containers reads only the FIRST container in a pod spec (scanner/k8s-manifest-provider.ts) — a multi-container pod's other containers carry no distinguishable placement signal. A Deployment whose name doesn't resolve to a real service-kind TypedUnit (same findUnitForDeployment correlation rule the shares-secret detector already uses) is a named CROSS_DOMAIN_UNRESOLVED ignored-item, never guessed. Flat/pre-rendered manifests only — Helm/Kustomize template resolution is a permanent non-goal (OOS-helm-kustomize)."
+  - id: boundary-change-override-single-membership-only
+    text: "T-MR-5 (boundary_change override): a node can belong to at most one composed-of boundary at a time — applying the override always vacates any prior boundary membership before placing the node in the new one (or none, when container is explicitly null). A real use case needing a node in 2+ composed-of boundaries simultaneously is not supported; not evidenced as a real need yet."
   - id: env-relationship-name-correlation-only
     text: "Env/ConfigMap-mediated relationships are detected only via --enable-env-soft-graph (opt-in, requires --k8s-manifests too) and only by KEY-NAME correlation against an allowlisted suffix list — always low, fixed confidence, never a value-based inference."
   - id: openapi-partial

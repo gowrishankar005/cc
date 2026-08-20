@@ -29,15 +29,14 @@ Single reference for what is **built**, **partial**, or **backlog**. For scope (
 | Route-composer registry | Built | Per-language route-assembly plugins (JAX-RS composed-route assembly is the reference implementation) |
 | Engine capability matrix | Built (stub routing) | Loaded/validated; full dynamic multi-engine swap not yet wired |
 | Persistence strategy catalogue | Partial | Driver-import + JPA `@Entity` + Spring Data + jOOQ dispatched; a small number of driver libraries remain plain-import only |
-| Decision Record / Override apply | Partial | Node add/type-change/remove/rename + relationship add/remove (connects shape) built; boundary-change overrides not yet built |
+| Decision Record / Override apply | Built | Node add/type-change/remove/rename + relationship add/remove (connects shape) + boundary-change (composed-of container reassignment, T-MR-5) |
 | Regression suite | Built | Exact-value assertions against real fixtures, not smoke tests; sample-repo-dependent tests skip gracefully when the sample isn't present locally |
-| Kubernetes manifest provider (shared-secret trust relationships) | Built | Flat/pre-rendered YAML only; Secret/ConfigMap *names* only, never values |
+| Kubernetes manifest provider (shared-secret trust + deployed-in placement relationships) | Built | Flat/pre-rendered YAML only; Secret/ConfigMap *names* only, never values. Runtime placement (T-MR-3): a resolved Deployment's namespace becomes a real `node-type: system` CALM node, with a `deployed-in` relationship from the service to it |
 | OpenAPI/Swagger ingestion | Built | Routes + security schemes; no line-number provenance (structural pointer only) since YAML/JSON parsing here doesn't preserve source positions |
 | Spring config file provider (`application.yml`/`.properties`) | Built | Deterministic reader; datasource/broker/cache detection, `server.port` → formal interface, JDBC protocol population |
 | Dependency-manifest corroboration (via a real SBOM tool) | Built (partial) | Raises confidence on an already-detected unit; never a primary detection source. Container/compose facts not yet wired |
 | Third-party plugin discovery / embed API | Backlog | Module boundary exists; discovery and an external embed API do not |
 | Two-tier (global + domain) mapping config | Backlog | |
-| Kubernetes-manifest-derived `deployed-in` relationships | Backlog | Trust relationships (shared secrets) are built; runtime-placement relationships are not |
 
 ## Extraction & analysis
 

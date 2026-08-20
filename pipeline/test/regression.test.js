@@ -1537,6 +1537,49 @@ test(
   }
 );
 
+test(
+  'T-MR-3 — k8s Deployment namespace produces a real deployed-in relationship to a synthetic system-type namespace node (real manifests, requirements/Architecture_as_Code_Solution_Design_v2.md §14.1)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const k8sManifestsDir = path.resolve(PYTHON_SAMPLE_ROOT, '..', '..', 'kubernetes-manifests');
+    // Self-derived expectation, not hardcoded: read the same manifests the
+    // pipeline reads, independently of the pipeline's own detector, so this
+    // test doesn't just re-assert whatever the code happens to produce.
+    const { discoverDeployments } = require(path.join(PIPELINE_ROOT, 'dist/scanner/k8s-manifest-provider'));
+    const rawDeployments = discoverDeployments(k8sManifestsDir);
+    const userserviceNamespace = rawDeployments.find((d) => d.name === 'userservice')?.namespace;
+    const contactsNamespace = rawDeployments.find((d) => d.name === 'contacts')?.namespace;
+    assert.ok(userserviceNamespace && contactsNamespace, 'ground truth: both deployments must exist in the real manifest set');
+
+    const { outDir, calm } = runPipeline(
+      [path.join(PYTHON_SAMPLE_ROOT, 'userservice'), path.join(PYTHON_SAMPLE_ROOT, 'contacts')],
+      ['--k8s-manifests', k8sManifestsDir]
+    );
+    try {
+      const deployedIn = calm.relationships.filter((r) => r['relationship-type']['deployed-in']);
+      assert.equal(deployedIn.length, 2, 'expected one deployed-in relationship per resolved service (userservice, contacts)');
+
+      const byContainer = new Map(deployedIn.map((r) => [r['relationship-type']['deployed-in'].nodes[0], r['relationship-type']['deployed-in'].container]));
+      assert.equal(byContainer.get('userservice.py'), `k8s-namespace:${userserviceNamespace}`);
+      assert.equal(byContainer.get('contacts.py'), `k8s-namespace:${contactsNamespace}`);
+
+      const namespaceNode = calm.nodes.find((n) => n['unique-id'] === `k8s-namespace:${userserviceNamespace}`);
+      assert.ok(namespaceNode, 'the referenced namespace must exist as a real node, not just a dangling relationship endpoint');
+      assert.equal(namespaceNode['node-type'], 'system');
+
+      for (const rel of deployedIn) {
+        assert.equal(rel.protocol, undefined, 'namespace placement is not a network protocol, never invented');
+      }
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      assert.equal(warnings, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
 test('T-CL-1 review fix — two deployments sharing TWO secrets (e.g. a JWT signing secret and a DB credential) must collapse to ONE shares-secret relationship, not one per secret', () => {
   const { detectK8sTrustRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/k8s-trust-detector'));
 
@@ -1559,6 +1602,97 @@ test('T-CL-1 review fix — two deployments sharing TWO secrets (e.g. a JWT sign
   assert.equal(relationships.length, 1, 'two shared secrets between the same real pair must produce exactly one relationship — before this fix, each secret pushed its own indistinguishable-downstream fact, which fact-identity.ts\'s TypedRelationship.id (kind|from|to|source, no secret name) would then silently collide onto one id anyway');
   assert.equal(relationships[0].from, 'verifier.py');
   assert.equal(relationships[0].to, 'issuer.py');
+});
+
+test('T-MR-3 — detectK8sDeployedInRelationships resolves a Deployment name to its real unit and namespace, never guesses when unresolved, dedupes 2+ Deployments naming the same unit+namespace to one edge', () => {
+  const { detectK8sDeployedInRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/k8s-deployment-detector'));
+
+  const userserviceUnit = { id: 'userservice.py', kind: 'service', name: 'userservice.py', filePath: 'userservice.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+
+  const deployments = [
+    { name: 'userservice', namespace: 'prod', configMapNames: [], secretMounts: [], sourceFile: 'userservice.yaml' },
+    // No TypedUnit matches "payment-reconciler" — must not guess, must be a real, named ignored-item.
+    { name: 'payment-reconciler', namespace: 'prod', configMapNames: [], secretMounts: [], sourceFile: 'payment-reconciler.yaml' },
+  ];
+
+  const { relationships, ignoredItems } = detectK8sDeployedInRelationships(deployments, [userserviceUnit]);
+
+  assert.equal(relationships.length, 1);
+  assert.equal(relationships[0].from, 'userservice.py');
+  assert.equal(relationships[0].to, 'k8s-namespace:prod');
+  assert.equal(relationships[0].kind, 'deployed-in');
+  assert.equal(relationships[0].source, 'k8s');
+
+  assert.equal(ignoredItems.length, 1);
+  assert.equal(ignoredItems[0].reason, 'CROSS_DOMAIN_UNRESOLVED');
+  assert.ok(ignoredItems[0].ref.includes('payment-reconciler'));
+
+  // Second, different instance of the "2+ deployments -> one edge" dedup
+  // mechanism T-CL-1 already fixed for k8s-trust-detector.ts's shares-secret
+  // shape (see the test directly above) — same mechanism class, this
+  // detector's own kind of duplicate input.
+  const { relationships: dedupedRelationships } = detectK8sDeployedInRelationships(
+    [
+      { name: 'userservice', namespace: 'prod', configMapNames: [], secretMounts: [], sourceFile: 'a.yaml' },
+      { name: 'userservice', namespace: 'prod', configMapNames: [], secretMounts: [], sourceFile: 'b.yaml' },
+    ],
+    [userserviceUnit]
+  );
+  assert.equal(dedupedRelationships.length, 1, 'two Deployment manifests naming the same unit+namespace must collapse to one deployed-in relationship, not one per manifest');
+});
+
+test('T-MR-3 — buildK8sNamespaceNodes builds one deduplicated system-type node per distinct namespace referenced by a deployed-in relationship, ignores every other relationship kind', () => {
+  const { buildK8sNamespaceNodes, namespaceNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-namespace-node-builder'));
+
+  const relationships = [
+    { from: 'a.py', to: 'k8s-namespace:prod', kind: 'deployed-in', crossPackage: false, source: 'k8s' },
+    { from: 'b.py', to: 'k8s-namespace:prod', kind: 'deployed-in', crossPackage: false, source: 'k8s' }, // same namespace as above — one node, not two
+    { from: 'c.py', to: 'k8s-namespace:staging', kind: 'deployed-in', crossPackage: false, source: 'k8s' },
+    { from: 'a.py', to: 'b.py', kind: 'calls', crossPackage: false, source: 'graphify' }, // not deployed-in — must not produce a node
+  ];
+
+  const nodes = buildK8sNamespaceNodes(relationships);
+  assert.equal(nodes.length, 2);
+  assert.deepEqual(nodes.map((n) => n['unique-id']).sort(), [namespaceNodeId('prod'), namespaceNodeId('staging')].sort());
+  for (const node of nodes) {
+    assert.equal(node['node-type'], 'system');
+  }
+});
+
+test('T-MR-3 — deployed-in relationships grade "structural", never "architecture": a k8s namespace placement fact is not a service->store/service connectivity claim (found reviewing against coverage-report.ts/hitl-review-trigger.ts\'s own grade === \'architecture\' filters)', () => {
+  const { gradeRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/relationship-grading'));
+
+  const serviceUnit = { id: 'userservice.py', kind: 'service', name: 'userservice.py', filePath: 'userservice.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+  const databaseUnit = { id: 'accountdb.py', kind: 'database', name: 'accountdb.py', filePath: 'accountdb.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+
+  const deployedIn = { from: 'userservice.py', to: 'k8s-namespace:prod', kind: 'deployed-in', crossPackage: false, source: 'k8s' };
+  const realArchEdge = { from: 'userservice.py', to: 'accountdb.py', kind: 'calls', crossPackage: false, source: 'graphify' };
+  const relationships = [deployedIn, realArchEdge];
+
+  gradeRelationships(relationships, [serviceUnit, databaseUnit]);
+
+  assert.equal(deployedIn.grade, 'structural', 'a namespace-placement fact must never grade "architecture" — it would silently satisfy coverage-report.ts\'s "has real outbound architecture coverage" check for a service with zero real connectivity edges');
+  assert.equal(realArchEdge.grade, 'architecture', 'a real service->database edge must still grade "architecture", unaffected by the deployed-in special case');
+});
+
+test('T-MR-3 — a service unit whose ONLY relationship is deployed-in must still count as ZERO real architecture-outbound coverage (the concrete regression the grading fix above locks in)', () => {
+  const { computeCompleteness } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
+
+  const isolatedService = { id: 'lonely.py', kind: 'service', name: 'lonely.py', filePath: 'lonely.py', startLine: 1, endLine: 1, evidence: [], confidence: 80, status: 'observed' };
+  const coveredService = { id: 'covered.py', kind: 'service', name: 'covered.py', filePath: 'covered.py', startLine: 1, endLine: 1, evidence: [], confidence: 80, status: 'observed' };
+  const database = { id: 'accountdb.py', kind: 'database', name: 'accountdb.py', filePath: 'accountdb.py', startLine: 1, endLine: 1, evidence: [], confidence: 80, status: 'observed' };
+  const units = [isolatedService, coveredService, database];
+
+  const relationships = [
+    // lonely.py's ONLY relationship is a k8s placement fact — must not count as coverage.
+    { from: 'lonely.py', to: 'k8s-namespace:prod', kind: 'deployed-in', crossPackage: false, source: 'k8s', grade: 'structural', status: 'externally-verified', id: 'r1' },
+    // covered.py has a real architecture-grade edge — must count.
+    { from: 'covered.py', to: 'accountdb.py', kind: 'calls', crossPackage: false, source: 'graphify', grade: 'architecture', status: 'observed', id: 'r2' },
+  ];
+
+  const completeness = computeCompleteness(units, relationships);
+  assert.equal(completeness.servicesWithArchitectureOutbound, 1, 'only covered.py has a real architecture-grade outbound edge — lonely.py\'s deployed-in relationship must not count');
+  assert.equal(completeness.architectureOutboundCoverage, 0.5, '1/2 services covered, not 2/2 — a deployed-in-only service must not be silently exempted from low-architecture-coverage review');
 });
 
 test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP/persistence/messaging/control evidence) must NOT become CALM nodes: lab lib-fintech-common produces ZERO nodes, calm validate 0 errors', () => {
@@ -1844,6 +1978,8 @@ test(
 test('K8s manifests absent — --k8s-manifests omitted entirely is a no-op, run completes normally (T-X5-1)', () => {
   const { calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample')]);
   assert.ok(!calm.relationships.some((r) => r.description?.startsWith('shares-secret')), 'no k8s trust relationship should appear when --k8s-manifests was never passed');
+  assert.ok(!calm.relationships.some((r) => r['relationship-type']['deployed-in']), 'no k8s deployed-in relationship should appear when --k8s-manifests was never passed (T-MR-3)');
+  assert.ok(!calm.nodes.some((n) => n['unique-id'].startsWith('k8s-namespace:')), 'no synthetic namespace node should appear when --k8s-manifests was never passed (T-MR-3)');
 });
 
 test('T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources") — a stale k8s deployment manifest naming one datastore engine (mysql) vs the live spring-config naming another (postgresql) forces a real review-queue item, never averaged into the unit\'s own confidence; an agreeing manifest produces no item; a genuinely ambiguous manifest set (2 different engines) also produces no item (never guess)', () => {
@@ -2347,6 +2483,144 @@ test('Relationship overrides — relationship_add/relationship_remove with DR en
       const { calm, result } = applyOverrides(baseCalm, dir);
       assert.equal(result.applied.length, 2);
       assert.equal(calm.relationships.length, 0, 'add then remove in the same pass should net to 0 relationships');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
+test('Boundary-change overrides — composed-of container reassignment with DR enforcement (T-MR-5)', () => {
+  const { applyOverrides } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/override-applier'));
+  const baseCalm = {
+    nodes: [
+      { 'unique-id': 'auth-service.py', 'node-type': 'service', name: 'auth-service.py', description: 'x' },
+      { 'unique-id': 'billing-service.py', 'node-type': 'service', name: 'billing-service.py', description: 'x' },
+      { 'unique-id': 'boundary-a', 'node-type': 'system', name: 'boundary-a', description: 'x' },
+      { 'unique-id': 'boundary-b', 'node-type': 'system', name: 'boundary-b', description: 'x' },
+    ],
+    relationships: [
+      { 'unique-id': 'boundary-a--composed-of--all', description: 'x', 'relationship-type': { 'composed-of': { container: 'boundary-a', nodes: ['auth-service.py'] } } },
+    ],
+  };
+  const decisionRecord = (id, status = 'active') => ({
+    decision_id: id,
+    module: 'architecture',
+    target_type: 'node',
+    target_ref: 'auth-service.py',
+    final_decision: { action: 'overridden' },
+    rationale: 'reassign boundary membership, test fixture',
+    reviewer: 'test',
+    reviewed_at: new Date().toISOString(),
+    status,
+  });
+  const boundaryOverride = (id, drId, targetRef, container) => ({
+    override_id: id,
+    module: 'architecture',
+    target_ref: targetRef,
+    override_type: 'boundary_change',
+    new_value: { container },
+    decision_record_ref: drId,
+    status: 'active',
+    created_by: 'test',
+    created_at: new Date().toISOString(),
+  });
+
+  // 1. Move a node from an EXISTING boundary (boundary-a) into a DIFFERENT
+  // existing boundary (boundary-b) — removed from the old composed-of,
+  // added to a newly-created one for boundary-b.
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-1')));
+      fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(boundaryOverride('ov-1', 'dr-1', 'auth-service.py', 'boundary-b')));
+      const { calm, result } = applyOverrides(baseCalm, dir);
+      assert.equal(result.applied.length, 1);
+      assert.equal(result.rejected.length, 0);
+
+      const oldBoundary = calm.relationships.find((r) => r['relationship-type']['composed-of']?.container === 'boundary-a');
+      assert.equal(oldBoundary, undefined, 'boundary-a had exactly one member — removing it must drop the whole composed-of relationship, not leave an empty container');
+
+      const newBoundary = calm.relationships.find((r) => r['relationship-type']['composed-of']?.container === 'boundary-b');
+      assert.ok(newBoundary, 'a new composed-of relationship for boundary-b must be created');
+      assert.deepEqual(newBoundary['relationship-type']['composed-of'].nodes, ['auth-service.py']);
+      assert.ok(newBoundary.metadata.some((m) => m.key === 'x-aac-status' && m.value === 'reviewed'));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // 2. container: null — removed from its boundary entirely, no new one created.
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-2')));
+      fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(boundaryOverride('ov-2', 'dr-2', 'auth-service.py', null)));
+      const { calm, result } = applyOverrides(baseCalm, dir);
+      assert.equal(result.applied.length, 1);
+      assert.equal(calm.relationships.length, 0, 'the only composed-of relationship (boundary-a) had exactly one member — must be dropped entirely, and no replacement created');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // 3. Unresolved decision_record_ref -> rejected, never applied.
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(boundaryOverride('ov-3', 'dr-does-not-exist', 'auth-service.py', 'boundary-b')));
+      const { calm, result } = applyOverrides(baseCalm, dir);
+      assert.equal(result.applied.length, 0);
+      assert.equal(result.rejected.length, 1);
+      assert.equal(calm.relationships.length, 1, 'original boundary-a composed-of must be untouched');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // 4. target_ref doesn't resolve to a real node -> orphan (not just a rejection).
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify({ ...decisionRecord('dr-4'), target_ref: 'ghost-service.py' }));
+      fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(boundaryOverride('ov-4', 'dr-4', 'ghost-service.py', 'boundary-b')));
+      const { result } = applyOverrides(baseCalm, dir);
+      assert.equal(result.applied.length, 0);
+      assert.equal(result.orphans.length, 1);
+      assert.equal(result.orphans[0].override_type, 'boundary_change');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // 5. A non-null container that doesn't resolve to a real node -> orphan
+  // (would create a dangling composed-of container, same discipline as
+  // relationship_add's missing-endpoint check).
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-5')));
+      fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(boundaryOverride('ov-5', 'dr-5', 'auth-service.py', 'ghost-boundary')));
+      const { calm, result } = applyOverrides(baseCalm, dir);
+      assert.equal(result.applied.length, 0);
+      assert.equal(result.orphans.length, 1);
+      assert.equal(calm.relationships.length, 1, 'original boundary-a composed-of must be untouched — rejected before any mutation');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // 6. Malformed new_value (missing/wrong-typed container) -> rejected.
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-overrides-'));
+    try {
+      fs.writeFileSync(path.join(dir, 'dr.json'), JSON.stringify(decisionRecord('dr-6')));
+      const badOverride = boundaryOverride('ov-6', 'dr-6', 'auth-service.py', 'boundary-b');
+      badOverride.new_value = { container: 42 };
+      fs.writeFileSync(path.join(dir, 'ov.json'), JSON.stringify(badOverride));
+      const { result } = applyOverrides(baseCalm, dir);
+      assert.equal(result.applied.length, 0);
+      assert.equal(result.rejected.length, 1);
+      assert.equal(result.orphans.length, 0, 'a malformed shape is not the same failure class as a real dangling reference');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -2893,6 +3167,33 @@ test('shares-secret relationship kind maps to connects with a distinct descripti
   assert.deepEqual(calmRel['relationship-type'].connects, { source: { node: 'auth-service.py' }, destination: { node: 'billing-service.py' } });
   assert.equal(calmRel.protocol, undefined, 'protocol must stay unset/null — a shared secret name is not a network protocol, never invented');
   assert.ok(calmRel.description.includes('shares-secret'), 'the TypedRelationship.kind distinction must survive into the CALM description, even though the shape is connects');
+});
+
+test('deployed-in relationship kind maps to the real CALM deployed-in shape, not connects — synthetic namespace node built before relationships (T-MR-3)', () => {
+  const { buildCalm } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/build-calm'));
+  const facts = {
+    contractVersion: '15.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      { id: 'userservice.py', kind: 'service', name: 'userservice.py', filePath: 'userservice.py', startLine: 1, endLine: 10, evidence: [{ signal: 'app.route', source: 'native-route', category: 'http-entry-point', weight: 40, ref: 'userservice.py:1' }], confidence: 100 },
+    ],
+    relationships: [{ from: 'userservice.py', to: 'k8s-namespace:default', kind: 'deployed-in', crossPackage: false, source: 'k8s' }],
+    ignoredItems: [],
+  };
+
+  const calm = buildCalm(facts, false); // system node (T-X7-3) would add an unrelated 2nd relationship — scoped to relationship-type mapping only
+  const namespaceNode = calm.nodes.find((n) => n['unique-id'] === 'k8s-namespace:default');
+  assert.ok(namespaceNode, 'the synthetic namespace node must exist in the built CALM document');
+  assert.equal(namespaceNode['node-type'], 'system');
+  assert.equal(namespaceNode.name, 'default');
+
+  assert.equal(calm.relationships.length, 1);
+  const calmRel = calm.relationships[0];
+  assert.ok(calmRel['relationship-type']['deployed-in'], 'deployed-in must map to CALM\'s own deployed-in shape, not connects');
+  assert.deepEqual(calmRel['relationship-type']['deployed-in'], { container: 'k8s-namespace:default', nodes: ['userservice.py'] });
+  assert.equal(calmRel.protocol, undefined, 'protocol must stay unset — namespace placement is not a network protocol, never invented');
 });
 
 test(
@@ -4083,6 +4384,8 @@ test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives 
     { from: 'HighConf.java', to: 'unresolved:x', kind: 'calls', crossPackage: false, source: 'graphify', mechanism: 'admitted-unresolved' },
     // k8s shares-secret — confirmed against a real deployed manifest.
     { from: 'HighConf.java', to: 'MedConf.java', kind: 'shares-secret', crossPackage: false, source: 'k8s' },
+    // T-MR-3 — k8s deployed-in, second real instance of "rel.source === 'k8s' -> externally-verified" generalizing over kind, not just shares-secret.
+    { from: 'HighConf.java', to: 'k8s-namespace:default', kind: 'deployed-in', crossPackage: false, source: 'k8s' },
     // Touches the contradicted unit — must inherit requires-review even with no confidence field of its own.
     { from: 'HighConf.java', to: 'Contradicted.java', kind: 'calls', crossPackage: false, source: 'graphify' },
   ];
@@ -4101,7 +4404,8 @@ test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives 
   assert.equal(relationships[1].status, 'inferred', 'multi-hop bridge edge, real but low fixed confidence -> inferred');
   assert.equal(relationships[2].status, 'requires-review', 'admitted-unresolved mechanism -> requires-review');
   assert.equal(relationships[3].status, 'externally-verified', 'k8s-sourced shares-secret -> externally-verified');
-  assert.equal(relationships[4].status, 'requires-review', 'touches a contradicted unit -> requires-review even with no confidence field');
+  assert.equal(relationships[4].status, 'externally-verified', 'k8s-sourced deployed-in -> externally-verified (T-MR-3, second real instance of the k8s-source rule)');
+  assert.equal(relationships[5].status, 'requires-review', 'touches a contradicted unit -> requires-review even with no confidence field');
 });
 
 test('T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review history") — computeRelationshipId/assignFactIds: content-derived from kind+endpoints+discriminator, never a run-scoped counter, stable across repeated calls', () => {
@@ -4645,7 +4949,15 @@ test('T-CL-6 (determinism) — same input scanned twice into the same --out dire
 
 test('T-CL-4 (contract bump, Contract_Evolution_Policy.md §2(c)) — CONTRACT_VERSION 14.0.0: every unit/relationship a real run produces carries a REAL (non-placeholder) status/id, and --from-facts refuses a stale-major-version input', () => {
   const { CONTRACT_VERSION, PENDING_STATUS, PENDING_RELATIONSHIP_ID } = require(path.join(PIPELINE_ROOT, 'dist/types/typed-facts'));
-  assert.equal(CONTRACT_VERSION, '14.0.0');
+  // Asserts the bump landed and is >= 14.0.0's own guarantee (status/id now
+  // required), not an exact string — T-MR-3 (2026-08-20) bumped again to
+  // 15.0.0 for an unrelated closed-union extension (TypedRelationship.kind
+  // gained 'deployed-in'); this test's own claim (every unit/relationship
+  // carries a real status/id) still holds and isn't re-tested per bump.
+  assert.ok(
+    Number(CONTRACT_VERSION.split('.')[0]) >= 14,
+    `CONTRACT_VERSION must be at least 14.0.0 (T-CL-4's required-field guarantee) — got ${CONTRACT_VERSION}`
+  );
 
   const { calm, outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample')]);
   assert.ok(calm.nodes.length > 0);

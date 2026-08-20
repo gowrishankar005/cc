@@ -59,6 +59,19 @@ mappings:
     calmRelationshipType: connects
     protocol: null
 
+  # T-MR-3 — k8s-derived runtime placement. targetNodeType 'system' is the
+  # synthetic namespace node modules/calm-generator/k8s-namespace-node-builder.ts
+  # builds (never a TypedUnit-mapped node-type-mapping.yml row — a namespace
+  # has no source file). Real CALM shape this time, not `connects`:
+  # `deployed-in: {container, nodes[]}` (Architecture_as_Code_Solution_Design_v2.md
+  # §14.1's "Closed here" decision) — relationship-builder.ts's `deployed-in`
+  # branch already existed, unreachable until this row.
+  - relationshipKind: deployed-in
+    sourceNodeType: service
+    targetNodeType: system
+    calmRelationshipType: deployed-in
+    protocol: null
+
 # Fallback when no row matches a {kind, sourceType, targetType} triple: still
 # `connects`, never `interacts` — see rules/relationship-type-mapping-schema.ts
 # for the exact default-application order.

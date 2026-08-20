@@ -70,6 +70,29 @@ function isValidCalmNode(value: unknown): value is CalmNode {
  * not silently — same "don't build ahead of a real need" discipline as
  * node_remove's already-existing four-shape cleanup logic below.
  */
+/**
+ * T-MR-5 — `boundary_change`'s own new_value shape: which `composed-of`
+ * CONTAINER node the target node should belong to now (`container: null`
+ * moves it out of every boundary it's currently in, without placing it in a
+ * new one — an honest "no boundary" outcome, not a silently-refused case).
+ * Not exported: same convention as relationship_add's own inline
+ * isValidConnectsRelationship — this override type's new_value shape isn't
+ * part of the module boundary, only this file's own validation.
+ */
+interface BoundaryChangeValue {
+  container: string | null;
+}
+
+function isValidBoundaryChange(value: unknown): value is BoundaryChangeValue {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return v.container === null || typeof v.container === 'string';
+}
+
+function composedOfShape(rel: CalmRelationship): { container: string; nodes: string[] } | undefined {
+  return (rel['relationship-type'] as unknown as Record<string, unknown>)['composed-of'] as { container: string; nodes: string[] } | undefined;
+}
+
 function isValidConnectsRelationship(value: unknown): value is CalmRelationship {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
@@ -96,8 +119,12 @@ function isValidConnectsRelationship(value: unknown): value is CalmRelationship 
  * Supports node_add / type_change / node_remove / node_rename /
  * relationship_add / relationship_remove — the hard predecessor for
  * human-in-the-loop-completed edges; those mitigations were false claims
- * until this shipped. `boundary_change` is still recognized (won't crash)
- * but reported as skipped, not pretended-complete — no evidenced use case yet.
+ * until this shipped. `boundary_change` (T-MR-5) reassigns which
+ * `composed-of` container node a target node belongs to — the first override
+ * type to touch the `composed-of` relationship shape (relationship_add stays
+ * `connects`-only, per isValidConnectsRelationship's own doc comment); moves
+ * the target out of any boundary it's currently in and into `new_value.container`
+ * (or out of every boundary entirely when `container` is explicitly `null`).
  */
 export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm: CalmDocument; result: OverrideApplicationResult } {
   const result: OverrideApplicationResult = { applied: [], rejected: [], skipped: [], orphans: [] };
@@ -268,9 +295,69 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
         break;
       }
 
-      case 'boundary_change':
-        result.skipped.push({ override_id: override.override_id, override_type: override.override_type, reason: `override_type "${override.override_type}" is recognized but not yet implemented` });
+      case 'boundary_change': {
+        if (!isValidBoundaryChange(override.new_value)) {
+          result.rejected.push({ override_id: override.override_id, reason: 'boundary_change new_value must be { container: string | null } — the composed-of container node the target should belong to, or null to remove it from every boundary' });
+          break;
+        }
+        const { container } = override.new_value;
+        if (!nodes.some((n) => n['unique-id'] === override.target_ref)) {
+          reportOrphan(result, override, `boundary_change target_ref "${override.target_ref}" not found among nodes`);
+          break;
+        }
+        if (container !== null && !nodes.some((n) => n['unique-id'] === container)) {
+          reportOrphan(result, override, `boundary_change references container "${container}" which does not exist — would create a dangling composed-of container`);
+          break;
+        }
+
+        // Remove target_ref from every composed-of relationship it's
+        // CURRENTLY a member of (its prior boundary, if any) — a node
+        // belongs to at most one boundary at a time under this override, so
+        // moving it means leaving the old one first. A composed-of left
+        // with zero members is dropped entirely rather than kept as a
+        // degenerate empty container (same "don't leave a broken construct
+        // behind" instinct as node_remove's own relationship cleanup above).
+        for (let i = relationships.length - 1; i >= 0; i--) {
+          const composedOf = composedOfShape(relationships[i]);
+          if (!composedOf) continue;
+          const memberIdx = composedOf.nodes.indexOf(override.target_ref);
+          if (memberIdx === -1) continue;
+          const remainingNodes = composedOf.nodes.filter((n) => n !== override.target_ref);
+          if (remainingNodes.length === 0) {
+            relationships.splice(i, 1);
+          } else {
+            relationships[i] = {
+              ...relationships[i],
+              'relationship-type': { 'composed-of': { container: composedOf.container, nodes: remainingNodes } },
+              metadata: withReviewedStatus([...(relationships[i].metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
+            };
+          }
+        }
+
+        if (container !== null) {
+          const existingIdx = relationships.findIndex((r) => composedOfShape(r)?.container === container);
+          if (existingIdx !== -1) {
+            const composedOf = composedOfShape(relationships[existingIdx])!;
+            if (!composedOf.nodes.includes(override.target_ref)) {
+              relationships[existingIdx] = {
+                ...relationships[existingIdx],
+                'relationship-type': { 'composed-of': { container, nodes: [...composedOf.nodes, override.target_ref] } },
+                metadata: withReviewedStatus([...(relationships[existingIdx].metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
+              };
+            }
+          } else {
+            relationships.push({
+              'unique-id': `${container}--composed-of--override`,
+              description: `${container} is composed-of ${override.target_ref} (T-MR-5 boundary_change override)`,
+              'relationship-type': { 'composed-of': { container, nodes: [override.target_ref] } },
+              metadata: withReviewedStatus([{ key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
+            });
+          }
+        }
+
+        result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
         break;
+      }
 
       default:
         // override_type is read from an on-disk JSON file, so an

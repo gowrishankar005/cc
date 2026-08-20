@@ -61,6 +61,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '14', // bumped for CONTRACT_VERSION 14.0.0 (T-CL-4) — TypedUnit.status/TypedRelationship.status/.id promoted required; this module never reads TypedUnit.status/TypedRelationship.id/.status at all, filters on Evidence.category only — reviewed, unaffected
+  supportedMajorVersion: '15', // bumped for CONTRACT_VERSION 15.0.0 (T-MR-3) — TypedRelationship.kind gained 'deployed-in'; this module never reads TypedRelationship at all, filters on Evidence.category only — reviewed, unaffected
   run,
 };

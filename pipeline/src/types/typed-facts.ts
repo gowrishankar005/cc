@@ -213,7 +213,16 @@ export interface TypedRelationship {
   // import), so it gets its own named kind rather than being silently
   // folded into 'connects' — the exact "relationship vocabulary thin"
   // complaint this was named to fix, not perpetuate.
-  kind: 'calls' | 'imports' | 'connects' | 'shares-secret';
+  // 'deployed-in' added in CONTRACT_VERSION 15.0.0 (T-MR-3, BACKLOG.md
+  // "Kubernetes-manifest-derived deployed-in relationships") — runtime
+  // PLACEMENT (which namespace a service actually runs in), the other half
+  // of what the k8s manifest provider already reads; shares-secret (T-X5-1)
+  // is the trust half. `rel.to` is a synthetic namespace-node id
+  // (`k8s-namespace:<namespace>`, modules/calm-generator/k8s-namespace-node-builder.ts)
+  // built directly as a CALM node the same way system-node-builder.ts's
+  // synthetic system node is — never a TypedUnit, since a k8s namespace has
+  // no source file to attribute one to.
+  kind: 'calls' | 'imports' | 'connects' | 'shares-secret' | 'deployed-in';
   crossPackage: boolean;
   // 'k8s' added alongside 'shares-secret' in the same 3.0.0 bump — the k8s
   // manifest provider (scanner/k8s-manifest-provider.ts) is a third
@@ -236,9 +245,16 @@ export interface TypedRelationship {
   // dual-unit decision). 'architecture': at least one endpoint is a service
   // unit (R1 one-hop service->database/topic, or a real service->service
   // call/import). 'trust': kind === 'shares-secret' (implicit trust via a
-  // shared credential, not a code-level edge). Always set by the time a run
-  // completes — absence would only mean an older typed-facts.json predating
-  // this field, never a live-run gap.
+  // shared credential, not a code-level edge). 'structural' also covers
+  // kind === 'deployed-in' (T-MR-3) — a real, verified k8s namespace-placement
+  // fact, but not a service->store/service connectivity claim, so it must
+  // never satisfy coverage-report.ts's/hitl-review-trigger.ts's own
+  // `grade === 'architecture'` filters (both documented as meaning
+  // specifically R1/R2, "never structural/trust") — a service whose only
+  // relationship is where it runs, not who it talks to, must still count as
+  // having zero real architecture-grade outbound coverage. Always set by the
+  // time a run completes — absence would only mean an older typed-facts.json
+  // predating this field, never a live-run gap.
   grade?: 'structural' | 'architecture' | 'trust';
   // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no CONTRACT_VERSION bump).
   // Set only by multi-hop-bridge-detector.ts's branches, already
@@ -460,7 +476,23 @@ export interface IgnoredItem {
 // and behave identically against a value that's now always defined;
 // threat-signals/resilience-lens filter on Evidence.category only, never
 // touch TypedUnit.status/TypedRelationship.id/.status at all).
-export const CONTRACT_VERSION = '14.0.0';
+//
+// 15.0.0 (T-MR-3, AGENT_TASKS_Ext_MultiRepo_Deployment.md, BACKLOG.md
+// "Kubernetes-manifest-derived deployed-in relationships"): TypedRelationship.kind
+// gained 'deployed-in' — a closed-union extension, tier (c). Runtime
+// placement (which k8s namespace a service actually runs in), the
+// documented-but-unbuilt other half of the k8s manifest provider — see
+// Architecture_as_Code_Solution_Design_v2.md §14.1's "Closed here" decision:
+// the namespace becomes a real `node-type: system` CALM node, with
+// `deployed-in` relationships from each service to it, built by
+// analysis/cross_package/k8s-deployment-detector.ts +
+// modules/calm-generator/k8s-namespace-node-builder.ts. Every existing
+// module reviewed and bumped to supportedMajorVersion "15": calm-generator's
+// relationship-type-mapping.yml gained the new row (relationship-builder.ts's
+// `case 'deployed-in':` branch was already written, just unreachable until
+// now); threat-signals/resilience-lens filter on Evidence.category only,
+// never touch TypedRelationship.kind, unaffected by a new value.
+export const CONTRACT_VERSION = '15.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION
