@@ -16,6 +16,8 @@ import { renderIntelligenceIR } from '../analysis/ir/intelligence-ir';
 import { CoverageReport, computeCompleteness } from '../analysis/coverage-report';
 import { UnmappedSignalsReport } from '../analysis/unmapped-signals';
 import { TypedFacts, CONTRACT_VERSION } from '../types/typed-facts';
+import { mergeIncrementalFacts } from '../analysis/incremental-merge';
+import { appendFactHistory } from '../analysis/fact-history';
 import { logMem } from '../util/debug-mem';
 import { isTestPath } from '../rules/test-path';
 
@@ -175,6 +177,33 @@ async function runSlice(
     relationships: ctx.relationships,
     ignoredItems: ctx.allIgnoredItems,
   };
+
+  // T-CL-2 — read the PRIOR run's typed-facts.json from this same --out
+  // directory (if any) before finishRun's calm-generator module overwrites
+  // it, and merge this run's freshly-computed units/relationships against
+  // it: unaffected facts (unchanged evidence) carry their prior status
+  // forward, a fact that was 'reviewed' is never silently overwritten
+  // (see incremental-merge.ts's own doc comment for the full rule). A
+  // mismatched contractVersion is treated as "no prior state" — merging
+  // across a shape change isn't meaningful. First run into a fresh --out
+  // directory is a no-op here (nothing to merge against).
+  const priorFactsPath = path.join(outDir, 'typed-facts.json');
+  let priorFacts: TypedFacts | undefined;
+  if (fs.existsSync(priorFactsPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(priorFactsPath, 'utf8')) as TypedFacts;
+      if (parsed.contractVersion === CONTRACT_VERSION) priorFacts = parsed;
+      else console.warn(`[run-slice] prior typed-facts.json contractVersion "${parsed.contractVersion}" != "${CONTRACT_VERSION}" — skipping incremental merge for this run`);
+    } catch (err) {
+      console.warn(`[run-slice] WARNING: could not read prior typed-facts.json for incremental merge, continuing without it: ${err}`);
+    }
+  }
+  const { report: mergeReport, history: mergeHistory } = mergeIncrementalFacts(priorFacts, facts.generatedAt, facts.units, facts.relationships);
+  fs.writeFileSync(path.join(outDir, 'merge-report.json'), JSON.stringify(mergeReport, null, 2));
+  appendFactHistory(outDir, mergeHistory);
+  console.log(
+    `[run-slice] incremental merge: units ${mergeReport.units.new} new / ${mergeReport.units.disappeared} disappeared / ${mergeReport.units.unaffected} unaffected / ${mergeReport.units.flaggedForReReview} flagged for re-review; relationships ${mergeReport.relationships.new} new / ${mergeReport.relationships.disappeared} disappeared / ${mergeReport.relationships.unaffected} unaffected / ${mergeReport.relationships.flaggedForReReview} flagged for re-review`
+  );
 
   // Goal A's actual plumbing: a real registry, module list externalized
   // (Wave M T-M1) — resolveModules throws clearly on an unknown name rather

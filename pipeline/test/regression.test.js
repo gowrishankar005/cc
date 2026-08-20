@@ -4479,3 +4479,108 @@ test('T-LR-5 — a codeql-di-introduced unit and the relationship pointing at it
   assert.equal(introducedUnit.status, 'requires-review');
   assert.equal(rel.status, 'requires-review', 'a relationship anchored to a not-yet-promoted introduced unit must itself read requires-review');
 });
+
+test('T-CL-2 (incremental merge) — new/unaffected/disappeared classification, and a "reviewed" fact with unchanged evidence carries its status forward untouched', () => {
+  const { mergeIncrementalFacts } = require(path.join(PIPELINE_ROOT, 'dist/analysis/incremental-merge'));
+
+  const evidence = [{ signal: 'Get', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:1' }];
+  const priorUnit = { id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1, evidence, confidence: 60, status: 'reviewed' };
+  const staleUnit = { id: 'u-gone', kind: 'service', name: 'gone', filePath: 'gone.ts', startLine: 1, endLine: 1, evidence, confidence: 60, status: 'observed' };
+  const prior = { contractVersion: '13.0.0', runVersion: 'v', generatedAt: 't0', packageRoots: [], units: [priorUnit, staleUnit], relationships: [], ignoredItems: [] };
+
+  // Fresh run: u1 reappears with IDENTICAL evidence (same signal/source/category/ref)
+  // but a fresh, non-'reviewed' status a plain assignStatuses recompute would
+  // have produced; u-gone doesn't reappear at all; u2 is genuinely new.
+  const freshU1 = { id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1, evidence: [{ ...evidence[0] }], confidence: 60, status: 'observed' };
+  const freshU2 = { id: 'u2', kind: 'service', name: 'u2', filePath: 'y.ts', startLine: 1, endLine: 1, evidence, confidence: 60, status: 'observed' };
+
+  const { report, history } = mergeIncrementalFacts(prior, 't1', [freshU1, freshU2], []);
+
+  assert.equal(freshU1.status, 'reviewed', 'unaffected reviewed fact must never be silently overwritten by a fresh recompute');
+  assert.equal(freshU2.status, 'observed');
+  assert.deepEqual(report.units, { new: 1, disappeared: 1, unaffected: 1, flaggedForReReview: 0 });
+
+  const disappearedEntry = history.find((h) => h.id === 'u-gone');
+  assert.ok(disappearedEntry, 'a fact absent from this run must be recorded in history, not silently dropped');
+  assert.equal(disappearedEntry.to, 'disappeared');
+  const newEntry = history.find((h) => h.id === 'u2');
+  assert.equal(newEntry.from, 'new');
+});
+
+test('T-CL-2 — a "reviewed" fact whose evidence CHANGED is flagged requires-review, never silently promoted to the fresh recompute', () => {
+  const { mergeIncrementalFacts } = require(path.join(PIPELINE_ROOT, 'dist/analysis/incremental-merge'));
+
+  const priorUnit = {
+    id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1,
+    evidence: [{ signal: 'Get', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:1' }],
+    confidence: 60, status: 'reviewed',
+  };
+  const prior = { contractVersion: '13.0.0', runVersion: 'v', generatedAt: 't0', packageRoots: [], units: [priorUnit], relationships: [], ignoredItems: [] };
+
+  // Same id, but a real new evidence entry (a second route) — a genuine
+  // change to what this fact claims after a human already reviewed it.
+  const freshUnit = {
+    id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1,
+    evidence: [
+      { signal: 'Get', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:1' },
+      { signal: 'Delete', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:20' },
+    ],
+    confidence: 80, status: 'observed',
+  };
+
+  const { report, history } = mergeIncrementalFacts(prior, 't1', [freshUnit], []);
+
+  assert.equal(freshUnit.status, 'requires-review', 'contradicting/changed evidence must flag for re-review, not silently keep reviewed nor silently adopt the fresh status');
+  assert.equal(report.units.flaggedForReReview, 1);
+  assert.equal(report.units.unaffected, 0);
+  const entry = history.find((h) => h.id === 'u1');
+  assert.equal(entry.from, 'reviewed');
+  assert.equal(entry.to, 'requires-review');
+});
+
+test('T-CL-3 (review history) — appendFactHistory grows a persistent, retrievable log across runs; never overwrites prior entries', () => {
+  const { appendFactHistory, readFactHistory } = require(path.join(PIPELINE_ROOT, 'dist/analysis/fact-history'));
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-history-test-'));
+
+  assert.deepEqual(readFactHistory(outDir), [], 'no fact-history.json yet — must read back as empty, not throw');
+
+  appendFactHistory(outDir, [{ id: 'u1', factType: 'unit', at: 't1', from: 'new', to: 'observed', reason: 'introduced by this run' }]);
+  appendFactHistory(outDir, [{ id: 'u1', factType: 'unit', at: 't2', from: 'observed', to: 'reviewed', reason: 'human confirmed' }]);
+
+  const history = readFactHistory(outDir);
+  assert.equal(history.length, 2, 'second append must ADD to the log, not replace it');
+  assert.equal(history[0].at, 't1');
+  assert.equal(history[1].at, 't2');
+});
+
+test('T-CL-6 (determinism) — same input scanned twice into the same --out directory produces semantically identical units/relationships/status, generatedAt excluded, evidence order-independent', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-determinism-test-'));
+  const nestjsRoot = path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample');
+
+  function factsSemanticSnapshot() {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const evidenceKey = (e) => `${e.category}|${e.source}|${e.signal}|${e.ref}`;
+    const units = facts.units
+      .map((u) => ({ id: u.id, kind: u.kind, status: u.status, confidence: u.confidence, evidence: [...u.evidence.map(evidenceKey)].sort() }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const relationships = facts.relationships
+      .map((r) => ({ id: r.id, kind: r.kind, from: r.from, to: r.to, source: r.source, status: r.status }))
+      .sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''));
+    return { units, relationships };
+  }
+
+  execFileSync('node', [RUN_SLICE, nestjsRoot, '--out', outDir], { stdio: 'pipe' });
+  const first = factsSemanticSnapshot();
+
+  execFileSync('node', [RUN_SLICE, nestjsRoot, '--out', outDir], { stdio: 'pipe' });
+  const second = factsSemanticSnapshot();
+
+  assert.deepEqual(second, first, 'a rerun of the identical input must be semantically identical (facts + status), independent of generatedAt and evidence array ordering');
+
+  // T-CL-2 is what makes this a real property, not a coincidence: nothing
+  // should have appeared, disappeared, or been re-flagged between two
+  // identical runs.
+  const mergeReport = JSON.parse(fs.readFileSync(path.join(outDir, 'merge-report.json'), 'utf8'));
+  assert.deepEqual(mergeReport.units, { new: 0, disappeared: 0, unaffected: mergeReport.units.unaffected, flaggedForReReview: 0 });
+  assert.ok(mergeReport.units.unaffected > 0, 'second identical run must classify every unit as unaffected');
+});
