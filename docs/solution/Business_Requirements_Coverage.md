@@ -25,7 +25,7 @@ Do not reopen these three as in-flight work. Leftovers stay gated.
 | `T-CL-1`…`T-CL-4` Contract & Lifecycle | T-FS-6 done — BR-70 / NFR-20 critical path |
 | `T-CL-5` Emission-coverage | No gate |
 | `T-RT-1`, `T-RT-2` Review Throughput | T-FS-1 and T-FS-6 done |
-| `T-LR-6` Per-(engine, fact-type) trust tiers | T-LR-5 done; this is the remainder in the CodeQL file |
+| `T-LR-6` Per-(engine, fact-type) trust tiers | **Done, 2026-08-20** (`pipeline/src/analysis/fact-trust-matrix.ts`) |
 | `T-MR-3`, `T-MR-5` | Independent `[B]` items |
 | `T-LM-8` Pattern-conformance stance | Written decision; do not wait for T-LM-1/3/4 |
 
@@ -55,7 +55,7 @@ Must-priority items still unbuilt: BR-20 (cross-repo), BR-70 (incremental merge)
 | **BR-30** | Every fact traces to evidence | **Implemented** (file:line / structured pointer, IgnoredItems) | — | — | No new task |
 | **BR-40** | Explicit confidence / **review status**; nothing gates until confirmed | **Implemented** — confidence + `FactStatus` (`observed`/`inferred`/`requires-review`/`reviewed`/`externally-verified`), `x-aac-status` CALM metadata, hard rule tested (2026-08-18) | `T-FS-6` — **done** | **B** | Closed. `T-CL-*`/`T-RT-2` may now start |
 | **BR-50** | Open lens set. Minimum named: security, vulnerability, data flow, **workflow/feature**, **observability**, resilience, **pattern conformance**, sustainability | Security + resilience scored; fitness declared. Vuln/lineage/green gated (no feed). Workflow/obs/pattern tasked, not built | `T-LM-1`…`4` in Lens Modules (1/3/4 gated). `T-LM-6`…`8` in Remaining Lenses | A closed | Do not invent T-LM-1/3/4. T-LM-8 is a written decision |
-| **BR-60** | Multiple techniques, explicit reconcile, no irreversible single tool | Dual-engine + structured-file + SBOM **partial, secondary-source introduction done** (T-FS-4). Contradiction **done** (T-FS-3). CodeQL **DI resolution shipped** (T-LR-5, 2026-08-19, opt-in/local-only — command-bus dispatch not shipped). Trust-tier PLACEMENT done; full per-fact-type MATRIX (`T-LR-6`) still stub | `T-LR-6` | — | — |
+| **BR-60** | Multiple techniques, explicit reconcile, no irreversible single tool | Dual-engine + structured-file + SBOM **partial, secondary-source introduction done** (T-FS-4). Contradiction **done** (T-FS-3). CodeQL **DI resolution shipped** (T-LR-5, 2026-08-19, opt-in/local-only — command-bus dispatch not shipped). Trust-tier PLACEMENT done; full per-fact-type MATRIX **shipped** (`T-LR-6`, 2026-08-20, `fact-trust-matrix.ts`) | — | — | — |
 | **BR-70** | Incremental re-extract; preserve human review; flag don’t overwrite | Overrides persist. Full fact-identity merge **not** built | `T-CL-1`…`4` | — | T-FS-6 done — no longer blocked; open to start |
 | **BR-80** | LLM never writes facts; advisory only | **Implemented as a permanent non-goal** (`OOS-llm-core-path`). `suggest-rules.ts` + residual-review are offline | `T-RT-4` (advisory layer) | — | Do not put any LLM on `run-slice` |
 | **BR-90** | Versionable, schema-validatable representation for CI / review | **Implemented** (`calm validate`, CALM 1.2). In-repo CI workflow existence ≠ a required product CI gate | — | — | No new task |
@@ -119,7 +119,7 @@ NFR-50 and NFR-60 are gaps in the product sense but are **already captured** as 
 | 4 | One multi-repo relationship via ranked join, real two-repo pair | **Tasked** — `T-MR-2`. Not started |
 | 5 | Every active lens queryable on one real model | **Partial** — `threat-signals` + `resilience-lens` + CALM |
 | 6 | One new lens as a query, no schema redesign | **Done** — resilience-lens. `threat-signals` already proved the module boundary |
-| 7 | One fact from a non-primary technique at its own trust tier | **Partial** — OpenAPI / k8s / SBOM / E2 placeholders exist; earned per-fact-type tiers are `T-LR-6` |
+| 7 | One fact from a non-primary technique at its own trust tier | **Done** — OpenAPI / k8s / SBOM / E2 placeholders exist; earned per-fact-type tiers shipped in `T-LR-6` (`fact-trust-matrix.ts`) |
 | 8 | Re-run identical; incremental update does not silently overwrite confirmed facts | **Tasked** — `T-CL-2` + `T-CL-6` |
 | 9 | One lens with a real fitness measurement; others marked not-fit-to-gate | **Done** for the two built lenses (`T-LM-0` + `T-LM-5`). New lenses must carry `fitness.json` |
 | 10 | Review queue triaged; backlog size/age queryable | **Tasked** — `T-RT-2` unblocked |
@@ -134,7 +134,7 @@ Pick at most one. Authoritative order: `AGENT_TASKS_Ext_Execution_Order.md`.
 1. **T-CL-1 → 2 → 3 → 4** — highest BR leverage now that status vocabulary exists (BR-70 / NFR-20).
 2. **T-RT-1 then T-RT-2** — NFR-80, both gates green.
 3. **T-CL-5** — smallest, parallel with either of the above.
-4. **T-LR-6** — remaining CodeQL work (per-fact-type trust matrix). Do not start a second DI engine. GHAS before private-repo production use of T-LR-5.
+4. ~~**T-LR-6** — remaining CodeQL work (per-fact-type trust matrix).~~ **Done, 2026-08-20.** Do not start a second DI engine. GHAS before private-repo production use of T-LR-5.
 5. **Do not start:** NFR-50/60 (deferred), T-FS-5 (skipped), E3 (deprioritised), T-LM-1/3/4 without a real feed, T-MR-1/2 or T-CL-6 before T-CL-2.
 
 ---

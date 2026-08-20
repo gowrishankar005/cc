@@ -2,6 +2,7 @@ import * as path from 'path';
 import { AnalysisContext, AnalysisPass } from './pass-registry';
 import { runCodeQLDiResolution, CodeQLDiBinding } from '../scanner/codeql-di-provider';
 import { TypedUnit } from '../types/typed-facts';
+import { relationshipTrust, unitIntroductionTrust } from './fact-trust-matrix';
 
 /**
  * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — turns CodeQL's real DI-binding
@@ -12,22 +13,21 @@ import { TypedUnit } from '../types/typed-facts';
  * when either is absent. Registered in DEFAULT_PASSES so any facts it
  * produces still get graded/statused; never a default-on path.
  *
- * Trust tier (item 5 of the checklist; full matrix is T-LR-6, not this
- * task): same-root confidence (7) sits BETWEEN R2b's (8) and R2c's (6) —
- * deliberately not the strongest tier despite CodeQL's own real, verified
- * accuracy (E1b: 2106 bindings, correct ambiguity refusal) — "never
- * automatically primary" per the checklist means this engine earns trust
- * over time, not on day one, regardless of how good the underlying analysis
- * already measures. Enforced structurally, not just by the confidence
- * number: this pass NEVER creates a relationship for a (from, to) pair an
- * earlier pass already resolved — it only fills a gap no existing mechanism
- * reaches, never contests or overrides a fact CodeGraph/Graphify already
- * established.
+ * Trust tier (item 5 of the checklist; full matrix is T-LR-6,
+ * `fact-trust-matrix.ts`): same-root confidence (7) sits BETWEEN R2b's (8)
+ * and R2c's (6) — deliberately not the strongest tier despite CodeQL's own
+ * real, verified accuracy (E1b: 2106 bindings, correct ambiguity refusal) —
+ * "never automatically primary" per the checklist means this engine earns
+ * trust over time, not on day one, regardless of how good the underlying
+ * analysis already measures. Enforced structurally, not just by the
+ * confidence number: this pass NEVER creates a relationship for a (from, to)
+ * pair an earlier pass already resolved — it only fills a gap no existing
+ * mechanism reaches, never contests or overrides a fact CodeGraph/Graphify
+ * already established. The actual confidence values live in
+ * `fact-trust-matrix.ts`, not as local constants here — a second engine or a
+ * new CodeQL fact type registers a row there, not a new constant in every
+ * file that needs a number.
  */
-const CODEQL_DI_SAME_ROOT_CONFIDENCE = 7;
-const CODEQL_DI_CROSS_ROOT_CONFIDENCE = 4;
-/** Introduced-unit tier — same "own tier, never promoted" class as T-FS-4's dependency-manifest introduction. */
-const CODEQL_DI_INTRODUCED_UNIT_CONFIDENCE = 10;
 
 function relativeToRoot(sourceRoot: string, packageRoots: string[], codeqlRelativePath: string): { root: string; relativeFilePath: string } | undefined {
   for (const root of packageRoots) {
@@ -108,11 +108,11 @@ export const codeqlDiPass: AnalysisPass = {
               signal: `codeql-di:${binding.mechanism}`,
               source: 'codeql-di',
               category: 'framework-bootstrap',
-              weight: CODEQL_DI_INTRODUCED_UNIT_CONFIDENCE,
+              weight: unitIntroductionTrust('codeql', 'codeql-di'),
               ref: `${implLoc.relativeFilePath}:1`,
             },
           ],
-          confidence: CODEQL_DI_INTRODUCED_UNIT_CONFIDENCE,
+          confidence: unitIntroductionTrust('codeql', 'codeql-di'),
         };
         ctx.allUnits.push(implUnit);
         const rootUnits = ctx.unitsByRoot.get(implLoc.root) ?? [];
@@ -127,14 +127,15 @@ export const codeqlDiPass: AnalysisPass = {
       if (alreadyResolved) continue;
 
       const crossRoot = injectingLoc.root !== implLoc.root;
+      const mechanism = binding.mechanism === 'bean-factory' ? 'codeql-di-bean-factory' : 'codeql-di-stereotype';
       ctx.relationships.push({
         from: injectingUnit.id,
         to: implUnit.id,
         kind: 'calls',
         crossPackage: crossRoot,
         source: 'codeql',
-        confidence: crossRoot ? CODEQL_DI_CROSS_ROOT_CONFIDENCE : CODEQL_DI_SAME_ROOT_CONFIDENCE,
-        mechanism: binding.mechanism === 'bean-factory' ? 'codeql-di-bean-factory' : 'codeql-di-stereotype',
+        confidence: relationshipTrust('codeql', mechanism, crossRoot ? 'cross-root' : 'same-root'),
+        mechanism,
       });
       relationshipCount++;
     }

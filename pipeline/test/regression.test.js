@@ -4430,3 +4430,61 @@ test('T-LR-5 — a codeql-di-introduced unit and the relationship pointing at it
   assert.equal(introducedUnit.status, 'requires-review');
   assert.equal(rel.status, 'requires-review', 'a relationship anchored to a not-yet-promoted introduced unit must itself read requires-review');
 });
+
+test('T-LR-6 (AGENT_TASKS_Ext_CodeQL_Engine.md) — fact-trust-matrix.ts is the single source of truth for every (engine, mechanism, scope) tier the producers actually emit', () => {
+  const { relationshipTrust, unitIntroductionTrust } = require(path.join(PIPELINE_ROOT, 'dist/analysis/fact-trust-matrix'));
+  // Graphify multi-hop tiers — real values multi-hop-bridge-detector.ts's own
+  // doc comments have always cited (R2 15/10, R2-stereotype 12/7, R2b 8/5,
+  // R2c 6/3), now read from the matrix instead of a locally-hardcoded copy.
+  assert.equal(relationshipTrust('graphify', 'r2-phase1', 'same-root'), 15);
+  assert.equal(relationshipTrust('graphify', 'r2-phase1', 'cross-root'), 10);
+  assert.equal(relationshipTrust('graphify', 'r2-stereotype', 'same-root'), 12);
+  assert.equal(relationshipTrust('graphify', 'r2-stereotype', 'cross-root'), 7);
+  assert.equal(relationshipTrust('graphify', 'r2b', 'same-root'), 8);
+  assert.equal(relationshipTrust('graphify', 'r2b', 'cross-root'), 5);
+  assert.equal(relationshipTrust('graphify', 'r2c', 'same-root'), 6);
+  assert.equal(relationshipTrust('graphify', 'r2c', 'cross-root'), 3);
+  assert.equal(relationshipTrust('graphify', 'admitted-unresolved', 'same-root'), 3);
+  assert.equal(relationshipTrust('graphify', 'admitted-unresolved', 'cross-root'), 2);
+  // T-LR-5's own placement — strictly between R2b (8) and R2c (6).
+  assert.equal(relationshipTrust('codeql', 'codeql-di-stereotype', 'same-root'), 7);
+  assert.equal(relationshipTrust('codeql', 'codeql-di-stereotype', 'cross-root'), 4);
+  assert.equal(relationshipTrust('codeql', 'codeql-di-bean-factory', 'same-root'), 7);
+  assert.equal(relationshipTrust('codeql', 'codeql-di-bean-factory', 'cross-root'), 4);
+  assert.equal(unitIntroductionTrust('codeql', 'codeql-di'), 10);
+
+  assert.throws(
+    () => relationshipTrust('graphify', 'no-such-mechanism', 'same-root'),
+    /no entry for/,
+    'an unregistered (engine, mechanism, scope) triple must fail loud, never silently default to some number'
+  );
+});
+
+test('T-LR-6 — "CodeQL is never automatically primary" is a structural assertion the matrix\'s own shape must satisfy, not just a stated intent', () => {
+  const trustMatrix = require(path.join(PIPELINE_ROOT, 'dist/analysis/fact-trust-matrix'));
+  // The real, shipped matrix must satisfy its own invariant.
+  assert.doesNotThrow(() => trustMatrix.assertCodeqlNeverPrimary());
+
+  // And the assertion must be a real check, not a no-op: a matrix with a
+  // codeql row at or above the strongest non-codeql tier must fail it.
+  const rigged = [
+    { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'same-root', confidence: 15, evidence: 'x' },
+    { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'same-root', confidence: 15, evidence: 'x' },
+  ];
+  assert.throws(() => trustMatrix.assertCodeqlNeverPrimary(rigged), /never automatically primary/);
+
+  // The check is scoped per fact type, not a single global max: a codeql
+  // row must only be compared against OTHER engines' rows for the SAME
+  // factType. A high-confidence codeql row in a fact type where CodeQL is
+  // the only producer (no competing engine to out-rank) must never trip
+  // the guard just because some UNRELATED fact type happens to have a
+  // lower non-codeql ceiling.
+  const soleProducerCase = [
+    { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2c', scope: 'same-root', confidence: 6, evidence: 'x' },
+    { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-di', scope: 'n/a', confidence: 10, evidence: 'x' },
+  ];
+  assert.doesNotThrow(
+    () => trustMatrix.assertCodeqlNeverPrimary(soleProducerCase),
+    'codeql confidence (10) exceeds the OTHER fact type\'s max (6), but they are different fact types — must not be compared against each other'
+  );
+});
