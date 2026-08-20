@@ -1,0 +1,13 @@
+{
+  "package": "java-jaxrs-charges",
+  "module": "threat-signals",
+  "authoredFrom": "coe-lab/fixtures/monorepo/packages/java-jaxrs-charges/src/main/java/lab/charges/ChargesApiResource.java",
+  "reasoning": "ChargesApiResource carries @Path/@GET/@POST (real http-entry-point evidence) and no @PreAuthorize, no call-site auth check, and no OpenAPI spec anywhere in this package granting it a security scheme. It is the only unit this package produces (Charge.java is a plain data class, no framework markers).",
+  "findings": [
+    {
+      "unitNameContains": "ChargesApiResource",
+      "stride": "spoofing",
+      "reason": "HTTP-facing, no security-control evidence anywhere in the fixture"
+    }
+  ]
+}

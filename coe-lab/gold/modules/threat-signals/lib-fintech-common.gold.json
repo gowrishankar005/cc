@@ -1,0 +1,10 @@
+{
+  "package": "lib-fintech-common",
+  "module": "threat-signals",
+  "authoredFrom": [
+    "coe-lab/fixtures/monorepo/packages/lib-fintech-common/src/main/java/lab/common/Money.java",
+    "coe-lab/fixtures/monorepo/packages/lib-fintech-common/src/main/java/lab/common/StringUtils.java"
+  ],
+  "reasoning": "The must-not-detect trap: Money and StringUtils are plain utility classes with zero framework markers of any kind -- they produce zero TypedUnits at all (0 units, per the coe-lab scoreboard), so there is nothing for threat-signals to even evaluate. A trap-consistency check for the module layer: if this file ever shows a non-empty findings list, either the trap itself regressed (a bogus unit got created) or threat-signals started fabricating findings for units that don't exist.",
+  "findings": []
+}

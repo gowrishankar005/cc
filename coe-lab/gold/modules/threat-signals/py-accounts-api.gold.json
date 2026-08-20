@@ -1,0 +1,13 @@
+{
+  "package": "py-accounts-api",
+  "module": "threat-signals",
+  "authoredFrom": "coe-lab/fixtures/monorepo/packages/py-accounts-api/accounts_api.py",
+  "reasoning": "accounts_api.py declares 4 Flask @app.route handlers (health, list_accounts, get_account, create_account) with no auth/security check anywhere in the file -- this pipeline's Python route detection is file-granular (one unit per file, Slice 1's own documented granularity), so the whole file is one service unit carrying http-entry-point evidence and no security-control evidence.",
+  "findings": [
+    {
+      "unitNameContains": "accounts_api",
+      "stride": "spoofing",
+      "reason": "HTTP-facing, no security-control evidence anywhere in the fixture"
+    }
+  ]
+}

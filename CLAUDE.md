@@ -8,15 +8,73 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 For scope, see [`docs/Requirements.md`](docs/Requirements.md). For what's built vs. backlog, see [`docs/solution/Capabilities.md`](docs/solution/Capabilities.md). For the current solution design, see [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](docs/solution/Architecture_as_Code_Solution_Design_v2.md) (platform) and [`docs/solution/language/java.md`](docs/solution/language/java.md) (Java specifics).
 
+**Before scoping anything, read the three governance registries** —
+[`docs/solution/BACKLOG.md`](docs/solution/BACKLOG.md) (what's already known-missing, often with evidence attached),
+[`docs/solution/Claim_Register.md`](docs/solution/Claim_Register.md) (what may be *said* to work, and the forbidden-phrase table),
+[`docs/solution/OOS_Registry.md`](docs/solution/OOS_Registry.md) (permanent non-goals, each with a revisit trigger).
+Skipping them produces work that is rejected on review or re-derives a
+question already answered here: a detector keyed to a sample repo's class
+names is always rejected, a permanent non-goal has a defined trigger rather
+than being simply unbuilt, and a P1 backlog row usually already carries the
+real evidence someone is about to go and re-gather.
+
 ## Working principles
 
 **1. Think Before Coding — don't assume, verify against the real tool/schema/repo.** "Specified" and "true" are different claims. Before asserting a design or dependency assumption holds, verify it — a schema-shaped claim can be falsified the moment the real validator runs against it; a "not installed" claim can be stale the moment someone actually checks again. When a genuine decision point has more than one defensible answer and only the user can pick it (build-environment assumptions, scope tradeoffs, which of several correct designs to build), ask rather than picking silently.
 
 **2. Simplicity First — minimum code that solves the problem, nothing speculative.** The construct-mapping catalogues (`node-type-mapping.yml`, `relationship-type-mapping.yml`, `control-requirement-catalogue.yml`, and the persistence/messaging/http-client detection catalogues) exist so builders stay thin and new capability is a data row, not new code. If a new signal needs more than a catalogue row plus one of the already-proven extraction mechanisms (native framework typing, decorator/annotation extraction, import detection, structured-file ingestion), stop and confirm it's actually in scope before inventing a new mechanism.
 
-**3. Surgical Changes — touch only what you must, clean up only your own mess.** Every builder (`node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `metadata-builder.ts`, `control-builder.ts`, `port-interface-builder.ts`) is isolated on purpose — fixing one should never require touching another. Remove only what your own change makes unused; leave pre-existing gaps named, not silently patched over.
+**3. Surgical Changes — touch only what you must, clean up only your own mess.** Every builder (`node-builder.ts`, `interface-builder.ts`, `relationship-builder.ts`, `metadata-builder.ts`, `control-builder.ts`, `port-interface-builder.ts`) is isolated on purpose — fixing one should never require touching another. Remove only what your own change makes unused; leave pre-existing gaps named, not silently patched over. **"Surgical" governs footprint — which files change — not generalization
+scope. A small diff tuned to make one failing repo pass is not more surgical
+than a slightly larger diff that fixes the actual mechanism class; it's just
+narrower, and narrower-but-instance-specific is the anti-pattern, not the
+virtue. If a bug traces to a mechanism (a matching pattern, a resolution
+strategy, a catalogue gap), fix the mechanism — see "Bug fixes are capability
+work" below.**
 
 **4. Goal-Driven Execution — define success criteria, loop until verified.** Every change should be framed as "does the regression suite still produce the same counts, does `calm validate` return 0 errors, does the output match grep-verified ground truth" — never "does this code look right." State the verify step before making a non-trivial change, not after.
+
+## Bug fixes are capability work, not exceptions to it
+
+Named because it recurs: a fix that makes one failing repo/fixture pass by
+adding a conditional, tuning a regex, or hardcoding a value is easy to mistake
+for a small, safe change. It is usually the opposite — a mechanism-instance
+patch dressed as a mechanism-class fix, and the next language, framework, or
+repo hits the same underlying gap again under a different symptom.
+
+**`OOS-sample-repo-detectors`** (`docs/solution/OOS_Registry.md`) already
+forbids the sharpest version of this — any code path keyed to a specific
+sample repo's class/module/package name — permanently, not as a backlog item.
+**`Catalogue_Intake.md`'s four requirements apply to any bug fix that changes
+detection, matching, or relationship-building logic, not only PRs framed as
+new capability.** Calling it a bug fix does not exempt it.
+
+Before writing a fix, not after:
+
+1. **Name the mechanism class the bug belongs to** — the same discipline
+   `Claim_Register.md`'s mechanism-class matrix already uses (`U-*`/`R-*`/`C-*`
+   rows are classes, never single-repo instances).
+2. **Check whether it's a catalogue gap or a mechanism gap.** A catalogue gap
+   is a data row (Simplicity First, above). A mechanism gap needs a real,
+   evidenced new extraction strategy — not a special case bolted onto an
+   existing one.
+3. **Verify the fix against a second, different instance of the same class**
+   — not just the case that reported the bug. This is now a stated
+   requirement in `Catalogue_Intake.md`, not a suggestion. If no second
+   instance exists yet, say so explicitly rather than silently skip it.
+4. **State the mechanism class in the commit message and the `Claim_Register.md`
+   entry**, so the next person (or session) can tell a capability fix from an
+   instance patch without reading the diff.
+
+**A task's own status note claiming a fix was "caught" or "refactored" is not
+itself evidence the catch was systemic.** The first real instance of this
+whole pattern (an annotation name hardcoded as a literal, generalized only
+after the fact) was found by the project owner reading a diff and getting
+suspicious, not by this rule, not by the task's own definition-of-done
+checklist, and not by the agent noticing on its own. Treat "flagged on
+review" in a status note as meaning *a human read the diff*, not as evidence
+the process would have caught it without one — and don't skip that reading
+because a task reports itself done.
 
 ## Repository layout
 
@@ -40,7 +98,7 @@ tools/          Standalone tooling (e.g. the residual-review session helper)
 | `coe-lab/generated/` | No | Yes — platform output under test |
 | `coe-lab/scripts/` | No | Yes |
 
-See `coe-lab/ISOLATION.md`. Gold paths are also listed in `.cursorignore` / `.grokignore`.
+See `coe-lab/ISOLATION.md`. Gold paths are also listed in `.cursorignore` / `.grokignore`. **Those ignore-files only guard the tools that read them** — under any other tooling, isolation rests on discipline alone. When in doubt, run implementation and scoring as separate sessions: a measurement taken by a process that read the answer key is void, not merely weak.
 
 ## Build and run
 
@@ -59,7 +117,7 @@ cd ../tools/review-session && python3 -m unittest discover -s . -p "test_*.py"  
 
 ## Pipeline architecture
 
-Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with `typed-facts.json` (`pipeline/src/types/typed-facts.ts`) as the fixed, versioned contract between Analysis and any downstream module. `calm-generator` and `threat-signals` are the two built modules.
+Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with `typed-facts.json` (`pipeline/src/types/typed-facts.ts`) as the fixed, versioned contract between Analysis and any downstream module. `calm-generator`, `threat-signals`, and `resilience-lens` are the three built modules.
 
 **Dual-engine scanner** — each tool doing what it's verified good at:
 - **CodeGraph** (`scanner/codegraph-provider.ts`) — per-package indexing; native `route` typing where its resolver covers the framework, plus `extractFromSource()`-based decorator/annotation facts for frameworks it doesn't natively type (e.g. JAX-RS, JPA).
@@ -91,3 +149,92 @@ Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with 
 - `npm test` (from `pipeline/`) is the real regression suite — exact-value assertions against checked-in fixtures, not smoke tests. Some tests reference sample repos that are only present locally for manual testing (see `.gitignore`'s `spikes/` entry) and skip gracefully when absent.
 - New detection coverage should be a catalogue row plus one of the four proven extraction mechanisms, per the Simplicity First principle above — see [`docs/solution/Catalogue_Intake.md`](docs/solution/Catalogue_Intake.md) for the intake process (evidence + test + backlog entry required).
 - Before claiming a fix or a new detection works, run it against a real fixture and check the actual output — don't infer correctness from reading the code.
+- **A new `run-slice` CLI flag is not done until it's a row in `README.md`'s CLI reference table.** A flag that only exists in `run-slice.ts`'s `KNOWN_FLAGS` array and a doc comment is invisible to anyone deciding what the product can actually do — code comments answer "how does this work," not "what can I run." Same for a materially new run-time behavior an existing flag gains.
+- **A new `DEFAULT_PASSES` entry is not done until it's a row in `README.md`'s "What runs by default vs. what needs a flag" table.** Whether a mechanism is always-on or opt-in is exactly the fact that gets buried in code if it isn't stated somewhere a reader can scan in one pass — don't make them read `passes.ts`'s pass-ordering comments to find out.
+
+## Session economy (no plugin required)
+
+Four cheap habits, adopted rather than any third-party workflow framework —
+evaluated and rejected as unnecessary overhead for this repo (`docs/06`
+convergence notes, research workspace), but these four ideas are worth
+keeping regardless of that verdict:
+
+- **One git worktree per active lane/task**, not one shared working tree
+  across parallel sessions. Removes the need to `git status`-check before
+  every commit to avoid sweeping up another session's in-progress work — a
+  real problem this project hit, not a hypothetical one.
+- **One task, one fresh session**, where practical. The lane files
+  (`AGENT_TASKS_Ext_*.md`) are written as self-contained briefs specifically
+  so this works — a session doesn't need prior conversation history if the
+  task file states what to read and what "done" means. Avoids carrying
+  irrelevant context forward and the fidelity loss a long session risks after
+  compaction.
+- **Two failed fix attempts on the same problem is a stop signal, not a cue
+  to try a third variation.** Repeated patching of the same symptom usually
+  means the mechanism class was scoped wrong (see "Bug fixes are capability
+  work" above) — stop, re-derive the mechanism class, then retry once, not
+  indefinitely.
+- **Once a lane/task file exists and is current, point a session at it
+  directly — don't write a prompt paraphrasing it.** `AGENT_TASKS_Ext_*.md`
+  files are self-contained by design (they name what to read and what
+  "done" means); a bespoke kickoff prompt duplicates that content and can go
+  stale relative to it the moment either one changes — which has already
+  happened once, on this project's own extension work.
+- **Root cause before patch, every time.** Reproduce → isolate → identify the
+  mechanism → fix, in that order. Skipping straight to a plausible-looking
+  change is the most common route to the instance-specific patches this
+  project's governance already exists to catch.
+
+## Process discipline (from this project's build retrospective)
+
+The retrospective measured roughly **two lines of planning prose for every one
+line of code that shipped** — ~11,000 lines of planning docs eventually deleted
+as superseded churn, and a requirements doc that reached v0.14 before scope
+locked. The engineering discipline in this repo is *why the codebase held up*;
+the cost was in where the effort went, not how much. These rules exist to keep
+that ratio from returning.
+
+**One requirements doc, ever.** Version it in commit history, not in
+filenames. The moment a doc is about to be saved as `_v2`, edit the original
+and commit — git already remembers what it said.
+
+**Two solutioning passes, hard cap.** A first draft, one structured critique,
+then build. Wanting a third review *before* writing code is itself the signal
+to go write the code — real evidence critiques a design faster and more
+honestly than another planning pass.
+
+**Turn open questions into tests, not paragraphs.** "Will this approach work?"
+is not settled by arguing in a document; it's settled by the smallest real
+test that could prove it wrong. If that test can't be written yet, the
+question isn't understood yet either.
+
+**"Documented" and "specified" never mean "done."** `Capabilities.md` and
+`Claim_Register.md` are the status of record. A design paragraph is not a
+capability.
+
+**Delete finished planning artifacts as you go.** A task or requirements doc's
+job ends when its content ships or is rejected. Don't archive "just in case" —
+that's what git history is for, and it doesn't clutter the working tree in the
+meantime.
+
+**Comments are for a stranger with no memory of today.** No session references,
+no task-ID shorthand only the author can resolve. Reasoning that matters
+belongs in the commit message — durable and searchable — not narrated through
+source files where it rots as context changes.
+
+**Abstract third-party references the day you write them.** Using real
+repositories as evidence is good practice; generalise the reference
+immediately ("a reference banking platform", not the real name). Retrofitting
+this across a whole repo is real, avoidable work — this project has already
+paid for it once.
+
+**Second occurrence of a mistake fixes the process, not the instance.** The
+first time something breaks, patch it. The second time the *same class* breaks,
+build the guardrail — a test, a lint rule, a frozen exam — so there's no third.
+Cross-document reference rot (a `§`, ID, or path that no longer resolves after
+a restructure) has now recurred enough times to warrant a mechanical check
+rather than another manual sweep.
+
+**Handover-ready is a standing constraint, not a final sweep.** The cheapest
+time to keep the repo clean is continuously; the most expensive is a dedicated
+pass at the end, which is exactly what closed out the previous cycle.

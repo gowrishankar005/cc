@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver residual review session — residuals.json",
-  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). Real, still-open gap (B-tier-b-detector): no trigger currently produces tier 'B', so every real residual today is 'A' or 'C'.",
+  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). T-FS-1 (BACKLOG.md 'Tier-B residual detection') closed the prior 'no trigger produces tier B' gap: multi-hop-single-candidate-below-threshold (multi-hop-bridge-detector.ts's tier-b-single-candidate ignored-item, a single real store candidate found among a bridge's several syntactic implementers) now maps to tier 'B'.",
   "type": "object",
   "required": ["generatedAt", "items"],
   "properties": {
@@ -20,7 +20,7 @@
         "tier": {
           "type": "string",
           "enum": ["A", "B", "C"],
-          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (either in-chat via Copilot's editFiles tool, the primary path, or the secondary/headless draft_tier_b.py; no trigger currently produces this tier, B-tier-b-detector). C = do not invent; document OOS or leave open."
+          "description": "A = architect must decide (choice card). B = LLM may draft if evidence bar met (either in-chat via Copilot's editFiles tool, the primary path, or the secondary/headless draft_tier_b.py; T-FS-1's multi-hop-single-candidate-below-threshold trigger is the first real producer of this tier). C = do not invent; document OOS or leave open."
         },
         "card": {
           "type": "string",

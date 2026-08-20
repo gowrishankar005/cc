@@ -46,7 +46,13 @@ export interface Evidence {
   // messaging unit — never a primary detection source on its own, always
   // weight-10 (corroboration tier), and only ever attached when exactly one
   // candidate unit exists in the root (never guessed under ambiguity).
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest';
+  // No new source value added in CONTRACT_VERSION 12.0.0 (T-LM-2, resilience
+  // lens) — retry annotations reuse the existing 'decorator' source (same
+  // extractFromSource()/decorates-ref mechanism @PreAuthorize/@KafkaListener
+  // already use) and timeout config reuses the existing 'structured-config'
+  // source (same spring-config-provider.ts flat-key read datasource/broker
+  // extraction already uses). Only Evidence.category gained a value.
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest' | 'codeql-di';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 — a Lambda
   // handler's `implements RequestHandler` clause. Deliberately NOT the same category
   // as 'http-entry-point' even though it must win the same kind tie-break
@@ -73,7 +79,18 @@ export interface Evidence {
     // host:port is not. `server.port` still becomes a real `tcp-host-port`
     // interface, but via a small dedicated function
     // (build-calm.ts's attachPortInterfaces), not this generic mechanism.
-    | 'spring-config';
+    | 'spring-config'
+    // 'resilience' added in CONTRACT_VERSION 12.0.0 (T-LM-2, Lens Modules
+    // lane) — a real, narrowly-scoped resilience-posture signal: a
+    // retry-annotation (Spring Retry `@Retryable`, Resilience4j `@Retry`,
+    // decorator-sourced) or a resilience4j timeout-duration config value
+    // (structured-config-sourced). Deliberately descriptive-only, same as
+    // 'spring-config' — never added to node-type-mapping.yml's
+    // interfaceCategories (a retry annotation is not a route). Falls
+    // through mapSignalsToUnits' kind-priority chain to the 'service'
+    // default when it's the only evidence on a file, same precedent as a
+    // security-control-only file (the proven DatatableWriteService shape).
+    | 'resilience';
   weight: number;
   ref: string; // file:line for code-sourced evidence; "relativeFilePath:paths"-style pointer for openapi (no line numbers available from a parsed YAML/JSON document)
   /**
@@ -88,6 +105,35 @@ export interface Evidence {
   argument?: string;
 }
 
+/**
+ * T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — fixed review-state
+ * vocabulary, alongside (not replacing) the existing confidence/grade/band
+ * scoring: 'observed' (direct high-confidence static evidence, no inference
+ * hop) · 'inferred' (a deterministic rule or a multi-hop mechanism —
+ * real, but one or more inference steps removed from direct evidence) ·
+ * 'requires-review' (a genuine disagreement, ambiguity, or an unclassified
+ * counterpart — a human must confirm) · 'reviewed' (human-confirmed via an
+ * ACTIVE Decision Record/Override — the only status a formerly
+ * requires-review fact can be promoted out of, set only by
+ * override-applier.ts, never by any Analysis pass) · 'externally-verified'
+ * (confirmed against an artifact independent of this run's own code
+ * reading — a published API contract or a real deployed manifest, not a
+ * static-analysis inference). Don't extend this vocabulary without a real
+ * evidenced trigger for the new value — same discipline as any other
+ * catalogue-adjacent enum in this codebase.
+ *
+ * Hard rule (not a heuristic, enforced in status-assignment.ts): a
+ * `kind: 'unresolved'` unit — this pipeline's placeholder for a real call
+ * site whose counterpart could not be classified into a real architectural
+ * kind, the closest analog this model has to an "external system" whose
+ * identity code evidence alone cannot confirm — never receives 'observed'
+ * or 'externally-verified' from code evidence. It carries no Evidence at
+ * all by construction, so this holds structurally, not just by convention;
+ * status-assignment.ts still asserts it explicitly rather than leaving it
+ * implicit.
+ */
+export type FactStatus = 'observed' | 'inferred' | 'requires-review' | 'reviewed' | 'externally-verified';
+
 export interface TypedUnit {
   id: string; // stable id, derived from qualifiedName or file+line
   // 'topic' added in CONTRACT_VERSION 4.0.0 (T-X7-1) — executes the dry run
@@ -101,6 +147,15 @@ export interface TypedUnit {
   endLine: number;
   evidence: Evidence[];
   confidence: number; // 0-100, weighted confidence bands
+  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no
+  // CONTRACT_VERSION bump — not one of §1's tracked closed unions). Set by
+  // status-assignment.ts (the true last Analysis pass) from this unit's own
+  // already-computed kind/confidence/evidence — no new extraction. Bumped
+  // to 'reviewed' only by override-applier.ts, strictly after Analysis, on
+  // the CALM element this unit produced — Analysis itself never writes
+  // 'reviewed', preserving the "Analysis concludes, Override corrects"
+  // separation the Decision Record mechanism depends on.
+  status?: FactStatus;
 }
 
 export interface TypedRelationship {
@@ -118,7 +173,7 @@ export interface TypedRelationship {
   // 'k8s' added alongside 'shares-secret' in the same 3.0.0 bump — the k8s
   // manifest provider (scanner/k8s-manifest-provider.ts) is a third
   // relationship-evidence source, distinct from codegraph/graphify.
-  source: 'codegraph' | 'graphify' | 'k8s';
+  source: 'codegraph' | 'graphify' | 'k8s' | 'codeql';
   // T-X9-1 — additive OPTIONAL field (Contract_Evolution_Policy.md §2(b),
   // no CONTRACT_VERSION bump needed: an unknown optional field is harmless
   // to any existing module). Set only by the env soft-graph detector today
@@ -141,17 +196,58 @@ export interface TypedRelationship {
   // this field, never a live-run gap.
   grade?: 'structural' | 'architecture' | 'trust';
   // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no CONTRACT_VERSION bump).
-  // Set only by multi-hop-bridge-detector.ts's two branches, both already
-  // distinguishable by confidence value (15/10 vs 8/5) but not
+  // Set only by multi-hop-bridge-detector.ts's branches, already
+  // distinguishable by confidence value (15/10 / 8/5 / 6/3) but not
   // self-documenting — this makes "which branch produced this edge"
   // askable directly (coverage report, IR, a future query layer) without
   // hardcoding the confidence-value mapping. 'r2-phase1': the bridge's sole
   // implementer IS itself a database/topic unit (S-layered-access).
   // 'r2b': the implementer is not itself a store but imports exactly one
-  // (S-layered-domain) — one inference hop deeper. Every other relationship
-  // producer (R0/R1/k8s/env-soft-graph) leaves this unset — absence means
-  // "not multi-hop-derived," never a fake default.
-  mechanism?: 'r2-phase1' | 'r2b';
+  // (S-layered-domain) — one inference hop deeper. 'r2c' (T-LR-2,
+  // BACKLOG.md "Direct-delegate bridge detection") — no `implements`-based
+  // interface layer at all; a concrete class referenced directly imports
+  // exactly one store itself. Every other relationship producer
+  // (R0/R1/k8s/env-soft-graph) leaves this unset — absence means "not
+  // multi-hop-derived," never a fake default.
+  // 'admitted-unresolved' added for T-P0-1 (E2, graded fact admission,
+  // BACKLOG.md's "Graded fact admission (dual-unit gate)" row) — a raw
+  // Graphify edge whose OTHER endpoint doesn't resolve to a real TypedUnit,
+  // admitted with a synthesized `kind: 'unresolved'` placeholder unit on
+  // that side instead of being silently dropped by
+  // graphify-reconciler.ts's `if (!from || !to) continue`.
+  // 'r2-stereotype' added for T-LR-3 (BACKLOG.md "Plain-interface bridge
+  // detection") — a bridge with 2+ real `implements` candidates (previously
+  // always refused as ambiguous) resolves when exactly ONE of them carries
+  // real, catalogue-recognized `@Service` stereotype evidence
+  // (spring-service-stereotype in signal-catalogue.yml) and the terminal
+  // check (implementer IS itself a database/topic unit) also passes —
+  // the same disambiguation-by-corroboration mechanism the CodeQL
+  // DI-resolution experiment verified at real scale
+  // (E1b-codeql-di-resolution-experiment.md's own "stereotype" mechanism).
+  // Deliberately does NOT also chase the r2b store-import hop after
+  // disambiguating — compounding an ambiguity-resolution step with a second
+  // inferred hop in the same edge would stack two layers of inference
+  // beyond what E1b's own evidence covers; 0 or 2+ stereotype-carrying
+  // implementers still refuses, same "never guess" discipline as every
+  // other branch. Not one of Contract_Evolution_Policy.md §1's tracked
+  // closed unions (only Evidence.source/category, TypedUnit.kind,
+  // TypedRelationship.kind, IgnoredItem.reason are) — this field is
+  // advisory provenance no module's core logic branches on, so widening it
+  // needs no CONTRACT_VERSION bump.
+  // 'codeql-di-bean-factory' / 'codeql-di-stereotype' added for T-LR-5
+  // (AGENT_TASKS_Ext_CodeQL_Engine.md) — codeql-di-pass.ts's two branches,
+  // matching di_resolution.ql's own 'mechanism' column exactly: a
+  // @Bean-factory-wired interface->impl binding, or a stereotype-resolved
+  // one CodeQL's whole-database join found but this pipeline's own
+  // Graphify-based r2-stereotype/r2c branches did not reach (different
+  // reach, not a duplicate of those mechanisms — trust-tier-gated,
+  // codeql-di-pass.ts never overrides an edge an earlier mechanism already
+  // produced for the same pair).
+  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved' | 'codeql-di-bean-factory' | 'codeql-di-stereotype';
+  // T-FS-6 — same FactStatus vocabulary and same status-assignment.ts /
+  // override-applier.ts split as TypedUnit.status (see that field's own doc
+  // comment). Additive OPTIONAL, no CONTRACT_VERSION bump.
+  status?: FactStatus;
 }
 
 export interface IgnoredItem {
@@ -253,7 +349,39 @@ export interface IgnoredItem {
 // ordered last like every other non-route-shaped source); threat-signals
 // filters on category only, unaffected by a new source value on an
 // already-existing category.
-export const CONTRACT_VERSION = '11.0.0';
+//
+// 12.0.0 (T-LM-2, Lens Modules lane, AGENT_TASKS_Ext_Lens_Modules.md):
+// Evidence.category gained 'resilience' — a closed-union extension, tier
+// (c), for the new resilience-lens module. No new Evidence.source (reuses
+// 'decorator' for retry annotations and 'structured-config' for timeout
+// values — both already-proven mechanisms, no third extraction path).
+// Both existing modules reviewed and bumped to supportedMajorVersion "12":
+// calm-generator's control-builder.ts filters on
+// `category === 'security-control'` only (unaffected); interface-builder.ts
+// never treats 'resilience' as route-shaped (not added to
+// node-type-mapping.yml's interfaceCategories, same as 'spring-config');
+// threat-signals filters on 'http-entry-point'/'security-control' only
+// (unaffected).
+// 13.0.0 (T-LR-5, AGENT_TASKS_Ext_CodeQL_Engine.md): Evidence.source gained
+// 'codeql-di' and TypedRelationship.source gained 'codeql' — both closed-union
+// extensions, tier (c), for the new codeql-di-provider.ts + codeql-di-pass.ts.
+// A second real StructuralEngine-class source (CodeQL's Java data-flow
+// analysis), not a Graphify/CodeGraph variant: it resolves a Spring interface
+// field to its real implementation via two mechanisms neither existing engine
+// can see at all (bean-factory wiring, stereotype-annotated implementers with
+// 2+ syntactic candidates) — see E1b-codeql-di-resolution-experiment.md.
+// 'codeql-di' Evidence.source is used ONLY when codeql-di-pass.ts introduces
+// a placeholder unit for a resolved implementation class with no existing
+// TypedUnit (same "secondary source introduces a fact at its own tier"
+// pattern T-FS-4 established for dependency-manifest evidence — see
+// status-assignment.ts's hard rule, generalized to cover this source too).
+// Both existing modules + resilience-lens reviewed and bumped to
+// supportedMajorVersion "13": none filter on TypedRelationship.source or
+// Evidence.source in a way a new value could silently break (calm-generator's
+// interface-builder.ts SOURCE_PRECEDENCE table gained 'codeql-di', ordered
+// last like every other non-route-shaped source; relationship-builder.ts
+// treats TypedRelationship.source as pass-through provenance metadata only).
+export const CONTRACT_VERSION = '13.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

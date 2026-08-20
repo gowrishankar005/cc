@@ -75,6 +75,18 @@ rules:
     weight: 25
     calmNodeType: service
 
+  # NestJS GraphQL class marker only. @Query/@Mutation are not catalogued:
+  # the same TypeScript bare word matches TypeORM's @Query, and findRule()
+  # does not use `framework`. Operations stay native-route when CodeGraph types them.
+  - id: nestjs-graphql-resolver-decorator
+    language: typescript
+    framework: nestjs-graphql
+    matchSignal: "Resolver"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 25
+    calmNodeType: service
+
   - id: nestjs-verb-decorator
     language: typescript
     framework: nestjs
@@ -147,6 +159,50 @@ rules:
     category: persistence
     weight: 10
     calmNodeType: database
+
+  # --- T-LR-3 (BACKLOG.md "Plain-interface bridge detection"): bare Spring
+  # @Service stereotype (requirements v0.10-era gap, named directly in
+  # Architect_Pilot_Feedback_Notes.md Entry 13). Real evidence: a reference
+  # Java/JAX-RS banking platform's PortfolioCommandSourceWritePlatformServiceImpl
+  # carries a bare `@Service` with no other framework marker (no `@Path`,
+  # no `@Entity`, no `@PreAuthorize`) — before this row, signal-catalogue.yml
+  # had no rule watching for `@Service`/`@Component`/`@Repository` at all
+  # (confirmed by a direct catalogue read before writing this row, not
+  # assumed), so a real Spring-managed bean like this produced zero
+  # evidence and zero units, invisible even to `multi-hop-bridge-detector.ts`'s
+  # implementer-disambiguation. Same decorator-extraction mechanism as
+  # `jpa-entity`/`spring-preauthorize` above — no new extraction code, a
+  # missing vocabulary row. Weighted 40 (sufficient alone, same tier as
+  # those two rows): a bare stereotype is Spring's own declaration that a
+  # class is a managed service bean, not weaker evidence than a route or a
+  # persistence annotation.
+  #
+  # Deliberately scoped to `@Service` ONLY, not also `@Component`/
+  # `@Repository` — only `@Service` has a real, cited evidence sample
+  # (Entry 13). `@Component` is Spring's generic stereotype (used for many
+  # non-service-shaped beans too — configuration helpers, converters); a
+  # class-forming rule for it needs its own real evidence sample before
+  # shipping, not "it seems likely," per `Catalogue_Intake.md`.
+  # `@Repository` already has real evidence but for a DIFFERENT extraction
+  # path (`spring-data-repository-extends`, an `extends JpaRepository<...>`
+  # structural match) — adding `@Repository` here as a bare-decorator match
+  # too would need its own separate evidence sample distinguishing it from
+  # that existing row, not bundled in speculatively.
+  - id: spring-service-stereotype
+    language: java
+    framework: spring
+    matchSignal: "Service"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 40
+    calmNodeType: service
+    # T-LR-3 — this row is ALSO the sole source of which stereotype names
+    # multi-hop-bridge-detector.ts's disambiguation branch treats as
+    # corroborating evidence (rule-schema.ts's bridgeStereotypeSignals()).
+    # Never a second, hardcoded copy of "Service" in the detector itself —
+    # extending disambiguation to a new stereotype later is this one flag on
+    # a new/existing row, not a code change.
+    bridgeStereotype: true
 
   # --- Java: Spring Security control evidence (requirements v0.10 §0 / v0.11) ---
   # Real evidence: spikes/fineract/repo/fineract-core/.../DatatableWriteService.java
@@ -371,3 +427,34 @@ rules:
     category: messaging
     weight: 40
     calmNodeType: topic
+
+  # --- T-LM-2 (Lens Modules lane): retry-annotation resilience evidence ---
+  # Two real, independently-published Java resilience libraries' retry
+  # annotations — decorator-detected via the SAME proven
+  # extractFromSource()/decorates-ref mechanism as every other Java signal
+  # above (C-dec's @PreAuthorize precedent), no new extraction mechanism.
+  # Weighted 40 ("sufficient alone" tier, same as jpa-entity/spring-preauthorize):
+  # a real `@Retryable`/`@Retry` annotation is decisive, first-party evidence
+  # of a resilience-aware class, matching the DatatableWriteService precedent
+  # (a security-control-only file with no HTTP route is still a real service
+  # unit — a resilience-control-only file is the same shape). Deliberately
+  # narrow to RETRY annotations only, per the lane file's own gate ("not
+  # 'resilience' scoped whole") — circuit-breaker/bulkhead/rate-limiter
+  # annotations are a related but separate mechanism instance, not built here.
+  - id: spring-retryable
+    language: java
+    framework: spring-retry
+    matchSignal: "Retryable"
+    matchSource: decorator
+    category: resilience
+    weight: 40
+    calmNodeType: service
+
+  - id: resilience4j-retry
+    language: java
+    framework: resilience4j
+    matchSignal: "Retry"
+    matchSource: decorator
+    category: resilience
+    weight: 40
+    calmNodeType: service

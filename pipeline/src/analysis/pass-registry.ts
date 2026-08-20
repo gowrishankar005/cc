@@ -58,9 +58,40 @@ export interface AnalysisContext {
   enableEnvSoftGraph?: boolean;
   /** T-Y4-1 — set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
   cfnManifestsDir?: string;
+  /** T-LR-5 — set by run-slice.ts from --codeql-source-root / --codeql-build-command; codeqlDiPass is registered in DEFAULT_PASSES but a no-op unless both fields are set — never a default-on path. Real, non-trivial cost (a real compile + CodeQL database build) and a real license constraint (free-tier CodeQL CLI cannot run in this pipeline's own CI against a non-Open-Source codebase) are why this is never a default-on path. */
+  codeqlSourceRoot?: string;
+  codeqlBuildCommand?: string;
   /** T-Y5-1 — set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
   cfnRouteBindingsFound?: number;
   cfnRouteBindingsBound?: number;
+  /**
+   * T-P0-1 (E2) round 3 — `${source}|${target}` raw-edge pairs
+   * multiHopBridgePass's detector already examined (resolved or honestly
+   * refused). Populated by multiHopBridgePass, which now runs BEFORE
+   * reconcilePass specifically so reconcilePass's graded-fact admission can
+   * defer to this set instead of racing the more specialized detector for
+   * the same edge. Absent/empty is safe — reconcileCrossPackageEdges
+   * defaults to an empty set when not passed.
+   */
+  multiHopExaminedPairs?: Set<string>;
+  /** T-P0-1 (E2) round 3 continued — see multiHopExaminedPairs; file-level companion (multi-hop-bridge-detector.ts's examinedBridgeFiles) covering edges into a bridge candidate's non-class-level nodes (e.g. its methods) that examinedPairs alone misses. */
+  multiHopExaminedFiles?: Set<string>;
+  /**
+   * T-LR-3 follow-up bugfix — units mapSignalsPass rejected as sub-`CONFIDENCE_FLOOR`
+   * (never added to `allUnits`/`unitsByRoot`, only recorded as an `IgnoredItem`
+   * with just a ref string, no evidence) but which are still a bare `service`
+   * stereotype (framework-bootstrap-only evidence) eligible for the same
+   * "replace with a later real detector's unit, merging evidence" treatment
+   * `overridableServiceFilePaths` already gives to units that DID clear the
+   * floor. Real finding: NestJS's bare `@Controller()` decorator
+   * (`nestjs-controller-decorator`, signal-catalogue.yml) has weight 25, under
+   * the 40 floor — a Controller-only file that also imports a messaging
+   * client was silently losing its stereotype evidence entirely, because the
+   * merge logic only ever looked in `allUnits`, where a sub-floor unit never
+   * appears. Without this, `overridableServiceFilePaths` is blind to any
+   * override candidate whose OWN confidence happens to be sub-floor.
+   */
+  subFloorServiceUnits?: TypedUnit[];
 }
 
 export interface AnalysisPass {
@@ -81,11 +112,73 @@ export async function runPasses(passes: AnalysisPass[], ctx: AnalysisContext): P
  * so a Controller importing an ORM's generated TYPES for its own DTOs
  * (real finding, a reference Node/NestJS wealth-management app's `@prisma/client` type imports)
  * doesn't also become a competing database/topic unit for the same file.
- * Lives here (not in passes.ts) so both passes.ts and messaging-pass.ts can
- * import it without a circular dependency between the two.
+ * Deliberately unconditional on evidence category — narrowing this set
+ * itself (tried and reverted, see `overridableServiceFilePaths` below) lets
+ * the import-based detectors independently create a SECOND, competing unit
+ * for the same file under a different id scheme (`file::ClassName` vs
+ * `file`), which is worse than the single-wrong-kind problem it was meant
+ * to fix: two CALM nodes for one real class. Lives here (not in passes.ts)
+ * so both passes.ts and messaging-pass.ts can import it without a circular
+ * dependency between the two.
  */
 export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
   return new Set(ctx.allUnits.filter((u) => u.kind === 'service').map((u) => u.filePath));
+}
+
+/**
+ * T-LR-3 real-data finding (2026-08-16): a SUBSET of `existingServiceFilePaths`
+ * — files whose `service` unit's ENTIRE evidence set is `framework-bootstrap`
+ * category only (a bare class-level stereotype like `@Service`, no real
+ * route or security-control evidence of its own). Real regression surfaced
+ * against a reference Java/JAX-RS banking platform: `spring-service-stereotype`
+ * (signal-catalogue.yml, T-LR-3) correctly makes a bare-`@Service` class a
+ * `service` unit, but `existingServiceFilePaths`'s original, unconditional
+ * exclusion then used that fact to suppress persistence detection entirely
+ * for the same file — silently flipping a real, previously-verified
+ * `database`-kind class (real `@Service` AND real `JdbcTemplate` usage) to
+ * `service`, contradicting this project's own documented finding that a
+ * bare stereotype does NOT indicate non-ownership (`BACKLOG.md`'s JDBC-
+ * ownership row, `soln/bug3-jdbc-ownership-phase-a-memo.md`) and the
+ * standing rule that a fix here may only ever change `kind` from `database`
+ * to `service`, never suppress unit creation.
+ *
+ * Consumed by `detectPersistencePass`/`detectMessagingPass` (passes.ts /
+ * messaging-pass.ts) as an "override-eligible" set, distinct from a
+ * narrower exclusion: files in this set still let the import-based
+ * detector build its own persistence/messaging unit as normal, and the
+ * calling pass then REPLACES the weak bare-stereotype unit with it (merging
+ * the stereotype evidence on, kind from the import detector, never both as
+ * two competing nodes) — never independently narrows
+ * `existingServiceFilePaths` itself, which stays unconditional so the
+ * ORIGINAL bug this filter fixes (a Controller with real `http-entry-point`
+ * evidence) is completely unaffected.
+ */
+export function overridableServiceFilePaths(ctx: AnalysisContext): Set<string> {
+  const paths = ctx.allUnits
+    .filter((u) => u.kind === 'service' && u.evidence.every((e) => e.category === 'framework-bootstrap'))
+    .map((u) => u.filePath);
+  // Sub-floor stereotypes (see AnalysisContext.subFloorServiceUnits) are
+  // already filtered to this same "service, framework-bootstrap-only"
+  // criterion by mapSignalsPass, so they're included unconditionally here.
+  const subFloorPaths = (ctx.subFloorServiceUnits ?? []).map((u) => u.filePath);
+  return new Set([...paths, ...subFloorPaths]);
+}
+
+/**
+ * Finds a weak stereotype unit eligible for replacement at `filePath` —
+ * either a real (floor-cleared) unit still in `ctx.allUnits`, or a sub-floor
+ * one that only exists in `ctx.subFloorServiceUnits` (see that field's doc
+ * comment). Callers merge the returned unit's evidence onto their own new
+ * unit, then splice it out of `allUnits`/`unitsByRoot` ONLY if it was found
+ * there — a sub-floor unit was never in either list, so there's nothing to
+ * splice for it.
+ */
+export function findOverridableServiceUnit(ctx: AnalysisContext, filePath: string): { unit: TypedUnit; inAllUnits: boolean } | undefined {
+  const inAllUnits = ctx.allUnits.find((u) => u.filePath === filePath && u.kind === 'service');
+  if (inAllUnits) return { unit: inAllUnits, inAllUnits: true };
+  const subFloor = (ctx.subFloorServiceUnits ?? []).find((u) => u.filePath === filePath);
+  if (subFloor) return { unit: subFloor, inAllUnits: false };
+  return undefined;
 }
 
 /**

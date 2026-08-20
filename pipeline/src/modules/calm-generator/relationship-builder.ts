@@ -31,7 +31,7 @@ function relationshipIdentityKey(rt: CalmRelationshipTypeShape): string {
  * first-encountered-wins (deterministic, and these never meaningfully
  * diverge within a real duplicate group). Every OTHER metadata field
  * (`x-aac-provenance`, `x-aac-mechanism`, `x-aac-confidence`,
- * `x-aac-relationship-grade`) collects the DISTINCT values actually present
+ * `x-aac-relationship-grade`, `x-aac-status`) collects the DISTINCT values actually present
  * across the group instead — "first wins" would silently drop real
  * information whenever two duplicates disagree, which is reachable: e.g. a
  * plain graphify-reconciler.ts 'calls' edge and a multi-hop-bridge-detector.ts
@@ -57,7 +57,7 @@ function mergeDuplicateRelationships(group: Array<{ calmRel: CalmRelationship; k
   };
 
   const distinctProvenance = distinctValuesFor('x-aac-provenance') as string[];
-  const metadata = ['x-aac-provenance', 'x-aac-cross-package', 'x-aac-confidence', 'x-aac-relationship-grade', 'x-aac-mechanism']
+  const metadata = ['x-aac-provenance', 'x-aac-cross-package', 'x-aac-confidence', 'x-aac-relationship-grade', 'x-aac-mechanism', 'x-aac-status']
     .map((key) => (key === 'x-aac-cross-package' ? first.metadata!.find((m) => m.key === key) : mergedEntry(key)))
     .filter((entry): entry is { key: string; value: unknown } => entry !== undefined);
 
@@ -159,6 +159,10 @@ export function buildRelationships(
           // T-L2-1 — only present on multi-hop-bridge-detector.ts output
           // ('r2-phase1' | 'r2b'); every other producer leaves it unset.
           ...(rel.mechanism !== undefined ? [{ key: 'x-aac-mechanism', value: rel.mechanism }] : []),
+          // T-FS-6 — set by assignStatusPass (the true last Analysis pass)
+          // for every relationship a real run produces; absent only for a
+          // typed-facts.json predating this field.
+          ...(rel.status !== undefined ? [{ key: 'x-aac-status', value: rel.status }] : []),
         ],
       };
       const protocol = rule.protocol ?? inferredProtocol(rel.to) ?? inferredProtocol(rel.from);

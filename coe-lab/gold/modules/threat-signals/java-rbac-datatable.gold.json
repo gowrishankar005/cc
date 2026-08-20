@@ -1,0 +1,10 @@
+{
+  "package": "java-rbac-datatable",
+  "module": "threat-signals",
+  "authoredFrom": [
+    "coe-lab/fixtures/monorepo/packages/java-rbac-datatable/src/main/java/lab/rbac/AccountReadController.java",
+    "coe-lab/fixtures/monorepo/packages/java-rbac-datatable/src/main/java/lab/rbac/DatatableWriteService.java"
+  ],
+  "reasoning": "AccountReadController carries both @GetMapping (http-entry-point) AND @PreAuthorize on every method (security-control) -- has both, must not be flagged. DatatableWriteService carries @PreAuthorize (security-control) but no HTTP route annotation at all -- fails threat-signals' own first filter (requires http-entry-point evidence to even be a candidate), so it is never evaluated for the second condition, correctly excluded for a different reason than AccountReadController.",
+  "findings": []
+}

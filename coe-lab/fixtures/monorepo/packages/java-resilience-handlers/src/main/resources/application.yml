@@ -1,0 +1,19 @@
+# Lab fixture — T-LM-2 (Lens Modules lane), review fix (2026-08-16).
+#
+# Real, documented resilience4j Spring Boot property
+# (https://resilience4j.readme.io/docs/getting-started-3#timelimiter). NOT
+# independently found in any of the 4 available spikes/ reference repos
+# (confirmed by grep across all four before authoring this file — zero hits
+# for "timelimiter" anywhere). The real, evidenced vocabulary in the
+# reference Java/JAX-RS banking platform is a DIFFERENT resilience4j
+# property, resilience4j.retry.instances.<name>.wait-duration (a retry
+# backoff wait, not a hard call timeout) -- see
+# docs/solution/Claim_Register.md's resilience-lens row and
+# scope-limitations.yml's resilience-lens-retry-timeout-only entry for the
+# honest disclosure: this specific config KEY is verified real-syntax but
+# not real-usage-evidenced.
+resilience4j:
+  timelimiter:
+    instances:
+      currencyRateLookup:
+        timeout-duration: 2s

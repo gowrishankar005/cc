@@ -1,0 +1,18 @@
+# "Never guess" fixture for T-FS-3: TWO deployments in the same manifest
+# set resolve to two DIFFERENT engine tokens (mysql here, mongodb in the
+# sibling file) — genuine ambiguity about which manifest is even the
+# authoritative one to compare against the code's own config, so this
+# detector must emit NO contradiction item at all rather than picking
+# either arbitrarily (same "never guess" discipline as every other detector
+# in this pipeline).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-db-a
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+        - name: orders-db-a
+          image: mysql:8.0

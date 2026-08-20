@@ -79,6 +79,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '11', // bumped for CONTRACT_VERSION 11.0.0 (T-CDX-2/3, B-cdxgen-reuse) — new 'dependency-manifest' Evidence.source only, no new category; interface-builder.ts's SOURCE_PRECEDENCE table gained the key (additive, never contributes interfaces)
+  supportedMajorVersion: '13', // bumped for CONTRACT_VERSION 13.0.0 (T-LR-5) — new 'codeql-di'/'codeql' source values; interface-builder.ts's SOURCE_PRECEDENCE table gained 'codeql-di' (ordered last, never route-shaped); relationship-builder.ts treats TypedRelationship.source as pass-through provenance only; control-builder.ts filters on 'security-control' category only (unaffected)
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

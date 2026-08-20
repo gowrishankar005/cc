@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TypedFacts } from '../../types/typed-facts';
 import { Module, ModuleContext } from '../registry';
+import { loadModuleFitness } from '../fitness';
 
 /**
  * The actual test of Goal A ("platform, not CALM-only script") — sketched
@@ -47,7 +48,12 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
   // module has ever depended on this file's location.
   const moduleDir = path.join(ctx.outDir, 'modules', 'threat-signals');
   fs.mkdirSync(moduleDir, { recursive: true });
-  fs.writeFileSync(path.join(moduleDir, 'threat-signals-report.json'), JSON.stringify({ findings }, null, 2));
+  // T-LM-5 (BR-110) — a machine-readable fitness declaration alongside the
+  // findings, not just Claim_Register.md prose a human has to go read
+  // separately. See fitness.ts's own doc comment for why this is checked-in
+  // data, never computed live against gold at run time.
+  const fitness = loadModuleFitness('threat-signals');
+  fs.writeFileSync(path.join(moduleDir, 'threat-signals-report.json'), JSON.stringify({ findings, fitness }, null, 2));
   if (findings.length > 0) {
     console.log(`[threat-signals] ${findings.length} unit(s) flagged: http-entry-point evidence with no security-control evidence`);
   }
@@ -55,6 +61,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '11', // bumped for CONTRACT_VERSION 11.0.0 (T-CDX-2/3) — new 'dependency-manifest' source lands on the existing 'persistence'/'messaging' categories, neither of which this pass filters on ('http-entry-point'/'security-control' only) — reviewed, not just bumped
+  supportedMajorVersion: '13', // bumped for CONTRACT_VERSION 13.0.0 (T-LR-5) — new 'codeql-di'/'codeql' source values, this pass filters on 'http-entry-point'/'security-control' category only — reviewed, not just bumped
   run,
 };

@@ -1,7 +1,20 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CalmDocument, CalmNode, CalmNodeType, CalmRelationship } from '../../types/calm';
+import { CalmDocument, CalmNode, CalmNodeType, CalmRelationship, CalmMetadataEntry } from '../../types/calm';
 import { DecisionRecord, Override, OverrideApplicationResult } from '../../types/overrides';
+
+/**
+ * T-FS-6 — the only place `x-aac-status: 'reviewed'` is ever set (see
+ * TypedUnit.status/TypedRelationship.status's own doc comment in
+ * typed-facts.ts: Analysis never writes 'reviewed', only override-applier.ts
+ * does, on the element an ACTIVE Override actually touched). Replaces any
+ * existing x-aac-status entry (assignStatusPass's own analysis-time value)
+ * rather than appending a second one — a human confirmation supersedes the
+ * deterministic default, it doesn't sit alongside it.
+ */
+function withReviewedStatus(metadata: CalmMetadataEntry[]): CalmMetadataEntry[] {
+  return [...metadata.filter((m) => m.key !== 'x-aac-status'), { key: 'x-aac-status', value: 'reviewed' }];
+}
 
 /** T-X6-2 — records a "target not found" rejection as BOTH a rejection (existing behavior, unchanged) and an orphan (new, dedicated classification) — see OverrideApplicationResult.orphans' own doc comment for why these are reported separately from other rejection causes. */
 function reportOrphan(result: OverrideApplicationResult, override: Override, reason: string): void {
@@ -133,7 +146,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
         }
         nodes.push({
           ...newNode,
-          metadata: [...(newNode.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }],
+          metadata: withReviewedStatus([...(newNode.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
         });
         result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
         break;
@@ -153,7 +166,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
         nodes[idx] = {
           ...existing,
           'node-type': override.new_value as CalmNodeType,
-          metadata: [...(existing.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }],
+          metadata: withReviewedStatus([...(existing.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
         };
         result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
         break;
@@ -173,7 +186,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
         nodes[idx] = {
           ...existing,
           name: override.new_value as string,
-          metadata: [...(existing.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }],
+          metadata: withReviewedStatus([...(existing.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
         };
         result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
         break;
@@ -238,7 +251,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
         }
         relationships.push({
           ...newRel,
-          metadata: [...(newRel.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }],
+          metadata: withReviewedStatus([...(newRel.metadata ?? []), { key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
         });
         result.applied.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref });
         break;

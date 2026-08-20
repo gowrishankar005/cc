@@ -15,7 +15,6 @@ import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapp
 export function buildNodes(units: TypedUnit[], mapping: NodeTypeMapping): CalmNode[] {
   const nodes: CalmNode[] = [];
   for (const unit of units) {
-    if (unit.kind === 'unresolved') continue;
     const rule = findNodeTypeMapping(mapping, unit.kind);
     if (!rule) {
       // No catalogue row for this unit kind — this is what §5.2 is meant to

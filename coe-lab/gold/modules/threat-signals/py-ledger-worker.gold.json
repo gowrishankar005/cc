@@ -1,0 +1,13 @@
+{
+  "package": "py-ledger-worker",
+  "module": "threat-signals",
+  "authoredFrom": "coe-lab/fixtures/monorepo/packages/py-ledger-worker/ledger_api.py",
+  "reasoning": "ledger_api.py declares 3 Flask @app.route handlers (health, post_entry, list_entries) with no auth/security check anywhere in the file -- same file-granular reasoning as py-accounts-api.",
+  "findings": [
+    {
+      "unitNameContains": "ledger_api",
+      "stride": "spoofing",
+      "reason": "HTTP-facing, no security-control evidence anywhere in the fixture"
+    }
+  ]
+}

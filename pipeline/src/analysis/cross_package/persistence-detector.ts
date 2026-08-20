@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { GraphifyRun } from '../../scanner/graphify-provider';
 import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportOwnerBaseClasses } from '../../rules/persistence-detection-schema';
+import { loadWiringAnnotationCatalogue, wiringAnnotationNames } from '../../rules/wiring-annotation-schema';
 import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
 
 /**
@@ -25,10 +26,16 @@ import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-im
  * (post-MVP consolidation — all three were independently-written copies of
  * the identical two-step algorithm before this).
  */
-export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePaths: Set<string> = new Set()): ImportStrategyResult {
-  const catalogue = loadPersistenceDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
+export function detectPersistenceUnits(
+  run: GraphifyRun,
+  existingServiceFilePaths: Set<string> = new Set(),
+  overridableServiceFilePaths: Set<string> = new Set()
+): ImportStrategyResult {
+  const rulesDir = path.join(__dirname, '..', '..', 'rules');
+  const catalogue = loadPersistenceDetectionCatalogue(rulesDir);
   const libraries = driverImportLibraries(catalogue);
   const ownerBaseClasses = driverImportOwnerBaseClasses(catalogue);
+  const wiringOnlyAnnotations = wiringAnnotationNames(loadWiringAnnotationCatalogue(rulesDir));
 
   return detectUnitsByImportStrategy(
     run,
@@ -41,6 +48,8 @@ export function detectPersistenceUnits(run: GraphifyRun, existingServiceFilePath
       unknownLibraryFallback: 'unknown-persistence-lib',
     },
     existingServiceFilePaths,
-    ownerBaseClasses
+    ownerBaseClasses,
+    wiringOnlyAnnotations,
+    overridableServiceFilePaths
   );
 }

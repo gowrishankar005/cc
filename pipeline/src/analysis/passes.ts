@@ -1,4 +1,4 @@
-import { AnalysisContext, AnalysisPass, existingServiceFilePaths, pushAll } from './pass-registry';
+import { AnalysisContext, AnalysisPass, existingServiceFilePaths, overridableServiceFilePaths, findOverridableServiceUnit, pushAll } from './pass-registry';
 import { composeRoutesForFile } from './route-composer-registry';
 import { mapSignalsToUnits } from './signal-mapper';
 import { runGraphifyPass } from '../scanner/graphify-provider';
@@ -15,6 +15,9 @@ import { envSoftGraphPass } from './env-soft-graph-pass';
 import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
 import { cfnRoutePass } from './cfn-route-pass';
+import { contradictionPass } from './contradiction-pass';
+import { assignStatuses } from './status-assignment';
+import { codeqlDiPass } from './codeql-di-pass';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -45,11 +48,31 @@ export const mapSignalsPass: AnalysisPass = {
   run(ctx: AnalysisContext) {
     for (const [root, raw] of ctx.rawByRoot) {
       const { units, ignoredItems } = mapSignalsToUnits(raw.nativeRoutes, raw.decoratorFacts, ctx.catalogue, raw.callFacts, raw.typeReferenceFacts, raw.extendsFacts);
+      // One emitted-unit set (BACKLOG.md "unitsByRoot/allUnits confidence-floor
+      // divergence"): relationship producers read unitsByRoot via
+      // buildNodeToUnitMap; grading and CALM emission read allUnits. A
+      // sub-floor unit in only the first set can anchor a real edge that
+      // then grades structural (kindById miss) and is dropped from CALM
+      // (relationship-builder requires both endpoints to be nodes). Same
+      // floor, both lists — sub-floor units stay IgnoredItems.
+      const emitted: typeof units = [];
       for (const u of units) {
         if (u.confidence < CONFIDENCE_FLOOR) {
           ctx.allIgnoredItems.push(ignoreLowConfidence(u.id, u.confidence));
+          // T-LR-3 follow-up bugfix — same "service, framework-bootstrap-only"
+          // criterion overridableServiceFilePaths uses, kept even sub-floor so
+          // detectPersistencePass/detectMessagingPass can still merge this
+          // stereotype's evidence onto a real unit they build for the same
+          // file (see AnalysisContext.subFloorServiceUnits doc comment). This
+          // unit is NEVER added to allUnits/unitsByRoot/CALM output on its
+          // own — the confidence floor is unaffected.
+          if (u.kind === 'service' && u.evidence.every((e) => e.category === 'framework-bootstrap')) {
+            if (!ctx.subFloorServiceUnits) ctx.subFloorServiceUnits = [];
+            ctx.subFloorServiceUnits.push(u);
+          }
         } else {
           ctx.allUnits.push(u);
+          emitted.push(u);
         }
       }
       pushAll(ctx.allIgnoredItems, ignoredItems);
@@ -58,8 +81,8 @@ export const mapSignalsPass: AnalysisPass = {
       for (const filePath of raw.excludedTestFiles) {
         ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: `Excluded from architectural extraction — matched a real test-path/filename convention (isTestPath())` });
       }
-      ctx.unitsByRoot.set(root, units);
-      console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${units.length} unit(s)${raw.excludedTestFiles.length > 0 ? `, ${raw.excludedTestFiles.length} test file(s) excluded` : ''}`);
+      ctx.unitsByRoot.set(root, emitted);
+      console.log(`[run-slice] ${root}: ${raw.nativeRoutes.length} native route(s), ${raw.decoratorFacts.length} decorator fact(s), ${emitted.length} unit(s)${raw.excludedTestFiles.length > 0 ? `, ${raw.excludedTestFiles.length} test file(s) excluded` : ''}`);
     }
   },
 };
@@ -71,9 +94,42 @@ export const detectPersistencePass: AnalysisPass = {
     if (ctx.packageRoots.length === 0) return;
     try {
       ctx.graphifyRun = runGraphifyPass(ctx.packageRoots);
-      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx));
+      // T-LR-3 real-data finding — overridableServiceFilePaths(ctx) names
+      // files whose ONLY existing 'service' unit evidence is a bare,
+      // weak stereotype (no real route/security-control signal of its
+      // own). detectPersistenceUnits still builds its own unit for those
+      // files (see graphify-import-strategy-detector.ts's own doc comment);
+      // the replace loop below swaps the weak unit out for the real
+      // persistence one, merging the stereotype evidence onto it, rather
+      // than the two ever coexisting as separate CALM nodes for one real
+      // class (the exact regression a real reference Java/JAX-RS banking
+      // platform class surfaced: real `@Service` AND real `JdbcTemplate`
+      // usage on the same file).
+      const overridable = overridableServiceFilePaths(ctx);
+      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx), overridable);
       for (const [root, persistenceUnits] of persistenceUnitsByRoot) {
         console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via graphify`);
+        let replacedCount = 0;
+        for (const pu of persistenceUnits) {
+          if (!overridable.has(pu.filePath)) continue;
+          const found = findOverridableServiceUnit(ctx, pu.filePath);
+          if (!found) continue;
+          // Merge the weak unit's own evidence (the bare stereotype fact)
+          // onto the persistence unit before replacing — the real fact
+          // stays visible, just no longer determines this unit's kind.
+          pushAll(pu.evidence, found.unit.evidence);
+          if (found.inAllUnits) {
+            const weakUnitIndex = ctx.allUnits.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
+            if (weakUnitIndex !== -1) ctx.allUnits.splice(weakUnitIndex, 1);
+            const rootUnitList = ctx.unitsByRoot.get(root) ?? [];
+            const weakRootIndex = rootUnitList.findIndex((u) => u.filePath === pu.filePath && u.kind === 'service');
+            if (weakRootIndex !== -1) rootUnitList.splice(weakRootIndex, 1);
+          }
+          replacedCount++;
+        }
+        if (replacedCount > 0) {
+          console.log(`[run-slice] ${root}: ${replacedCount} weak bare-stereotype unit(s) replaced by real persistence evidence for the same file (never coexisting as two nodes)`);
+        }
         pushAll(ctx.allUnits, persistenceUnits);
         const rootUnits: typeof persistenceUnits = [];
         pushAll(rootUnits, ctx.unitsByRoot.get(root) ?? []);
@@ -97,10 +153,22 @@ export const reconcilePass: AnalysisPass = {
   name: 'reconcile',
   run(ctx: AnalysisContext) {
     if (!ctx.graphifyRun) return; // Graphify pass didn't run or failed — already logged by detectPersistencePass
-    ctx.relationships = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot);
-    const crossCount = ctx.relationships.filter((r) => r.crossPackage).length;
+    // T-P0-1 (E2) round 3 — appends now, not overwrites, so it can run
+    // AFTER multiHopBridgePass without discarding what that pass already
+    // added; ctx.multiHopExaminedPairs (populated by that earlier pass)
+    // tells graded-fact admission which edges are already someone else's
+    // territory.
+    const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot, ctx.multiHopExaminedPairs, ctx.multiHopExaminedFiles);
+    pushAll(ctx.relationships, relationships);
+    // T-P0-1 (E2) — graded-fact-admission placeholders (kind: 'unresolved').
+    // Pushed into ctx.allUnits (not ctx.unitsByRoot) since they're not real
+    // per-root architectural units — only relationship endpoints and CALM
+    // nodes. gradeRelationshipsPass (last pass) needs them in ctx.allUnits
+    // to see their kind and force 'structural' grading.
+    pushAll(ctx.allUnits, unresolvedUnits);
+    const crossCount = relationships.filter((r) => r.crossPackage).length;
     console.log(
-      `[run-slice] graphify: ${ctx.relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${ctx.relationships.length - crossCount} same-package)`
+      `[run-slice] graphify: ${relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${relationships.length - crossCount} same-package)${unresolvedUnits.length > 0 ? `, ${unresolvedUnits.length} admitted via unresolved-endpoint placeholder` : ''}`
     );
   },
 };
@@ -114,20 +182,39 @@ export const gradeRelationshipsPass: AnalysisPass = {
 };
 
 /**
+ * T-FS-6 — the true LAST pass, after gradeRelationshipsPass: reads
+ * ctx.allUnits/ctx.relationships/ctx.allIgnoredItems, never appends to any
+ * of them, so it must run after every producer of all three, including
+ * contradictionPass (whose ignored-items this pass cross-references).
+ */
+export const assignStatusPass: AnalysisPass = {
+  name: 'assignStatus',
+  run(ctx: AnalysisContext) {
+    assignStatuses(ctx.allUnits, ctx.relationships, ctx.allIgnoredItems);
+  },
+};
+
+/**
  * Default pass order. openApiPass (T-X4-1) added after mapSignalsPass —
  * independent of it (reads no shared state), grouped here since both are
  * "unit-producing" passes before persistence/reconcile. k8sTrustPass
- * (T-X5-1) MUST run LAST, after reconcilePass — reconcilePass does
- * `ctx.relationships = reconcileCrossPackageEdges(...)` (an overwrite, not
- * an append), so anything pushed to ctx.relationships before it runs would
- * be silently discarded. multiHopBridgePass (AREC T-C1, R2) is APPEND-only
- * and also needs the final ctx.unitsByRoot, so it must run after
- * reconcilePass too — placed right after it, before the other append-only
- * relationship passes (order among k8sTrust/envSoftGraph/multiHopBridge
- * doesn't matter, none of them read each other's output).
- * gradeRelationshipsPass MUST be the true last pass for the same reason, one
- * level further — it reads (not overwrites) ctx.relationships, so it has to
- * run after every pass that appends to it.
+ * (T-X5-1), envSoftGraphPass and multiHopBridgePass are all APPEND-only and
+ * need the final ctx.unitsByRoot, so they run after the unit-producing
+ * passes above. reconcilePass (T-P0-1, E2 round 3) now also appends rather
+ * than overwrites ctx.relationships, so its position relative to those three
+ * is no longer forced by an overwrite hazard — EXCEPT multiHopBridgePass
+ * must still run BEFORE reconcilePass specifically, so
+ * ctx.multiHopExaminedPairs is populated before reconcilePass's graded-fact
+ * admission logic runs and can defer to it instead of racing it for the same
+ * edge (see multi-hop-bridge-pass.ts's doc comment for the real fixtures
+ * that caught this). k8sTrust/envSoftGraph read neither ctx.relationships
+ * nor multiHopExaminedPairs, so their position among these five is
+ * otherwise free. gradeRelationshipsPass reads (never appends to)
+ * ctx.relationships, so it has to run after every pass that appends to it.
+ * T-FS-6's assignStatusPass is now the true final pass — it reads
+ * ctx.allIgnoredItems (including contradictionPass's own output) and
+ * ctx.relationships' final `grade`/`confidence`/`mechanism`, so it must run
+ * after every producer of all three, gradeRelationshipsPass included.
  */
 export const DEFAULT_PASSES: AnalysisPass[] = [
   composeRoutesPass,
@@ -153,11 +240,25 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // corroboration candidates (persistence/messaging units) include
   // spring-config-derived database/topic units too, not just
   // Graphify-import-derived ones; before reconcile like its neighbors,
-  // since it only mutates existing units' evidence, never relationships.
+  // since it only mutates existing units' evidence or (T-FS-4) introduces a
+  // new one — never relationships.
   cdxgenCorroborationPass,
-  reconcilePass,
   multiHopBridgePass,
+  reconcilePass,
   k8sTrustPass,
   envSoftGraphPass,
+  // T-FS-3 — needs springConfigPass's database units (already final by this
+  // point) and k8sTrustPass's own manifests-dir convention; reads neither
+  // ctx.relationships nor multiHopExaminedPairs, so — same as its two
+  // neighbors above — its exact position here is otherwise free. Must
+  // still run before gradeRelationshipsPass, the true last pass.
+  contradictionPass,
+  // T-LR-5 — must run after reconcilePass/multiHopBridgePass (so its
+  // trust-tier "never contest an existing edge" check sees every relationship
+  // an earlier, more-established mechanism already produced) and before
+  // gradeRelationshipsPass/assignStatusPass (so any relationship or unit it
+  // introduces still gets graded/statused like every other real fact).
+  codeqlDiPass,
   gradeRelationshipsPass,
+  assignStatusPass,
 ];

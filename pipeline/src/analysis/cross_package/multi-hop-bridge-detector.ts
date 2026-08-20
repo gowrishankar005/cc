@@ -3,6 +3,19 @@ import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-fac
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 
 /**
+ * Shared ignoredItem-detail prefixes, exported so a reader (hitl-review-
+ * trigger.ts) can recover the source unit id it needs without re-deriving
+ * or hardcoding a second copy of the literal text this file emits. Real
+ * bug class named on code review (2026-08-16): a free-text detail string
+ * with no shared constant is one accidental copy-edit away from silently
+ * breaking id recovery (a `facts.units.find()` that just stops matching,
+ * no error) — applies to BOTH the pre-existing `unresolved-multi-hop`
+ * prefix and the newer tier-b one, not only the one this review named.
+ */
+export const UNRESOLVED_MULTI_HOP_PREFIX = 'unresolved-multi-hop: "';
+export const TIER_B_SINGLE_CANDIDATE_PREFIX = 'tier-b-single-candidate: "';
+
+/**
  * Produces architecture-grade relationships for the layered shape R0/R1
  * structurally cannot see: a `service` unit
  * references a BRIDGE (an interface/type with zero TypedUnits of its own —
@@ -33,17 +46,111 @@ const R2_CROSS_ROOT_CONFIDENCE = 10;
 const R2B_SAME_ROOT_CONFIDENCE = 8;
 /** Deepest, most-inferred tier this pipeline produces — implementer-import chase AND a root-boundary claim together. */
 const R2B_CROSS_ROOT_CONFIDENCE = 5;
+/**
+ * T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — a concrete class
+ * referenced directly, with no `implements`-based interface layer at all,
+ * that itself imports/references exactly one database/topic unit. Real
+ * evidence: 28 candidates found in a real public-sample scan, 0 resolved
+ * before this. Below R2b's tier, deliberately: R2b's implementer is at
+ * least corroborated by a real `implements` type-system fact (this class
+ * genuinely implements that interface); a direct delegate has no such
+ * corroboration at all — only "referenced directly, imports exactly one
+ * store," a strictly weaker structural signal.
+ */
+const R2C_SAME_ROOT_CONFIDENCE = 6;
+/** Weakest tier this pipeline produces — direct-delegate AND a root-boundary claim together. */
+const R2C_CROSS_ROOT_CONFIDENCE = 3;
+/**
+ * T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — a bridge with 2+
+ * real `implements` candidates, disambiguated to exactly one because only
+ * that one carries real `@Service` stereotype evidence
+ * (spring-service-stereotype in signal-catalogue.yml), and that sole
+ * stereotype-carrying candidate is itself a database/topic unit. Strictly
+ * below R2 Phase 1's tier (15/10): Phase 1's implementer was never
+ * ambiguous to begin with; this one genuinely had 2+ real candidates and
+ * needed an extra corroborating fact to narrow them. Strictly above R2b's
+ * tier (8/5): unlike R2b, this IS still a direct `implements`-corroborated
+ * terminal match, not a second-hop import chase — the extra uncertainty is
+ * "which of several real implementers," not "does the implementer even
+ * reach a store."
+ */
+const R2_STEREOTYPE_SAME_ROOT_CONFIDENCE = 12;
+/** Cross-root pairing for the stereotype-disambiguated tier above. */
+const R2_STEREOTYPE_CROSS_ROOT_CONFIDENCE = 7;
 
 export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
   ignoredItems: IgnoredItem[];
+  /**
+   * T-P0-1 (E2) round 3 — every raw edge (`${edge.source}|${edge.target}`)
+   * this detector took ownership of examining, whether it went on to
+   * resolve (r2-phase1/r2b/r2c) or honestly refuse (an
+   * `unresolved-multi-hop` ignored item). Consumed by
+   * `reconcileCrossPackageEdges`'s graded-admission path so a blunter,
+   * earlier-running catch-all never races this detector's own careful,
+   * ambiguity-aware decision for the exact same edge — the generic fix for
+   * the real conflict found running E2 against `r2b-implementer-hop-sample`
+   * (round 2) and `r2c-direct-delegate-sample` (round 3): admission getting
+   * to an edge first and admitting a low-confidence fact for something this
+   * detector was about to examine far more carefully.
+   */
+  examinedPairs: Set<string>;
+  /**
+   * T-P0-1 (E2) round 3 continued — `examinedPairs` alone proved
+   * insufficient against `r2c-direct-delegate-sample`: Graphify emits a
+   * SEPARATE `calls` edge straight to the bridge candidate's individual
+   * METHOD node (e.g. `ThingService.retrieveAll`), distinct from the
+   * class-level `imports`/`references` edge this detector actually walks.
+   * That edge's target never appears in examinedPairs, so pair-level
+   * deferral missed it and E2 admitted it anyway. Source files of every
+   * bridge candidate this detector examined (resolved or refused) — the
+   * reconciler defers admission for ANY edge targeting a node in one of
+   * these files, the same file-level granularity `implementsTargetFiles`
+   * already used for a narrower case (BACKLOG.md "Direct-delegate bridge
+   * detection" evidence).
+   */
+  examinedBridgeFiles: Set<string>;
 }
 
-export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): MultiHopBridgeResult {
+/**
+ * Dedupe a list of NodeUnitMatch candidates by their REAL underlying unit id
+ * — Graphify can emit more than one raw edge for the same real target
+ * (confirmed necessary by `uniqueStoreUnits`/`uniqueDelegateStores` below,
+ * both pre-existing). One shared helper, not three copies of the same
+ * `[...new Map(...).values()]` idiom.
+ */
+function dedupeByUnitId(matches: NodeUnitMatch[]): NodeUnitMatch[] {
+  return [...new Map(matches.map((m) => [m.unit.id, m])).values()];
+}
+
+export function detectMultiHopBridgeRelationships(
+  run: GraphifyRun,
+  unitsByRoot: Map<string, TypedUnit[]>,
+  /**
+   * T-LR-3 — raw signal names (e.g. "Service") that count as bridge-
+   * disambiguating stereotype evidence, read from signal-catalogue.yml's
+   * `bridgeStereotype: true` rows (rule-schema.ts's bridgeStereotypeSignals()).
+   * Catalogue-driven, never a hardcoded name here — same discipline T-LR-1's
+   * `wiringOnlyAnnotations` parameter established for
+   * graphify-import-strategy-detector.ts, after that file's first pass
+   * hardcoded `'Configuration'` as a literal and was flagged on review.
+   * Defaults to empty so a caller that hasn't wired the catalogue through
+   * degrades to "no disambiguation," never a crash.
+   */
+  bridgeStereotypeSignals: string[] = []
+): MultiHopBridgeResult {
   const nodeToUnit = buildNodeToUnitMap(run, unitsByRoot);
   const relationships: TypedRelationship[] = [];
   const ignoredItems: IgnoredItem[] = [];
+  const examinedPairs = new Set<string>();
+  const examinedBridgeFiles = new Set<string>();
   const seen = new Set<string>(); // dedupe: a service can reference the same bridge from multiple AST sites/methods
+  // T-LR-3 — the stereotype-disambiguation filter (below) is invariant per
+  // bridge, but this detector's outer loop examines a bridge once per
+  // service that references it (potentially many). Memoized here so a
+  // bridge referenced from N call sites computes its stereotype candidates
+  // once, not N times.
+  const stereotypeCandidatesByBridge = new Map<string, NodeUnitMatch[]>();
 
   // Real finding while building this against a reference Java/JAX-RS banking
   // platform: Graphify emits a node with `source_file: ""` for EVERY
@@ -107,18 +214,173 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     if (nodeToUnit.has(bridgeNodeId)) continue; // not a bridge — the imported thing already has its own evidence/unit (R1 handles this)
     if (!isRealBridgeCandidate(bridgeNodeId)) continue; // external/unresolved symbol (annotation type, out-of-root type) — not a real in-repo bridge, no ignored-item noise
 
-    const implementers = implementersByTarget.get(bridgeNodeId) ?? [];
+    // From here on, this edge is this detector's own territory — recorded
+    // regardless of what happens next (resolve or refuse).
+    examinedPairs.add(`${edge.source}|${edge.target}`);
+    const bridgeFile = nodeById.get(bridgeNodeId)?.source_file;
+    if (bridgeFile) examinedBridgeFiles.add(bridgeFile);
+
+    // Dedupe by resolved unit id (falling back to the raw node id when a
+    // candidate resolves to no TypedUnit at all) BEFORE implementers.length
+    // is used as the ambiguity signal — a genuinely non-ambiguous single
+    // real implementer must never be miscounted as 2+ because Graphify
+    // happened to emit two raw `implements` edges for it, which would
+    // wrongly route a real R2-Phase-1 case into the (weaker-confidence)
+    // disambiguation branch below with a fabricated "resolved from
+    // ambiguity" trail.
+    const rawImplementers = implementersByTarget.get(bridgeNodeId) ?? [];
+    const seenImplementerKeys = new Set<string>();
+    const implementers = rawImplementers.filter((id) => {
+      const key = nodeToUnit.get(id)?.unit.id ?? id;
+      if (seenImplementerKeys.has(key)) return false;
+      seenImplementerKeys.add(key);
+      return true;
+    });
     if (implementers.length !== 1) {
-      // 0 (no implementer in scanned roots — the real single-module case
-      // seen in a reference Java/JAX-RS banking platform, per the design
-      // note) or 2+ (genuinely ambiguous) — never guess (§2.2/§2.4.1).
+      // T-LR-2 — 0 implementers doesn't only mean "the interface's
+      // implementer isn't in scanned roots" (the case the ignored-item
+      // below was originally written for). It's ALSO the exact shape a
+      // concrete class referenced directly, with no interface at all,
+      // produces: nothing has an `implements` edge targeting it, because
+      // it isn't an interface. Before giving up, check whether the
+      // candidate ITSELF (not an implementer of it — there is none)
+      // imports/references exactly one database/topic unit, reusing the
+      // exact same importsBySource lookup R2b's second hop already uses.
+      // A genuine interface with a real implementer outside scanned roots
+      // naturally fails this (interfaces don't import concrete stores in
+      // their own declarations), so this doesn't need to structurally
+      // distinguish "interface" from "concrete class" — the check is
+      // self-limiting to the real shape by construction. 2+ implementers
+      // (genuine ambiguity between real candidates) is untouched — that's
+      // a different, already-correctly-handled case, never routed here.
+      if (implementers.length === 0) {
+        const delegateTargets = importsBySource.get(bridgeNodeId) ?? [];
+        const delegateStoreCandidates = delegateTargets
+          .map((targetId) => nodeToUnit.get(targetId))
+          .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
+        const uniqueDelegateStores = dedupeByUnitId(delegateStoreCandidates);
+        if (uniqueDelegateStores.length === 1) {
+          emitBridgeRelationship(fromMatch, uniqueDelegateStores[0], R2C_SAME_ROOT_CONFIDENCE, R2C_CROSS_ROOT_CONFIDENCE, 'r2c');
+          continue;
+        }
+      }
+
+      // T-LR-3 — 2+ implementers is not automatically ambiguous when
+      // exactly one of them carries real, catalogue-recognized `@Service`
+      // stereotype evidence and the rest don't. This narrows genuine
+      // ambiguity using an extra real fact (the same disambiguation-by-
+      // corroboration approach the CodeQL DI-resolution experiment verified
+      // against real, messy Spring wiring, including cases with 2+
+      // stereotype-carrying implementers that correctly stay refused —
+      // E1b-codeql-di-resolution-experiment.md). Never applies to the
+      // implementers.length === 0 case above (there is nothing to
+      // disambiguate among). Runs BEFORE T-FS-1's tier-b check below: this
+      // branch can auto-resolve a real relationship (stronger evidence);
+      // T-FS-1's check only ever produces a human-review item, so it must
+      // never shadow an auto-resolvable case.
+      //
+      // disambiguatedNonTerminal, set only in the exactly-one-stereotype
+      // case below, exists so the ignored-item message can honestly say
+      // WHICH real class was found and singled out, distinct from genuine
+      // multi-candidate ambiguity — verified against a real second instance
+      // (2026-08-16): a real 3-root scan of a reference Java/JAX-RS banking
+      // platform's charge + provider + core modules correctly narrows a
+      // real command-source-write-platform bridge interface's 2 real
+      // `implements` candidates (the real implementation, carrying `@Service`;
+      // a test-double with no stereotype at all, confirmed via direct source
+      // read) down to the real one — but correctly still refuses, because
+      // that real implementer's own kind is 'service', not database/topic
+      // (it is a command-dispatch coordinator, not a persistence layer —
+      // this IS the real chain Architect_Pilot_Feedback_Notes.md Entry 11/13 traced by
+      // hand, and Entry 14's own finding that the deepest hop is a SEPARATE,
+      // still-open JDBC-ownership ambiguity holds here too).
+      let disambiguatedNonTerminal: NodeUnitMatch | undefined;
+      if (implementers.length >= 2 && bridgeStereotypeSignals.length > 0) {
+        let uniqueStereotypeUnits = stereotypeCandidatesByBridge.get(bridgeNodeId);
+        if (!uniqueStereotypeUnits) {
+          const stereotypeImplementers = implementers
+            .map((id) => nodeToUnit.get(id))
+            .filter((m): m is NodeUnitMatch => !!m && m.unit.evidence.some((e) => e.source === 'decorator' && bridgeStereotypeSignals.includes(e.signal)));
+          uniqueStereotypeUnits = dedupeByUnitId(stereotypeImplementers);
+          stereotypeCandidatesByBridge.set(bridgeNodeId, uniqueStereotypeUnits);
+        }
+        if (uniqueStereotypeUnits.length === 1) {
+          const stereotypeMatch = uniqueStereotypeUnits[0];
+          if (stereotypeMatch.unit.kind === 'database' || stereotypeMatch.unit.kind === 'topic') {
+            emitBridgeRelationship(fromMatch, stereotypeMatch, R2_STEREOTYPE_SAME_ROOT_CONFIDENCE, R2_STEREOTYPE_CROSS_ROOT_CONFIDENCE, 'r2-stereotype');
+            continue;
+          }
+          // Disambiguated to one real implementer, but it isn't itself a
+          // database/topic unit — deliberately does NOT also chase R2b's
+          // store-import hop here (see the mechanism field's doc comment
+          // in typed-facts.ts): stacking a second inferred hop onto an
+          // already-disambiguated edge goes beyond what E1b's evidence
+          // covers. Falls through to the same honest refusal below, but
+          // with a message that names what was actually found.
+          disambiguatedNonTerminal = stereotypeMatch;
+        }
+      }
+
+      // T-FS-1 (Tier-B residual class, BACKLOG.md "Tier-B residual
+      // detection") — implementers.length >= 2 is SYNTACTIC ambiguity (N
+      // classes implement this bridge interface). That is not always
+      // SEMANTIC ambiguity: Phase 1's own terminal test (is the implementer
+      // itself a real database/topic TypedUnit?) already tells apart a real
+      // store implementation from a plain class with no persistence/
+      // messaging evidence of its own (a mock, a stub, an alternate
+      // in-memory implementation — a common real Java pattern). Reusing
+      // that existing test here, not a new extraction mechanism: if exactly
+      // ONE of the N syntactic implementers is itself a store unit, this is
+      // "one high-confidence candidate obscured by noise," a genuinely
+      // different, weaker-but-real signal than "N candidates, 2+ of them
+      // real stores" (true ambiguity — falls through to the generic refusal
+      // below, unchanged). Still never emits a relationship (the "never
+      // guess" rule is untouched) — this only changes what gets WRITTEN to
+      // ignoredItems, so a downstream reader (hitl-review-trigger.ts) can
+      // tell the two shapes apart and route the single-candidate case to a
+      // human decision instead of silence. Reached only when T-LR-3's
+      // stereotype disambiguation above did NOT already auto-resolve a
+      // relationship (checked on the raw implementers list either way —
+      // the two checks look at different evidence, stereotype vs.
+      // store-kind, and can legitimately disagree on which single
+      // candidate they each single out).
+      if (implementers.length >= 2) {
+        const storeImplementers = implementers
+          .map((implId) => nodeToUnit.get(implId))
+          .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
+        const uniqueStoreImplementers = [...new Map(storeImplementers.map((m) => [m.unit.id, m])).values()];
+        if (uniqueStoreImplementers.length === 1) {
+          const candidate = uniqueStoreImplementers[0];
+          const wouldBeConfidence = fromMatch.root === candidate.root ? R2_SAME_ROOT_CONFIDENCE : R2_CROSS_ROOT_CONFIDENCE;
+          const key = `${fromMatch.unit.id}|${bridgeNodeId}|tier-b-single-candidate`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            ignoredItems.push({
+              ref: `${fromMatch.unit.filePath}`,
+              reason: 'CROSS_DOMAIN_UNRESOLVED',
+              detail: `${TIER_B_SINGLE_CANDIDATE_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots, but exactly 1 ("${candidate.unit.id}") is itself a real database/topic unit — the other ${implementers.length - 1} carry no persistence/messaging evidence of their own. A single high-confidence candidate obscured by syntactic ambiguity, not genuine multi-candidate ambiguity (would resolve at confidence ${wouldBeConfidence}, r2-phase1 tier, if unambiguous) — needs a human decision, not an automatic edge, per R2's "never guess" rule.`,
+            });
+          }
+          continue;
+        }
+      }
+
+      // 0 (no implementer in scanned roots, AND (T-LR-2) not itself a
+      // direct delegate either — the real single-module case seen in a
+      // reference Java/JAX-RS banking platform, per the design note), 2+
+      // with no stereotype disambiguation possible (T-LR-3) and no single
+      // store candidate (T-FS-1), or 2+ with a disambiguated implementer
+      // that still isn't a store — never guess (§2.2/§2.4.1).
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);
+        const detail = disambiguatedNonTerminal
+          ? `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which stereotype-disambiguation narrowed to a sole real implementer ("${disambiguatedNonTerminal.unit.id}", kind: ${disambiguatedNonTerminal.unit.kind}) among ${implementers.length} candidates — but that implementer is not itself a database/topic unit, and the implementer-import hop is not chased after disambiguation — no architecture relationship emitted, per R2's "never guess" rule.`
+          : `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots (need exactly 1) — no architecture relationship emitted, per R2's "never guess" rule.`;
         ignoredItems.push({
           ref: `${fromMatch.unit.filePath}`,
           reason: 'CROSS_DOMAIN_UNRESOLVED',
-          detail: `unresolved-multi-hop: "${fromMatch.unit.id}" references bridge "${bridgeNodeId}" which has ${implementers.length} candidate implementation(s) in scanned roots (need exactly 1) — no architecture relationship emitted, per R2's "never guess" rule.`,
+          detail,
         });
       }
       continue;
@@ -147,7 +409,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
       .map((targetId) => nodeToUnit.get(targetId))
       .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
     // Dedupe by unit id — the same store can be imported via more than one edge.
-    const uniqueStoreUnits = [...new Map(storeCandidates.map((m) => [m.unit.id, m])).values()];
+    const uniqueStoreUnits = dedupeByUnitId(storeCandidates);
 
     if (uniqueStoreUnits.length === 1) {
       emitBridgeRelationship(fromMatch, uniqueStoreUnits[0], R2B_SAME_ROOT_CONFIDENCE, R2B_CROSS_ROOT_CONFIDENCE, 'r2b');
@@ -163,7 +425,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
       ignoredItems.push({
         ref: `${fromMatch.unit.filePath}`,
         reason: 'CROSS_DOMAIN_UNRESOLVED',
-        detail: `unresolved-multi-hop: "${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
+        detail: `${UNRESOLVED_MULTI_HOP_PREFIX}${fromMatch.unit.id}" -> bridge "${bridgeNodeId}" -> implementer "${implNodeId}" is not a database/topic unit (${implMatch ? `kind: ${implMatch.unit.kind}` : 'no TypedUnit at all'}) and imports ${uniqueStoreUnits.length} candidate store unit(s) in scanned roots (need exactly 1, R2b) — hop bound reached, no architecture relationship emitted.`,
       });
     }
   }
@@ -173,7 +435,7 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     to: NodeUnitMatch,
     sameRootConfidence: number,
     crossRootConfidence: number,
-    mechanism: 'r2-phase1' | 'r2b'
+    mechanism: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype'
   ): void {
     if (from.unit.id === to.unit.id) return; // degenerate: bridge resolves back to the source's own unit
     const dedupeKey = `${from.unit.id}|${to.unit.id}`;
@@ -190,5 +452,5 @@ export function detectMultiHopBridgeRelationships(run: GraphifyRun, unitsByRoot:
     });
   }
 
-  return { relationships, ignoredItems };
+  return { relationships, ignoredItems, examinedPairs, examinedBridgeFiles };
 }

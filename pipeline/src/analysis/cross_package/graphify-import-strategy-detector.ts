@@ -2,7 +2,7 @@ import * as path from 'path';
 import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
 import { TypedUnit, Evidence } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
-import { classExtendsBaseClass } from '../../rules/class-ownership-resolver';
+import { classExtendsBaseClass, classHasAnnotation } from '../../rules/class-ownership-resolver';
 import { isTestPath } from '../../rules/test-path';
 
 /**
@@ -126,7 +126,29 @@ export function detectUnitsByImportStrategy(
    * Only libraries present here get the extra ownership check; every other
    * library's behavior is byte-for-byte unchanged (empty Map by default).
    */
-  ownerBaseClasses: Map<string, string> = new Map()
+  ownerBaseClasses: Map<string, string> = new Map(),
+  /**
+   * T-LR-1 — class-level annotation names that mark a class as a
+   * dependency-wiring factory, never a real user/owner of what it wires
+   * (`wiring-annotation-catalogue.yml`, `wiringAnnotationNames()`). Data,
+   * not code: adding a new ecosystem's equivalent convention is a catalogue
+   * row, never a hardcoded name here — the check below is generic over
+   * however many entries this list has, from zero to many, across any
+   * language `classHasAnnotation`'s `@`-prefixed-annotation scan covers.
+   */
+  wiringOnlyAnnotations: string[] = [],
+  /**
+   * T-LR-3 real-data finding — a SUBSET of `existingServiceFilePaths`
+   * (`pass-registry.ts`'s `overridableServiceFilePaths`): files whose only
+   * `service` unit evidence is a bare, weak class-level stereotype (no real
+   * route/security-control signal of its own). For these files, this
+   * detector still builds its own unit as normal (does NOT skip via the
+   * `existingServiceFilePaths` check below) — the calling pass
+   * (detectPersistencePass/detectMessagingPass) then REPLACES the weak
+   * unit with this one, rather than the two ever coexisting as separate
+   * competing CALM nodes for one real class.
+   */
+  overridableServiceFilePaths: Set<string> = new Set()
 ): ImportStrategyResult {
   const { graph } = run;
   const unitsByRoot = new Map<string, TypedUnit[]>();
@@ -147,7 +169,12 @@ export function detectUnitsByImportStrategy(
       excludedTestFiles.push(resolved.relativeFilePath);
       continue;
     }
-    if (existingServiceFilePaths.has(resolved.relativeFilePath)) continue; // already established as a service — don't also emit a competing database/topic unit for the same file
+    // T-LR-3 real-data finding — a file whose ONLY service evidence is a
+    // weak, bare stereotype (overridableServiceFilePaths) is NOT skipped
+    // here; the calling pass replaces that weak unit with whatever this
+    // detector produces below, instead of silently losing real persistence/
+    // messaging evidence for it.
+    if (existingServiceFilePaths.has(resolved.relativeFilePath) && !overridableServiceFilePaths.has(resolved.relativeFilePath)) continue;
 
     const fileNodeId = graph.nodes.find((n) => n.source_file === file && n.source_location === 'L1')?.id;
     if (!fileNodeId) continue;
@@ -174,6 +201,25 @@ export function detectUnitsByImportStrategy(
       const matchedLibrary =
         fileEdges.find((e) => libraries.has(e.target))?.target ??
         fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined);
+
+      // T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
+      // driver-import evidence") — a class whose only relationship to a
+      // matched library is via factory-wiring (any annotation in
+      // wiringOnlyAnnotations, catalogue-driven, never a hardcoded name
+      // here) is never a real owner/user of it, regardless of which
+      // library or which kind (database/topic) this detector instance is
+      // producing — it exists to WIRE the thing for something ELSE to use,
+      // not to use it itself. Generic, unconditional on ownerBaseClasses
+      // (unlike the Q13 check below, which only applies to
+      // specifically-configured libraries) — this exclusion is real for
+      // every driver-import library, for every catalogued wiring
+      // annotation.
+      if (
+        wiringOnlyAnnotations.some((annotationName) =>
+          classHasAnnotation(path.join(resolved.root, resolved.relativeFilePath), classNode.source_location, annotationName, fileLineCache)
+        )
+      )
+        continue;
 
       // Q13 ontology fix — for a library that requires ownership proof
       // (e.g. @prisma/client), a plain import is no longer sufficient: THIS
