@@ -12,12 +12,15 @@ consequence-first, tie-broken by residual id for a stable order.
 Age is real, not invented: `residuals.json`'s own residual ids are
 positional/regenerated per run (triage.py's own documented limitation —
 they are not stable across scans), so "how long has this exact residual
-been open" can only be answered by matching (trigger, unitIds) signatures
-across a series of PRIOR Session Packs, the same signature
-`triage.py`'s `apply_baseline()` already uses for --baseline carry-
-forward. Pass `--history` with one or more earlier session dirs (oldest
-first) to get a real age; without it, age is honestly reported as unknown
-rather than guessed at.
+been open" can only be answered by matching residuals across a series of
+PRIOR Session Packs. `compute_ages()` matches by SHARED UNIT ID alone —
+the same real mechanism `triage.py`'s `apply_baseline()` uses for
+--baseline carry-forward (a dict keyed by unit id, not a combined
+signature) — so a residual whose trigger/class drifted between scans on
+the SAME unit is still recognized as the same underlying item, same as
+apply_baseline's own 'reconfirm' case. Pass `--history` with one or more
+earlier session dirs (oldest first) to get a real age; without it, age is
+honestly reported as unknown rather than guessed at.
 """
 
 from __future__ import annotations
@@ -38,10 +41,6 @@ def _load_residuals(session_dir: Path) -> dict:
     return json.loads(residuals_path.read_text())
 
 
-def _signature(residual: dict) -> tuple:
-    return (residual.get("trigger"), tuple(sorted(residual.get("unitIds", []))))
-
-
 def rank_backlog(residuals: list[dict]) -> list[dict]:
     """Open residuals only, sorted by consequence score descending (a
     residual with no `consequence` field — an older pack built before
@@ -52,21 +51,33 @@ def rank_backlog(residuals: list[dict]) -> list[dict]:
 
 
 def compute_ages(backlog: list[dict], history_packs: list[dict]) -> dict[str, dict]:
-    """{residual_id: {"first_seen": iso-timestamp, "age_days": float}} for
-    every backlog residual whose (trigger, unitIds) signature is found in
-    an OLDER pack in `history_packs` (each a parsed residuals.json dict,
-    already sorted oldest-first by the caller). A residual with no match
-    in any given history pack is simply absent from the returned dict —
-    "no history found" is reported by the caller as unknown, never
-    defaulted to zero."""
+    """{residual_id: {"first_seen": iso-timestamp}} for every backlog
+    residual that shares AT LEAST ONE unit id with a residual in an OLDER
+    pack in `history_packs` (each a parsed residuals.json dict, already
+    sorted oldest-first by the caller). A residual with no match in any
+    given history pack is simply absent from the returned dict — "no
+    history found" is reported by the caller as unknown, never defaulted
+    to zero.
+
+    Matches by shared unit id alone, deliberately NOT also requiring the
+    trigger to match — real bug found on review: an earlier version keyed
+    on (trigger, unitIds) together, which is a STRICTER match than
+    triage.py's own apply_baseline() (its real, established precedent for
+    "is this the same residual across scans"), which matches by unit id
+    membership alone and treats a trigger/class change on the SAME unit as
+    a 'reconfirm' of the same underlying residual, not a different one.
+    The stricter version silently reported "unknown" age for exactly that
+    drift case — the one apply_baseline's own docstring calls out as real,
+    not hypothetical. This mirrors that same real mechanism, not a
+    superficially similar one."""
     ages: dict[str, dict] = {}
     for residual in backlog:
-        if not residual.get("unitIds"):
+        unit_ids = set(residual.get("unitIds", []))
+        if not unit_ids:
             continue  # a run-level residual has no stable unit-based signature to match on — never guessed
-        sig = _signature(residual)
         first_seen = None
         for pack in history_packs:
-            match = next((r for r in pack.get("items", []) if _signature(r) == sig), None)
+            match = next((r for r in pack.get("items", []) if unit_ids & set(r.get("unitIds", []))), None)
             if match is not None:
                 first_seen = pack.get("generatedAt")
                 break

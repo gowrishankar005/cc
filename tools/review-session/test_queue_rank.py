@@ -75,6 +75,19 @@ class TestComputeAges(unittest.TestCase):
         ages = compute_ages(backlog, history)
         self.assertNotIn("R-005", ages, "a run-level residual with no unit ids has no stable signature to match on")
 
+    def test_matches_by_shared_unit_id_even_when_trigger_drifted(self):
+        """Real bug found on review: an earlier version required BOTH
+        trigger and unitIds to match, which is stricter than triage.py's
+        own apply_baseline() (matches by unit id alone) — a residual whose
+        trigger/class changed between scans on the SAME unit (exactly the
+        'reconfirm' case apply_baseline already names as real) used to
+        report age as unknown even though the underlying item is still the
+        same open residual."""
+        backlog = [_residual("R-009", 2, ["pii-proxy"], trigger="S2-http-without-security-control", unit_ids=["svc.py"])]
+        history = [{"generatedAt": "2026-08-01T00:00:00Z", "items": [{"trigger": "S5-zero-service-units-with-store-present", "unitIds": ["svc.py"]}]}]
+        ages = compute_ages(backlog, history)
+        self.assertEqual(ages["R-009"]["first_seen"], "2026-08-01T00:00:00Z", "must still find the age even though this run's trigger differs from the history pack's (a real reconfirm-shaped drift)")
+
     def test_earliest_pack_wins_when_present_in_multiple(self):
         backlog = [_residual("R-005", 2, ["pii-proxy"], trigger="S5-zero-service-units-with-store-present", unit_ids=["db.py"])]
         history = [
