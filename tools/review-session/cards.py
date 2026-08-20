@@ -171,13 +171,22 @@ def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> l
     return out
 
 
+def group_by_class(residuals: list[dict]) -> dict[tuple, list[str]]:
+    """{(tier, class): [residual_id, ...]} — the same "similar residuals"
+    grouping build_all_cards uses for its sibling note, factored out so
+    bulk_apply.py (T-RT-1) can find a residual's siblings without
+    re-deriving the grouping rule a second time."""
+    groups: dict[tuple, list[str]] = {}
+    for r in residuals:
+        groups.setdefault((r["tier"], r["class"]), []).append(r["id"])
+    return groups
+
+
 def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict) -> dict:
     """Returns {residual_id: markdown_card}. Also computes the real
     'similar residuals' grouping (same tier+class), shared across all cards
     in the group — not per-card in isolation."""
-    groups: dict[tuple, list[str]] = {}
-    for r in residuals:
-        groups.setdefault((r["tier"], r["class"]), []).append(r["id"])
+    groups = group_by_class(residuals)
 
     cards = {}
     for r in residuals:
