@@ -4,7 +4,7 @@
 
 **Product target:** polyglot enterprise monorepos — not any single application. Public repositories and lab fixtures are evidence samples used to prove or disprove detection mechanisms, not the product itself.
 
-**No LLM in the core generation path.** An optional, offline tool may propose new detection-catalogue entries for human review; nothing in the generation path itself calls an LLM.
+**No LLM in the core generation path.** Two optional, offline tools may call an LLM — `suggest-rules.ts` to propose new detection-catalogue entries, and `tools/review-session/advisory.py` to explain evidence and propose hypotheses for open review residuals — both human-gated, neither writes a fact, and neither is ever imported by `run-slice`'s call graph.
 
 | | |
 |---|---|
@@ -85,9 +85,9 @@ Authoritative detail: [`docs/solution/Claim_Register.md`](./docs/solution/Claim_
 
 **Scanning & analysis** — hybrid dual-engine scanning (per-package native typing + a combined cross-package structural pass); JAX-RS/Spring MVC/Flask/NestJS route composition; JPA/import-based persistence detection; messaging consumer/producer detection; outbound-HTTP client detection; OpenAPI ingestion; Spring configuration file reading; dependency-manifest (SBOM) corroboration; multi-hop bridge resolution across layered access classes; Kubernetes shared-secret trust relationships and manifest-vs-config contradiction detection; CloudFormation/SAM API-Gateway-to-Lambda route binding; an opt-in CodeQL DI-resolution engine for Spring wiring shapes neither structural engine can see; completeness/silence metrics that flag when a result looks empty because nothing was checked vs. genuinely checked-and-clean. See [What runs by default vs. what needs a flag](#what-runs-by-default-vs-what-needs-a-flag) for which of these are always-on.
 
-**CALM generation** — catalogue-driven builders (nodes, interfaces, relationships, controls, system boundary, metadata); schema-correct relationship shapes; decorator- and call-site-based security controls with file:line evidence; a Decision Record/Override mechanism for human correction after a scan; a human-readable intermediate representation rendered from the same facts as the CALM output.
+**CALM generation** — catalogue-driven builders (nodes, interfaces, relationships, controls, system boundary, metadata); schema-correct relationship shapes; decorator- and call-site-based security controls with file:line evidence; a Decision Record/Override mechanism for human correction after a scan, including boundary-change overrides (reassigning a node's `composed-of` container membership); a human-readable intermediate representation rendered from the same facts as the CALM output; incremental merge against a prior run's `typed-facts.json` in the same `--out` directory, so a human-`reviewed` status is never silently lost on rerun.
 
-**Output honesty metadata** — not an afterthought, first-class output on every generated artefact: a `FactStatus` (`observed`/`inferred`/`requires-review`/`reviewed`/`externally-verified`) on every node and relationship (`x-aac-status`), telling a consumer which facts are safe to treat as settled versus which still need a human look; a self-disclosed `x-aac-scope-limitations` block at the document root (sourced from `scope-limitations.yml`) naming this specific run's known gaps, not just a general disclaimer; per-module fitness declarations (`fitness.json` alongside each module's findings) stating whether that module's output has been gold-measured or is `not-yet-fit-to-gate` — so a consumer knows whether it's safe to gate a CI decision on a given module's findings.
+**Output honesty metadata** — not an afterthought, first-class output on every generated artefact: a `FactStatus` (`observed`/`inferred`/`requires-review`/`reviewed`/`externally-verified`) on every node and relationship (`x-aac-status`), telling a consumer which facts are safe to treat as settled versus which still need a human look; a self-disclosed `x-aac-scope-limitations` block at the document root (sourced from `scope-limitations.yml`) naming this specific run's known gaps, not just a general disclaimer; per-module fitness declarations (`fitness.json` alongside each module's findings) stating whether that module's output has been gold-measured or is `not-yet-fit-to-gate` — so a consumer knows whether it's safe to gate a CI decision on a given module's findings; an `emission-coverage-report.json` alongside every generated CALM document stating, as a real measured ratio (not an assertion), what a real detected fact could not be represented in CALM and why (an unmapped unit kind, a dangling relationship endpoint, an unmapped security-control signal).
 
 **Modules (what each one actually checks)** — see [`--modules`](#run-slice-cli-reference) to pick a different set:
 
@@ -99,7 +99,7 @@ Authoritative detail: [`docs/solution/Claim_Register.md`](./docs/solution/Claim_
 
 **Evaluation** — a fixtures monorepo covering the supported frameworks; hand-authored semantic and full-CALM gold architecture; scoring scripts; a strict isolation rule preventing gold from ever informing detector design (`coe-lab/ISOLATION.md`).
 
-**Tooling** — a real regression suite (`npm test`, exact-value assertions against checked-in fixtures); an offline, explicitly-invoked rule-suggestion CLI (LLM-optional, never on the generation path); a Dockerfile.
+**Tooling** — a real regression suite (`npm test`, exact-value assertions against checked-in fixtures); an offline, explicitly-invoked rule-suggestion CLI (LLM-optional, never on the generation path); a residual review-session workflow (`tools/review-session/`) turning a scan's open review items into architect-facing choice cards, with bulk-apply, consequence-ranked triage, and an optional LLM-advisory layer — see [Residual review workflow](#residual-review-workflow); a Dockerfile.
 
 ---
 
@@ -113,7 +113,7 @@ Named explicitly rather than left implicit — a high confidence score on what *
 | **Call-site security controls** | Only decorator/annotation-based controls (e.g. `@PreAuthorize`) and a small set of call-based patterns are detected; broader method-call-based authorization checks are backlog. |
 | **Confidence vs. completeness** | A high confidence score on a detected unit says nothing about whether the surrounding architecture was fully captured — always check the generated output's own scope-limitations metadata. |
 | **Persistence/messaging breadth** | Spring Data repositories, jOOQ, and some cloud-native persistence/messaging shapes are designed but not fully dispatched. |
-| **Kubernetes runtime placement** | Shared-secret trust relationships are detected; `deployed-in` (runtime placement) relationships are not yet built. |
+| **Cross-repo joins are root-granularity only** | `--repo-manifests` resolves a whole scanned root to a whole published contract — never a specific class/unit on either side, since none of the three ranked signals (API-spec title, artifact coordinates, service-catalogue name) are attributable more precisely than "this root produced this evidence." Every resulting relationship is capped at `requires-review`/`structural`, never promoted further. |
 
 See [`docs/solution/OOS_Registry.md`](./docs/solution/OOS_Registry.md) for permanent (not just near-term) non-goals, each with a stated reason and revisit trigger.
 
@@ -135,7 +135,8 @@ coe-lab/                  ← evaluation benchmark (fixtures + gold + scripts)
 docs/
   Requirements.md         ← current scope
   solution/               ← design, capabilities, backlog, claim register
-tools/                    ← standalone tooling (residual-review session)
+tools/                    ← standalone tooling
+  review-session/         ← residual review-session workflow (pack/cards/apply, optional LLM-advisory layer)
 ```
 
 ---
@@ -186,6 +187,7 @@ table exists to prevent.
 | Dependency-manifest (SBOM) corroboration + secondary-source introduction | **Always** | No flag — auto-detects `@cyclonedx/cdxgen` on `PATH` and a committed lockfile; a no-op (not an error) when either is absent |
 | CloudFormation/SAM route binding | Opt-in | `--cfn-manifests <dir>` |
 | Kubernetes shared-secret trust relationships | Opt-in | `--k8s-manifests <dir>` |
+| Kubernetes `deployed-in` runtime-placement relationships (T-MR-3) | Opt-in | `--k8s-manifests <dir>` (same flag — one manifest read produces both trust and placement facts) |
 | Contradiction detection (k8s manifest vs. Spring config) | Opt-in | `--k8s-manifests <dir>` (same flag, no separate one) |
 | Env-key-name soft-graph correlation | Opt-in | `--enable-env-soft-graph` (also requires `--k8s-manifests`) |
 | CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>` — real, non-trivial cost (a real compile + CodeQL database build), never on by default |
@@ -208,7 +210,7 @@ anyone deciding what the product can do.
 | `--modules <name>,<name>,...` | Yes | `calm-generator,threat-signals,resilience-lens` | Which modules to run — see `docs/solution/Module_Authoring_Guide.md` |
 | `--strict-detect` | No | off | Exit non-zero when routes were expected (grep-verified usage) but zero were found — turns a silent CodeGraph detect-gate failure into a loud one |
 | `--no-snippets` | No | snippets included | Omit source-snippet content from the IR/output (redaction-adjacent; excludes snippet bodies, not evidence pointers) |
-| `--k8s-manifests <dir>` | Yes | — (off) | Read flat/pre-rendered Kubernetes manifests for shared-Secret/ConfigMap trust relationships. **Also activates contradiction detection** (a k8s Deployment image naming a different datastore engine than a Spring-config-sourced unit's own JDBC scheme forces that unit to `requires-review`) — no separate flag for this |
+| `--k8s-manifests <dir>` | Yes | — (off) | Read flat/pre-rendered Kubernetes manifests for shared-Secret/ConfigMap trust relationships. **Also activates `deployed-in` runtime-placement relationships** (T-MR-3 — a real `node-type: system` CALM node per namespace, `grade: structural` so it's never mistaken for real service connectivity) **and contradiction detection** (a k8s Deployment image naming a different datastore engine than a Spring-config-sourced unit's own JDBC scheme forces that unit to `requires-review`) — no separate flags for either |
 | `--enable-env-soft-graph` | No | off | Env-key-name-correlation relationships — requires `--k8s-manifests` too; always low, fixed confidence |
 | `--cfn-manifests <dir>` | Yes | — (off) | Read CloudFormation/SAM templates to bind API Gateway routes to their Lambda handlers |
 | `--strict-overrides` | No | off | Fail the run if any Override is rejected (orphaned target, malformed value, inactive Decision Record) instead of reporting and continuing |
@@ -220,7 +222,7 @@ anyone deciding what the product can do.
 
 **When to reach for which flag:**
 
-- Have Kubernetes manifests for the system? → `--k8s-manifests <dir>`. You get shared-secret trust edges for free; if a manifest's datastore image disagrees with a Spring-config-sourced unit's JDBC scheme, that unit is also automatically forced to `requires-review` (no extra flag).
+- Have Kubernetes manifests for the system? → `--k8s-manifests <dir>`. You get shared-secret trust edges AND `deployed-in` runtime-placement edges (which namespace each service actually runs in) for free; if a manifest's datastore image disagrees with a Spring-config-sourced unit's JDBC scheme, that unit is also automatically forced to `requires-review` (no extra flag).
 - Also want low-confidence env-var-name correlation edges on top of that? → add `--enable-env-soft-graph` (does nothing without `--k8s-manifests`).
 - System is deployed via CloudFormation/SAM (API Gateway → Lambda)? → `--cfn-manifests <dir>`.
 - Hit a case where CodeGraph/Graphify can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--codeql-source-root`/`--codeql-build-command` (see the dedicated section below first — real cost, license-gated, local-only).
@@ -269,6 +271,50 @@ See [`coe-lab/README.md`](./coe-lab/README.md).
 
 ---
 
+## Residual review workflow
+
+Every `run-slice` scan leaves some facts genuinely uncertain — that's a
+correct outcome (`README`'s own S1/S2/S5 "never guess" discipline), not a
+defect. `tools/review-session/` turns those open items into an
+architect-facing **Session Pack**: choice cards for a human to answer,
+applied back through the *same* Decision Record/Override mechanism
+`--overrides` already uses — never a second, informal write path into CALM.
+
+```bash
+# 1. Build a real pack from a real run-slice output directory
+node pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
+cd tools/review-session
+python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
+
+# 2. Hand-author decisions for the generated choice cards (tools/review-session/examples/README.md),
+#    then validate before applying
+python3 validate_drafts.py --session-dir ../../review-sessions/my-run --calm /tmp/my-run/architecture.calm.json
+
+# 3. Apply — the only command that ever calls run-slice/override-applier; requires confirmation
+python3 apply.py --session-dir ../../review-sessions/my-run --out /tmp/my-run-reviewed
+```
+
+**Optional, once the basic pack → cards → apply loop is familiar:**
+
+| Tool | What it does |
+|---|---|
+| `python3 bulk_apply.py --session-dir ... --anchor R-014 --i-confirm-bulk-apply` | Replicates one already-answered residual's decision across every other open residual in the same (tier, class) group — still writes one real Decision Record per residual, never a blanket batch record |
+| `python3 queue_rank.py --session-dir ... [--history <prior-session-dir>]` | Ranks the open backlog highest-consequence-first (PII-touching, external-system-identity, trust-boundary signals — named proxies over real detected facts, not a PII/data-classification engine) and reports real residual age across reruns |
+| `python3 advisory.py --session-dir ...` | **Optional LLM-advisory layer** (`ANTHROPIC_API_KEY` required; reports what it would attempt and writes nothing without one) — explains evidence and proposes hypotheses for open residuals, and optionally one catalogue-rule candidate per residual. **Never writes a fact**: any response shaped like a decision/override is rejected outright, and accepting a hypothesis via a card is still one human judgement, never treated as independent corroboration |
+| `python3 pack.py --out-dir ... --session-dir ... --baseline <prior-session-dir>` | A later rescan carries forward already-decided residuals instead of re-asking, and flags real drift (the same unit's trigger/class changed since it was decided) as `reconfirm` rather than silently overwriting or silently re-asking |
+
+**Hard boundary:** nothing under `tools/review-session/` is ever imported by
+`pipeline/src/orchestration/run-slice.ts` or anything in its call graph —
+this is offline, human-invoked tooling, not part of the deterministic core
+(`OOS_Registry.md`'s `OOS-llm-core-path`, revisit trigger "Never").
+
+See [`tools/review-session/README.md`](./tools/review-session/README.md) for
+the full command reference, the S1–S12 non-negotiable rules, and
+[`docs/solution/Architect_Residual_Review_Session.md`](./docs/solution/Architect_Residual_Review_Session.md)
+for the design.
+
+---
+
 ## Validation layers
 
 | Layer | Meaning |
@@ -295,6 +341,7 @@ A clean L0+L1 result on a fixture does not imply L2 on a real multi-module syste
 | [`docs/solution/Module_Authoring_Guide.md`](./docs/solution/Module_Authoring_Guide.md) | Adding a new module |
 | [`docs/solution/Contract_Evolution_Policy.md`](./docs/solution/Contract_Evolution_Policy.md) | When to version the typed-facts contract |
 | [`docs/solution/Catalogue_Intake.md`](./docs/solution/Catalogue_Intake.md) | Adding a new detection catalogue row |
+| [`docs/solution/Architect_Residual_Review_Session.md`](./docs/solution/Architect_Residual_Review_Session.md) | Design for the residual review-session workflow (`tools/review-session/`) |
 | [`CLAUDE.md`](./CLAUDE.md) | Working guidance for AI coding assistants |
 
 ---
