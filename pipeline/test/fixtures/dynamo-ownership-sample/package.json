@@ -1,0 +1,6 @@
+{
+  "name": "dynamo-ownership-sample",
+  "version": "0.1.0",
+  "private": true,
+  "description": "T-MR-4 synthetic fixture — isolates the DynamoDB import-vs-ownership shape (a class that genuinely owns a DynamoDBClient field vs. one that merely receives it as a method parameter). Not a found-in-the-wild sample; disclosed as synthetic per Catalogue_Intake.md."
+}

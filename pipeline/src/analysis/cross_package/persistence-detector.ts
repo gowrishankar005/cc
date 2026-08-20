@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { GraphifyRun } from '../../scanner/graphify-provider';
-import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportOwnerBaseClasses } from '../../rules/persistence-detection-schema';
+import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportOwnerBaseClasses, driverImportOwnerFieldTypes } from '../../rules/persistence-detection-schema';
 import { loadWiringAnnotationCatalogue, wiringAnnotationNames } from '../../rules/wiring-annotation-schema';
 import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
 
@@ -35,6 +35,7 @@ export function detectPersistenceUnits(
   const catalogue = loadPersistenceDetectionCatalogue(rulesDir);
   const libraries = driverImportLibraries(catalogue);
   const ownerBaseClasses = driverImportOwnerBaseClasses(catalogue);
+  const ownerFieldTypes = driverImportOwnerFieldTypes(catalogue);
   const wiringOnlyAnnotations = wiringAnnotationNames(loadWiringAnnotationCatalogue(rulesDir));
 
   return detectUnitsByImportStrategy(
@@ -49,6 +50,7 @@ export function detectPersistenceUnits(
     },
     existingServiceFilePaths,
     ownerBaseClasses,
+    ownerFieldTypes,
     wiringOnlyAnnotations,
     overridableServiceFilePaths
   );

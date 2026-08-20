@@ -1378,6 +1378,66 @@ test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging doubl
   }
 });
 
+test('T-MR-4 — DynamoDB ownership shape (Node/TS, @aws-sdk/client-dynamodb): a class that owns a real DynamoDBClient field stays database, a class that only receives one as a method parameter is NOT a database unit; existing ts-orders-dynamo real-field-owner case unaffected', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/dynamo-ownership-sample');
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+
+    const store = findNode(calm, 'OrderDynamoStore');
+    assert.ok(store, 'OrderDynamoStore (owns a real DynamoDBClient field) must still be a real database unit');
+    assert.equal(store['node-type'], 'database');
+
+    // The real ambiguity T-MR-4 closes — Claim_Register.md's U-persist-import
+    // counterexample (a reference AWS SaaS sample's TierService imports
+    // DynamoDbClient purely to pass it through, does not own it).
+    assert.equal(
+      findNode(calm, 'OrderClientPassthrough'),
+      undefined,
+      'OrderClientPassthrough must NOT be a database node — it receives DynamoDBClient as a method parameter, never owns it'
+    );
+
+    // Only one real unit in this fixture and nothing to connect it to
+    // (isolating the ownership shape, not a connectivity scenario), so
+    // calm-cli's real architecture-nodes-must-be-referenced orphan WARNING
+    // is expected here — asserting errors, not warnings, same as any other
+    // deliberately single-unit fixture.
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
+test('T-MR-4 — DynamoDB ownership shape, second different instance (Java, AWS SDK v1 com.amazonaws.services.dynamodbv2.AmazonDynamoDB): field-owner stays database, method-parameter-only receiver does not', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/dynamo-ownership-java-sample');
+  fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  const { outDir, calm } = runPipeline([fixtureRoot]);
+  try {
+    const store = findNode(calm, 'TierClientDynamoStoreV1');
+    assert.ok(store, 'TierClientDynamoStoreV1 (owns a real AmazonDynamoDB field) must be a real database unit');
+    assert.equal(store['node-type'], 'database');
+
+    assert.equal(
+      findNode(calm, 'TierClientPassthroughV1'),
+      undefined,
+      'TierClientPassthroughV1 must NOT be a database node — it receives AmazonDynamoDB as a method parameter, never owns it'
+    );
+
+    // Same single-unit orphan-warning caveat as the Node/TS fixture above.
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
+    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
+  }
+});
+
 test('T-LR-3 follow-up — weak bare-stereotype + messaging import is one topic node, not two (synthetic; persistence already proved the Java half)', () => {
   const { outDir, calm } = runPipeline([WEAK_SERVICE_MESSAGING_ROOT]);
   try {

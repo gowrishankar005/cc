@@ -8,7 +8,7 @@
 # docs/solution/language/java.md §3.1 are NOT dispatched by this file —
 # stated honestly per strategy below, not silently implied working.
 
-version: "0.4.0"
+version: "0.5.0"
 
 strategies:
   - id: driver-import
@@ -72,15 +72,44 @@ strategies:
       # generic bug this same round — a file importing BOTH a persistence
       # AND a messaging library produced duplicate unique-ids (see
       # existingUnitFilePaths, pass-registry.ts).
-      - { name: "@aws-sdk/client-dynamodb", language: typescript, evidenceLevel: verified }
-      - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — covers DynamoDB use but also other AWS services, so a real false-positive risk this catalogue row doesn't hide
+      #
+      # T-MR-4 ownerFieldType — DynamoDB clients are never subclassed (no
+      # `extends` idiom exists for them the way PrismaClient has one), so
+      # Q13's ownerBaseClass check can't apply here; the real ownership
+      # idiom is composition — a store class holds one as a field. Real,
+      # already-documented ambiguity this closes: Claim_Register.md's
+      # U-persist-import counterexample (a reference AWS SaaS sample's
+      # TierService imports DynamoDbClient purely to pass it through to a
+      # method parameter, does not own it — the true store is a separate
+      # class). Verified via a synthetic fixture isolating the shape
+      # (pipeline/test/fixtures/dynamo-ownership-sample) — disclosed as
+      # synthetic, not found-in-the-wild, per Catalogue_Intake.md's
+      # requirement 1; ts-orders-dynamo's real OrdersDynamoStore (a genuine
+      # `private dynamo = new DynamoDBClient(...)` field) re-verified still
+      # passes with the new check applied.
+      - { name: "@aws-sdk/client-dynamodb", language: typescript, evidenceLevel: verified, ownerFieldType: DynamoDBClient }
+      - { name: aws-sdk, language: typescript, evidenceLevel: unverified } # legacy v2 SDK; generic — covers DynamoDB use but also other AWS services, so a real false-positive risk this catalogue row doesn't hide; no single ownerFieldType name would be honest here, left unchanged
       # Java — a large financial-services organization-evidenced (v0.14), not yet added to real Graphify
       # import-edge matching — named here as the concrete next catalogue
       # addition, not yet dispatched (Graphify's actual edge-target naming
       # for these hasn't been verified against real Java source).
       - { name: com.mongodb, language: java, evidenceLevel: unverified }
-      - { name: com.amazonaws.services.dynamodbv2, language: java, evidenceLevel: unverified }
-      - { name: software.amazon.awssdk.services.dynamodb, language: java, evidenceLevel: unverified } # AWS SDK v2 for Java, distinct package from the v1 entry above
+      # T-MR-4 ownerFieldType — same composition-ownership ambiguity as the
+      # Node v3 SDK row above, verified via a second, different instance of
+      # the same mechanism class (different language, different SDK
+      # generation — AWS SDK v1 for Java's AmazonDynamoDB interface, not
+      # the v2 DynamoDbClient class below): synthetic fixture
+      # pipeline/test/fixtures/dynamo-ownership-java-sample, disclosed as
+      # synthetic per Catalogue_Intake.md.
+      - { name: com.amazonaws.services.dynamodbv2, language: java, evidenceLevel: unverified, ownerFieldType: AmazonDynamoDB }
+      # AWS SDK v2 for Java, distinct package from the v1 entry above.
+      # T-MR-4 ownerFieldType — re-verified against the existing real
+      # java-lambda-apigw/java-lambda-orphan-store lab fixtures (TierStore,
+      # LegacyTierHandler, OrderStore all genuinely declare
+      # `private final DynamoDbClient dynamoDbClient` fields) — all three
+      # still resolve as real database units with the new check applied,
+      # not just the new synthetic negative case.
+      - { name: software.amazon.awssdk.services.dynamodb, language: java, evidenceLevel: verified, ownerFieldType: DynamoDbClient }
       # T-X7-4 — org.postgresql IS the PostgreSQL JDBC driver package,
       # unambiguously (not a guess: this is what the package name means).
       # protocol: JDBC is a real value in core.json#/defs/protocol

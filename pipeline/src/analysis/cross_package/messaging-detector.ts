@@ -48,6 +48,7 @@ export function detectMessagingUnits(
     },
     existingServiceFilePaths,
     new Map(),
+    new Map(),
     wiringOnlyAnnotations,
     overridableServiceFilePaths
   );

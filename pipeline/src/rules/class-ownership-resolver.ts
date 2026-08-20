@@ -52,6 +52,63 @@ export function classExtendsBaseClass(absoluteFilePath: string, classSourceLocat
 }
 
 /**
+ * T-MR-4 — composition-style ownership check, the counterpart to
+ * classExtendsBaseClass for libraries whose real ownership idiom is a FIELD
+ * holding the client, not inheritance (the AWS SDK's Dynamo clients are
+ * never subclassed — a store class holds one as `private final DynamoDbClient
+ * client = DynamoDbClient.builder().build();` in Java, or
+ * `private client = new DynamoDBClient(...)` / a TS constructor-property
+ * `constructor(private client: DynamoDBClient)` in Node). The same
+ * import-vs-ownership ambiguity Q13 found for Prisma is real here too
+ * (Claim_Register.md's U-persist-import counterexample: a handler that
+ * imports DynamoDbClient purely to pass it through to a method parameter is
+ * not its owner).
+ *
+ * Scanned across the class's own real source span (classSourceLocation to
+ * endLine, both already computed by the caller from real method-line
+ * evidence — not an arbitrary fixed window) rather than just the header,
+ * since fields are declared in the class BODY, not the `class X {` line.
+ *
+ * Deliberately conservative, not full parsing: a TS/JS match requires an
+ * explicit accessibility/readonly modifier (private/public/protected/
+ * readonly) on the declaration — this is what distinguishes a real field or
+ * constructor-property-shorthand param from a plain, unmarked method
+ * parameter of the same type (the exact ambiguity this exists to resolve).
+ * A Java match requires the WHOLE trimmed line to be a self-contained
+ * declaration statement ending in `;`, with the type immediately followed
+ * by an identifier — excludes method signatures (which always have `(`
+ * before reaching `;`) but does NOT distinguish a class field from a local
+ * variable declared inside a method body; a class that locally constructs
+ * and uses the client within one of its own methods is still real
+ * ownership evidence, not the false-positive shape this guards against, so
+ * this is an accepted breadth, not a bug — see scope-limitations.yml's
+ * dynamo-field-ownership-heuristic entry.
+ */
+export function classDeclaresFieldOfType(absoluteFilePath: string, classSourceLocation: string, endLine: number, typeName: string, fileLineCache: Map<string, string[]>): boolean {
+  const startLine = parseInt(/^L(\d+)/.exec(classSourceLocation)?.[1] ?? '', 10);
+  if (!startLine) return false;
+
+  let lines = fileLineCache.get(absoluteFilePath);
+  if (!lines) {
+    try {
+      lines = fs.readFileSync(absoluteFilePath, 'utf8').split('\n');
+    } catch {
+      return false; // file no longer readable at this path — degrade to "no match", not a crash
+    }
+    fileLineCache.set(absoluteFilePath, lines);
+  }
+
+  const bodyLines = lines.slice(startLine - 1, Math.min(endLine, lines.length));
+  const escapedType = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  const tsAnnotatedField = new RegExp(`\\b(?:private|public|protected|readonly)\\s+\\w+\\s*:\\s*${escapedType}\\b`);
+  const tsConstructedField = new RegExp(`\\b(?:private|public|protected|readonly)\\s+\\w+\\s*=\\s*new\\s+${escapedType}\\s*\\(`);
+  const javaFieldStatement = new RegExp(`^\\s*(?:private|protected|public)?\\s*(?:static\\s+)?(?:final\\s+)?${escapedType}\\s+\\w+\\s*(?:=[^;]*)?;\\s*$`);
+
+  return bodyLines.some((line) => tsAnnotatedField.test(line) || tsConstructedField.test(line) || javaFieldStatement.test(line));
+}
+
+/**
  * T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
  * driver-import evidence") — real evidence from Bug 3's Phase A pass
  * (`soln/bug3-jdbc-ownership-phase-a-memo.md` Finding 2): a

@@ -2,7 +2,7 @@ import * as path from 'path';
 import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
 import { TypedUnit, Evidence, PENDING_STATUS } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
-import { classExtendsBaseClass, classHasAnnotation } from '../../rules/class-ownership-resolver';
+import { classExtendsBaseClass, classDeclaresFieldOfType, classHasAnnotation } from '../../rules/class-ownership-resolver';
 import { isTestPath } from '../../rules/test-path';
 
 /**
@@ -30,8 +30,18 @@ import { isTestPath } from '../../rules/test-path';
  * `fileLineCache` is caller-supplied and shared across the whole detection
  * pass (not module-global — stays scoped to one run, no cross-test/cross-run
  * leakage) so a file with many matching import lines is only read once.
+ *
+ * T-MR-4 — returns BOTH the real resolved qualified import (used as
+ * evidence.signal, unchanged) AND which catalogue library name it matched
+ * (`catalogueLib`). Real, generic gap this fixes: ownerBaseClasses/
+ * ownerFieldTypes lookups are keyed by the catalogue's own library name
+ * (e.g. "org.postgresql"), but the qualified import text a Java match
+ * resolves to is never that literal string (e.g.
+ * "org.postgresql.core.Utils") — a plain `map.get(qualified)` can never hit
+ * for ANY Java driver-import library, not just the one T-MR-4 adds. Latent
+ * until now because no Java catalogue row had ever set ownerBaseClass.
  */
-function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<string>, fileLineCache: Map<string, string[]>): string | undefined {
+function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<string>, fileLineCache: Map<string, string[]>): { qualified: string; catalogueLib: string } | undefined {
   if (!edge.source_file.endsWith('.java')) return undefined;
   const resolved = run.resolveRoot(edge.source_file);
   if (!resolved) return undefined;
@@ -39,7 +49,7 @@ function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<s
   const qualified = resolveJavaImportPackage(absPath, edge.source_location, fileLineCache);
   if (!qualified) return undefined;
   for (const lib of libraries) {
-    if (javaImportMatchesPackage(qualified, lib)) return qualified;
+    if (javaImportMatchesPackage(qualified, lib)) return { qualified, catalogueLib: lib };
   }
   return undefined;
 }
@@ -128,6 +138,12 @@ export function detectUnitsByImportStrategy(
    */
   ownerBaseClasses: Map<string, string> = new Map(),
   /**
+   * T-MR-4 — the composition-ownership counterpart to ownerBaseClasses
+   * (persistence-detection-schema.ts's driverImportOwnerFieldTypes()).
+   * Only libraries present here get the extra field-ownership check.
+   */
+  ownerFieldTypes: Map<string, string> = new Map(),
+  /**
    * T-LR-1 — class-level annotation names that mark a class as a
    * dependency-wiring factory, never a real user/owner of what it wires
    * (`wiring-annotation-catalogue.yml`, `wiringAnnotationNames()`). Data,
@@ -198,9 +214,15 @@ export function detectUnitsByImportStrategy(
       // matched — surfaces the REAL package name as evidence.signal (e.g.
       // "org.postgresql.core.Utils") instead of the generic unknown-lib text.
       const fileEdges = graph.edges.filter((e) => e.source === fileNodeId);
-      const matchedLibrary =
-        fileEdges.find((e) => libraries.has(e.target))?.target ??
-        fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined);
+      const literalMatch = fileEdges.find((e) => libraries.has(e.target))?.target;
+      const javaMatch = literalMatch === undefined ? fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined) : undefined;
+      const matchedLibrary = literalMatch ?? javaMatch?.qualified;
+      // T-MR-4 — the catalogue's OWN library name (e.g. "org.postgresql"),
+      // for ownerBaseClasses/ownerFieldTypes lookups. Distinct from
+      // matchedLibrary (the evidence.signal text below) because a Java
+      // match's resolved qualified import (e.g. "org.postgresql.core.Utils")
+      // is never itself a catalogue key — see resolveJavaMatch's doc comment.
+      const matchedCatalogueLibrary = literalMatch ?? javaMatch?.catalogueLib;
 
       // T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
       // driver-import evidence") — a class whose only relationship to a
@@ -227,10 +249,20 @@ export function detectUnitsByImportStrategy(
       // from its own real source, multi-line-aware — class-ownership-resolver.ts).
       // A file importing the driver for its own TYPES only (real a reference Node/NestJS wealth-management app
       // AccessService shape) correctly produces no unit for that class here.
-      const requiredBaseClass = matchedLibrary ? ownerBaseClasses.get(matchedLibrary) : undefined;
+      const requiredBaseClass = matchedCatalogueLibrary ? ownerBaseClasses.get(matchedCatalogueLibrary) : undefined;
       if (requiredBaseClass) {
         const absPath = path.join(resolved.root, resolved.relativeFilePath);
         if (!classExtendsBaseClass(absPath, classNode.source_location, requiredBaseClass, fileLineCache)) continue;
+      }
+
+      // T-MR-4 — the composition-ownership counterpart: a library like the
+      // AWS SDK's Dynamo clients is never subclassed, so ownership can only
+      // be proven by a real field of the client's own type (see
+      // class-ownership-resolver.ts's classDeclaresFieldOfType doc comment).
+      const requiredFieldType = matchedCatalogueLibrary ? ownerFieldTypes.get(matchedCatalogueLibrary) : undefined;
+      if (requiredFieldType) {
+        const absPath = path.join(resolved.root, resolved.relativeFilePath);
+        if (!classDeclaresFieldOfType(absPath, classNode.source_location, endLine, requiredFieldType, fileLineCache)) continue;
       }
 
       const unit: TypedUnit = {

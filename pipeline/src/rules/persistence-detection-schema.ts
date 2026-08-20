@@ -23,6 +23,21 @@ export interface PersistenceLibraryEntry {
    * blanket).
    */
   ownerBaseClass?: string;
+  /**
+   * T-MR-4 — the composition-style counterpart to ownerBaseClass, for
+   * libraries where real ownership is a FIELD holding the client, never an
+   * `extends` relationship (the AWS SDK's Dynamo clients are never
+   * subclassed; a store class holds one as a field/constructor-injected
+   * dependency instead). Set ONLY where import-vs-ownership ambiguity is
+   * real and evidenced (Claim_Register.md's U-persist-import counterexample:
+   * a handler importing DynamoDbClient purely to pass it through, vs. a
+   * store class that actually holds it). When set, a matched file's class
+   * only becomes a database unit if THAT class's own source declares a
+   * field of this type (class-ownership-resolver.ts's
+   * classDeclaresFieldOfType) — plain import alone is no longer sufficient.
+   * Absent for every other library: unchanged plain-import behavior.
+   */
+  ownerFieldType?: string;
 }
 
 export interface PersistenceStrategy {
@@ -88,6 +103,24 @@ export function driverImportOwnerBaseClasses(catalogue: PersistenceDetectionCata
     if (!lib.ownerBaseClass) continue;
     map.set(lib.name, lib.ownerBaseClass);
     map.set(toGraphifyRefTarget(lib.name), lib.ownerBaseClass);
+  }
+  return map;
+}
+
+/**
+ * T-MR-4 — library name -> required owner field type (see
+ * PersistenceLibraryEntry.ownerFieldType). Same lookup shape as
+ * driverImportOwnerBaseClasses (keyed by both the literal catalogue name
+ * and its Graphify ref_-transformed form), for the composition-ownership
+ * counterpart to the extends-based check.
+ */
+export function driverImportOwnerFieldTypes(catalogue: PersistenceDetectionCatalogue): Map<string, string> {
+  const strategy = catalogue.strategies.find((s) => s.id === 'driver-import');
+  const map = new Map<string, string>();
+  for (const lib of strategy?.libraries ?? []) {
+    if (!lib.ownerFieldType) continue;
+    map.set(lib.name, lib.ownerFieldType);
+    map.set(toGraphifyRefTarget(lib.name), lib.ownerFieldType);
   }
   return map;
 }
