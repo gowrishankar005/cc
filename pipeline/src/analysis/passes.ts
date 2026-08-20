@@ -18,6 +18,7 @@ import { cfnRoutePass } from './cfn-route-pass';
 import { contradictionPass } from './contradiction-pass';
 import { assignStatuses } from './status-assignment';
 import { codeqlDiPass } from './codeql-di-pass';
+import { assignFactIds } from './fact-identity';
 
 export const CONFIDENCE_FLOOR = 40;
 
@@ -182,6 +183,21 @@ export const gradeRelationshipsPass: AnalysisPass = {
 };
 
 /**
+ * T-CL-1 — assigns every relationship its stable, content-derived id (see
+ * fact-identity.ts). Reads only kind/from/to/mechanism/source, none of
+ * which gradeRelationshipsPass or assignStatusPass change, so its exact
+ * position between them is free — placed here so a relationship's id is
+ * available to assignStatusPass too, on the (currently unused but harmless)
+ * chance a future status rule wants it.
+ */
+export const factIdentityPass: AnalysisPass = {
+  name: 'factIdentity',
+  run(ctx: AnalysisContext) {
+    assignFactIds(ctx.relationships);
+  },
+};
+
+/**
  * T-FS-6 — the true LAST pass, after gradeRelationshipsPass: reads
  * ctx.allUnits/ctx.relationships/ctx.allIgnoredItems, never appends to any
  * of them, so it must run after every producer of all three, including
@@ -260,5 +276,6 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // introduces still gets graded/statused like every other real fact).
   codeqlDiPass,
   gradeRelationshipsPass,
+  factIdentityPass,
   assignStatusPass,
 ];

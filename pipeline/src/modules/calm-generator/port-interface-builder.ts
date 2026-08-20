@@ -44,8 +44,17 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
     // is stable regardless of directory-walk order.
     const distinctPorts = [...new Map(portFacts.map((p) => [p.port, p])).values()].sort((a, b) => a.ref.localeCompare(b.ref));
 
-    const newInterfaces: CalmInterface[] = distinctPorts.map((p, i) => ({
-      'unique-id': `${unit.id}::iface-port-${i}`,
+    // T-CL-1 review fix — the id was `iface-port-${i}`, a positional index
+    // into this sorted-and-deduped list: deterministic given identical
+    // inputs, but not content-derived — adding a THIRD port fact for the
+    // same unit could shift an unrelated, unchanged port's ordinal and
+    // therefore its id, the same run-scoped-position anti-pattern
+    // fact-identity.ts's own doc comment names (a second real instance of
+    // the mechanism class the `rel-${i}` fix closed, found on review). The
+    // port number is already the real, distinct semantic coordinate sitting
+    // right here — using it directly needs no index at all.
+    const newInterfaces: CalmInterface[] = distinctPorts.map((p) => ({
+      'unique-id': `${unit.id}::iface-port-${p.port}`,
       type: 'port-interface',
       port: p.port,
     }));

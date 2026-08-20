@@ -179,7 +179,7 @@ table exists to prevent.
 
 | Mechanism | Runs by default? | How to reach it |
 |---|---|---|
-| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
+| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, relationship fact-identity assignment (`TypedRelationship.id`, T-CL-1), status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
 | OpenAPI/Swagger ingestion | **Always** | No flag — auto-discovers `openapi.yaml`/`.json` at each package root |
 | Spring config file reading (`application.yml`/`.properties`) | **Always** | No flag — auto-discovers config files at each package root |
 | Dependency-manifest (SBOM) corroboration + secondary-source introduction | **Always** | No flag — auto-detects `@cyclonedx/cdxgen` on `PATH` and a committed lockfile; a no-op (not an error) when either is absent |

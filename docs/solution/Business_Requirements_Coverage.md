@@ -22,7 +22,7 @@ Do not reopen these three as in-flight work. Leftovers stay gated.
 
 | Item | Why it is free |
 |---|---|
-| `T-CL-1`…`T-CL-4` Contract & Lifecycle | T-FS-6 done — BR-70 / NFR-20 critical path |
+| `T-CL-2`…`T-CL-4` Contract & Lifecycle | T-CL-1 done (2026-08-20) — BR-70 / NFR-20 critical path |
 | `T-CL-5` Emission-coverage | No gate |
 | `T-RT-1`, `T-RT-2` Review Throughput | T-FS-1 and T-FS-6 done |
 | `T-LR-6` Per-(engine, fact-type) trust tiers | T-LR-5 done; this is the remainder in the CodeQL file |
@@ -56,7 +56,7 @@ Must-priority items still unbuilt: BR-20 (cross-repo), BR-70 (incremental merge)
 | **BR-40** | Explicit confidence / **review status**; nothing gates until confirmed | **Implemented** — confidence + `FactStatus` (`observed`/`inferred`/`requires-review`/`reviewed`/`externally-verified`), `x-aac-status` CALM metadata, hard rule tested (2026-08-18) | `T-FS-6` — **done** | **B** | Closed. `T-CL-*`/`T-RT-2` may now start |
 | **BR-50** | Open lens set. Minimum named: security, vulnerability, data flow, **workflow/feature**, **observability**, resilience, **pattern conformance**, sustainability | Security + resilience scored; fitness declared. Vuln/lineage/green gated (no feed). Workflow/obs/pattern tasked, not built | `T-LM-1`…`4` in Lens Modules (1/3/4 gated). `T-LM-6`…`8` in Remaining Lenses | A closed | Do not invent T-LM-1/3/4. T-LM-8 is a written decision |
 | **BR-60** | Multiple techniques, explicit reconcile, no irreversible single tool | Dual-engine + structured-file + SBOM **partial, secondary-source introduction done** (T-FS-4). Contradiction **done** (T-FS-3). CodeQL **DI resolution shipped** (T-LR-5, 2026-08-19, opt-in/local-only — command-bus dispatch not shipped). Trust-tier PLACEMENT done; full per-fact-type MATRIX (`T-LR-6`) still stub | `T-LR-6` | — | — |
-| **BR-70** | Incremental re-extract; preserve human review; flag don’t overwrite | Overrides persist. Full fact-identity merge **not** built | `T-CL-1`…`4` | — | T-FS-6 done — no longer blocked; open to start |
+| **BR-70** | Incremental re-extract; preserve human review; flag don’t overwrite | Overrides persist. **T-CL-1 (fact identity) done, 2026-08-20** — real `unique-id` run-scoped-counter bug found and fixed (`Claim_Register.md`'s `T-CL-1-fact-identity` row). Incremental merge itself (T-CL-2) still **not** built | `T-CL-2`…`4` | — | T-CL-1 done — T-CL-2 (incremental merge) now unblocked |
 | **BR-80** | LLM never writes facts; advisory only | **Implemented as a permanent non-goal** (`OOS-llm-core-path`). `suggest-rules.ts` + residual-review are offline | `T-RT-4` (advisory layer) | — | Do not put any LLM on `run-slice` |
 | **BR-90** | Versionable, schema-validatable representation for CI / review | **Implemented** (`calm validate`, CALM 1.2). In-repo CI workflow existence ≠ a required product CI gate | — | — | No new task |
 | **BR-100** | Human-reviewable “what changed and why” | **Partial** — IR + coverage + review queue exist; no incremental diff-of-facts yet | `T-CL-2` + IR; review session pack | — | Blocked on incremental merge |
@@ -131,7 +131,7 @@ NFR-50 and NFR-60 are gaps in the product sense but are **already captured** as 
 
 Pick at most one. Authoritative order: `AGENT_TASKS_Ext_Execution_Order.md`.
 
-1. **T-CL-1 → 2 → 3 → 4** — highest BR leverage now that status vocabulary exists (BR-70 / NFR-20).
+1. **T-CL-2 → 3 → 4** — T-CL-1 done (2026-08-20); highest BR leverage remaining (BR-70 / NFR-20).
 2. **T-RT-1 then T-RT-2** — NFR-80, both gates green.
 3. **T-CL-5** — smallest, parallel with either of the above.
 4. **T-LR-6** — remaining CodeQL work (per-fact-type trust matrix). Do not start a second DI engine. GHAS before private-repo production use of T-LR-5.

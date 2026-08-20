@@ -1537,6 +1537,30 @@ test(
   }
 );
 
+test('T-CL-1 review fix — two deployments sharing TWO secrets (e.g. a JWT signing secret and a DB credential) must collapse to ONE shares-secret relationship, not one per secret', () => {
+  const { detectK8sTrustRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/k8s-trust-detector'));
+
+  const verifierUnit = { id: 'verifier.py', kind: 'service', name: 'verifier.py', filePath: 'verifier.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+  const issuerUnit = { id: 'issuer.py', kind: 'service', name: 'issuer.py', filePath: 'issuer.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+
+  const deployments = [
+    { name: 'issuer', namespace: 'default', configMapNames: [], secretMounts: [
+      { secretName: 'jwt-key', itemKeys: ['jwtRS256.key'] },
+      { secretName: 'db-cred', itemKeys: ['db.key'] }, // second, distinct secret, same issuer/verifier direction convention as jwt-key
+    ], sourceFile: 'issuer.yaml' },
+    { name: 'verifier', namespace: 'default', configMapNames: [], secretMounts: [
+      { secretName: 'jwt-key', itemKeys: ['jwtRS256.key.pub'] },
+      { secretName: 'db-cred', itemKeys: ['db.key.pub'] },
+    ], sourceFile: 'verifier.yaml' },
+  ];
+
+  const { relationships } = detectK8sTrustRelationships(deployments, [verifierUnit, issuerUnit]);
+
+  assert.equal(relationships.length, 1, 'two shared secrets between the same real pair must produce exactly one relationship — before this fix, each secret pushed its own indistinguishable-downstream fact, which fact-identity.ts\'s TypedRelationship.id (kind|from|to|source, no secret name) would then silently collide onto one id anyway');
+  assert.equal(relationships[0].from, 'verifier.py');
+  assert.equal(relationships[0].to, 'issuer.py');
+});
+
 test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP/persistence/messaging/control evidence) must NOT become CALM nodes: lab lib-fintech-common produces ZERO nodes, calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/lib-fintech-common');
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -3695,7 +3719,7 @@ test('B-duplicate-relationship-objects — two raw edges of different kinds betw
   const result = buildRelationships(relationships, nodes, mapping);
 
   assert.equal(result.length, 1, 'two raw edges of different kinds between the same real pair must collapse to exactly one CalmRelationship');
-  assert.equal(result[0]['unique-id'], 'rel-0', 'first-encountered id must survive the merge, deterministically');
+  assert.equal(result[0]['unique-id'], 'imports|ChargesApiResource.java|ChargeReadPlatformServiceImpl.java|graphify', 'T-CL-1: first-encountered id must survive the merge, deterministically — content-derived from kind|from|to|discriminator, never a positional rel-N counter (the fixed anti-pattern)');
   assert.deepEqual(relMetadata(result[0], 'x-aac-provenance'), ['graphify', 'r2-phase1'], 'distinct provenance values must be merged into an array, never silently dropped');
   assert.match(result[0].description, /imports\+calls/, 'description must name both distinct raw kinds, not just the first');
 });
@@ -4078,6 +4102,31 @@ test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives 
   assert.equal(relationships[2].status, 'requires-review', 'admitted-unresolved mechanism -> requires-review');
   assert.equal(relationships[3].status, 'externally-verified', 'k8s-sourced shares-secret -> externally-verified');
   assert.equal(relationships[4].status, 'requires-review', 'touches a contradicted unit -> requires-review even with no confidence field');
+});
+
+test('T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review history") — computeRelationshipId/assignFactIds: content-derived from kind+endpoints+discriminator, never a run-scoped counter, stable across repeated calls', () => {
+  const { computeRelationshipId, assignFactIds } = require(path.join(PIPELINE_ROOT, 'dist/analysis/fact-identity'));
+
+  const plainEdge = { from: 'A.java', to: 'B.java', kind: 'calls', crossPackage: false, source: 'graphify' };
+  const bridgeEdge = { from: 'A.java', to: 'B.java', kind: 'calls', crossPackage: false, source: 'graphify', mechanism: 'r2b' };
+
+  // Same endpoints, same raw kind, but a real specialized mechanism — must
+  // NOT collide with the plain reconciler edge between the same two units;
+  // mechanism is the discriminator, falling back to source when unset.
+  assert.equal(computeRelationshipId(plainEdge), 'calls|A.java|B.java|graphify');
+  assert.equal(computeRelationshipId(bridgeEdge), 'calls|A.java|B.java|r2b');
+  assert.notEqual(computeRelationshipId(plainEdge), computeRelationshipId(bridgeEdge));
+
+  // Stable: computing twice from the same inputs (simulating two separate
+  // runs over unchanged facts) must produce the identical id — this is the
+  // property a positional `rel-${i}` counter cannot hold once producer
+  // ordering or count varies between runs.
+  assert.equal(computeRelationshipId(plainEdge), computeRelationshipId({ ...plainEdge }));
+
+  const relationships = [plainEdge, bridgeEdge];
+  assignFactIds(relationships);
+  assert.equal(relationships[0].id, 'calls|A.java|B.java|graphify');
+  assert.equal(relationships[1].id, 'calls|A.java|B.java|r2b');
 });
 
 test('T-FS-6 real-repo wiring: stereotype-disambiguation-sample end to end through run-slice.js and CALM x-aac-status metadata', () => {

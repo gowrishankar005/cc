@@ -135,7 +135,26 @@ export interface Evidence {
 export type FactStatus = 'observed' | 'inferred' | 'requires-review' | 'reviewed' | 'externally-verified';
 
 export interface TypedUnit {
-  id: string; // stable id, derived from qualifiedName or file+line
+  // T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review
+  // history") — every existing producer already derives this from semantic
+  // coordinates, never a file:line span or a run-scoped counter, so this
+  // field needed no shape change, only this comment correcting a stale
+  // claim ("derived from qualifiedName or file+line" — line was never
+  // actually part of it). mapSignalsToUnits: the unit's own filePath
+  // (Slice-1 granularity, one file == one unit). Synthetic-unit producers
+  // each add their own discriminator to stay content-derived: cdxgen
+  // corroboration (`cdxgen:<root>:<matchName>`), spring-config
+  // (`<fileKey>::<suffix>`), Graphify cross-package import strategy
+  // (`<relativeFilePath>::<className>`), codeql-di (`codeql-di:<root>:<relativeFilePath>`),
+  // and the graded-fact-admission unresolved-endpoint placeholder
+  // (`unresolved:<graphifyNodeId>` — verified 2026-08-20 against a real
+  // `graphify extract` two-run diff that graphifyy's own `_make_id` is
+  // content-derived from the symbol's file+name, not a counter, so this is
+  // safe to key on directly). A file rename changes this id; the old id
+  // simply stops appearing in a later run's TypedFacts — T-CL-2's merge
+  // reads that as a disappeared fact plus a new one, not a bug to work
+  // around here.
+  id: string;
   // 'topic' added in CONTRACT_VERSION 4.0.0 (T-X7-1) — executes the dry run
   // already rehearsed in Contract_Evolution_Policy.md §4 for real: a
   // message queue/topic (Kafka topic, JMS queue, SQS queue, SNS topic) is a
@@ -248,6 +267,26 @@ export interface TypedRelationship {
   // override-applier.ts split as TypedUnit.status (see that field's own doc
   // comment). Additive OPTIONAL, no CONTRACT_VERSION bump.
   status?: FactStatus;
+  // T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review
+  // history") — additive OPTIONAL, tier (b) (Contract_Evolution_Policy.md
+  // §2), no CONTRACT_VERSION bump: unlike TypedUnit, a TypedRelationship
+  // previously had no identity of its own at the TypedFacts level at all —
+  // relationship-builder.ts's CALM `unique-id` was a positional `rel-${i}`
+  // counter (found while building this task, itself a real instance of the
+  // exact anti-pattern this field exists to close: run-scoped, not content-
+  // derived, so it silently changed on rerun even when the relationship set
+  // was unchanged). Computed once, by fact-identity.ts's assignFactIds
+  // (analysis/passes.ts's factIdentityPass, after every relationship
+  // producer including gradeRelationshipsPass), from this relationship's own
+  // semantic coordinates: kind (fact type) + from/to (endpoint identities,
+  // themselves stable TypedUnit.id values) + mechanism-or-source
+  // (discriminator — mechanism when a specialized detector set one,
+  // otherwise source, so e.g. a plain graphify reconcile edge and a
+  // multi-hop-bridge-detector edge between the same two units never collide
+  // even though kind/from/to alone would). relationship-builder.ts now
+  // reuses this id directly as the CALM `unique-id` instead of computing its
+  // own. Absent only for a typed-facts.json predating this field.
+  id?: string;
 }
 
 export interface IgnoredItem {

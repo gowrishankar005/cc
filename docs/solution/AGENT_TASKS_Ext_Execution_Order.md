@@ -37,7 +37,7 @@ Use this to pick the next session.
 |---|---|---|---|---|
 | — | `AGENT_TASKS_Ext_Fact_Semantics.md` | **B closed entirely, 2026-08-18** — `T-FS-6` (`FactStatus` + hard rule, see `Claim_Register.md`'s `T-FS-6-status-vocabulary` row) and `T-FS-4` (secondary-source introduction, `T-FS-4-secondary-source-introduction` row) both done | Nothing left in this file | **BR-40 closed**, unblocks BR-70 / NFR-20 / NFR-80 ranking / success #3 |
 | **2** | `AGENT_TASKS_Ext_Review_Throughput.md` | **T-RT-1** bulk residual authoring — **unblocked** (T-FS-1 done). **T-RT-2**/**T-RT-4** now also unblocked (T-FS-6 done) | **T-RT-3** anytime if evidence exists | **NFR-80**, CON-30 |
-| **3** | `AGENT_TASKS_Ext_Contract_Lifecycle.md` | **T-CL-5** emission-coverage. **T-CL-1 → 2 → 3 → 4** now unblocked (T-FS-6 done) | **T-CL-6** after T-CL-2 | **NFR-40** now; **BR-70** / **NFR-10** / **NFR-20** now unblocked |
+| **3** | `AGENT_TASKS_Ext_Contract_Lifecycle.md` | **T-CL-5** emission-coverage. **T-CL-1 done (2026-08-20)** — fact identity scheme (`Claim_Register.md`'s `T-CL-1-fact-identity` row). **T-CL-2 → 3 → 4** next | **T-CL-6** after T-CL-2 | **NFR-40** now; **BR-70** / **NFR-10** / **NFR-20** now unblocked |
 | **4** | `AGENT_TASKS_Ext_CodeQL_Engine.md` | Start the 7-item checklist; ship **DI first** | Do not also rebuild T-LR-4 in Graphify. GHAS before private-repo production | **BR-60**, unblocks **T-LR-4** / bean-factory |
 | — | `AGENT_TASKS_Ext_Lens_Modules.md` | **T-LM-5 done, 2026-08-18** — fitness declaration, `Claim_Register.md`'s Module fitness section | `T-LM-1/3/4` stay gated on a real feed / new extraction. Do not invent schemas | **BR-110 closed** |
 | **6** | `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | **T-MR-3** `deployed-in`, **T-MR-5** boundary overrides | **T-MR-1/2** after T-CL-2. **T-MR-4** after CodeQL or as a careful catalogue-only pass | BR-10 residual; **BR-20** later |
@@ -49,7 +49,7 @@ Use this to pick the next session.
 
 ## 3. Recommended next session (pick one)
 
-1. **T-CL-1 → 2 → 3 → 4** — now unblocked by T-FS-6; largest unlock left (BR-70/NFR-10/NFR-20).
+1. **T-CL-2 → 3 → 4** — T-CL-1 done (2026-08-20); largest unlock left (BR-70/NFR-10/NFR-20).
 2. **T-RT-1/T-RT-2** — review throughput, both now unblocked (T-FS-1 and T-FS-6 done).
 3. **T-CL-5** — small, no gate, NFR-40.
 4. **T-LR-5** — only if you are ready for the CodeQL shipping checklist (now more valuable: T-LR-4 is empirically blocked on it).
@@ -69,7 +69,7 @@ Do not open T-LM-6/7 or T-MR-1/2 before their gates.
 | BR-40 | **Built** — confidence + review-status vocab (T-FS-6, 2026-08-18) | — |
 | BR-50 | Security + **resilience** scored. Vuln/lineage/green still gated. Workflow/obs/pattern still unbuilt | Remaining Lenses |
 | BR-60 | Contradiction **done**. Secondary-source introduction **done**. CodeQL still not wired | CodeQL |
-| BR-70 / NFR-20 | Still unbuilt, now unblocked (T-FS-6 done) | T-CL-1…4 |
+| BR-70 / NFR-20 | Still unbuilt overall — **T-CL-1 (fact identity) done, 2026-08-20** | T-CL-2…4 |
 | BR-80 | Still OOS on core path | T-RT-4 after T-RT-1/2 |
 | BR-90 / 120 / 140 / 150 | Built | — |
 | BR-100 | Partial (no incremental diff) | T-CL-2 |

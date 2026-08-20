@@ -36,6 +36,20 @@ export function detectK8sTrustRelationships(
 ): { relationships: TypedRelationship[]; ignoredItems: IgnoredItem[] } {
   const relationships: TypedRelationship[] = [];
   const ignoredItems: IgnoredItem[] = [];
+  // T-CL-1 review fix — two deployments can legitimately share MORE THAN
+  // ONE Secret (e.g. a JWT signing secret and a DB credential, both mounted
+  // by the same issuer/verifier pair). Without this, each secret pushed its
+  // own `shares-secret` relationship, which is fine at the raw array level
+  // but collapses to a single fact both downstream: relationship-builder.ts's
+  // own B-duplicate-relationship-objects dedup already merges them at the
+  // final CALM shape (connects|from|to, no secret name in the key), and
+  // fact-identity.ts's TypedRelationship.id (kind|from|to|source) can't
+  // distinguish them either — no secret name is carried on the relationship
+  // at all. Same "one edge, not one per key" precedent
+  // env-soft-graph-detector.ts's own `seenPairs` already established for an
+  // analogous many-signals-one-fact shape; adopted here rather than letting
+  // two indistinguishable-downstream facts silently collide onto one id.
+  const seenPairs = new Set<string>();
 
   const secretGroups = new Map<string, DeploymentManifest[]>();
   for (const dep of deployments) {
@@ -72,6 +86,10 @@ export function detectK8sTrustRelationships(
         });
         continue;
       }
+      const pairKey = `${verifierUnit.id}->${issuerUnit.id}`;
+      if (seenPairs.has(pairKey)) continue; // multiple shared secrets between the same pair — one edge, not one per secret
+      seenPairs.add(pairKey);
+
       relationships.push({
         from: verifierUnit.id,
         to: issuerUnit.id,

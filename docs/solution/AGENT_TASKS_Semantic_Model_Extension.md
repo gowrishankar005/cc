@@ -34,8 +34,13 @@ session. **Lens Modules — T-LM-0, T-LM-2 done (2026-08-15, resilience lens: re
 timeout-config detection, gold+scorer built with it); T-LM-1 checked and deferred (no real
 SCA/vulnerability feed in this environment — cdxgen produces an SBOM, not vuln data);
 T-LM-3/4/5 not started.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
-records a deliberate research pause taken partway through. Lane files:
-`AGENT_TASKS_Ext_*.md`.
+records a deliberate research pause taken partway through. **Contract &
+Lifecycle: T-CL-1 (fact identity scheme) done, 2026-08-20** — see
+`AGENT_TASKS_Ext_Contract_Lifecycle.md` and `Claim_Register.md`'s
+`T-CL-1-fact-identity` row; T-CL-2 (incremental merge) next. This paragraph
+is otherwise last refreshed 2026-08-14 and does not reflect every task
+closed since (see `AGENT_TASKS_Ext_Execution_Order.md` for the current
+due-list, which is kept live). Lane files: `AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace
 (`codeintel/Architecture Model/docs/`), referenced by ID (`BR-*`, `NFR-*`,
 `CON-*`, `L*`, `A*`, `E*`).
@@ -194,7 +199,7 @@ pressure — this note is the correction.
 | `AGENT_TASKS_Ext_CodeQL_Engine.md` | After Session C; E1/E1b + 7-item checklist | Not Session C |
 | `AGENT_TASKS_Ext_Lens_Modules.md` | **none — fully independent. Session A = T-LM-1…4** | everything |
 | `AGENT_TASKS_Ext_Remaining_Lenses.md` | After Session A | — |
-| `AGENT_TASKS_Ext_Contract_Lifecycle.md` | T-CL-5 now; T-CL-1…4 after T-FS-6 | Lens Modules |
+| `AGENT_TASKS_Ext_Contract_Lifecycle.md` | T-CL-5 now; **T-CL-1 done (2026-08-20)**, T-CL-2…4 next | Lens Modules |
 | `AGENT_TASKS_Ext_Review_Throughput.md` | T-FS-1 | Layered Recovery |
 | `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-MR-3/5 now; T-MR-1/2 after T-CL-2 | Lens Modules |
 | `AGENT_TASKS_Ext_Execution_Order.md` | — | The due-list and wave order |
