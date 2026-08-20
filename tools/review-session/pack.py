@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from redact import redact  # noqa: E402
 from triage import build_residuals, apply_baseline  # noqa: E402
 from cards import build_all_cards  # noqa: E402
+from consequence import annotate_residuals  # noqa: E402
 
 SNIPPET_CONTEXT_LINES = 3  # +/- lines around a referenced line, bounded window per design §6
 
@@ -107,6 +108,13 @@ def main() -> int:
 
     unit_index = _build_unit_index(facts)
     (session_dir / "evidence" / "unit-index.json").write_text(json.dumps(unit_index, indent=2))
+
+    # T-RT-2: a real, computed consequence score per residual (PII-proxy /
+    # external-system-identity / trust-boundary-edge signals — see
+    # consequence.py's own module docstring for exactly what each proxies
+    # for and why), so queue_rank.py can rank the backlog highest-
+    # consequence-first without re-deriving these facts itself.
+    residuals = annotate_residuals(residuals, unit_index, facts.get("relationships", []))
 
     packs = _build_evidence_packs(residuals, unit_index, package_roots)
     (session_dir / "evidence" / "packs.json").write_text(json.dumps(packs, indent=2))

@@ -53,6 +53,18 @@
         "reconfirm": {
           "type": "boolean",
           "description": "(--baseline). True when a prior session's decision exists for this residual's unit, but THIS run's (trigger, class) differs from what the baseline recorded — the underlying source/facts likely changed shape since the decision was made. Never silently carried forward or silently overwritten; still gets a real, fresh choice card. Absent (not false) when no baseline was given or no prior decision matched."
+        },
+        "consequence": {
+          "type": "object",
+          "description": "T-RT-2 (BACKLOG.md 'Consequence-ranked queue'). Written by consequence.py's annotate_residuals(), read by queue_rank.py to sort the backlog highest-consequence-first. 'pii-proxy'/'external-system-identity'/'trust-boundary-edge' are named proxies for real, already-computed facts (TypedUnit.kind, TypedRelationship.kind) — see consequence.py's own module docstring for the exact mapping and its honest limits (this pipeline has no real PII/data-classification detector).",
+          "properties": {
+            "signals": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["pii-proxy", "external-system-identity", "trust-boundary-edge"] }
+            },
+            "score": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["signals", "score"]
         }
       }
     }
