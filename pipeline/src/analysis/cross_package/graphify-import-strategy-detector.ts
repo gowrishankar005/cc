@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
-import { TypedUnit, Evidence } from '../../types/typed-facts';
+import { TypedUnit, Evidence, PENDING_STATUS } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
 import { classExtendsBaseClass, classHasAnnotation } from '../../rules/class-ownership-resolver';
 import { isTestPath } from '../../rules/test-path';
@@ -240,6 +240,7 @@ export function detectUnitsByImportStrategy(
         filePath: resolved.relativeFilePath,
         startLine: classLine,
         endLine,
+        status: PENDING_STATUS,
         evidence: [
           {
             signal: matchedLibrary ?? config.unknownLibraryFallback,

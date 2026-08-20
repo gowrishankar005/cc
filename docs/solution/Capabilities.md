@@ -15,6 +15,7 @@ Single reference for what is **built**, **partial**, or **backlog**. For scope (
 | Capability | Status | Notes |
 |---|---|---|
 | Typed-facts contract (`contractVersion`) | Built | Versions the shape of the Scanner→Analysis contract, separate from catalogue-content versioning |
+| Fact identity scheme (T-CL-1) | Built | `TypedUnit.id` audited as already content-derived per-producer (never file:line, never a run-scoped counter); `TypedRelationship.id` added (`kind\|from\|to\|mechanism-or-source`), replacing a real run-scoped-counter bug in `relationship-builder.ts`'s old CALM `unique-id`. Foundational for incremental merge (T-CL-2, not yet built) and review history (T-CL-3, not yet built) — see `Claim_Register.md`'s `T-CL-1-fact-identity` row |
 | Module registry + `--modules` flag | Built | Modules declare a supported contract major version; an incompatible module is skipped, a throwing module doesn't stop the others |
 | CALM generator module | Built | Builders (node/interface/relationship/control/metadata) + override-applier |
 | Second module (threat-signals) | Built | Proves the module boundary holds using only the typed-facts contract |

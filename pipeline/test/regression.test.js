@@ -1537,6 +1537,30 @@ test(
   }
 );
 
+test('T-CL-1 review fix — two deployments sharing TWO secrets (e.g. a JWT signing secret and a DB credential) must collapse to ONE shares-secret relationship, not one per secret', () => {
+  const { detectK8sTrustRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/k8s-trust-detector'));
+
+  const verifierUnit = { id: 'verifier.py', kind: 'service', name: 'verifier.py', filePath: 'verifier.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+  const issuerUnit = { id: 'issuer.py', kind: 'service', name: 'issuer.py', filePath: 'issuer.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 };
+
+  const deployments = [
+    { name: 'issuer', namespace: 'default', configMapNames: [], secretMounts: [
+      { secretName: 'jwt-key', itemKeys: ['jwtRS256.key'] },
+      { secretName: 'db-cred', itemKeys: ['db.key'] }, // second, distinct secret, same issuer/verifier direction convention as jwt-key
+    ], sourceFile: 'issuer.yaml' },
+    { name: 'verifier', namespace: 'default', configMapNames: [], secretMounts: [
+      { secretName: 'jwt-key', itemKeys: ['jwtRS256.key.pub'] },
+      { secretName: 'db-cred', itemKeys: ['db.key.pub'] },
+    ], sourceFile: 'verifier.yaml' },
+  ];
+
+  const { relationships } = detectK8sTrustRelationships(deployments, [verifierUnit, issuerUnit]);
+
+  assert.equal(relationships.length, 1, 'two shared secrets between the same real pair must produce exactly one relationship — before this fix, each secret pushed its own indistinguishable-downstream fact, which fact-identity.ts\'s TypedRelationship.id (kind|from|to|source, no secret name) would then silently collide onto one id anyway');
+  assert.equal(relationships[0].from, 'verifier.py');
+  assert.equal(relationships[0].to, 'issuer.py');
+});
+
 test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP/persistence/messaging/control evidence) must NOT become CALM nodes: lab lib-fintech-common produces ZERO nodes, calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/lib-fintech-common');
   fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
@@ -3695,7 +3719,7 @@ test('B-duplicate-relationship-objects — two raw edges of different kinds betw
   const result = buildRelationships(relationships, nodes, mapping);
 
   assert.equal(result.length, 1, 'two raw edges of different kinds between the same real pair must collapse to exactly one CalmRelationship');
-  assert.equal(result[0]['unique-id'], 'rel-0', 'first-encountered id must survive the merge, deterministically');
+  assert.equal(result[0]['unique-id'], 'imports|ChargesApiResource.java|ChargeReadPlatformServiceImpl.java|graphify', 'T-CL-1: first-encountered id must survive the merge, deterministically — content-derived from kind|from|to|discriminator, never a positional rel-N counter (the fixed anti-pattern)');
   assert.deepEqual(relMetadata(result[0], 'x-aac-provenance'), ['graphify', 'r2-phase1'], 'distinct provenance values must be merged into an array, never silently dropped');
   assert.match(result[0].description, /imports\+calls/, 'description must name both distinct raw kinds, not just the first');
 });
@@ -4078,6 +4102,31 @@ test('T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assignStatuses derives 
   assert.equal(relationships[2].status, 'requires-review', 'admitted-unresolved mechanism -> requires-review');
   assert.equal(relationships[3].status, 'externally-verified', 'k8s-sourced shares-secret -> externally-verified');
   assert.equal(relationships[4].status, 'requires-review', 'touches a contradicted unit -> requires-review even with no confidence field');
+});
+
+test('T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review history") — computeRelationshipId/assignFactIds: content-derived from kind+endpoints+discriminator, never a run-scoped counter, stable across repeated calls', () => {
+  const { computeRelationshipId, assignFactIds } = require(path.join(PIPELINE_ROOT, 'dist/analysis/fact-identity'));
+
+  const plainEdge = { from: 'A.java', to: 'B.java', kind: 'calls', crossPackage: false, source: 'graphify' };
+  const bridgeEdge = { from: 'A.java', to: 'B.java', kind: 'calls', crossPackage: false, source: 'graphify', mechanism: 'r2b' };
+
+  // Same endpoints, same raw kind, but a real specialized mechanism — must
+  // NOT collide with the plain reconciler edge between the same two units;
+  // mechanism is the discriminator, falling back to source when unset.
+  assert.equal(computeRelationshipId(plainEdge), 'calls|A.java|B.java|graphify');
+  assert.equal(computeRelationshipId(bridgeEdge), 'calls|A.java|B.java|r2b');
+  assert.notEqual(computeRelationshipId(plainEdge), computeRelationshipId(bridgeEdge));
+
+  // Stable: computing twice from the same inputs (simulating two separate
+  // runs over unchanged facts) must produce the identical id — this is the
+  // property a positional `rel-${i}` counter cannot hold once producer
+  // ordering or count varies between runs.
+  assert.equal(computeRelationshipId(plainEdge), computeRelationshipId({ ...plainEdge }));
+
+  const relationships = [plainEdge, bridgeEdge];
+  assignFactIds(relationships);
+  assert.equal(relationships[0].id, 'calls|A.java|B.java|graphify');
+  assert.equal(relationships[1].id, 'calls|A.java|B.java|r2b');
 });
 
 test('T-FS-6 real-repo wiring: stereotype-disambiguation-sample end to end through run-slice.js and CALM x-aac-status metadata', () => {
@@ -4487,4 +4536,132 @@ test('T-LR-6 — "CodeQL is never automatically primary" is a structural asserti
     () => trustMatrix.assertCodeqlNeverPrimary(soleProducerCase),
     'codeql confidence (10) exceeds the OTHER fact type\'s max (6), but they are different fact types — must not be compared against each other'
   );
+});
+
+test('T-CL-2 (incremental merge) — new/unaffected/disappeared classification, and a "reviewed" fact with unchanged evidence carries its status forward untouched', () => {
+  const { mergeIncrementalFacts } = require(path.join(PIPELINE_ROOT, 'dist/analysis/incremental-merge'));
+
+  const evidence = [{ signal: 'Get', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:1' }];
+  const priorUnit = { id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1, evidence, confidence: 60, status: 'reviewed' };
+  const staleUnit = { id: 'u-gone', kind: 'service', name: 'gone', filePath: 'gone.ts', startLine: 1, endLine: 1, evidence, confidence: 60, status: 'observed' };
+  const prior = { contractVersion: '13.0.0', runVersion: 'v', generatedAt: 't0', packageRoots: [], units: [priorUnit, staleUnit], relationships: [], ignoredItems: [] };
+
+  // Fresh run: u1 reappears with IDENTICAL evidence (same signal/source/category/ref)
+  // but a fresh, non-'reviewed' status a plain assignStatuses recompute would
+  // have produced; u-gone doesn't reappear at all; u2 is genuinely new.
+  const freshU1 = { id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1, evidence: [{ ...evidence[0] }], confidence: 60, status: 'observed' };
+  const freshU2 = { id: 'u2', kind: 'service', name: 'u2', filePath: 'y.ts', startLine: 1, endLine: 1, evidence, confidence: 60, status: 'observed' };
+
+  const { report, history } = mergeIncrementalFacts(prior, 't1', [freshU1, freshU2], []);
+
+  assert.equal(freshU1.status, 'reviewed', 'unaffected reviewed fact must never be silently overwritten by a fresh recompute');
+  assert.equal(freshU2.status, 'observed');
+  assert.deepEqual(report.units, { new: 1, disappeared: 1, unaffected: 1, flaggedForReReview: 0 });
+
+  const disappearedEntry = history.find((h) => h.id === 'u-gone');
+  assert.ok(disappearedEntry, 'a fact absent from this run must be recorded in history, not silently dropped');
+  assert.equal(disappearedEntry.to, 'disappeared');
+  const newEntry = history.find((h) => h.id === 'u2');
+  assert.equal(newEntry.from, 'new');
+});
+
+test('T-CL-2 — a "reviewed" fact whose evidence CHANGED is flagged requires-review, never silently promoted to the fresh recompute', () => {
+  const { mergeIncrementalFacts } = require(path.join(PIPELINE_ROOT, 'dist/analysis/incremental-merge'));
+
+  const priorUnit = {
+    id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1,
+    evidence: [{ signal: 'Get', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:1' }],
+    confidence: 60, status: 'reviewed',
+  };
+  const prior = { contractVersion: '13.0.0', runVersion: 'v', generatedAt: 't0', packageRoots: [], units: [priorUnit], relationships: [], ignoredItems: [] };
+
+  // Same id, but a real new evidence entry (a second route) — a genuine
+  // change to what this fact claims after a human already reviewed it.
+  const freshUnit = {
+    id: 'u1', kind: 'service', name: 'u1', filePath: 'x.ts', startLine: 1, endLine: 1,
+    evidence: [
+      { signal: 'Get', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:1' },
+      { signal: 'Delete', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x.ts:20' },
+    ],
+    confidence: 80, status: 'observed',
+  };
+
+  const { report, history } = mergeIncrementalFacts(prior, 't1', [freshUnit], []);
+
+  assert.equal(freshUnit.status, 'requires-review', 'contradicting/changed evidence must flag for re-review, not silently keep reviewed nor silently adopt the fresh status');
+  assert.equal(report.units.flaggedForReReview, 1);
+  assert.equal(report.units.unaffected, 0);
+  const entry = history.find((h) => h.id === 'u1');
+  assert.equal(entry.from, 'reviewed');
+  assert.equal(entry.to, 'requires-review');
+});
+
+test('T-CL-3 (review history) — appendFactHistory grows a persistent, retrievable log across runs; never overwrites prior entries', () => {
+  const { appendFactHistory, readFactHistory } = require(path.join(PIPELINE_ROOT, 'dist/analysis/fact-history'));
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-history-test-'));
+
+  assert.deepEqual(readFactHistory(outDir), [], 'no fact-history.json yet — must read back as empty, not throw');
+
+  appendFactHistory(outDir, [{ id: 'u1', factType: 'unit', at: 't1', from: 'new', to: 'observed', reason: 'introduced by this run' }]);
+  appendFactHistory(outDir, [{ id: 'u1', factType: 'unit', at: 't2', from: 'observed', to: 'reviewed', reason: 'human confirmed' }]);
+
+  const history = readFactHistory(outDir);
+  assert.equal(history.length, 2, 'second append must ADD to the log, not replace it');
+  assert.equal(history[0].at, 't1');
+  assert.equal(history[1].at, 't2');
+});
+
+test('T-CL-6 (determinism) — same input scanned twice into the same --out directory produces semantically identical units/relationships/status, generatedAt excluded, evidence order-independent', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-determinism-test-'));
+  const nestjsRoot = path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample');
+
+  function factsSemanticSnapshot() {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const evidenceKey = (e) => `${e.category}|${e.source}|${e.signal}|${e.ref}`;
+    const units = facts.units
+      .map((u) => ({ id: u.id, kind: u.kind, status: u.status, confidence: u.confidence, evidence: [...u.evidence.map(evidenceKey)].sort() }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const relationships = facts.relationships
+      .map((r) => ({ id: r.id, kind: r.kind, from: r.from, to: r.to, source: r.source, status: r.status }))
+      .sort((a, b) => (a.id ?? '').localeCompare(b.id ?? ''));
+    return { units, relationships };
+  }
+
+  execFileSync('node', [RUN_SLICE, nestjsRoot, '--out', outDir], { stdio: 'pipe' });
+  const first = factsSemanticSnapshot();
+
+  execFileSync('node', [RUN_SLICE, nestjsRoot, '--out', outDir], { stdio: 'pipe' });
+  const second = factsSemanticSnapshot();
+
+  assert.deepEqual(second, first, 'a rerun of the identical input must be semantically identical (facts + status), independent of generatedAt and evidence array ordering');
+
+  // T-CL-2 is what makes this a real property, not a coincidence: nothing
+  // should have appeared, disappeared, or been re-flagged between two
+  // identical runs.
+  const mergeReport = JSON.parse(fs.readFileSync(path.join(outDir, 'merge-report.json'), 'utf8'));
+  assert.deepEqual(mergeReport.units, { new: 0, disappeared: 0, unaffected: mergeReport.units.unaffected, flaggedForReReview: 0 });
+  assert.ok(mergeReport.units.unaffected > 0, 'second identical run must classify every unit as unaffected');
+});
+
+test('T-CL-4 (contract bump, Contract_Evolution_Policy.md §2(c)) — CONTRACT_VERSION 14.0.0: every unit/relationship a real run produces carries a REAL (non-placeholder) status/id, and --from-facts refuses a stale-major-version input', () => {
+  const { CONTRACT_VERSION, PENDING_STATUS, PENDING_RELATIONSHIP_ID } = require(path.join(PIPELINE_ROOT, 'dist/types/typed-facts'));
+  assert.equal(CONTRACT_VERSION, '14.0.0');
+
+  const { calm, outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample')]);
+  assert.ok(calm.nodes.length > 0);
+  const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+  assert.equal(facts.contractVersion, CONTRACT_VERSION);
+  for (const unit of facts.units) {
+    assert.ok(unit.status, `unit "${unit.id}" must carry a real status — TypedUnit.status is required as of CONTRACT_VERSION 14.0.0`);
+  }
+  for (const rel of facts.relationships) {
+    assert.ok(rel.id && rel.id !== PENDING_RELATIONSHIP_ID, `relationship must carry a real, content-derived id, never the construction-time placeholder ("${PENDING_RELATIONSHIP_ID}") — factIdentityPass must overwrite it for every relationship`);
+    assert.ok(rel.status, `relationship must carry a real status — TypedRelationship.status is required as of CONTRACT_VERSION 14.0.0 (construction-time placeholder is "${PENDING_STATUS}", also overwritten unconditionally)`);
+  }
+
+  // --from-facts must refuse an input whose major contractVersion predates this bump.
+  const staleFacts = { ...facts, contractVersion: '13.0.0' };
+  const staleFactsPath = path.join(outDir, 'stale-typed-facts.json');
+  fs.writeFileSync(staleFactsPath, JSON.stringify(staleFacts));
+  assert.throws(() => execFileSync('node', [RUN_SLICE, '--from-facts', staleFactsPath, '--out', fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-stale-'))], { stdio: 'pipe' }));
 });

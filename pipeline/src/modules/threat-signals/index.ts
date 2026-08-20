@@ -61,6 +61,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '13', // bumped for CONTRACT_VERSION 13.0.0 (T-LR-5) — new 'codeql-di'/'codeql' source values, this pass filters on 'http-entry-point'/'security-control' category only — reviewed, not just bumped
+  supportedMajorVersion: '14', // bumped for CONTRACT_VERSION 14.0.0 (T-CL-4) — TypedUnit.status/TypedRelationship.status/.id promoted required; this module never reads TypedUnit.status/TypedRelationship.id/.status at all, filters on Evidence.category only — reviewed, unaffected
   run,
 };

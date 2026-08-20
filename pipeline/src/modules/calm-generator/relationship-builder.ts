@@ -1,6 +1,7 @@
 import { TypedRelationship, TypedUnit } from '../../types/typed-facts';
 import { CalmNode, CalmRelationship, CalmRelationshipTypeShape } from '../../types/calm';
 import { RelationshipTypeMapping, findRelationshipTypeMapping } from '../../rules/construct-mapping-schema';
+import { computeRelationshipId } from '../../analysis/fact-identity';
 
 /**
  * B-duplicate-relationship-objects — identifies a relationship by its FINAL
@@ -114,7 +115,7 @@ export function buildRelationships(
 
   const built = relationships
     .filter((r) => nodeIds.has(r.from) && nodeIds.has(r.to))
-    .map((rel, i) => {
+    .map((rel) => {
       const sourceType = nodeTypeById.get(rel.from)!;
       const targetType = nodeTypeById.get(rel.to)!;
       const rule = findRelationshipTypeMapping(mapping, rel.kind, sourceType, targetType);
@@ -139,7 +140,14 @@ export function buildRelationships(
       }
 
       const calmRel: CalmRelationship = {
-        'unique-id': `rel-${i}`,
+        // T-CL-1 — content-derived from the relationship's own semantic
+        // coordinates (analysis/fact-identity.ts), not a positional index:
+        // the old `rel-${i}` counter changed on rerun even when the
+        // relationship set itself was unchanged, the exact "never a
+        // run-scoped counter" anti-pattern this task exists to close.
+        // Falls back to computing it fresh only for a typed-facts.json
+        // predating rel.id (e.g. an older --from-facts input).
+        'unique-id': rel.id ?? computeRelationshipId(rel),
         description: `${rel.kind} relationship (${rel.crossPackage ? 'cross-package' : 'same-package'}, source: ${rel.source})`,
         'relationship-type': relationshipType,
         metadata: [

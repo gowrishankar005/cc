@@ -1,5 +1,5 @@
 import { DeploymentManifest, ConfigMapKeys } from '../../scanner/k8s-manifest-provider';
-import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-facts';
+import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { EnvRelationshipAllowlist, allowlistedBasename } from '../../rules/env-relationship-schema';
 import { findUnitForDeployment } from './deployment-correlation';
 
@@ -91,6 +91,8 @@ export function detectEnvSoftGraphRelationships(
           crossPackage: referencerUnit.filePath !== targetUnit.filePath,
           source: 'k8s',
           confidence: 20, // low, fixed — a name-correlation guess, never promoted (T-X9-1's own explicit instruction)
+          status: PENDING_STATUS,
+          id: PENDING_RELATIONSHIP_ID,
         });
       }
     }

@@ -179,7 +179,8 @@ table exists to prevent.
 
 | Mechanism | Runs by default? | How to reach it |
 |---|---|---|
-| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
+| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, relationship fact-identity assignment (`TypedRelationship.id`, T-CL-1), status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
+| Incremental merge against the prior run's `typed-facts.json` in the same `--out` directory (T-CL-2) — unaffected facts (including a human-`reviewed` status) carry forward unchanged; a fact whose evidence changed after being `reviewed` is flagged `requires-review`, never silently overwritten either way. Writes `merge-report.json` and appends to `fact-history.json` (T-CL-3, retrievable who/when/why a status changed) | **Always** | No flag — a no-op (nothing to merge) the first time a given `--out` directory is used |
 | OpenAPI/Swagger ingestion | **Always** | No flag — auto-discovers `openapi.yaml`/`.json` at each package root |
 | Spring config file reading (`application.yml`/`.properties`) | **Always** | No flag — auto-discovers config files at each package root |
 | Dependency-manifest (SBOM) corroboration + secondary-source introduction | **Always** | No flag — auto-detects `@cyclonedx/cdxgen` on `PATH` and a committed lockfile; a no-op (not an error) when either is absent |
@@ -201,7 +202,7 @@ anyone deciding what the product can do.
 
 | Flag | Takes a value | Default | What it does |
 |---|---|---|---|
-| `--out <dir>` | Yes | `./calm-output` | Output directory for `typed-facts.json`, `architecture.calm.json`, and module outputs |
+| `--out <dir>` | Yes | `./calm-output` | Output directory for `typed-facts.json`, `architecture.calm.json`, module outputs, `merge-report.json` and `fact-history.json` (T-CL-2/T-CL-3). Rerunning against the same directory incrementally merges against its prior `typed-facts.json` rather than starting from a blank slate |
 | `--overrides <dir>` | Yes | — (off) | Apply Decision Record/Override pairs from this directory as a final pass after deterministic CALM construction |
 | `--modules <name>,<name>,...` | Yes | `calm-generator,threat-signals,resilience-lens` | Which modules to run — see `docs/solution/Module_Authoring_Guide.md` |
 | `--strict-detect` | No | off | Exit non-zero when routes were expected (grep-verified usage) but zero were found — turns a silent CodeGraph detect-gate failure into a loud one |

@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { AnalysisContext, AnalysisPass } from './pass-registry';
 import { runCodeQLDiResolution, CodeQLDiBinding } from '../scanner/codeql-di-provider';
-import { TypedUnit } from '../types/typed-facts';
+import { TypedUnit, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../types/typed-facts';
 import { relationshipTrust, unitIntroductionTrust } from './fact-trust-matrix';
 
 /**
@@ -103,6 +103,7 @@ export const codeqlDiPass: AnalysisPass = {
           filePath: implLoc.relativeFilePath,
           startLine: 1,
           endLine: 1,
+          status: PENDING_STATUS,
           evidence: [
             {
               signal: `codeql-di:${binding.mechanism}`,
@@ -136,6 +137,8 @@ export const codeqlDiPass: AnalysisPass = {
         source: 'codeql',
         confidence: relationshipTrust('codeql', mechanism, crossRoot ? 'cross-root' : 'same-root'),
         mechanism,
+        status: PENDING_STATUS,
+        id: PENDING_RELATIONSHIP_ID,
       });
       relationshipCount++;
     }

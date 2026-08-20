@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { GraphifyRun, GraphifyEdge, parseSourceLocation } from '../../scanner/graphify-provider';
-import { TypedUnit, TypedRelationship } from '../../types/typed-facts';
+import { TypedUnit, TypedRelationship, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { findJavaImportForBareName, getJavaPackageDeclaration } from '../../rules/java-import-resolver';
 import { relationshipTrust } from '../fact-trust-matrix';
 
@@ -209,6 +209,7 @@ function buildPlaceholderMatch(
     filePath: resolved.relativeFilePath,
     startLine: line,
     endLine: line,
+    status: PENDING_STATUS,
     evidence: [],
     confidence: ADMITTED_SAME_ROOT_CONFIDENCE,
   };
@@ -303,6 +304,8 @@ export function reconcileCrossPackageEdges(
       kind: edge.relation === 'imports' ? 'imports' : edge.relation === 'calls' ? 'calls' : 'connects',
       crossPackage,
       source: 'graphify',
+      status: PENDING_STATUS,
+      id: PENDING_RELATIONSHIP_ID,
       ...(admitted
         ? { confidence: crossPackage ? ADMITTED_CROSS_ROOT_CONFIDENCE : ADMITTED_SAME_ROOT_CONFIDENCE, mechanism: 'admitted-unresolved' as const }
         : {}),

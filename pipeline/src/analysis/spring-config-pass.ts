@@ -1,7 +1,7 @@
 import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { CONFIDENCE_FLOOR } from './passes';
 import { discoverSpringConfigFiles, SpringConfigFile } from '../scanner/spring-config-provider';
-import { Evidence, TypedUnit } from '../types/typed-facts';
+import { Evidence, TypedUnit, PENDING_STATUS } from '../types/typed-facts';
 import { scoreConfidence } from './confidence-scorer';
 import { jdbcScheme } from './jdbc-url';
 
@@ -51,6 +51,7 @@ function buildUnit(file: SpringConfigFile, suffix: string, kind: TypedUnit['kind
     filePath: file.filePath,
     startLine: 1,
     endLine: 1, // no line numbers available from a parsed YAML/JSON/properties document — same honest limitation openapi-pass.ts already carries
+    status: PENDING_STATUS,
     evidence,
     confidence: scoreConfidence(evidence),
   };
