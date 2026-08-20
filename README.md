@@ -15,6 +15,11 @@
 | **Solution design** | [`docs/solution/Architecture_as_Code_Solution_Design_v2.md`](./docs/solution/Architecture_as_Code_Solution_Design_v2.md) |
 | **Evaluation harness** | [`coe-lab/`](./coe-lab/) |
 
+**New here?**
+- Want to **run Weaver against a repo**? Jump to [Quick start](#quick-start) — there's a 2-minute walkthrough using a checked-in fixture, no real target repo needed to try it.
+- Want to **add support for a new framework/library**, or extend a detection catalogue? Start at [`docs/solution/Catalogue_Intake.md`](./docs/solution/Catalogue_Intake.md), not by reading source first — it names the four proven extraction mechanisms and what evidence a new catalogue row needs.
+- Want to **build/test Weaver's own code**? [`CLAUDE.md`](./CLAUDE.md) has the real build/test commands and this repo's working principles — despite the name, it's the practical reference for any contributor, human or AI.
+
 ---
 
 ## What this project is (and is not)
@@ -143,23 +148,55 @@ tools/                    ← standalone tooling
 
 ## Quick start
 
+**A "package root"**, used throughout this doc and the CLI, is any directory whose own source forms one coherent unit to scan — a Maven/Gradle module, an npm package, a Python package, or just a service's own subdirectory in a monorepo. It does **not** need to be a whole repository; a multi-module monorepo is usually scanned as several package roots passed to the same `run-slice` invocation (see "Multi-root" below), not one call per module.
+
 ### Prerequisites
 
 - Node.js 20+
-- Python with `graphifyy` on `PATH` (`pip install graphifyy`)
+- **Optional but recommended:** the [Graphify](https://pypi.org/project/graphifyy/) CLI on `PATH`, for cross-package relationship detection — `pip install graphifyy` installs a command named **`graphify`** (no double-y; only the PyPI package name has one). **Missing it does not fail a run** — Weaver catches the failure, logs a warning, and continues with same-file detection only (no cross-package edges). Confirm it's really on `PATH` with `graphify --version`, not `graphifyy --version`.
 
-### Build, test, run
+### Try it now (2 minutes, no target repo needed)
+
+Every checked-in fixture under `pipeline/test/fixtures/` is a real, runnable package root — a safe way to see real output before pointing Weaver at your own code.
 
 ```bash
 cd pipeline
 npm install
 npm run build
-npm test
+
+node dist/orchestration/run-slice.js test/fixtures/nestjs-sample --out /tmp/weaver-demo
+```
+
+Real output from this exact command:
+
+```text
+[engine-capability-matrix] v0.2.0: 8 route(s), 4 proven, 2 with a Phase 2 augment engine (none fired yet), cross-package backbone: graphify
+[run-slice] .../test/fixtures/nestjs-sample: 3 native route(s), 4 decorator fact(s), 1 unit(s)
+[run-slice] graphify: 0 relationship(s) reconciled (0 cross-package, 0 same-package)
+[platform-artefacts] coverage: 1 root(s), graphify ok; unmapped: 0 signal cluster(s), 0 occurrence(s)
+[run-slice] incremental merge: units 1 new / 0 disappeared / 0 unaffected / 0 flagged for re-review; relationships 0 new / 0 disappeared / 0 unaffected / 0 flagged for re-review
+[write-artefacts] emission coverage: 100.0% (0 gap(s) — see modules/calm-generator/emission-coverage-report.json)
+[threat-signals] 1 unit(s) flagged: http-entry-point evidence with no security-control evidence
+[run-slice] wrote artefacts to /tmp/weaver-demo
+```
+
+`/tmp/weaver-demo/architecture.calm.json` now has a real `service` node for the one NestJS controller in that fixture, with its three routes as `path-interface` entries and `x-aac-confidence`/`x-aac-provenance` metadata pointing at the exact source lines that produced it. If `graphify` isn't on `PATH`, the same command still works — the `graphify:`/`coverage:` lines above just read `graphify failed`/`WARNING: graphify pass failed, continuing without cross-package relationships` instead, and cross-package relationships are skipped, same-file detection is unaffected.
+
+```bash
+# Schema-validate what you just generated
+npm run validate -- /tmp/weaver-demo/architecture.calm.json -f pretty
+```
+
+### Build, test, run against your own code
+
+```bash
+cd pipeline
+npm test   # runs the real regression suite (builds first)
 
 # Scan one or more package roots → CALM + facts
 node dist/orchestration/run-slice.js /path/to/package --out /path/to/out
 
-# Multi-root example
+# Multi-root example — a real monorepo scan, not one call per module
 node dist/orchestration/run-slice.js rootA rootB --out /path/to/out
 
 # Optional: Kubernetes-manifest / env-correlation signals
