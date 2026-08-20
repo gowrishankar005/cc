@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { AnalysisContext, AnalysisPass } from './pass-registry';
 import { runCodeQLDiResolution, CodeQLDiBinding } from '../scanner/codeql-di-provider';
-import { TypedUnit } from '../types/typed-facts';
+import { TypedUnit, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../types/typed-facts';
 
 /**
  * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — turns CodeQL's real DI-binding
@@ -103,6 +103,7 @@ export const codeqlDiPass: AnalysisPass = {
           filePath: implLoc.relativeFilePath,
           startLine: 1,
           endLine: 1,
+          status: PENDING_STATUS,
           evidence: [
             {
               signal: `codeql-di:${binding.mechanism}`,
@@ -135,6 +136,8 @@ export const codeqlDiPass: AnalysisPass = {
         source: 'codeql',
         confidence: crossRoot ? CODEQL_DI_CROSS_ROOT_CONFIDENCE : CODEQL_DI_SAME_ROOT_CONFIDENCE,
         mechanism: binding.mechanism === 'bean-factory' ? 'codeql-di-bean-factory' : 'codeql-di-stereotype',
+        status: PENDING_STATUS,
+        id: PENDING_RELATIONSHIP_ID,
       });
       relationshipCount++;
     }

@@ -1,5 +1,5 @@
 import { DeploymentManifest } from '../../scanner/k8s-manifest-provider';
-import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-facts';
+import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { findUnitForDeployment } from './deployment-correlation';
 
 /**
@@ -96,6 +96,8 @@ export function detectK8sTrustRelationships(
         kind: 'shares-secret',
         crossPackage: verifierUnit.filePath !== issuerUnit.filePath, // best-effort; real cross-package-ness is a Graphify-reconciler concept this doesn't have access to
         source: 'k8s',
+        status: PENDING_STATUS,
+        id: PENDING_RELATIONSHIP_ID,
       });
     }
   }

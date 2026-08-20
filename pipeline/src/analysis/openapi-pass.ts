@@ -2,7 +2,7 @@ import { AnalysisContext, AnalysisPass, pushAll } from './pass-registry';
 import { CONFIDENCE_FLOOR } from './passes';
 import { discoverOpenApiDocuments, OpenApiSecurityScheme } from '../scanner/openapi-provider';
 import { ignoreLowConfidence } from './ignored-items';
-import { Evidence, TypedUnit } from '../types/typed-facts';
+import { Evidence, TypedUnit, PENDING_STATUS } from '../types/typed-facts';
 import { scoreConfidence } from './confidence-scorer';
 
 const ROUTE_WEIGHT = 40; // matches nativeRouteWeight's convention in signal-mapper.ts — a structured OpenAPI operation is as decisive as a native-typed route
@@ -124,6 +124,7 @@ export const openApiPass: AnalysisPass = {
           filePath: doc.filePath,
           startLine: 1,
           endLine: 1, // no line numbers available from a parsed YAML/JSON document — honest limitation, not a guess
+          status: PENDING_STATUS,
           evidence,
           confidence,
         };

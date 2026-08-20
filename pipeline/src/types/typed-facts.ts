@@ -134,6 +134,27 @@ export interface Evidence {
  */
 export type FactStatus = 'observed' | 'inferred' | 'requires-review' | 'reviewed' | 'externally-verified';
 
+/**
+ * CONTRACT_VERSION 14.0.0 (T-CL-4) — construction-time placeholder for
+ * TypedUnit.status/TypedRelationship.status, now a REQUIRED field. Every
+ * unit/relationship a real run produces gets its REAL status from
+ * status-assignment.ts's assignStatusPass, unconditionally, as the true
+ * last DEFAULT_PASSES entry (see TypedUnit.status's own doc comment) —
+ * nothing reads a unit's/relationship's status before that pass overwrites
+ * this placeholder, so its specific value here is never observable.
+ */
+export const PENDING_STATUS: FactStatus = 'inferred';
+
+/**
+ * CONTRACT_VERSION 14.0.0 (T-CL-4) — construction-time placeholder for
+ * TypedRelationship.id, now a REQUIRED field. fact-identity.ts's
+ * assignFactIds (analysis/passes.ts's factIdentityPass) unconditionally
+ * overwrites every relationship's id from its own semantic coordinates, as
+ * the true last relationship-producing DEFAULT_PASSES entry — nothing reads
+ * a relationship's id before that pass overwrites this placeholder.
+ */
+export const PENDING_RELATIONSHIP_ID = '';
+
 export interface TypedUnit {
   // T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review
   // history") — every existing producer already derives this from semantic
@@ -166,15 +187,20 @@ export interface TypedUnit {
   endLine: number;
   evidence: Evidence[];
   confidence: number; // 0-100, weighted confidence bands
-  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no
-  // CONTRACT_VERSION bump — not one of §1's tracked closed unions). Set by
-  // status-assignment.ts (the true last Analysis pass) from this unit's own
-  // already-computed kind/confidence/evidence — no new extraction. Bumped
-  // to 'reviewed' only by override-applier.ts, strictly after Analysis, on
-  // the CALM element this unit produced — Analysis itself never writes
-  // 'reviewed', preserving the "Analysis concludes, Override corrects"
-  // separation the Decision Record mechanism depends on.
-  status?: FactStatus;
+  // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4, Contract_Evolution_Policy.md
+  // §2(c) — promoting an existing optional field to required is a real
+  // shape guarantee, not cosmetic). Previously `status?:` (T-FS-6,
+  // additive-optional, tier (b)) — promoted once `assignStatusPass`
+  // (status-assignment.ts) was confirmed the unconditional true-last
+  // DEFAULT_PASSES entry (analysis/passes.ts), so every unit a real run
+  // produces always carries one; a module can now rely on `status` being
+  // present instead of checking for absence. Set by status-assignment.ts
+  // from this unit's own already-computed kind/confidence/evidence — no new
+  // extraction. Bumped to 'reviewed' only by override-applier.ts, strictly
+  // after Analysis, on the CALM element this unit produced — Analysis
+  // itself never writes 'reviewed', preserving the "Analysis concludes,
+  // Override corrects" separation the Decision Record mechanism depends on.
+  status: FactStatus;
 }
 
 export interface TypedRelationship {
@@ -263,30 +289,26 @@ export interface TypedRelationship {
   // codeql-di-pass.ts never overrides an edge an earlier mechanism already
   // produced for the same pair).
   mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved' | 'codeql-di-bean-factory' | 'codeql-di-stereotype';
-  // T-FS-6 — same FactStatus vocabulary and same status-assignment.ts /
-  // override-applier.ts split as TypedUnit.status (see that field's own doc
-  // comment). Additive OPTIONAL, no CONTRACT_VERSION bump.
-  status?: FactStatus;
-  // T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review
-  // history") — additive OPTIONAL, tier (b) (Contract_Evolution_Policy.md
-  // §2), no CONTRACT_VERSION bump: unlike TypedUnit, a TypedRelationship
-  // previously had no identity of its own at the TypedFacts level at all —
-  // relationship-builder.ts's CALM `unique-id` was a positional `rel-${i}`
-  // counter (found while building this task, itself a real instance of the
-  // exact anti-pattern this field exists to close: run-scoped, not content-
-  // derived, so it silently changed on rerun even when the relationship set
-  // was unchanged). Computed once, by fact-identity.ts's assignFactIds
-  // (analysis/passes.ts's factIdentityPass, after every relationship
-  // producer including gradeRelationshipsPass), from this relationship's own
-  // semantic coordinates: kind (fact type) + from/to (endpoint identities,
-  // themselves stable TypedUnit.id values) + mechanism-or-source
-  // (discriminator — mechanism when a specialized detector set one,
-  // otherwise source, so e.g. a plain graphify reconcile edge and a
-  // multi-hop-bridge-detector edge between the same two units never collide
-  // even though kind/from/to alone would). relationship-builder.ts now
-  // reuses this id directly as the CALM `unique-id` instead of computing its
-  // own. Absent only for a typed-facts.json predating this field.
-  id?: string;
+  // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4) — same promotion
+  // reasoning as TypedUnit.status above: previously `status?:` (T-FS-6,
+  // tier (b)), promoted once `assignStatusPass` was confirmed unconditional
+  // in DEFAULT_PASSES for every relationship a real run produces. Same
+  // status-assignment.ts / override-applier.ts split as TypedUnit.status.
+  status: FactStatus;
+  // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4) — previously `id?:`
+  // (T-CL-1, tier (b)), promoted once `factIdentityPass` (analysis/passes.ts,
+  // after every relationship producer including gradeRelationshipsPass) was
+  // confirmed unconditional in DEFAULT_PASSES, and once T-CL-2's incremental
+  // merge started depending on every relationship actually carrying one to
+  // key its prior/fresh matching on. Computed by fact-identity.ts's
+  // assignFactIds from this relationship's own semantic coordinates: kind
+  // (fact type) + from/to (endpoint identities, themselves stable
+  // TypedUnit.id values) + mechanism-or-source (discriminator — mechanism
+  // when a specialized detector set one, otherwise source, so e.g. a plain
+  // graphify reconcile edge and a multi-hop-bridge-detector edge between the
+  // same two units never collide even though kind/from/to alone would).
+  // relationship-builder.ts reuses this id directly as the CALM `unique-id`.
+  id: string;
 }
 
 export interface IgnoredItem {
@@ -420,7 +442,25 @@ export interface IgnoredItem {
 // interface-builder.ts SOURCE_PRECEDENCE table gained 'codeql-di', ordered
 // last like every other non-route-shaped source; relationship-builder.ts
 // treats TypedRelationship.source as pass-through provenance metadata only).
-export const CONTRACT_VERSION = '13.0.0';
+// 14.0.0 (T-CL-4, AGENT_TASKS_Ext_Contract_Lifecycle.md, Contract_Evolution_Policy.md
+// §2(c)): TypedUnit.status, TypedRelationship.status, and TypedRelationship.id
+// promoted from optional to REQUIRED — a new-required-field change, tier (c),
+// not a closed-union extension. Real, not cosmetic: status-assignment.ts's
+// assignStatusPass and fact-identity.ts's factIdentityPass (via
+// analysis/passes.ts's factIdentityPass entry) are both unconditional,
+// always-last DEFAULT_PASSES entries — every unit/relationship a real run
+// produces has always carried both fields since T-FS-6/T-CL-1 shipped, this
+// bump only makes that guarantee visible in the type itself, and (per T-CL-2)
+// gives incremental-merge.ts's id-keyed matching something the contract
+// itself promises will be present, not just a per-producer convention. Every
+// existing module reviewed and bumped to supportedMajorVersion "14": none
+// ever branched on the ABSENCE of `status`/`id` (calm-generator's
+// relationship-builder.ts's own `rel.id ?? computeRelationshipId(rel)`
+// fallback and `rel.status !== undefined` metadata guard both still compile
+// and behave identically against a value that's now always defined;
+// threat-signals/resilience-lens filter on Evidence.category only, never
+// touch TypedUnit.status/TypedRelationship.id/.status at all).
+export const CONTRACT_VERSION = '14.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

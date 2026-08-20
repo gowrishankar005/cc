@@ -1,5 +1,5 @@
 import { GraphifyRun } from '../../scanner/graphify-provider';
-import { TypedUnit, TypedRelationship, IgnoredItem } from '../../types/typed-facts';
+import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 
 /**
@@ -449,6 +449,8 @@ export function detectMultiHopBridgeRelationships(
       source: 'graphify',
       confidence: from.root === to.root ? sameRootConfidence : crossRootConfidence,
       mechanism, // T-L2-1 — r2-phase1 vs r2b, distinguishable without decoding the confidence value
+      status: PENDING_STATUS,
+      id: PENDING_RELATIONSHIP_ID,
     });
   }
 

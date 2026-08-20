@@ -4584,3 +4584,26 @@ test('T-CL-6 (determinism) — same input scanned twice into the same --out dire
   assert.deepEqual(mergeReport.units, { new: 0, disappeared: 0, unaffected: mergeReport.units.unaffected, flaggedForReReview: 0 });
   assert.ok(mergeReport.units.unaffected > 0, 'second identical run must classify every unit as unaffected');
 });
+
+test('T-CL-4 (contract bump, Contract_Evolution_Policy.md §2(c)) — CONTRACT_VERSION 14.0.0: every unit/relationship a real run produces carries a REAL (non-placeholder) status/id, and --from-facts refuses a stale-major-version input', () => {
+  const { CONTRACT_VERSION, PENDING_STATUS, PENDING_RELATIONSHIP_ID } = require(path.join(PIPELINE_ROOT, 'dist/types/typed-facts'));
+  assert.equal(CONTRACT_VERSION, '14.0.0');
+
+  const { calm, outDir } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample')]);
+  assert.ok(calm.nodes.length > 0);
+  const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+  assert.equal(facts.contractVersion, CONTRACT_VERSION);
+  for (const unit of facts.units) {
+    assert.ok(unit.status, `unit "${unit.id}" must carry a real status — TypedUnit.status is required as of CONTRACT_VERSION 14.0.0`);
+  }
+  for (const rel of facts.relationships) {
+    assert.ok(rel.id && rel.id !== PENDING_RELATIONSHIP_ID, `relationship must carry a real, content-derived id, never the construction-time placeholder ("${PENDING_RELATIONSHIP_ID}") — factIdentityPass must overwrite it for every relationship`);
+    assert.ok(rel.status, `relationship must carry a real status — TypedRelationship.status is required as of CONTRACT_VERSION 14.0.0 (construction-time placeholder is "${PENDING_STATUS}", also overwritten unconditionally)`);
+  }
+
+  // --from-facts must refuse an input whose major contractVersion predates this bump.
+  const staleFacts = { ...facts, contractVersion: '13.0.0' };
+  const staleFactsPath = path.join(outDir, 'stale-typed-facts.json');
+  fs.writeFileSync(staleFactsPath, JSON.stringify(staleFacts));
+  assert.throws(() => execFileSync('node', [RUN_SLICE, '--from-facts', staleFactsPath, '--out', fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-stale-'))], { stdio: 'pipe' }));
+});

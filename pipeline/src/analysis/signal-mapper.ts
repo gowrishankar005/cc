@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { NativeRouteFact, DecoratorFact } from '../scanner/structural-engine';
 import { SignalCatalogue, findRule } from '../rules/rule-schema';
-import { Evidence, TypedUnit, IgnoredItem } from '../types/typed-facts';
+import { Evidence, TypedUnit, IgnoredItem, PENDING_STATUS } from '../types/typed-facts';
 import { ignoreUnknownSignal } from './ignored-items';
 import { scoreConfidence } from './confidence-scorer';
 
@@ -245,6 +245,7 @@ export function mapSignalsToUnits(
       filePath,
       startLine: span.start,
       endLine: span.end,
+      status: PENDING_STATUS,
       evidence,
       confidence,
     });

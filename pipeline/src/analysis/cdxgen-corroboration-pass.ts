@@ -4,7 +4,7 @@ import { discoverCdxgenComponents } from '../scanner/cdxgen-provider';
 import { loadPersistenceDetectionCatalogue } from '../rules/persistence-detection-schema';
 import { loadMessagingDetectionCatalogue } from '../rules/messaging-detection-schema';
 import { scoreConfidence } from './confidence-scorer';
-import { TypedUnit } from '../types/typed-facts';
+import { TypedUnit, PENDING_STATUS } from '../types/typed-facts';
 
 const CORROBORATION_WEIGHT = 10; // same corroboration tier as jpa-table's weight
 
@@ -61,6 +61,7 @@ function introducedUnit(root: string, matchName: string, matchVersion: string | 
     filePath: `dependency-manifest:${matchName}`,
     startLine: 1,
     endLine: 1,
+    status: PENDING_STATUS,
     evidence: [
       {
         signal: `cdxgen:${matchName}${matchVersion ? `@${matchVersion}` : ''}`,
