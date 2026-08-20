@@ -42,7 +42,7 @@ Do not reopen these three as in-flight work. Leftovers stay gated.
 | Missing from AGENT_TASKS | 3 | Required in §7, no execution row |
 | Constraint / process (not a build task) | 6 | Bind how we work; already encoded in OOS / isolation / claim register |
 
-Must-priority items still unbuilt: BR-20 (cross-repo), BR-70 (incremental merge), NFR-20 (review history), NFR-40 (emission coverage). All four are tasked and unblocked (T-CL / T-MR). The three BR-50 remaining lenses are tasked in `AGENT_TASKS_Ext_Remaining_Lenses.md`.
+Must-priority items still unbuilt: BR-70 (incremental merge), NFR-20 (review history), NFR-40 (emission coverage). **BR-20 (cross-repo) shipped 2026-08-20** — see below. The three BR-50 remaining lenses are tasked in `AGENT_TASKS_Ext_Remaining_Lenses.md`.
 
 ---
 
@@ -51,7 +51,7 @@ Must-priority items still unbuilt: BR-20 (cross-repo), BR-70 (incremental merge)
 | ID | Requirement (short) | Platform | AGENT_TASKS | Session | Decision |
 |---|---|---|---|---|---|
 | **BR-10** | Model from Java / TS / Python source + config | **Implemented** (routes, persistence, messaging, controls, config, OpenAPI, k8s trust). Layered Java now includes `T-LR-4` (bean-factory wiring, via T-LR-5's CodeQL engine, 2026-08-19) | Residual: `T-MR-4` remaining drivers | C closed, T-LR-5 closed | Do not start a fourth “language coverage” session |
-| **BR-20** | Single- and multi-repo, including **cross-repo** joins | Multi-**root** (co-scanned) **implemented**. Cross-**repo** (not co-scanned) **not** | `T-MR-1`, `T-MR-2` | — | Wait for T-CL-2, or only design T-MR-1 (manifest) now |
+| **BR-20** | Single- and multi-repo, including **cross-repo** joins | Multi-**root** (co-scanned) **implemented**. Cross-**repo** (not co-scanned) **implemented, 2026-08-20** — ranked join (API-spec identity → artifact coordinates → service-catalogue/DNS), capped at `requires-review`/`structural`, `--repo-manifests <dir>`. No real cross-org two-repo pair verified in this environment (disclosed, `scope-limitations.yml`) | `T-MR-1`, `T-MR-2` — **both done** | — | Closed. See `Claim_Register.md`'s `T-MR-1-repo-manifest`/`T-MR-2-cross-repo-join` rows |
 | **BR-30** | Every fact traces to evidence | **Implemented** (file:line / structured pointer, IgnoredItems) | — | — | No new task |
 | **BR-40** | Explicit confidence / **review status**; nothing gates until confirmed | **Implemented** — confidence + `FactStatus` (`observed`/`inferred`/`requires-review`/`reviewed`/`externally-verified`), `x-aac-status` CALM metadata, hard rule tested (2026-08-18) | `T-FS-6` — **done** | **B** | Closed. `T-CL-*`/`T-RT-2` may now start |
 | **BR-50** | Open lens set. Minimum named: security, vulnerability, data flow, **workflow/feature**, **observability**, resilience, **pattern conformance**, sustainability | Security + resilience scored; fitness declared. Vuln/lineage/green gated (no feed). Pattern conformance decided external (`T-LM-8` done, 2026-08-20). Workflow/obs tasked, not built | `T-LM-1`…`4` in Lens Modules (1/3/4 gated). `T-LM-6`/`7` in Remaining Lenses (gated on real consumer + gold). `T-LM-8` done | A closed | Do not invent T-LM-1/3/4. Do not start T-LM-6/7 without a real consumer |
@@ -116,7 +116,7 @@ NFR-50 and NFR-60 are gaps in the product sense but are **already captured** as 
 | 1 | Each in-scope framework validated on a real repo | **Partial / ongoing** — Claim_Register cells. Not a single task |
 | 2 | Schema-valid model before review | **Implemented** (`calm validate`) |
 | 3 | CI blocks merge when an unconfirmed fact touches PII / a service | **Not tasked.** T-FS-6 status exists; CI gate is still unowned |
-| 4 | One multi-repo relationship via ranked join, real two-repo pair | **Tasked** — `T-MR-2`. Not started |
+| 4 | One multi-repo relationship via ranked join, real two-repo pair | **Partial** — `T-MR-2` shipped and verified end-to-end against three checked-in fixtures (one per ranked tier), `calm validate` clean each time. **Not yet verified against a real cross-organization two-repo pair** — `spikes/` scratch clones weren't available in this environment; disclosed in `scope-limitations.yml`'s `cross-repo-join-root-granularity-only`, not silently claimed complete |
 | 5 | Every active lens queryable on one real model | **Partial** — `threat-signals` + `resilience-lens` + CALM |
 | 6 | One new lens as a query, no schema redesign | **Done** — resilience-lens. `threat-signals` already proved the module boundary |
 | 7 | One fact from a non-primary technique at its own trust tier | **Done** — OpenAPI / k8s / SBOM / E2 placeholders exist; earned per-fact-type tiers shipped in `T-LR-6` (`fact-trust-matrix.ts`) |
@@ -135,7 +135,7 @@ Pick at most one. Authoritative order: `AGENT_TASKS_Ext_Execution_Order.md`.
 2. **T-RT-1 then T-RT-2** — NFR-80, both gates green.
 3. **T-CL-5** — smallest, parallel with either of the above.
 4. ~~**T-LR-6** — remaining CodeQL work (per-fact-type trust matrix).~~ **Done, 2026-08-20.** Do not start a second DI engine. GHAS before private-repo production use of T-LR-5.
-5. **Do not start:** NFR-50/60 (deferred), T-FS-5 (skipped), E3 (deprioritised), T-LM-1/3/4 without a real feed, T-MR-1/2 or T-CL-6 before T-CL-2.
+5. **Do not start:** NFR-50/60 (deferred), T-FS-5 (skipped), E3 (deprioritised), T-LM-1/3/4 without a real feed. ~~T-MR-1/2 or T-CL-6 before T-CL-2.~~ **T-CL-2, T-CL-6, T-MR-1, T-MR-2 all done, 2026-08-20.**
 
 ---
 

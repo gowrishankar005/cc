@@ -10,6 +10,7 @@ import { attachNodeMetadata, buildDocumentMetadata } from './metadata-builder';
 import { attachControls } from './control-builder';
 import { buildSystemNode } from './system-node-builder';
 import { buildK8sNamespaceNodes } from './k8s-namespace-node-builder';
+import { buildCrossRepoNodes } from './external-repo-node-builder';
 import { attachPortInterfaces, springConfigProtocolBySignal } from './port-interface-builder';
 
 /**
@@ -46,6 +47,11 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true): CalmDocu
   // 'deployed-in' TypedRelationship's `to` must already be a real node id or
   // buildRelationships' own nodeIds.has(r.to) filter silently drops it.
   nodes.push(...buildK8sNamespaceNodes(facts.relationships));
+  // T-MR-2 — same reasoning: a repo-manifest-sourced relationship's
+  // endpoints are synthetic (repo-root / external-contract), never a real
+  // TypedUnit, so both must already exist as real node ids before
+  // buildRelationships' own nodeIds.has(...) filter runs.
+  nodes.push(...buildCrossRepoNodes(facts.relationships));
   attachInterfaces(units, nodes, nodeTypeMapping);
   attachPortInterfaces(units, nodes); // T-PC1-6/B-formal-interface-port
   attachControls(units, nodes, controlRequirementCatalogue);

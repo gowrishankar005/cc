@@ -4977,3 +4977,251 @@ test('T-CL-4 (contract bump, Contract_Evolution_Policy.md §2(c)) — CONTRACT_V
   fs.writeFileSync(staleFactsPath, JSON.stringify(staleFacts));
   assert.throws(() => execFileSync('node', [RUN_SLICE, '--from-facts', staleFactsPath, '--out', fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-stale-'))], { stdio: 'pipe' }));
 });
+
+// T-MR-1 / T-MR-2 (AGENT_TASKS_Ext_MultiRepo_Deployment.md) — per-repo
+// manifest schema/loader, and the ranked cross-repo join it feeds.
+const REPO_MANIFESTS_FIXTURE_ROOT = path.join(PIPELINE_ROOT, 'test/fixtures/repo-manifests'); // checked-in
+
+test('T-MR-1 — loadRepoManifest parses a real checked-in manifest, validates required fields, rejects a publish entry with no identity a join could ever resolve against', () => {
+  const { loadRepoManifest, discoverRepoManifests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/repo-manifest-provider'));
+
+  const manifests = discoverRepoManifests(REPO_MANIFESTS_FIXTURE_ROOT);
+  assert.equal(manifests.length, 1, 'expected the one checked-in fixture manifest');
+  const manifest = manifests[0];
+  assert.equal(manifest.repo, 'other-service');
+  assert.equal(manifest.publishes.length, 3);
+  assert.equal(manifest.publishes[0].apiSpec.title, 'Widgets API');
+  assert.equal(manifest.publishes[1].artifact.coordinates, 'pkg:pypi/psycopg2@2.9.9');
+  assert.equal(manifest.publishes[2].serviceCatalogue.dns, 'prop-redis-host');
+
+  assert.deepEqual(discoverRepoManifests(path.join(os.tmpdir(), 'weaver-nonexistent-manifests-dir')), [], 'a missing manifests directory is a real, honest "no manifests" — never an error');
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-bad-manifest-'));
+  try {
+    const noIdentityPath = path.join(tmpDir, 'bad.yml');
+    fs.writeFileSync(noIdentityPath, 'repo: bad-repo\npublishes:\n  - nodeId: x\n    name: y\n');
+    assert.throws(() => loadRepoManifest(noIdentityPath, 'bad.yml'), /declares no identity/, 'a publish entry with no apiSpec/artifact/serviceCatalogue must fail loudly, not silently parse into an unresolvable entry');
+
+    const malformedPath = path.join(tmpDir, 'malformed.yml');
+    fs.writeFileSync(malformedPath, 'nonsense: true\n');
+    assert.throws(() => loadRepoManifest(malformedPath, 'malformed.yml'), /malformed/, 'a manifest missing "repo"\/"publishes" must fail loudly, same discipline as loadSignalCatalogue');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('T-MR-2 — detectCrossRepoJoins resolves strictly in tier order (API-spec identity -> artifact coordinates -> service-catalogue/DNS), stops at the first match, never guesses on a non-match', () => {
+  const { detectCrossRepoJoins } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/cross-repo-join-detector'));
+
+  const manifests = [
+    {
+      repo: 'other-service',
+      sourceFile: 'other-service.weaver-manifest.yml',
+      publishes: [
+        // Deliberately carries BOTH apiSpec and artifact identity — tier 1 must win, tier 2 must never even be checked for this entry.
+        { nodeId: 'both.py', name: 'both', apiSpec: { title: 'Shared API' }, artifact: { coordinates: 'pkg:pypi/shared@1.0.0' } },
+        { nodeId: 'artifact-only.py', name: 'artifact-only', artifact: { coordinates: 'pkg:pypi/onlyartifact@2.0.0' } },
+        { nodeId: 'dns-only.py', name: 'dns-only', serviceCatalogue: { dns: 'catalogue-host' } },
+        { nodeId: 'unmatched.py', name: 'unmatched', serviceCatalogue: { dns: 'nobody-references-this-host' } },
+      ],
+    },
+  ];
+
+  const inputsByRoot = new Map([
+    [
+      '/roots/consumer',
+      {
+        root: '/roots/consumer',
+        openApiDocuments: [{ filePath: 'openapi.yaml', title: 'Shared API', operations: [], securitySchemes: [] }],
+        cdxgenComponents: [
+          { name: 'shared', version: '1.0.0', purl: 'pkg:pypi/shared@1.0.0' }, // real for the both.py entry too — must never fire since tier 1 already resolved it
+          { name: 'onlyartifact', version: '2.0.0', purl: 'pkg:pypi/onlyartifact@2.0.0' },
+        ],
+        springConfigValues: ['catalogue-host', 'unrelated-value'],
+      },
+    ],
+  ]);
+
+  const { relationships } = detectCrossRepoJoins(inputsByRoot, manifests);
+  assert.equal(relationships.length, 3, 'expected exactly 3 resolved joins — both.py (tier 1), artifact-only.py (tier 2), dns-only.py (tier 3); unmatched.py must produce nothing');
+
+  const byTo = new Map(relationships.map((r) => [r.to, r]));
+  const bothRel = byTo.get('external-contract:other-service|both.py');
+  assert.ok(bothRel, 'expected a resolved edge for the dual-identity entry');
+  assert.equal(bothRel.mechanism, 'cross-repo-api-spec', 'tier 1 must win over tier 2 when both would resolve — ranked, not "first match found"');
+
+  const artifactRel = byTo.get('external-contract:other-service|artifact-only.py');
+  assert.equal(artifactRel.mechanism, 'cross-repo-artifact');
+
+  const dnsRel = byTo.get('external-contract:other-service|dns-only.py');
+  assert.equal(dnsRel.mechanism, 'cross-repo-service-catalogue');
+
+  for (const rel of relationships) {
+    assert.equal(rel.from, 'repo-root:/roots/consumer');
+    assert.equal(rel.kind, 'connects');
+    assert.equal(rel.source, 'repo-manifest');
+    assert.equal(rel.crossPackage, true);
+  }
+
+  assert.ok(!byTo.has('external-contract:other-service|unmatched.py'), 'a DNS value never referenced anywhere in this root must never guess a match — no relationship, no ignored item (never a real candidate to begin with)');
+});
+
+test('T-MR-2 — detectCrossRepoJoins dedupes a repeated (root, contract) pair to one relationship', () => {
+  const { detectCrossRepoJoins } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/cross-repo-join-detector'));
+  const manifests = [{ repo: 'r', sourceFile: 'r.yml', publishes: [{ nodeId: 'n', name: 'n', apiSpec: { title: 'T' } }] }];
+  const inputsByRoot = new Map([
+    ['/root', { root: '/root', openApiDocuments: [{ filePath: 'a.yaml', title: 'T', operations: [], securitySchemes: [] }, { filePath: 'b.yaml', title: 'T', operations: [], securitySchemes: [] }], cdxgenComponents: [], springConfigValues: [] }],
+  ]);
+  const { relationships } = detectCrossRepoJoins(inputsByRoot, manifests);
+  assert.equal(relationships.length, 1, 'two local OpenAPI documents both matching the same published contract must collapse to one relationship, not one per matching document');
+});
+
+test('T-MR-2 review fix — artifact-coordinate tier matches every real representation cdxgen can produce for a component (bare name, name@version, name==version, purl), not just whichever ONE this run\'s code happened to prefer', () => {
+  const { detectCrossRepoJoins } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/cross-repo-join-detector'));
+  const manifests = [
+    {
+      repo: 'r',
+      sourceFile: 'r.yml',
+      publishes: [
+        { nodeId: 'npm-style.js', name: 'npm-style', artifact: { coordinates: 'left-pad@1.3.0' } }, // manifest author used npm's own "name@version" convention
+        { nodeId: 'pypi-style.py', name: 'pypi-style', artifact: { coordinates: 'requests==2.31.0' } }, // manifest author used PyPI's own "name==version" convention
+        { nodeId: 'purl-style.py', name: 'purl-style', artifact: { coordinates: 'pkg:pypi/psycopg2@2.9.9' } },
+      ],
+    },
+  ];
+  // Real cdxgen output shape: a purl IS present (cdxgen always populates one
+  // for anything it recognizes, confirmed against pipeline/test/fixtures/cdxgen-sample's
+  // real psycopg2 output) — the manifest's own "name@version"/"name==version"
+  // form must still resolve even though cdxgen's own component never carries
+  // that exact string as a field.
+  const cdxgenComponents = [
+    { name: 'left-pad', version: '1.3.0', purl: 'pkg:npm/left-pad@1.3.0' },
+    { name: 'requests', version: '2.31.0', purl: 'pkg:pypi/requests@2.31.0' },
+    { name: 'psycopg2', version: '2.9.9', purl: 'pkg:pypi/psycopg2@2.9.9' },
+  ];
+  const inputsByRoot = new Map([['/root', { root: 'consumer', openApiDocuments: [], cdxgenComponents, springConfigValues: [] }]]);
+
+  const { relationships } = detectCrossRepoJoins(inputsByRoot, manifests);
+  assert.equal(relationships.length, 3, 'all three coordinate forms must resolve — before this fix, only the purl-style entry would (silently, no error, no signal the other two coordinate forms never matched anything)');
+  for (const rel of relationships) assert.equal(rel.mechanism, 'cross-repo-artifact');
+});
+
+test('T-MR-2 review fix — crossRepoJoinPass anchors the repo-root node id on a portable label (path.basename), never the full resolved scan path', () => {
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/openapi-sample')], ['--repo-manifests', REPO_MANIFESTS_FIXTURE_ROOT]);
+  try {
+    const repoRootNode = calm.nodes.find((n) => n['unique-id'].startsWith('repo-root:'));
+    assert.ok(repoRootNode, 'expected a real repo-root anchor node');
+    assert.equal(repoRootNode['unique-id'], 'repo-root:openapi-sample', 'must be the short basename label, not the machine-local absolute scan path (a real bug found by inspecting actual generated CALM output: the id used to be the full resolved path, breaking cross-environment fact-identity stability)');
+    assert.equal(repoRootNode.name, 'openapi-sample');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-MR-2 — buildCrossRepoNodes builds one deduplicated system-type node per distinct repo-root/external-contract endpoint, ignores every non-repo-manifest relationship', () => {
+  const { buildCrossRepoNodes, repoRootNodeId, externalContractNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/external-repo-node-builder'));
+  const relationships = [
+    { from: repoRootNodeId('/roots/a'), to: externalContractNodeId('other-service', 'X.java'), kind: 'connects', crossPackage: true, source: 'repo-manifest' },
+    { from: repoRootNodeId('/roots/a'), to: externalContractNodeId('other-service', 'Y.java'), kind: 'connects', crossPackage: true, source: 'repo-manifest' }, // same repo-root — must collapse to ONE repo-root node
+    { from: 'a.py', to: 'b.py', kind: 'calls', crossPackage: false, source: 'graphify' }, // not repo-manifest — must not produce a node
+  ];
+  const nodes = buildCrossRepoNodes(relationships);
+  assert.equal(nodes.length, 3, 'one repo-root node + two distinct external-contract nodes, the plain graphify edge contributes nothing');
+  const repoRootNode = nodes.find((n) => n['unique-id'] === repoRootNodeId('/roots/a'));
+  assert.ok(repoRootNode);
+  assert.equal(repoRootNode['node-type'], 'system');
+  const contractNode = nodes.find((n) => n['unique-id'] === externalContractNodeId('other-service', 'X.java'));
+  assert.ok(contractNode);
+  assert.equal(contractNode['node-type'], 'system');
+});
+
+test('T-MR-2 — a repo-manifest-sourced relationship always reads requires-review, even for the strongest (API-spec identity) tier — "review status at best" is an absolute cap, not just the weakest tier\'s ceiling', () => {
+  const { assignStatuses } = require(path.join(PIPELINE_ROOT, 'dist/analysis/status-assignment'));
+  const rel = { from: 'repo-root:/r', to: 'external-contract:other|n', kind: 'connects', crossPackage: true, source: 'repo-manifest', mechanism: 'cross-repo-api-spec' };
+  assignStatuses([], [rel], []);
+  assert.equal(rel.status, 'requires-review');
+});
+
+test('T-MR-2 — a repo-manifest-sourced relationship always grades "structural", never "architecture": neither endpoint is confirmed by this run\'s own code reading of BOTH sides', () => {
+  const { gradeRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/relationship-grading'));
+  const relationships = [
+    { from: 'repo-root:/r', to: 'external-contract:other|n', kind: 'connects', crossPackage: true, source: 'repo-manifest' },
+    { from: 'svc.py', to: 'db.py', kind: 'connects', crossPackage: false, source: 'graphify' },
+  ];
+  const units = [
+    { id: 'svc.py', kind: 'service', name: 'svc.py', filePath: 'svc.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 },
+    { id: 'db.py', kind: 'database', name: 'db.py', filePath: 'db.py', startLine: 1, endLine: 1, evidence: [], confidence: 80 },
+  ];
+  gradeRelationships(relationships, units);
+  assert.equal(relationships[0].grade, 'structural');
+  assert.equal(relationships[1].grade, 'architecture', 'a real same-run service->database edge must still grade architecture, unaffected by the cross-repo special case');
+});
+
+test('T-MR-2 end-to-end (tier 1, API-spec identity) — real openapi-sample fixture + checked-in repo-manifest fixture produce a real cross-repo connects relationship, calm validate clean', () => {
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/openapi-sample')], ['--repo-manifests', REPO_MANIFESTS_FIXTURE_ROOT]);
+  try {
+    const crossRepoRels = calm.relationships.filter((r) => relMetadata(r, 'x-aac-provenance') === 'repo-manifest');
+    assert.equal(crossRepoRels.length, 1, 'expected exactly one resolved cross-repo join — the api-spec-matching entry only, not the artifact/dns ones this root has no evidence for');
+    const rel = crossRepoRels[0];
+    assert.equal(relMetadata(rel, 'x-aac-mechanism'), 'cross-repo-api-spec');
+    assert.equal(relMetadata(rel, 'x-aac-status'), 'requires-review');
+    assert.equal(relMetadata(rel, 'x-aac-relationship-grade'), 'structural');
+    assert.equal(rel['relationship-type'].connects.destination.node, 'external-contract:other-service|src/main/java/com/example/other/WidgetsController.java');
+
+    const externalNode = calm.nodes.find((n) => n['unique-id'] === rel['relationship-type'].connects.destination.node);
+    assert.ok(externalNode, 'the referenced external contract must exist as a real node, not just a dangling relationship endpoint');
+    assert.equal(externalNode['node-type'], 'system');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-MR-2 end-to-end (tier 2, published artifact coordinates) — real cdxgen-sample fixture (real requirements.txt, real cdxgen shell-out) resolves via artifact coordinates, not API-spec', () => {
+  const cdxgenBin = path.join(PIPELINE_ROOT, 'node_modules/.bin/cdxgen');
+  if (!fs.existsSync(cdxgenBin)) return; // same optional-devDependency degradation as the existing T-CDX-2/3 test
+
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/cdxgen-sample')], ['--repo-manifests', REPO_MANIFESTS_FIXTURE_ROOT]);
+  try {
+    const crossRepoRels = calm.relationships.filter((r) => relMetadata(r, 'x-aac-provenance') === 'repo-manifest');
+    assert.equal(crossRepoRels.length, 1);
+    assert.equal(relMetadata(crossRepoRels[0], 'x-aac-mechanism'), 'cross-repo-artifact');
+    assert.equal(crossRepoRels[0]['relationship-type'].connects.destination.node, 'external-contract:other-service|src/main/python/otherdb.py');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-MR-2 end-to-end (tier 3, service-catalogue/DNS) — real spring-config-properties-sample fixture resolves via a real application.properties config VALUE, the weakest tier, still capped at requires-review/structural', () => {
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/spring-config-properties-sample')], ['--repo-manifests', REPO_MANIFESTS_FIXTURE_ROOT]);
+  try {
+    const crossRepoRels = calm.relationships.filter((r) => relMetadata(r, 'x-aac-provenance') === 'repo-manifest');
+    assert.equal(crossRepoRels.length, 1);
+    assert.equal(relMetadata(crossRepoRels[0], 'x-aac-mechanism'), 'cross-repo-service-catalogue');
+    assert.equal(relMetadata(crossRepoRels[0], 'x-aac-status'), 'requires-review');
+    assert.equal(crossRepoRels[0]['relationship-type'].connects.destination.node, 'external-contract:other-service|src/main/java/com/example/other/RedisCacheConfig.java');
+
+    const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+    assert.equal(warnings, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-MR-2 — crossRepoJoinPass is a no-op unless --repo-manifests is passed (opt-in only, never a default-on path)', () => {
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/openapi-sample')]);
+  try {
+    const crossRepoRels = calm.relationships.filter((r) => relMetadata(r, 'x-aac-provenance') === 'repo-manifest');
+    assert.equal(crossRepoRels.length, 0, 'no --repo-manifests flag means no manifests are ever read, regardless of how much local evidence would otherwise resolve a join');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});

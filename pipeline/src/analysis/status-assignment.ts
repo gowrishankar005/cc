@@ -61,6 +61,14 @@ function statusForRelationship(rel: TypedRelationship, statusById: Map<string, F
   // k8s-manifest-sourced (shares-secret) — confirmed against a real deployed
   // manifest, not inferred from static code reading.
   if (rel.source === 'k8s') return 'externally-verified';
+  // T-MR-2 — a cross-repo join is never confirmed by this run's own code
+  // reading of BOTH sides (only the local root was actually scanned; the
+  // other side is a manifest declaration this run trusts but cannot
+  // verify). "Review status at best" (this task's own acceptance text) is
+  // an absolute cap on the WHOLE mechanism, not just its weakest tier —
+  // checked here, before any tier-specific signal, so even a Tier-1
+  // shared-API-spec-identity match never reads 'externally-verified'.
+  if (rel.source === 'repo-manifest') return 'requires-review';
   // T-P0-1 (E2) — admitted with a synthesized unresolved-endpoint placeholder
   // on one side; the same hard rule as an unresolved unit applies to the
   // edge that anchors to one.

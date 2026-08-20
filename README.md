@@ -189,6 +189,7 @@ table exists to prevent.
 | Contradiction detection (k8s manifest vs. Spring config) | Opt-in | `--k8s-manifests <dir>` (same flag, no separate one) |
 | Env-key-name soft-graph correlation | Opt-in | `--enable-env-soft-graph` (also requires `--k8s-manifests`) |
 | CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>` — real, non-trivial cost (a real compile + CodeQL database build), never on by default |
+| Ranked cross-repo joins against another repo's T-MR-1 manifest (T-MR-2) | Opt-in | `--repo-manifests <dir>` — a directory of other repos' `*.weaver-manifest.yml` files; every relationship this mechanism produces is capped at `status: requires-review` and `grade: structural`, regardless of which ranked tier resolved it |
 | Decision Record/Override application | Opt-in | `--overrides <dir>` |
 | calm-generator, threat-signals, resilience-lens modules | **All three, by default** | `--modules <name>,<name>,...` to run a different set |
 
@@ -215,6 +216,7 @@ anyone deciding what the product can do.
 | `--from-facts <typed-facts.json>` | Yes | — | Reconstruct CALM output from a previously-generated, frozen `typed-facts.json` — no rescan. Refuses an incompatible `contractVersion` rather than attempting reconstruction |
 | `--codeql-source-root <dir>` | Yes | — (off) | T-LR-5: the real, compilable root CodeQL should index (must be a common ancestor of every `--modules`-relevant package root). Requires `--codeql-build-command` too. See the CodeQL section below — real, non-trivial cost and a real license constraint, never on by default |
 | `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile** — an up-to-date/cached build never re-invokes the compiler, so CodeQL's tracer observes nothing and the database silently comes back empty (a real failure mode found building this, not a hypothetical) |
+| `--repo-manifests <dir>` | Yes | — (off) | T-MR-2: a directory of OTHER repos' `*.weaver-manifest.yml` files (T-MR-1, `scanner/repo-manifest-provider.ts`) to join this run's own evidence against — never this run's own manifest, and the pipeline never writes to any target repo. Resolves in strict order (shared API-spec identity → published artifact coordinates → service-catalogue/DNS), stopping at the first match per candidate; unmatched entries are never guessed at |
 
 **When to reach for which flag:**
 
@@ -225,6 +227,7 @@ anyone deciding what the product can do.
 - Re-running CALM generation after tweaking `--modules` or an override, without re-scanning source? → `--from-facts <typed-facts.json>` instead of re-running the whole scan.
 - A human already corrected a wrong classification? → `--overrides <dir>`; add `--strict-overrides` in CI so a malformed/orphaned override fails the build instead of silently no-op'ing.
 - Debugging why a route didn't get detected? → `--strict-detect` turns a silent zero-routes result into a hard failure you'll actually notice.
+- Need a relationship to a service in a repo you didn't scan (not co-scanned via multiple package roots)? → `--repo-manifests <dir>`, pointed at a local directory holding copies of the OTHER repos' own T-MR-1 manifests (see `docs/solution/AGENT_TASKS_Ext_MultiRepo_Deployment.md`). Every resulting relationship is capped at `requires-review`/`structural` — treat it as a lead for a human to confirm, not a settled architecture fact.
 
 #### Optional: CodeQL DI-resolution (`--codeql-source-root` / `--codeql-build-command`)
 

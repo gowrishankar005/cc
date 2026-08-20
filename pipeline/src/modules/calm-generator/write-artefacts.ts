@@ -79,6 +79,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '15', // bumped for CONTRACT_VERSION 15.0.0 (T-MR-3) — TypedRelationship.kind gained 'deployed-in'; reviewed, real code change already shipped in the SAME commit (relationship-type-mapping.yml's new row, k8s-namespace-node-builder.ts wired into build-calm.ts before relationship-builder.ts runs) — this module now understands the new value, not just tolerates it
+  supportedMajorVersion: '16', // bumped for CONTRACT_VERSION 16.0.0 (T-MR-2) — TypedRelationship.source gained 'repo-manifest'; reviewed, real code change already shipped in the SAME commit (relationship-type-mapping.yml's new row, external-repo-node-builder.ts wired into build-calm.ts before relationship-builder.ts runs) — this module now understands the new value, not just tolerates it
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

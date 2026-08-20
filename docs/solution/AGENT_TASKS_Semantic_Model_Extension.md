@@ -201,7 +201,7 @@ pressure — this note is the correction.
 | `AGENT_TASKS_Ext_Remaining_Lenses.md` | After Session A | — |
 | `AGENT_TASKS_Ext_Contract_Lifecycle.md` | T-CL-5 now; **T-CL-1 done (2026-08-20)**, T-CL-2…4 next | Lens Modules |
 | `AGENT_TASKS_Ext_Review_Throughput.md` | T-FS-1 | Layered Recovery |
-| `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-MR-3/5 now; T-MR-1/2 after T-CL-2 | Lens Modules |
+| `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-MR-3/5/1/2 all done, 2026-08-20 | Lens Modules |
 | `AGENT_TASKS_Ext_Execution_Order.md` | — | The due-list and wave order |
 
 **Two lanes can start immediately:** P0 experiments, and Lens Modules —

@@ -67,6 +67,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const resilienceLensModule: Module = {
   name: 'resilience-lens',
-  supportedMajorVersion: '15', // bumped for CONTRACT_VERSION 15.0.0 (T-MR-3) — TypedRelationship.kind gained 'deployed-in'; this module never reads TypedRelationship.kind at all, filters on Evidence.category === 'resilience' only — reviewed, unaffected
+  supportedMajorVersion: '16', // bumped for CONTRACT_VERSION 16.0.0 (T-MR-2) — TypedRelationship.source gained 'repo-manifest'; this module never reads TypedRelationship.kind/source at all, filters on Evidence.category === 'resilience' only — reviewed, unaffected
   run,
 };

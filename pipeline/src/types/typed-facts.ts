@@ -227,7 +227,15 @@ export interface TypedRelationship {
   // 'k8s' added alongside 'shares-secret' in the same 3.0.0 bump — the k8s
   // manifest provider (scanner/k8s-manifest-provider.ts) is a third
   // relationship-evidence source, distinct from codegraph/graphify.
-  source: 'codegraph' | 'graphify' | 'k8s' | 'codeql';
+  // 'repo-manifest' added in CONTRACT_VERSION 16.0.0 (T-MR-2,
+  // AGENT_TASKS_Ext_MultiRepo_Deployment.md) — a ranked cross-repo join
+  // resolved against another repo's human-authored T-MR-1 manifest
+  // (scanner/repo-manifest-provider.ts), never against this run's own
+  // scanned code. Both endpoints are synthetic (never a real TypedUnit —
+  // neither this repo's own anchor nor the other repo's published contract
+  // has a file this run indexed), same "no source file, build the CALM node
+  // directly" pattern k8s-namespace-node-builder.ts already established.
+  source: 'codegraph' | 'graphify' | 'k8s' | 'codeql' | 'repo-manifest';
   // T-X9-1 — additive OPTIONAL field (Contract_Evolution_Policy.md §2(b),
   // no CONTRACT_VERSION bump needed: an unknown optional field is harmless
   // to any existing module). Set only by the env soft-graph detector today
@@ -304,7 +312,28 @@ export interface TypedRelationship {
   // reach, not a duplicate of those mechanisms — trust-tier-gated,
   // codeql-di-pass.ts never overrides an edge an earlier mechanism already
   // produced for the same pair).
-  mechanism?: 'r2-phase1' | 'r2b' | 'r2c' | 'r2-stereotype' | 'admitted-unresolved' | 'codeql-di-bean-factory' | 'codeql-di-stereotype';
+  // 'cross-repo-api-spec' / 'cross-repo-artifact' / 'cross-repo-service-catalogue'
+  // added for T-MR-2 (cross-repo-join-detector.ts) — the three ranked
+  // reliability tiers, named in the same order: a shared OpenAPI/AsyncAPI
+  // spec title, a published artifact coordinate, or a service-catalogue
+  // name/DNS match (the weakest tier — see repo-manifest-provider.ts's
+  // ServiceCatalogueIdentity doc comment for why it's still never promoted
+  // above 'requires-review'). Like every other value in this field, not one
+  // of Contract_Evolution_Policy.md §1's tracked closed unions (advisory
+  // provenance only) — no CONTRACT_VERSION bump for this addition;
+  // TypedRelationship.source gaining 'repo-manifest' is the real (c)-tier
+  // change for T-MR-2.
+  mechanism?:
+    | 'r2-phase1'
+    | 'r2b'
+    | 'r2c'
+    | 'r2-stereotype'
+    | 'admitted-unresolved'
+    | 'codeql-di-bean-factory'
+    | 'codeql-di-stereotype'
+    | 'cross-repo-api-spec'
+    | 'cross-repo-artifact'
+    | 'cross-repo-service-catalogue';
   // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4) — same promotion
   // reasoning as TypedUnit.status above: previously `status?:` (T-FS-6,
   // tier (b)), promoted once `assignStatusPass` was confirmed unconditional
@@ -492,7 +521,33 @@ export interface IgnoredItem {
 // `case 'deployed-in':` branch was already written, just unreachable until
 // now); threat-signals/resilience-lens filter on Evidence.category only,
 // never touch TypedRelationship.kind, unaffected by a new value.
-export const CONTRACT_VERSION = '15.0.0';
+//
+// 16.0.0 (T-MR-2, AGENT_TASKS_Ext_MultiRepo_Deployment.md, BACKLOG.md
+// "Cross-repo relationship resolution (beyond co-scanned roots)"):
+// TypedRelationship.source gained 'repo-manifest' — a closed-union
+// extension, tier (c). A ranked, never-guessed join against another repo's
+// T-MR-1 manifest (scanner/repo-manifest-provider.ts): shared API-spec
+// identity -> published artifact coordinates -> service-catalogue/DNS,
+// strictly in that order, each tier only tried once the one before it
+// failed to resolve (analysis/cross_package/cross-repo-join-detector.ts).
+// Both endpoints are synthetic 'system'-node-type CALM nodes (never a
+// TypedUnit — neither side has a file this run indexed), built directly by
+// modules/calm-generator/external-repo-node-builder.ts, same "no source
+// file" pattern k8s-namespace-node-builder.ts (T-MR-3) already established.
+// Every relationship this mechanism produces is capped at
+// status: 'requires-review' regardless of which tier resolved it
+// (status-assignment.ts) and grade: 'structural', never 'architecture'
+// (relationship-grading.ts) — this task's own acceptance text ("never infer
+// a cross-repo edge from naming alone — review status at best") is honored
+// as an absolute cap on the whole mechanism, not just the weakest tier.
+// All three modules reviewed and bumped to supportedMajorVersion "16":
+// calm-generator's relationship-builder.ts needed no code change (the
+// `connects` kind + the existing `default: connects` fallback in
+// relationship-type-mapping.yml already resolve a 'system'->'system' pair,
+// confirmed by adding an explicit row rather than relying on the fallback
+// silently); threat-signals/resilience-lens filter on Evidence.category
+// only, never touch TypedRelationship.source, unaffected.
+export const CONTRACT_VERSION = '16.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

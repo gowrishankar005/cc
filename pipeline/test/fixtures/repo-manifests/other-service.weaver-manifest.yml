@@ -1,0 +1,24 @@
+# T-MR-1 example — a human-authored manifest for a repo NOT scanned by this
+# run, checked in here as a fixture for T-MR-2's regression tests. Three
+# publish entries, one per ranked join tier, each matched against a
+# DIFFERENT checked-in test root's own real evidence:
+#   - api-widgets: tier 1, matches test/fixtures/openapi-sample's real
+#     openapi.yaml (title: "Widgets API")
+#   - psycopg2-client: tier 2, matches test/fixtures/cdxgen-sample's real
+#     requirements.txt (psycopg2==2.9.9 -> purl pkg:pypi/psycopg2@2.9.9)
+#   - redis-cache: tier 3, matches test/fixtures/spring-config-properties-sample's
+#     real application.properties (spring.data.redis.host=prop-redis-host)
+repo: other-service
+publishes:
+  - nodeId: src/main/java/com/example/other/WidgetsController.java
+    name: widgets-api
+    apiSpec:
+      title: Widgets API
+  - nodeId: src/main/python/otherdb.py
+    name: psycopg2-client
+    artifact:
+      coordinates: "pkg:pypi/psycopg2@2.9.9"
+  - nodeId: src/main/java/com/example/other/RedisCacheConfig.java
+    name: redis-cache
+    serviceCatalogue:
+      dns: prop-redis-host

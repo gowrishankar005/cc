@@ -12,6 +12,7 @@ import { outboundHttpPass } from './outbound-http-pass';
 import { springConfigPass } from './spring-config-pass';
 import { cdxgenCorroborationPass } from './cdxgen-corroboration-pass';
 import { envSoftGraphPass } from './env-soft-graph-pass';
+import { crossRepoJoinPass } from './cross-repo-join-pass';
 import { gradeRelationships } from './relationship-grading';
 import { multiHopBridgePass } from './multi-hop-bridge-pass';
 import { cfnRoutePass } from './cfn-route-pass';
@@ -263,6 +264,13 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   reconcilePass,
   k8sTrustPass,
   envSoftGraphPass,
+  // T-MR-2 — another append-only relationship producer with the same
+  // ordering freedom as k8sTrustPass/envSoftGraphPass above: reads
+  // ctx.openApiDocumentsByRoot (final by now) and its own fresh
+  // cdxgen/spring-config discovery, never ctx.relationships or
+  // multiHopExaminedPairs. Must still run before gradeRelationshipsPass/
+  // factIdentityPass/assignStatusPass, the true-last passes.
+  crossRepoJoinPass,
   // T-FS-3 — needs springConfigPass's database units (already final by this
   // point) and k8sTrustPass's own manifests-dir convention; reads neither
   // ctx.relationships nor multiHopExaminedPairs, so — same as its two

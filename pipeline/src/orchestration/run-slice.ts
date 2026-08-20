@@ -93,7 +93,8 @@ async function runSlice(
   enableEnvSoftGraph = false,
   cfnManifestsDir?: string,
   codeqlSourceRoot?: string,
-  codeqlBuildCommand?: string
+  codeqlBuildCommand?: string,
+  repoManifestsDir?: string
 ): Promise<void> {
   const catalogue = loadSignalCatalogue(path.join(__dirname, '..', 'rules'));
   logEngineCapabilitySummary(loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner')));
@@ -162,6 +163,7 @@ async function runSlice(
     cfnManifestsDir,
     codeqlSourceRoot,
     codeqlBuildCommand,
+    repoManifestsDir,
   };
   await runPasses(DEFAULT_PASSES, ctx);
   logMem('after runPasses');
@@ -304,6 +306,7 @@ const KNOWN_FLAGS = [
   '--from-facts',
   '--codeql-source-root',
   '--codeql-build-command',
+  '--repo-manifests',
 ];
 
 // Flags that consume the NEXT token as their value — that token must never
@@ -311,7 +314,7 @@ const KNOWN_FLAGS = [
 // version of this function checked every token including flag VALUES, so a
 // real invocation like `--overrides -tmp/session-drafts` would have wrongly
 // rejected a legitimate, if unusually-named, directory argument).
-const VALUE_TAKING_FLAGS = ['--out', '--overrides', '--modules', '--k8s-manifests', '--cfn-manifests', '--from-facts', '--codeql-source-root', '--codeql-build-command'];
+const VALUE_TAKING_FLAGS = ['--out', '--overrides', '--modules', '--k8s-manifests', '--cfn-manifests', '--from-facts', '--codeql-source-root', '--codeql-build-command', '--repo-manifests'];
 
 function checkForUnknownFlags(args: string[]): void {
   for (let i = 0; i < args.length; i++) {
@@ -338,7 +341,7 @@ function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error(
-      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>]\n' +
+      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>] [--repo-manifests <dir>]\n' +
         '   or: run-slice --from-facts <typed-facts.json> [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--no-snippets] [--strict-overrides] [--no-system-node]'
     );
     process.exit(1);
@@ -376,10 +379,12 @@ function main() {
   const codeqlSourceRoot = codeqlSourceRootIdx >= 0 ? path.resolve(args[codeqlSourceRootIdx + 1]) : undefined;
   const codeqlBuildCommandIdx = args.indexOf('--codeql-build-command');
   const codeqlBuildCommand = codeqlBuildCommandIdx >= 0 ? args[codeqlBuildCommandIdx + 1] : undefined;
-  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const repoManifestsIdx = args.indexOf('--repo-manifests');
+  const repoManifestsDir = repoManifestsIdx >= 0 ? path.resolve(args[repoManifestsIdx + 1]) : undefined;
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, repoManifestsIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
-  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand).catch((err) => {
+  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand, repoManifestsDir).catch((err) => {
     console.error('[run-slice] FAILED:', err);
     process.exit(1);
   });

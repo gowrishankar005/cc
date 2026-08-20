@@ -72,6 +72,19 @@ mappings:
     calmRelationshipType: deployed-in
     protocol: null
 
+  # T-MR-2 — a ranked cross-repo join. Both endpoints are synthetic 'system'
+  # node-type nodes (modules/calm-generator/external-repo-node-builder.ts —
+  # neither this run's own repo-root anchor nor the other repo's published
+  # contract has a source file this run indexed). Already covered by the
+  # `default: connects` fallback below even without this row — added
+  # explicitly anyway, same "a real mechanism gets a real catalogue row, not
+  # a silent default" discipline every other row here already follows.
+  - relationshipKind: connects
+    sourceNodeType: system
+    targetNodeType: system
+    calmRelationshipType: connects
+    protocol: null
+
 # Fallback when no row matches a {kind, sourceType, targetType} triple: still
 # `connects`, never `interacts` — see rules/relationship-type-mapping-schema.ts
 # for the exact default-application order.

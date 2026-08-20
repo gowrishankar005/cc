@@ -36,6 +36,20 @@ export function gradeRelationships(relationships: TypedRelationship[], units: Ty
       rel.grade = 'structural';
       continue;
     }
+    // T-MR-2 — same reasoning as shares-secret/deployed-in above, made an
+    // explicit branch rather than left to the generic service-endpoint
+    // fallback's accidental behavior (neither cross-repo endpoint is ever a
+    // 'service'-kind TypedUnit, so it would fall through to 'structural'
+    // anyway — this just makes that intentional and testable directly).
+    // Pairing grade: 'architecture' with a status the mechanism itself caps
+    // at 'requires-review' (status-assignment.ts) would be internally
+    // inconsistent: 'architecture' elsewhere in this codebase means a real
+    // R1/R2 same-run-confirmed connectivity claim, which a cross-repo join
+    // — confirming only ONE side by this run's own code reading — never is.
+    if (rel.source === 'repo-manifest') {
+      rel.grade = 'structural';
+      continue;
+    }
     const fromKind = kindById.get(rel.from);
     const toKind = kindById.get(rel.to);
     // T-P0-1 (E2) — a relationship touching a graded-fact-admission
