@@ -3,6 +3,7 @@ import { AnalysisContext, AnalysisPass } from './pass-registry';
 import { runCodeQLDiResolution, CodeQLDiBinding } from '../scanner/codeql-di-provider';
 import { TypedUnit, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../types/typed-facts';
 import { relationshipTrust, unitIntroductionTrust } from './fact-trust-matrix';
+import { loadEngineCapabilityMatrix, warnIfMechanismUnverified } from '../scanner/engine-capability-matrix';
 
 /**
  * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — turns CodeQL's real DI-binding
@@ -150,5 +151,15 @@ export const codeqlDiPass: AnalysisPass = {
     if (relationshipCount > 0 || introducedCount > 0) {
       console.log(`[codeql-di] ${bindings.length} real DI binding(s) resolved by CodeQL; ${relationshipCount} new relationship(s), ${introducedCount} new unit(s) introduced`);
     }
+
+    // T-onboarding-16 — real, cheap drift check: engine-capability-matrix.yml's
+    // relationshipMechanisms section is this project's own record of which
+    // (language, mechanism) combos have been measured "proven". di_resolution.ql
+    // is Java/Spring-shaped only, so `bindings.length > 0` here always means
+    // real Spring-annotated code was matched — this never fires as a false
+    // alarm on a different framework, only as a warning if the matrix itself
+    // ever falls out of sync with what this pass actually produced.
+    const matrix = loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner'));
+    warnIfMechanismUnverified(matrix, 'java', 'codeql-di-resolution', bindings.length);
   },
 };

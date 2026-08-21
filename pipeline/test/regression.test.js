@@ -5587,3 +5587,34 @@ test('--no-auto-codeql suppresses both the --auto-codeql flag and the WEAVER_COD
     fs.rmSync(outDir2, { recursive: true, force: true });
   }
 });
+
+test('engine-capability-matrix.yml: java/codeql-di-resolution is marked proven (T-LR-5/E1b real evidence)', () => {
+  const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
+  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-di-resolution'), 'the one real, shipped DI-resolution mechanism (T-LR-5, 2105 real Fineract bindings) must be recorded as proven');
+});
+
+test('engine-capability-matrix.yml: exploratory-only mechanisms (NestJS/Guice) are correctly NOT marked proven', () => {
+  const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
+  assert.equal(isRelationshipMechanismProven(matrix, 'typescript', 'codeql-nestjs-token-di'), false, 'E2a is a hand-run exploratory query, not a live pass — must not read as proven');
+  assert.equal(isRelationshipMechanismProven(matrix, 'java', 'codeql-guice-di'), false, 'Tier2 Guice result is real-but-contaminated (208/218 rows), not a clean proven mechanism');
+});
+
+test('warnIfMechanismUnverified: warns on an unrecorded mechanism firing, silent on a proven one, silent on zero bindings', () => {
+  const { warnIfMechanismUnverified } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const fakeMatrix = { version: '0.0.0', routes: [], relationshipMechanisms: [{ language: 'java', framework: ['spring-mvc'], mechanism: 'codeql-di-resolution', evidenceLevel: 'proven' }], crossPackageBackbone: 'graphify' };
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (msg) => warnings.push(msg);
+  try {
+    warnIfMechanismUnverified(fakeMatrix, 'java', 'codeql-di-resolution', 5); // proven — must stay silent
+    warnIfMechanismUnverified(fakeMatrix, 'java', 'codeql-di-resolution', 0); // zero bindings — must stay silent regardless of proven-ness
+    warnIfMechanismUnverified(fakeMatrix, 'java', 'codeql-guice-di', 10); // real bindings, no matrix entry at all — must warn
+    assert.equal(warnings.length, 1, `expected exactly 1 warning, got ${warnings.length}: ${JSON.stringify(warnings)}`);
+    assert.match(warnings[0], /codeql-guice-di.*10 real binding/, 'the one warning must name the unrecorded mechanism and the real binding count');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
