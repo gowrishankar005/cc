@@ -189,6 +189,49 @@ Real output from this exact command:
 npm run validate -- /tmp/weaver-demo/architecture.calm.json -f pretty
 ```
 
+**Java/Spring, same idea** — `test/fixtures/spring-config-sample` (a real
+JAX-RS resource plus real `application.yml`/`application-prod.yml` Spring
+config):
+
+```bash
+node dist/orchestration/run-slice.js test/fixtures/spring-config-sample --out /tmp/weaver-spring-demo
+```
+
+Real output from this exact command:
+
+```text
+[engine-capability-matrix] v0.2.0: 8 route(s), 4 proven, 2 with a Phase 2 augment engine (none fired yet), cross-package backbone: graphify
+[run-slice] .../test/fixtures/spring-config-sample: 0 native route(s), 1 decorator fact(s), 1 unit(s)
+[run-slice] graphify: 0 relationship(s) reconciled (0 cross-package, 0 same-package)
+[platform-artefacts] coverage: 1 root(s), graphify ok; unmapped: 0 signal cluster(s), 0 occurrence(s)
+[write-artefacts] emission coverage: 100.0% (0 gap(s) — see modules/calm-generator/emission-coverage-report.json)
+[threat-signals] 1 unit(s) flagged: http-entry-point evidence with no security-control evidence
+[run-slice] wrote artefacts to /tmp/weaver-spring-demo
+```
+
+One small fixture, six real CALM nodes: the JAX-RS resource itself
+(`service`), plus five nodes read straight out of the two `application*.yml`
+profiles — a `database` node per environment's `spring.datasource.url`
+(postgresql in `application.yml`, mysql in `application-prod.yml`), a
+`network` node for `spring.kafka.bootstrap-servers`, a `database` node for
+`spring.data.redis`, and a `network` node for `spring.rabbitmq.addresses`
+in the prod profile. `calm validate` clean, 0 errors/0 warnings.
+
+### What's in my `--out` directory?
+
+A first scan writes more than just the CALM file. Here's what to actually
+look at, versus what's diagnostic/advanced:
+
+| File | Look at it first? | What it is |
+|---|---|---|
+| `architecture.calm.json` | **Yes — start here** | The generated CALM architecture graph — nodes, relationships, controls |
+| `typed-facts.json` | If you want the raw facts CALM was built from | The `TypedFacts` contract — every unit/relationship/evidence item before CALM construction |
+| `unmapped-signals-report.json` | Only if curious | Raw decorators/annotations this run saw but has no catalogue rule for — a **real, expected, nonzero count on most real repos**, not a sign something broke. A signal clustered 5+ times is a real catalogue-promotion candidate; a one-off is usually just app-specific code with no architectural signal to extract |
+| `coverage-report.json` | Only if curious | Analysis-time completeness — routes/files seen, whether Graphify ran, per-root counts |
+| `emission-coverage-report.json` | Only if curious | CALM-construction-time completeness — a real detected fact that couldn't be represented in CALM, and why (rare on a correct scan) |
+| `merge-report.json` / `fact-history.json` | Only on a rerun into the same `--out` dir | What changed since the last scan of this same output directory, and the full history of any status change |
+| `modules/<name>/*.json` | If you ran non-default modules | Each module's own findings — `modules/calm-generator/emission-coverage-report.json`, `modules/threat-signals/threat-signals-report.json`, etc. |
+
 ### Build, test, run against your own code
 
 ```bash
@@ -207,6 +250,13 @@ node dist/orchestration/run-slice.js rootA rootB --out /path/to/out
 # Schema-validate the generated CALM
 npm run validate -- /path/to/out/architecture.calm.json -f pretty
 ```
+
+**Before your first real scan:** if `graphify` is on `PATH`, a scan writes
+`.graphify-cache/` and `.codegraph/` **inside the scanned package root**
+(siblings of your source, not under `--out`) — confirmed by directory
+listing before/after a real scan. Add both to that repo's `.gitignore`
+before your first run, or you'll see them as untracked noise in `git
+status` afterward.
 
 ### What runs by default vs. what needs a flag
 
