@@ -5470,3 +5470,82 @@ test('T-onboarding-1b negative case — a method-level decorator with NO matchin
     'a genuinely unmapped method-level decorator on a DIFFERENT line than any native route must still be reported, never silently suppressed by this fix'
   );
 });
+
+test('--auto-codeql detection: Gradle root WITH a gradlew wrapper derives a --no-daemon --rerun-tasks build command', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(root, 'build.gradle'), '// real gradle build file\n');
+    fs.writeFileSync(path.join(root, 'gradlew'), '#!/bin/sh\necho gradlew\n', { mode: 0o755 });
+    const result = detectCodeqlBuildConfig([root]);
+    assert.ok(result, 'a real build.gradle + gradlew wrapper must be detected');
+    assert.equal(result.buildTool, 'gradle');
+    assert.equal(result.sourceRoot, root);
+    assert.match(result.buildCommand, /--no-daemon/, 'must always force --no-daemon — a pre-existing daemon silently empties the CodeQL database (found running a real 3-engine benchmark, 2026-08-21)');
+    assert.match(result.buildCommand, /--rerun-tasks/, 'must always force a real recompile — an up-to-date/cached build never re-invokes the compiler');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql detection: Gradle root WITHOUT a gradlew wrapper refuses to guess a system-wide gradle version', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(root, 'build.gradle'), '// real gradle build file, no wrapper checked in\n');
+    const result = detectCodeqlBuildConfig([root]);
+    assert.equal(result, undefined, 'a build.gradle with no gradlew wrapper must not silently fall back to a system gradle install of unknown version');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql detection: Maven root derives a clean-compile build command, preferring ./mvnw over mvn when present', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const rootNoWrapper = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  const rootWithWrapper = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(rootNoWrapper, 'pom.xml'), '<project></project>\n');
+    const noWrapperResult = detectCodeqlBuildConfig([rootNoWrapper]);
+    assert.ok(noWrapperResult);
+    assert.equal(noWrapperResult.buildTool, 'maven');
+    assert.match(noWrapperResult.buildCommand, /^mvn /, 'falls back to plain mvn when no ./mvnw wrapper exists');
+    assert.match(noWrapperResult.buildCommand, /clean compile/, 'must force clean — an up-to-date Maven build never re-invokes javac either, same silent-empty-database failure mode as Gradle');
+
+    fs.writeFileSync(path.join(rootWithWrapper, 'pom.xml'), '<project></project>\n');
+    fs.writeFileSync(path.join(rootWithWrapper, 'mvnw'), '#!/bin/sh\necho mvnw\n', { mode: 0o755 });
+    const wrapperResult = detectCodeqlBuildConfig([rootWithWrapper]);
+    assert.match(wrapperResult.buildCommand, /^\.\/mvnw /, 'prefers the repo-pinned ./mvnw wrapper over a system-wide mvn when both are available');
+  } finally {
+    fs.rmSync(rootNoWrapper, { recursive: true, force: true });
+    fs.rmSync(rootWithWrapper, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql detection: no build.gradle/pom.xml at all returns undefined (never guesses a build)', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(root, 'package.json'), '{}');
+    assert.equal(detectCodeqlBuildConfig([root]), undefined);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql CLI wiring: explicit --codeql-source-root/--codeql-build-command take precedence over --auto-codeql, never overridden', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  try {
+    // A deliberately-inert explicit build command ("true") — this test only
+    // asserts CLI precedence (--auto-codeql must not clobber explicit
+    // flags), not a real CodeQL run; codeql-di-pass.ts's own graceful
+    // degradation (binary/build failure -> WARNING, continue) keeps this
+    // fast and offline either way.
+    execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir, '--codeql-source-root', fixtureRoot, '--codeql-build-command', 'true', '--auto-codeql'], { encoding: 'utf8' });
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    assert.equal(facts.contractVersion, require(path.join(PIPELINE_ROOT, 'dist/types/typed-facts')).CONTRACT_VERSION, 'run must complete normally — --auto-codeql must not clobber explicit flags nor break the run when both are present');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});

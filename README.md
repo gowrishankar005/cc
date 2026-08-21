@@ -283,7 +283,7 @@ table exists to prevent.
 | Kubernetes `deployed-in` runtime-placement relationships (T-MR-3) | Opt-in | `--k8s-manifests <dir>` (same flag — one manifest read produces both trust and placement facts) |
 | Contradiction detection (k8s manifest vs. Spring config) | Opt-in | `--k8s-manifests <dir>` (same flag, no separate one) |
 | Env-key-name soft-graph correlation | Opt-in | `--enable-env-soft-graph` (also requires `--k8s-manifests`) |
-| CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>` — real, non-trivial cost (a real compile + CodeQL database build), never on by default |
+| CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>`, or `--auto-codeql` to derive both from a detected `build.gradle`/`pom.xml` — real, non-trivial cost (a real compile + CodeQL database build), never on by default either way |
 | Ranked cross-repo joins against another repo's T-MR-1 manifest (T-MR-2) | Opt-in | `--repo-manifests <dir>` — a directory of other repos' `*.weaver-manifest.yml` files; every relationship this mechanism produces is capped at `status: requires-review` and `grade: structural`, regardless of which ranked tier resolved it |
 | Decision Record/Override application | Opt-in | `--overrides <dir>` |
 | calm-generator, threat-signals, resilience-lens modules | **All three, by default** | `--modules <name>,<name>,...` to run a different set |
@@ -311,6 +311,7 @@ anyone deciding what the product can do.
 | `--from-facts <typed-facts.json>` | Yes | — | Reconstruct CALM output from a previously-generated, frozen `typed-facts.json` — no rescan. Refuses an incompatible `contractVersion` rather than attempting reconstruction |
 | `--codeql-source-root <dir>` | Yes | — (off) | T-LR-5: the real, compilable root CodeQL should index (must be a common ancestor of every `--modules`-relevant package root). Requires `--codeql-build-command` too. See the CodeQL section below — real, non-trivial cost and a real license constraint, never on by default |
 | `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew --no-daemon :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile in a process CodeQL's tracer actually sees** — an up-to-date/cached build never re-invokes the compiler, and for Gradle, a pre-existing daemon runs the real compile *outside* CodeQL's traced process tree even when `--rerun-tasks` forces it — either way the database silently comes back empty rather than erroring (a real failure mode found building this, not a hypothetical). Gradle callers need both `--rerun-tasks` and `--no-daemon` |
+| `--auto-codeql` | No | off | Derives `--codeql-source-root`/`--codeql-build-command` from a detected `build.gradle`/`build.gradle.kts` (with a `gradlew` wrapper) or `pom.xml` (preferring a checked-in `mvnw` wrapper) at the common ancestor of every package root, instead of hand-writing both. **Still requires this explicit flag** — it only removes the friction of deriving the two values, it does not make CodeQL reachable without a conscious opt-in (same license reason `--codeql-source-root`/`--codeql-build-command` are opt-in below). Explicit `--codeql-source-root`/`--codeql-build-command` always take precedence and are never overridden if both are also passed. Refuses to guess a Gradle build with no `gradlew` wrapper checked in (a system-wide `gradle` install could be any version) rather than silently picking one — logs a message and continues without CodeQL evidence instead |
 | `--repo-manifests <dir>` | Yes | — (off) | T-MR-2: a directory of OTHER repos' `*.weaver-manifest.yml` files (T-MR-1, `scanner/repo-manifest-provider.ts`) to join this run's own evidence against — never this run's own manifest, and the pipeline never writes to any target repo. Resolves in strict order (shared API-spec identity → published artifact coordinates → service-catalogue/DNS), stopping at the first match per candidate; unmatched entries are never guessed at |
 
 **When to reach for which flag:**
@@ -318,7 +319,7 @@ anyone deciding what the product can do.
 - Have Kubernetes manifests for the system? → `--k8s-manifests <dir>`. You get shared-secret trust edges AND `deployed-in` runtime-placement edges (which namespace each service actually runs in) for free; if a manifest's datastore image disagrees with a Spring-config-sourced unit's JDBC scheme, that unit is also automatically forced to `requires-review` (no extra flag).
 - Also want low-confidence env-var-name correlation edges on top of that? → add `--enable-env-soft-graph` (does nothing without `--k8s-manifests`).
 - System is deployed via CloudFormation/SAM (API Gateway → Lambda)? → `--cfn-manifests <dir>`.
-- Hit a case where CodeGraph/Graphify can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--codeql-source-root`/`--codeql-build-command` (see the dedicated section below first — real cost, license-gated, local-only).
+- Hit a case where CodeGraph/Graphify can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--auto-codeql` (or `--codeql-source-root`/`--codeql-build-command` for a hand-tuned build) — see the dedicated section below first: real cost, license-gated, local-only.
 - Re-running CALM generation after tweaking `--modules` or an override, without re-scanning source? → `--from-facts <typed-facts.json>` instead of re-running the whole scan.
 - A human already corrected a wrong classification? → `--overrides <dir>`; add `--strict-overrides` in CI so a malformed/orphaned override fails the build instead of silently no-op'ing.
 - Debugging why a route didn't get detected? → `--strict-detect` turns a silent zero-routes result into a hard failure you'll actually notice.
@@ -342,7 +343,25 @@ node dist/orchestration/run-slice.js /path/to/module \
   --codeql-build-command "./gradlew --no-daemon :my-module:compileJava --rerun-tasks"
 ```
 
-**Gradle callers: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
+**Or let it derive both flags from a detected build file:**
+
+```bash
+node dist/orchestration/run-slice.js /path/to/module --auto-codeql
+# [run-slice] --auto-codeql: detected gradle build at /path/to/repo-root,
+# running CodeQL DI-resolution with build command:
+# ./gradlew --no-daemon compileJava --rerun-tasks
+```
+
+`--auto-codeql` always includes `--no-daemon`/`--rerun-tasks` (Gradle) or
+`clean` (Maven) automatically — the two silent-empty-database gotchas below
+are exactly what it exists to avoid making you remember. It only looks at
+the common ancestor of your package roots for `build.gradle`/`pom.xml`, and
+only trusts a `gradlew`/`mvnw` wrapper if one is checked in (never guesses a
+system-wide build-tool version) — if neither is found, it logs a message
+and the run continues without CodeQL evidence, same as omitting the flags
+entirely.
+
+**Gradle callers hand-writing the command: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
 failure mode, found running a live three-engine benchmark (Fineract +
 Spring Boot Admin, 2026-08-21): if a Gradle daemon from an earlier local
 build is already running, CodeQL's build tracer only instruments the
