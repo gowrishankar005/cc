@@ -123,10 +123,29 @@ fixtures as real architecture in generated CALM output, which is a
 correctness failure this pipeline's own principles treat as more serious
 than a coverage gap. Before this becomes a real production task: (1) add
 source-root or active-Module scoping, (2) re-run and confirm the 10 clean
-production bindings survive unchanged. (3) **`E2a` re-checked, 2026-08-22:
-no contamination** — `ghostfolio` has no test-scoped alternate module
-registering `DataProviderInterfaces`/`DataEnhancers`; both real
-registrations found are in `apps/api/src` production code, matching the
-ambiguity already disclosed in `E2a-typescript-nestjs-codeql-evaluation.md`
-exactly, nothing additional. `E1b`/`E2` (Spring, multi-`@Configuration`
-profiles) not yet re-checked for the same risk.
+production bindings survive unchanged. (3) **`E2a`/`E1b`/`E2` all
+re-checked, 2026-08-22: no contamination in any of them.**
+`ghostfolio` has no test-scoped alternate module registering
+`DataProviderInterfaces`/`DataEnhancers`; both real registrations found are
+in `apps/api/src` production code, matching the ambiguity already
+disclosed in `E2a-typescript-nestjs-codeql-evaluation.md` exactly, nothing
+additional. For `E1b`/`E2`: verified directly against a real, generic
+"list every indexed file under `src/test/`" query run against Fineract's,
+`spring-bot`'s, and `spring-petclinic`'s own CodeQL databases (the latter
+two rebuilt with the identical `mvn -q -DskipTests clean compile` command
+`E2` used, to confirm reproducibility, not just re-derive from theory) —
+**zero test-source files in all three databases**, despite `spring-bot`
+and `spring-petclinic` genuinely containing test-scoped
+`@Configuration`/`@Bean` classes (2 and 1 respectively, confirmed by grep).
+Root cause of why this class of bug hit Guice/`legend-sdlc` specifically
+and not these three: Maven's `compile` goal and Gradle's `compileJava`
+task both stop before the `test-compile` phase/`compileTestJava` task ever
+runs, so test source is structurally never compiled or seen by CodeQL's
+tracer under either command shape. `legend-sdlc` hit the bug because `mvn
+install` (full lifecycle, chosen there to work around a separate reactor
+test-jar dependency issue specific to that repo) does reach
+`test-compile`. **This makes the risk build-command-specific, not
+query-logic-specific** — any future caller using an `install`/`test`-phase
+build command for any language/repo should expect this risk and add
+main/test scoping; a `compile`-only (or equivalent) command structurally
+cannot hit it.
