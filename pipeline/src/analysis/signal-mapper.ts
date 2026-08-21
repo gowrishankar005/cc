@@ -84,6 +84,19 @@ export function mapSignalsToUnits(
   // Every native route is HTTP-entry-point evidence at the catalogue's
   // standard weight for that category.
   const nativeRouteWeight = catalogue.rules.find((r) => r.matchSource === 'native-route')?.weight ?? 40;
+  // T-onboarding-1b — every native route's own file:startLine, so the
+  // decoratorFacts loop below can tell "a raw decorator with no catalogue
+  // rule" apart from "the exact same annotation CodeGraph's native route
+  // resolver already consumed on this line" (e.g. Spring MVC's
+  // @GetMapping/@PostMapping: real, fully-detected HTTP-entry-point
+  // evidence via the native-route path above, never itself catalogued as a
+  // decorator rule, since that would double-detect the same fact through
+  // two independent paths). Same "mark it consumed, don't report it as an
+  // unexplained gap" idea route-composer-registry.ts's own `consumed` set
+  // already established for JAX-RS-style composition — this is the
+  // equivalent for native-route-typed frameworks, which never went through
+  // that composer at all.
+  const nativeRouteLines = new Set(nativeRoutes.map((r) => `${r.filePath}:${r.startLine}`));
   for (const route of nativeRoutes) {
     const ref = `${route.filePath}:${route.startLine}`;
     record(
@@ -103,6 +116,17 @@ export function mapSignalsToUnits(
     const rule = findRule(catalogue, dec.referenceName, 'decorator', dec.language);
     const ref = `${dec.filePath}:${dec.line}`;
     if (!rule) {
+      // T-onboarding-1b — a method-level decorator on the exact file:line a
+      // native route already consumed is a real, fully-detected fact, not
+      // an unexplained one; skip it silently rather than record it as
+      // unmapped. Scoped to fromNodeKind === 'method' deliberately: a
+      // class-level decorator's own line never coincides with a route's
+      // startLine in practice (confirmed directly against real CodeGraph
+      // output — a class-level @RestController and its methods' @GetMapping
+      // report distinct line numbers), so this check is a no-op for
+      // class-level facts and never suppresses a genuinely-unmapped
+      // class-level signal.
+      if (dec.fromNodeKind === 'method' && nativeRouteLines.has(ref)) continue;
       ignoredItems.push(ignoreUnknownSignal(ref, dec.referenceName));
       continue;
     }

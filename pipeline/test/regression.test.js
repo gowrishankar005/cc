@@ -5459,3 +5459,68 @@ test('T-CL-5 (emission-coverage rule), end-to-end — a real run-slice invocatio
     fs.rmSync(outDir, { recursive: true, force: true });
   }
 });
+
+test('T-onboarding-1a — Spring MVC @RestController/@Controller now has a catalogue row, real routes still native-typed', () => {
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample')]);
+  try {
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const unit = facts.units.find((u) => u.filePath.endsWith('WidgetController.java'));
+    assert.ok(unit, 'WidgetController must produce a real unit');
+    assert.equal(unit.kind, 'service');
+    assert.ok(
+      unit.evidence.some((e) => e.category === 'framework-bootstrap' && e.signal === 'RestController'),
+      '@RestController must now be catalogued framework-bootstrap evidence on the unit, not silently dropped'
+    );
+    assert.equal(
+      unit.evidence.filter((e) => e.category === 'http-entry-point').length,
+      2,
+      'the two real @GetMapping/@PostMapping routes must still be native-typed as before — this fix must not change route detection, only catalogue coverage of the class-level stereotype'
+    );
+
+    const unmapped = JSON.parse(fs.readFileSync(path.join(outDir, 'unmapped-signals-report.json'), 'utf8'));
+    assert.ok(
+      !unmapped.clusters.some((c) => c.signal === 'RestController'),
+      'RestController must no longer appear as an unmapped signal cluster now that it has a real catalogue row'
+    );
+
+    const node = calm.nodes.find((n) => n.name === 'WidgetController');
+    assert.ok(node);
+    assert.equal(node['node-type'], 'service');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-onboarding-1b — native-route-consumed method-level decorators no longer appear as unmapped signals', () => {
+  const { outDir, calm } = runPipeline([path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample')]);
+  try {
+    const unmapped = JSON.parse(fs.readFileSync(path.join(outDir, 'unmapped-signals-report.json'), 'utf8'));
+    assert.equal(unmapped.clusterCount, 0, 'a fully-correct scan of this real Spring MVC shape must report zero unmapped signals — GetMapping/PostMapping are real, fully-detected native-route evidence, not unexplained gaps');
+
+    // Must be a pure accounting fix — detection output itself is unchanged.
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    const unit = facts.units.find((u) => u.filePath.endsWith('WidgetController.java'));
+    assert.equal(unit.evidence.filter((e) => e.category === 'http-entry-point').length, 2);
+    assert.equal(unit.evidence.filter((e) => e.category === 'framework-bootstrap').length, 1);
+
+    const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+    assert.equal(errors, 0);
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('T-onboarding-1b negative case — a method-level decorator with NO matching native route still reports as unmapped (never over-suppressed)', () => {
+  const { mapSignalsToUnits } = require(path.join(PIPELINE_ROOT, 'dist/analysis/signal-mapper'));
+  const catalogue = { rules: [] }; // no rule can match "SomeUnknownAnnotation" regardless
+  const nativeRoutes = [{ filePath: 'x.java', startLine: 10, name: 'GET /x', qualifiedName: 'x' }];
+  const decoratorFacts = [
+    // Same file, but a DIFFERENT line from the native route — must not be suppressed.
+    { referenceName: 'SomeUnknownAnnotation', fromNodeId: 'm1', filePath: 'x.java', line: 20, fromNodeKind: 'method', language: 'java' },
+  ];
+  const { ignoredItems } = mapSignalsToUnits(nativeRoutes, decoratorFacts, catalogue);
+  assert.ok(
+    ignoredItems.some((i) => i.detail && i.detail.includes('SomeUnknownAnnotation')),
+    'a genuinely unmapped method-level decorator on a DIFFERENT line than any native route must still be reported, never silently suppressed by this fix'
+  );
+});

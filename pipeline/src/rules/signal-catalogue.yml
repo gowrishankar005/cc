@@ -204,6 +204,37 @@ rules:
     # a new/existing row, not a code change.
     bridgeStereotype: true
 
+  # T-onboarding-1a — found reviewing this catalogue against a real minimal
+  # Spring Boot app (coe-lab's java-spring-orders fixture): NestJS's own
+  # @Controller already has a row above (nestjs-controller-decorator), but
+  # Spring MVC's class-level stereotypes had none at all, so a completely
+  # correct scan (real routes detected, real service->service relationship
+  # resolved) still reported @RestController/@Controller as "unmapped" —
+  # not a detection failure, a real catalogue-completeness gap. Same
+  # framework-bootstrap reasoning as nestjs-controller-decorator above:
+  # @RestController/@Controller mark "this class is a Spring MVC
+  # controller," they are never themselves a route the way @GetMapping/
+  # @PostMapping are — categorizing them as http-entry-point would
+  # double-count evidence against the real native-typed routes.
+  #
+  # Deliberately does NOT include RequestMapping: unlike RestController/
+  # Controller, @RequestMapping is genuinely dual-purpose in real Spring MVC
+  # source — a class-level base-path prefix (framework-bootstrap-shaped,
+  # like this row) OR a real method-level route when used without
+  # @GetMapping/@PostMapping (http-entry-point-shaped, already covered by
+  # CodeGraph's native route typing). findRule() has no fromNodeKind
+  # (class-vs-method) input to disambiguate the two uses safely — adding a
+  # single row here would either double-count the method-level case or miss
+  # the class-level one, so it stays out until that disambiguation exists.
+  - id: spring-mvc-controller-decorator
+    language: java
+    framework: spring
+    matchSignal: "RestController|Controller"
+    matchSource: decorator
+    category: framework-bootstrap
+    weight: 25
+    calmNodeType: service
+
   # --- Java: Spring Security control evidence (requirements v0.10 §0 / v0.11) ---
   # Real evidence: spikes/fineract/repo/fineract-core/.../DatatableWriteService.java
   # — a pure Java `interface` with @PreAuthorize on every method, NO @Path/
