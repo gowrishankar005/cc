@@ -310,7 +310,7 @@ anyone deciding what the product can do.
 | `--no-system-node` | No | system node included | Omit the synthetic root `system` node and its `composed-of` edges from CALM output |
 | `--from-facts <typed-facts.json>` | Yes | — | Reconstruct CALM output from a previously-generated, frozen `typed-facts.json` — no rescan. Refuses an incompatible `contractVersion` rather than attempting reconstruction |
 | `--codeql-source-root <dir>` | Yes | — (off) | T-LR-5: the real, compilable root CodeQL should index (must be a common ancestor of every `--modules`-relevant package root). Requires `--codeql-build-command` too. See the CodeQL section below — real, non-trivial cost and a real license constraint, never on by default |
-| `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile** — an up-to-date/cached build never re-invokes the compiler, so CodeQL's tracer observes nothing and the database silently comes back empty (a real failure mode found building this, not a hypothetical) |
+| `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew --no-daemon :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile in a process CodeQL's tracer actually sees** — an up-to-date/cached build never re-invokes the compiler, and for Gradle, a pre-existing daemon runs the real compile *outside* CodeQL's traced process tree even when `--rerun-tasks` forces it — either way the database silently comes back empty rather than erroring (a real failure mode found building this, not a hypothetical). Gradle callers need both `--rerun-tasks` and `--no-daemon` |
 | `--repo-manifests <dir>` | Yes | — (off) | T-MR-2: a directory of OTHER repos' `*.weaver-manifest.yml` files (T-MR-1, `scanner/repo-manifest-provider.ts`) to join this run's own evidence against — never this run's own manifest, and the pipeline never writes to any target repo. Resolves in strict order (shared API-spec identity → published artifact coordinates → service-catalogue/DNS), stopping at the first match per candidate; unmatched entries are never guessed at |
 
 **When to reach for which flag:**
@@ -339,8 +339,22 @@ reference Java/Spring monorepo).
 # target — real cost (minutes, not seconds), not a default-on path.
 node dist/orchestration/run-slice.js /path/to/module \
   --codeql-source-root /path/to/repo-root \
-  --codeql-build-command "./gradlew :my-module:compileJava --rerun-tasks"
+  --codeql-build-command "./gradlew --no-daemon :my-module:compileJava --rerun-tasks"
 ```
+
+**Gradle callers: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
+failure mode, found running a live three-engine benchmark (Fineract +
+Spring Boot Admin, 2026-08-21): if a Gradle daemon from an earlier local
+build is already running, CodeQL's build tracer only instruments the
+process tree it directly launches — the already-running daemon does the
+real compilation *outside* that tree, so CodeQL sees zero source even
+though Gradle reports `BUILD SUCCESSFUL` with real `javac` output and
+`--rerun-tasks` genuinely forced a recompile. The database still finalizes
+without an error — `codeql-di-provider.ts` logs a WARNING and continues
+with zero bindings, so this degrades silently rather than crashing, but the
+result is misleadingly empty. `./gradlew --stop` before the run, or
+`--no-daemon` in the build command itself, avoids it. Maven callers are not
+affected (no persistent daemon by default).
 
 Real output from an actual `run-slice` invocation with this flag on, against
 a real multi-module Java/Spring monorepo (`Claim_Register.md`'s
