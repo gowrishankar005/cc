@@ -152,6 +152,7 @@ async function runSlice(
 
   const ctx: AnalysisContext = {
     packageRoots,
+    outDir,
     catalogue,
     rawByRoot,
     allUnits: [],

@@ -252,11 +252,15 @@ npm run validate -- /path/to/out/architecture.calm.json -f pretty
 ```
 
 **Before your first real scan:** if `graphify` is on `PATH`, a scan writes
-`.graphify-cache/` and `.codegraph/` **inside the scanned package root**
-(siblings of your source, not under `--out`) — confirmed by directory
-listing before/after a real scan. Add both to that repo's `.gitignore`
-before your first run, or you'll see them as untracked noise in `git
-status` afterward.
+`.graphify-cache/` **inside your `--out` directory** (a real, deliberate
+incremental-caching benefit — a second scan into the *same* `--out`
+directory is dramatically faster). `codegraph-provider.ts`'s `.codegraph/`
+**does** still get written inside the scanned package root, as a sibling of
+your source — this one is a permanent constraint of the third-party
+CodeGraph SDK itself (it decides where its own index lives, with no
+location override in its public API), not something Weaver's own code
+controls. Add `.codegraph/` to that repo's `.gitignore` before your first
+run, or you'll see it as untracked noise in `git status` afterward.
 
 ### What runs by default vs. what needs a flag
 

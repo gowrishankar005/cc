@@ -109,17 +109,35 @@ function computeCommonAncestor(roots: string[]): string {
  * N unchanged" in ~0.1s, using `graphify-out/cache/` it writes itself). The
  * earlier `fs.mkdtempSync`/`fs.rmSync` pattern discarded that cache every
  * single run for no reason — this was a real, avoidable cost this whole
- * session paid on every a reference Java/JAX-RS banking platform/the reference Python app run without needing to. Mirrors
- * CodeGraph's own per-package-root `.codegraph/` persistent-cache
- * convention (same directory-inside-the-scanned-tree pattern, already
- * accepted in this codebase) rather than inventing a different convention
- * for Graphify alone.
+ * session paid on every a reference Java/JAX-RS banking platform/the reference Python app run without needing to.
+ *
+ * T-onboarding-2 (2026-08-21) — lives under `cacheBaseDir` (this run's
+ * `--out`), NOT beside the scanned source as originally built. Real
+ * beginner-usability finding: a scan silently dropped `.graphify-cache`
+ * inside the TARGET repo with zero warning, surprising untracked-directory
+ * noise for anyone pointing Weaver at their own real repository — the
+ * primary use case. Deliberately diverges from `codegraph-provider.ts`'s
+ * own `.codegraph/`-beside-source convention here rather than matching it:
+ * that one is imposed by the third-party CodeGraph SDK itself (confirmed by
+ * reading its own `InitOptions`/`OpenOptions` types — no location override
+ * exists, only a same-directory rename via `CODEGRAPH_DIR`), so it's a
+ * permanent constraint, not a choice; this cache is entirely OUR OWN
+ * `--out` we already control, so there's no equivalent reason to keep it
+ * beside the source. Real trade-off, not hidden: the incremental speedup
+ * above now only applies across reruns into the SAME `--out` directory,
+ * not any rerun against the same source regardless of `--out` — already the
+ * convention T-CL-2's own incremental merge expects, and it eliminates a
+ * real staleness bug class the old beside-source location had (a persistent
+ * cache surviving hand-edits between separate local dev runs against the
+ * same fixture path — the exact reason ~50 regression tests used to force
+ * `fs.rmSync` it before every run; a `--out`-scoped cache is fresh by
+ * construction, since test `--out` dirs are always freshly `mkdtempSync`'d).
  */
-export function runGraphifyPass(packageRoots: string[], graphifyBin = 'graphify'): GraphifyRun {
+export function runGraphifyPass(packageRoots: string[], cacheBaseDir: string, graphifyBin = 'graphify'): GraphifyRun {
   const scanRoot = packageRoots.length === 1 ? path.resolve(packageRoots[0]) : computeCommonAncestor(packageRoots);
   const absRoots = packageRoots.map((r) => path.resolve(r));
 
-  const cacheDir = path.join(scanRoot, '.graphify-cache');
+  const cacheDir = path.join(cacheBaseDir, '.graphify-cache');
   fs.mkdirSync(cacheDir, { recursive: true });
   execFileSync(graphifyBin, ['extract', scanRoot, '--code-only', '--no-cluster', '--out', cacheDir], { stdio: 'pipe' });
   const graphPath = path.join(cacheDir, 'graphify-out', 'graph.json');

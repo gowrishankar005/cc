@@ -41,6 +41,8 @@ export interface RawRootFacts {
 
 export interface AnalysisContext {
   packageRoots: string[];
+  /** T-onboarding-2 — this run's --out directory. Set once at context construction (run-slice.ts), used by detectPersistencePass so Graphify's own persistent cache (runGraphifyPass) writes under --out instead of beside the scanned source. */
+  outDir: string;
   catalogue: SignalCatalogue;
   rawByRoot: Map<string, RawRootFacts>;
   allUnits: TypedUnit[];

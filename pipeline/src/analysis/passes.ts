@@ -95,7 +95,7 @@ export const detectPersistencePass: AnalysisPass = {
   run(ctx: AnalysisContext) {
     if (ctx.packageRoots.length === 0) return;
     try {
-      ctx.graphifyRun = runGraphifyPass(ctx.packageRoots);
+      ctx.graphifyRun = runGraphifyPass(ctx.packageRoots, ctx.outDir);
       // T-LR-3 real-data finding — overridableServiceFilePaths(ctx) names
       // files whose ONLY existing 'service' unit evidence is a bare,
       // weak stereotype (no real route/security-control signal of its

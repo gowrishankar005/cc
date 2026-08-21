@@ -601,15 +601,8 @@ test('AREC T-D1 — TypeScript decorator/call dedup: NestJS fixture produces ZER
 
 test('R2 multi-hop bridge: synthetic fixture proves the mechanism (service -> zero-evidence interface -> sole @Entity implementer)', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2-bridge-sample');
-  // Real finding while building this: graphify's persistent per-root cache
-  // (.graphify-cache) can retain a stale node-id assignment across repeated
-  // hand-edits of the SAME fixture during development — force a clean
-  // extraction so this test never depends on whatever cache state a prior
-  // local run left behind.
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     const resource = findNode(calm, 'WidgetApiResource.java');
     const impl = findNode(calm, 'WidgetReadServiceImpl.java');
@@ -637,16 +630,13 @@ test('R2 multi-hop bridge: synthetic fixture proves the mechanism (service -> ze
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the mechanism (service -> zero-evidence interface -> PLAIN implementer -> imported entity), and the ambiguity path still refuses to guess', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2b-implementer-hop-sample');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     // Positive path: WidgetReadServiceImpl (the implementer) is a PLAIN
     // class — no @Entity, no driver import — distinct from r2-bridge-sample
@@ -703,16 +693,13 @@ test('AREC R2b (T-R1-2) — implementer->store hop: synthetic fixture proves the
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('T-FS-1 (BACKLOG.md "Tier-B residual detection") — synthetic fixture: a bridge with 2 syntactic implementers but exactly 1 real store candidate produces a distinguishable tier-b-single-candidate residual (never a fabricated edge); a genuinely ambiguous 2-real-store bridge in the SAME fixture still refuses with the original unresolved-multi-hop message', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2-tier-b-candidate-sample');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     // --- Positive path: WidgetReadService has 2 implementers, but only
     // WidgetReadServiceImpl is a real store — the mock carries no evidence
@@ -779,16 +766,13 @@ test('T-FS-1 (BACKLOG.md "Tier-B residual detection") — synthetic fixture: a b
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixture: service -> concrete class (no interface at all) -> imported entity resolves, and the ambiguity path still refuses to guess', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/r2c-direct-delegate-sample');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     // Positive path: GizmoService has no interface at all — GizmoApiResource
     // references the concrete class directly. Distinct from R2b
@@ -840,16 +824,13 @@ test('T-LR-2 (BACKLOG.md "Direct-delegate bridge detection") — synthetic fixtu
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — synthetic fixture: a bridge with 2 real implementers resolves when exactly one carries the bare @Service stereotype, and the both-stereotyped ambiguity path still refuses to guess', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     // Positive path: WidgetReadService has TWO real implementers in scanned
     // roots (WidgetReadServiceImpl, WidgetReadServiceLegacyImpl) — before
@@ -910,7 +891,6 @@ test('T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — synthetic fixtu
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
@@ -1332,10 +1312,8 @@ test('Robustness — pushAll never throws RangeError on arrays large enough to e
 
 test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging double-detector collision fix: lab ts-orders-dynamo fixture, no duplicate unique-ids, calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-orders-dynamo');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     // Real bug found: OrdersDynamoStore imports BOTH
     // @aws-sdk/client-dynamodb (persistence) AND @aws-sdk/client-sqs
@@ -1374,16 +1352,13 @@ test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging doubl
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('T-MR-4 — DynamoDB ownership shape (Node/TS, @aws-sdk/client-dynamodb): a class that owns a real DynamoDBClient field stays database, a class that only receives one as a method parameter is NOT a database unit; existing ts-orders-dynamo real-field-owner case unaffected', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/dynamo-ownership-sample');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     const store = findNode(calm, 'OrderDynamoStore');
     assert.ok(store, 'OrderDynamoStore (owns a real DynamoDBClient field) must still be a real database unit');
@@ -1408,14 +1383,12 @@ test('T-MR-4 — DynamoDB ownership shape (Node/TS, @aws-sdk/client-dynamodb): a
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('T-MR-4 — DynamoDB ownership shape, second different instance (Java, AWS SDK v1 com.amazonaws.services.dynamodbv2.AmazonDynamoDB): field-owner stays database, method-parameter-only receiver does not', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/dynamo-ownership-java-sample');
   fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
     const store = findNode(calm, 'TierClientDynamoStoreV1');
@@ -1434,7 +1407,6 @@ test('T-MR-4 — DynamoDB ownership shape, second different instance (Java, AWS 
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
@@ -1476,7 +1448,6 @@ test('T-LR-3 follow-up — weak bare-stereotype + messaging import is one topic 
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(WEAK_SERVICE_MESSAGING_ROOT, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
@@ -1757,10 +1728,8 @@ test('T-MR-3 — a service unit whose ONLY relationship is deployed-in must stil
 
 test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP/persistence/messaging/control evidence) must NOT become CALM nodes: lab lib-fintech-common produces ZERO nodes, calm validate 0 errors', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/lib-fintech-common');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
     // StringUtils.java / Money.java: plain business-logic classes, no HTTP
     // route, no @Entity, no decorator, no call-site control — zero
     // catalogue evidence of ANY kind, so zero units, so zero CALM nodes.
@@ -1773,14 +1742,12 @@ test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP
     assert.equal(warnings, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
 test('Lambda RequestHandler -> service (not database, not invisible); handler that owns DynamoDbClient directly still stays service; store class stays database; architecture-grade connects present', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
   fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
@@ -1822,7 +1789,6 @@ test('Lambda RequestHandler -> service (not database, not invisible); handler th
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
   }
 });
@@ -1830,7 +1796,6 @@ test('Lambda RequestHandler -> service (not database, not invisible); handler th
 test('CFN/SAM path join: real path/method/handler binding resolved across TWO separate template files, attached to the real scanned units as real path-interfaces, calm validate + gold L0/L1/L2 all PASS', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
   fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
   // --cfn-manifests points at the SAME fixture dir, which real-evidence
   // testing found needs its own multi-file join: api-gateway.yaml (Resource
@@ -1854,7 +1819,6 @@ test('CFN/SAM path join: real path/method/handler binding resolved across TWO se
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
     fs.rmSync(path.join(fixtureRoot, 'graphify-out'), { recursive: true, force: true });
   }
 });
@@ -1862,7 +1826,6 @@ test('CFN/SAM path join: real path/method/handler binding resolved across TWO se
 test('S5 completeness flag: 0 service units with a real store present, AND real CFN routes found but unbound, both fire; neither fires on the healthy java-lambda-apigw fixture', () => {
   const orphanRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-orphan-store');
   fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
   fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
   // OrderStore.java is a real Dynamo store with NO handler anywhere in
   // this root; api-gateway.yaml's OrderHandlerFn.Handler references a
@@ -1881,7 +1844,6 @@ test('S5 completeness flag: 0 service units with a real store present, AND real 
   } finally {
     fs.rmSync(orphanOutDir, { recursive: true, force: true });
     fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
     fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
   }
 
@@ -1889,7 +1851,6 @@ test('S5 completeness flag: 0 service units with a real store present, AND real 
   // units, real bound CFN routes) must NOT trip either S5 condition.
   const healthyRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
   fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
   fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
   const { outDir: healthyOutDir } = runPipeline([healthyRoot], ['--cfn-manifests', healthyRoot]);
   try {
@@ -1899,7 +1860,6 @@ test('S5 completeness flag: 0 service units with a real store present, AND real 
   } finally {
     fs.rmSync(healthyOutDir, { recursive: true, force: true });
     fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
     fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
   }
 });
@@ -1909,7 +1869,6 @@ test('HITL review trigger — S5 triggers wired in (found via Architect_Residual
 
   const orphanRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-orphan-store');
   fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
   fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
   const { outDir: orphanOutDir } = runPipeline([orphanRoot], ['--cfn-manifests', orphanRoot]);
   try {
@@ -1929,14 +1888,12 @@ test('HITL review trigger — S5 triggers wired in (found via Architect_Residual
   } finally {
     fs.rmSync(orphanOutDir, { recursive: true, force: true });
     fs.rmSync(path.join(orphanRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(orphanRoot, '.graphify-cache'), { recursive: true, force: true });
     fs.rmSync(path.join(orphanRoot, 'graphify-out'), { recursive: true, force: true });
   }
 
   // Negative path: the healthy fixture must not produce either S5 review item.
   const healthyRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-lambda-apigw');
   fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
-  fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
   fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
   const { outDir: healthyOutDir } = runPipeline([healthyRoot], ['--cfn-manifests', healthyRoot]);
   try {
@@ -1948,7 +1905,6 @@ test('HITL review trigger — S5 triggers wired in (found via Architect_Residual
   } finally {
     fs.rmSync(healthyOutDir, { recursive: true, force: true });
     fs.rmSync(path.join(healthyRoot, '.codegraph'), { recursive: true, force: true });
-    fs.rmSync(path.join(healthyRoot, '.graphify-cache'), { recursive: true, force: true });
     fs.rmSync(path.join(healthyRoot, 'graphify-out'), { recursive: true, force: true });
   }
 });
@@ -2790,10 +2746,8 @@ test('OpenAPI fixture — static provider discovers routes + securitySchemes, st
 
 test('AREC T-E4 — OpenAPI dual-unit merge (trap card T8): lab ts-nestjs-users (openapi.yaml + real controller, same routes) produces ONE node, not two', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-nestjs-users');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     // Before this fix: TWO service nodes for one real service
     // ('src/users.controller.ts' AND 'openapi.yaml') — a real unit-level
@@ -2826,7 +2780,6 @@ test('AREC T-E4 — OpenAPI dual-unit merge (trap card T8): lab ts-nestjs-users 
     assert.equal(errors, 0);
   } finally {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   }
 });
 
@@ -2867,7 +2820,6 @@ test(
       assert.equal(errors, 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
-      fs.rmSync(path.join(creditBureauRoot, '.graphify-cache'), { recursive: true, force: true });
     }
   }
 );
@@ -4495,10 +4447,8 @@ test('T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review history")
 
 test('T-FS-6 real-repo wiring: stereotype-disambiguation-sample end to end through run-slice.js and CALM x-aac-status metadata', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/stereotype-disambiguation-sample');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
     const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
 
     // Real confidence-40 (medium band) unit -> inferred; real confidence-80/90 (high band) units -> observed.
@@ -4543,10 +4493,8 @@ test('T-FS-6 real-repo wiring: contradiction-flagged unit gets requires-review s
 
 test('T-FS-6 real-repo wiring: openapi-corroborated unit gets externally-verified status (lab ts-nestjs-users)', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/ts-nestjs-users');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir, calm } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
     const serviceNode = calm.nodes.find((n) => n['node-type'] === 'service');
     assert.ok(serviceNode, 'expected the merged service node');
     assert.equal(
@@ -4626,10 +4574,8 @@ test('T-LM-5 (AGENT_TASKS_Ext_Lens_Modules.md, BR-110) — loadModuleFitness rea
 
 test('T-LM-5 real-repo wiring: threat-signals and resilience-lens both surface a real fitness declaration in their own report JSON (lab java-resilience-handlers, single run, both modules fire)', () => {
   const fixtureRoot = path.join(LAB_ROOT, 'fixtures/monorepo/packages/java-resilience-handlers');
-  fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
   const { outDir } = runPipeline([fixtureRoot]);
   try {
-    fs.rmSync(path.join(fixtureRoot, '.graphify-cache'), { recursive: true, force: true });
 
     const threatSignalsReport = JSON.parse(fs.readFileSync(path.join(outDir, 'modules/threat-signals/threat-signals-report.json'), 'utf8'));
     assert.equal(threatSignalsReport.fitness.status, 'measured');
