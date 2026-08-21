@@ -5549,3 +5549,41 @@ test('--auto-codeql CLI wiring: explicit --codeql-source-root/--codeql-build-com
     fs.rmSync(outDir, { recursive: true, force: true });
   }
 });
+
+test('WEAVER_CODEQL_LICENSE_CONFIRMED=1 triggers the same auto-detect path as --auto-codeql, with no flag needed', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample'); // no build.gradle/pom.xml — exercises the "detection attempted, nothing found" branch, not a real CodeQL run
+  try {
+    const output = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir], { encoding: 'utf8', env: { ...process.env, WEAVER_CODEQL_LICENSE_CONFIRMED: '1' } });
+    assert.match(output, /WEAVER_CODEQL_LICENSE_CONFIRMED=1:.*no build\.gradle/, 'the env var alone (no --auto-codeql flag) must trigger the same detection attempt, visibly logged');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('WEAVER_CODEQL_LICENSE_CONFIRMED requires the exact value "1" — a stray truthy string must not enable it', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  try {
+    const output = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir], { encoding: 'utf8', env: { ...process.env, WEAVER_CODEQL_LICENSE_CONFIRMED: 'true' } });
+    assert.doesNotMatch(output, /WEAVER_CODEQL_LICENSE_CONFIRMED/, '"true" is not "1" — must not be treated as a deliberate confirmation, avoiding an accidental env var collision or copy-pasted value silently enabling CodeQL');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('--no-auto-codeql suppresses both the --auto-codeql flag and the WEAVER_CODEQL_LICENSE_CONFIRMED env var for a single run', () => {
+  const outDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const outDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  try {
+    const flagOutput = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir1, '--auto-codeql', '--no-auto-codeql'], { encoding: 'utf8' });
+    assert.match(flagOutput, /--no-auto-codeql: suppressing/, '--no-auto-codeql must override --auto-codeql for this run');
+
+    const envOutput = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir2, '--no-auto-codeql'], { encoding: 'utf8', env: { ...process.env, WEAVER_CODEQL_LICENSE_CONFIRMED: '1' } });
+    assert.match(envOutput, /--no-auto-codeql: suppressing/, '--no-auto-codeql must override the env var too, without requiring it to be unset');
+  } finally {
+    fs.rmSync(outDir1, { recursive: true, force: true });
+    fs.rmSync(outDir2, { recursive: true, force: true });
+  }
+});

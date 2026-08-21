@@ -309,6 +309,7 @@ const KNOWN_FLAGS = [
   '--codeql-source-root',
   '--codeql-build-command',
   '--auto-codeql',
+  '--no-auto-codeql',
   '--repo-manifests',
 ];
 
@@ -344,7 +345,7 @@ function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error(
-      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>] [--auto-codeql] [--repo-manifests <dir>]\n' +
+      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>] [--auto-codeql] [--no-auto-codeql] [--repo-manifests <dir>]\n' +
         '   or: run-slice --from-facts <typed-facts.json> [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--no-snippets] [--strict-overrides] [--no-system-node]'
     );
     process.exit(1);
@@ -383,26 +384,44 @@ function main() {
   const codeqlBuildCommandIdx = args.indexOf('--codeql-build-command');
   let codeqlBuildCommand = codeqlBuildCommandIdx >= 0 ? args[codeqlBuildCommandIdx + 1] : undefined;
   const autoCodeqlIdx = args.indexOf('--auto-codeql');
+  const noAutoCodeqlIdx = args.indexOf('--no-auto-codeql');
   const repoManifestsIdx = args.indexOf('--repo-manifests');
   const repoManifestsDir = repoManifestsIdx >= 0 ? path.resolve(args[repoManifestsIdx + 1]) : undefined;
-  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, autoCodeqlIdx, repoManifestsIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, autoCodeqlIdx, noAutoCodeqlIdx, repoManifestsIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
-  // --auto-codeql: only fills in a gap left by explicit flags, never
-  // overrides them — a caller who hand-wrote --codeql-source-root/
-  // --codeql-build-command already made a deliberate choice, same
-  // "never contest an existing fact" discipline the CodeQL DI pass itself
-  // already follows for relationships (codeql-di-pass.ts). Still requires
-  // the flag itself: this only removes the friction of deriving the two
-  // values, it does not make CodeQL reachable without an explicit opt-in.
-  if (autoCodeqlIdx >= 0 && !codeqlSourceRoot && !codeqlBuildCommand) {
+  // --auto-codeql / WEAVER_CODEQL_LICENSE_CONFIRMED: only fills in a gap
+  // left by explicit flags, never overrides them — a caller who hand-wrote
+  // --codeql-source-root/--codeql-build-command already made a deliberate
+  // choice, same "never contest an existing fact" discipline the CodeQL DI
+  // pass itself already follows for relationships (codeql-di-pass.ts).
+  //
+  // WEAVER_CODEQL_LICENSE_CONFIRMED=1 is a per-ENVIRONMENT confirmation
+  // (set once in a shell profile or CI job config), not a per-repo default —
+  // it must equal exactly "1", not any truthy string, to avoid an unrelated
+  // env var collision or a copy-pasted "=true" silently enabling this. A
+  // fresh clone of this repo with nothing set in its environment behaves
+  // identically to before this existed: CodeQL stays off. See README's
+  // CodeQL section for the real license text this confirms — this pipeline
+  // has no way to verify a caller's actual license tier, only that they
+  // have consciously attested to having checked it.
+  //
+  // --no-auto-codeql is the escape hatch: even with the env var set
+  // globally, one invocation can still skip CodeQL (e.g. a fast smoke-test
+  // run) without unsetting the environment variable.
+  const envLicenseConfirmed = process.env.WEAVER_CODEQL_LICENSE_CONFIRMED === '1';
+  const autoCodeqlRequested = autoCodeqlIdx >= 0 || envLicenseConfirmed;
+  if (noAutoCodeqlIdx >= 0 && autoCodeqlRequested) {
+    console.log('[run-slice] --no-auto-codeql: suppressing auto-detected CodeQL DI-resolution for this run (--auto-codeql flag and/or WEAVER_CODEQL_LICENSE_CONFIRMED were present but overridden)');
+  } else if (noAutoCodeqlIdx === -1 && autoCodeqlRequested && !codeqlSourceRoot && !codeqlBuildCommand) {
+    const trigger = autoCodeqlIdx >= 0 ? '--auto-codeql' : 'WEAVER_CODEQL_LICENSE_CONFIRMED=1';
     const detected = detectCodeqlBuildConfig(packageRoots);
     if (detected) {
       codeqlSourceRoot = detected.sourceRoot;
       codeqlBuildCommand = detected.buildCommand;
-      console.log(`[run-slice] --auto-codeql: detected ${detected.buildTool} build at ${detected.sourceRoot}, running CodeQL DI-resolution with build command: ${detected.buildCommand}`);
+      console.log(`[run-slice] ${trigger}: detected ${detected.buildTool} build at ${detected.sourceRoot}, running CodeQL DI-resolution with build command: ${detected.buildCommand}`);
     } else {
-      console.log('[run-slice] --auto-codeql: no build.gradle/build.gradle.kts (with gradlew) or pom.xml found at the common package root — continuing without CodeQL DI-resolution evidence');
+      console.log(`[run-slice] ${trigger}: no build.gradle/build.gradle.kts (with gradlew) or pom.xml found at the common package root — continuing without CodeQL DI-resolution evidence`);
     }
   }
 

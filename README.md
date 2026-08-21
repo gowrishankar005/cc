@@ -311,7 +311,8 @@ anyone deciding what the product can do.
 | `--from-facts <typed-facts.json>` | Yes | — | Reconstruct CALM output from a previously-generated, frozen `typed-facts.json` — no rescan. Refuses an incompatible `contractVersion` rather than attempting reconstruction |
 | `--codeql-source-root <dir>` | Yes | — (off) | T-LR-5: the real, compilable root CodeQL should index (must be a common ancestor of every `--modules`-relevant package root). Requires `--codeql-build-command` too. See the CodeQL section below — real, non-trivial cost and a real license constraint, never on by default |
 | `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew --no-daemon :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile in a process CodeQL's tracer actually sees** — an up-to-date/cached build never re-invokes the compiler, and for Gradle, a pre-existing daemon runs the real compile *outside* CodeQL's traced process tree even when `--rerun-tasks` forces it — either way the database silently comes back empty rather than erroring (a real failure mode found building this, not a hypothetical). Gradle callers need both `--rerun-tasks` and `--no-daemon` |
-| `--auto-codeql` | No | off | Derives `--codeql-source-root`/`--codeql-build-command` from a detected `build.gradle`/`build.gradle.kts` (with a `gradlew` wrapper) or `pom.xml` (preferring a checked-in `mvnw` wrapper) at the common ancestor of every package root, instead of hand-writing both. **Still requires this explicit flag** — it only removes the friction of deriving the two values, it does not make CodeQL reachable without a conscious opt-in (same license reason `--codeql-source-root`/`--codeql-build-command` are opt-in below). Explicit `--codeql-source-root`/`--codeql-build-command` always take precedence and are never overridden if both are also passed. Refuses to guess a Gradle build with no `gradlew` wrapper checked in (a system-wide `gradle` install could be any version) rather than silently picking one — logs a message and continues without CodeQL evidence instead |
+| `--auto-codeql` | No | off | Derives `--codeql-source-root`/`--codeql-build-command` from a detected `build.gradle`/`build.gradle.kts` (with a `gradlew` wrapper) or `pom.xml` (preferring a checked-in `mvnw` wrapper) at the common ancestor of every package root, instead of hand-writing both. **Still requires this explicit flag** — it only removes the friction of deriving the two values, it does not make CodeQL reachable without a conscious opt-in (same license reason `--codeql-source-root`/`--codeql-build-command` are opt-in below). Explicit `--codeql-source-root`/`--codeql-build-command` always take precedence and are never overridden if both are also passed. Refuses to guess a Gradle build with no `gradlew` wrapper checked in (a system-wide `gradle` install could be any version) rather than silently picking one — logs a message and continues without CodeQL evidence instead. The `WEAVER_CODEQL_LICENSE_CONFIRMED=1` environment variable triggers the identical behavior without needing this flag on every invocation — see the CodeQL section below |
+| `--no-auto-codeql` | No | off | Suppresses `--auto-codeql`/`WEAVER_CODEQL_LICENSE_CONFIRMED` for a single run — skip CodeQL for one invocation without unsetting the environment variable |
 | `--repo-manifests <dir>` | Yes | — (off) | T-MR-2: a directory of OTHER repos' `*.weaver-manifest.yml` files (T-MR-1, `scanner/repo-manifest-provider.ts`) to join this run's own evidence against — never this run's own manifest, and the pipeline never writes to any target repo. Resolves in strict order (shared API-spec identity → published artifact coordinates → service-catalogue/DNS), stopping at the first match per candidate; unmatched entries are never guessed at |
 
 **When to reach for which flag:**
@@ -359,7 +360,36 @@ the common ancestor of your package roots for `build.gradle`/`pom.xml`, and
 only trusts a `gradlew`/`mvnw` wrapper if one is checked in (never guesses a
 system-wide build-tool version) — if neither is found, it logs a message
 and the run continues without CodeQL evidence, same as omitting the flags
-entirely.
+entirely. **Known limitation**: if a package root has both `build.gradle`
+and `pom.xml` checked in, Gradle is always tried first — on a machine where
+that Gradle build's toolchain doesn't resolve (e.g. a pinned Java version
+with no matching JDK linked) but Maven would have worked against the
+identical source, this degrades to "no CodeQL evidence" rather than falling
+back to Maven (`BACKLOG.md`, found running `E2-java-framework-generalization-experiment.md`).
+
+**Don't want to type `--auto-codeql` on every invocation?** Set
+`WEAVER_CODEQL_LICENSE_CONFIRMED=1` once in your own shell profile or CI job
+config — it triggers the identical auto-detection, with no flag needed:
+
+```bash
+export WEAVER_CODEQL_LICENSE_CONFIRMED=1
+node dist/orchestration/run-slice.js /path/to/module   # CodeQL auto-detected, same as --auto-codeql
+```
+
+**This is a per-environment attestation, not a codebase-wide default.** It
+must equal exactly `1` — not `true`/`yes`/any other truthy string, to avoid
+an unrelated environment variable collision or a copy-pasted value silently
+enabling this. A fresh clone of this repo, or any CI job that hasn't
+explicitly set it, behaves exactly as before: CodeQL stays off. Setting it
+is **your attestation that you've checked your own CodeQL CLI license
+tier** — the free CodeQL CLI license permits automated/unattended use only
+against an Open Source Codebase, or under a paid GitHub Advanced Security
+(GHAS) license; this pipeline has no way to verify which applies to you, it
+only checks that you've consciously set the variable. See GitHub's own
+[CodeQL CLI license terms](https://github.com/github/codeql-cli-binaries/blob/main/LICENSE.md)
+before setting this in an automated/CI context. To skip CodeQL for a single
+run without unsetting the environment variable, pass `--no-auto-codeql` —
+it overrides both the flag and the env var for that one invocation.
 
 **Gradle callers hand-writing the command: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
 failure mode, found running a live three-engine benchmark (Fineract +
