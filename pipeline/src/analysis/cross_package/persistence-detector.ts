@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { GraphifyRun } from '../../scanner/graphify-provider';
+import { CrossPackageGraphRun } from '../../scanner/codegraph-crossroot-provider';
 import { loadPersistenceDetectionCatalogue, driverImportLibraries, driverImportOwnerBaseClasses, driverImportOwnerFieldTypes } from '../../rules/persistence-detection-schema';
 import { loadWiringAnnotationCatalogue, wiringAnnotationNames } from '../../rules/wiring-annotation-schema';
 import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
@@ -27,7 +27,7 @@ import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-im
  * the identical two-step algorithm before this).
  */
 export function detectPersistenceUnits(
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   existingServiceFilePaths: Set<string> = new Set(),
   overridableServiceFilePaths: Set<string> = new Set()
 ): ImportStrategyResult {

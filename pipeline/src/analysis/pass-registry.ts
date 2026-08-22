@@ -1,7 +1,7 @@
 import { SignalCatalogue } from '../rules/rule-schema';
 import { TypedUnit, IgnoredItem, TypedRelationship } from '../types/typed-facts';
 import { NativeRouteFact, DecoratorFact } from '../scanner/structural-engine';
-import { GraphifyRun } from '../scanner/graphify-provider';
+import { CrossPackageGraphRun } from '../scanner/codegraph-crossroot-provider';
 import { OpenApiDocument } from '../scanner/openapi-provider';
 import { DeployableManifest } from '../scanner/deployable-manifest-provider';
 import { logMem } from '../util/debug-mem';
@@ -49,9 +49,9 @@ export interface AnalysisContext {
   allIgnoredItems: IgnoredItem[];
   unitsByRoot: Map<string, TypedUnit[]>;
   relationships: TypedRelationship[];
-  /** Populated by detectPersistencePass; consumed by reconcilePass. Absent if the Graphify pass failed (graceful degradation, unchanged from before this refactor). */
-  graphifyRun?: GraphifyRun;
-  graphifyError?: unknown;
+  /** Populated by detectPersistencePass; consumed by reconcilePass. Absent if the cross-package pass failed (graceful degradation, unchanged from before this refactor). */
+  crossPackageRun?: CrossPackageGraphRun;
+  crossPackageError?: unknown;
   /** Populated by openApiPass (T-X4-1); undefined for a root openApiPass hasn't run for yet. Empty array (not absent) means "ran, found none" — coverage-report.ts distinguishes the two. */
   openApiDocumentsByRoot?: Map<string, OpenApiDocument[]>;
   /** Set by run-slice.ts from --k8s-manifests <dir>; k8sTrustPass (T-X5-1) is a no-op when absent — opt-in, same convention as overridesDir. */

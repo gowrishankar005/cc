@@ -184,7 +184,13 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
 }
 
 export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
-  const graphifyStatus: CoverageReport['graphifyStatus'] = ctx.graphifyRun ? 'ok' : ctx.graphifyError ? 'failed' : 'skipped';
+  // Field names on CoverageReport (graphifyStatus/graphifyNodeCount/graphifyEdgeCount/
+  // graphifyError) are kept as-is — external JSON contract, now sourced from
+  // the codegraph cross-root pass (ctx.crossPackageRun), not Graphify. Not
+  // renamed: no functional reason to churn a serialized field name, and
+  // downstream consumers (intelligence-ir.ts, platform-artefacts.ts,
+  // external tooling reading coverage-report.json) key off these names.
+  const graphifyStatus: CoverageReport['graphifyStatus'] = ctx.crossPackageRun ? 'ok' : ctx.crossPackageError ? 'failed' : 'skipped';
 
   const roots: RootCoverage[] = ctx.packageRoots.map((root) => {
     const raw = ctx.rawByRoot.get(root);
@@ -194,8 +200,8 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
 
     let graphifyNodeCount = 0;
     let graphifyEdgeCount = 0;
-    if (ctx.graphifyRun) {
-      const { graph, resolveRoot } = ctx.graphifyRun;
+    if (ctx.crossPackageRun) {
+      const { graph, resolveRoot } = ctx.crossPackageRun;
       graphifyNodeCount = graph.nodes.filter((n) => resolveRoot(n.source_file)?.root === root).length;
       graphifyEdgeCount = graph.edges.filter((e) => resolveRoot(e.source_file)?.root === root).length;
     }
@@ -251,7 +257,7 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   // Folding this into the SAME reviewer-facing list closes that gap.
   if (graphifyStatus !== 'ok') {
     completeness.silenceFlags.push(
-      `S0-graphify-backbone-incomplete: graphifyStatus is "${graphifyStatus}"${ctx.graphifyError ? ` (${String(ctx.graphifyError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on Graphify; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
+      `S0-cross-package-backbone-incomplete: graphifyStatus is "${graphifyStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
     );
   }
   // T-Y5-1 — the second, CFN-specific half of the HT-ASB-006 class: real
@@ -273,7 +279,7 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   return {
     generatedAt: new Date().toISOString(),
     graphifyStatus,
-    graphifyError: ctx.graphifyError ? String(ctx.graphifyError) : undefined,
+    graphifyError: ctx.crossPackageError ? String(ctx.crossPackageError) : undefined,
     roots,
     ignoredByReason,
     unmappedSignalCount,

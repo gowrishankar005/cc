@@ -107,4 +107,4 @@ relationshipMechanisms:
     evidenceLevel: exploratory-not-shipped
     note: "Tier2 (2026-08-22): real gap confirmed on finos/legend-sdlc, but the first exploratory query's 218 raw bindings were 208/218 main/test-scoping-contaminated (mvn install compiled test source) — only 10 hand-verified clean. Needs source-root/active-Module scoping before this evidenceLevel could honestly move past exploratory."
 
-crossPackageBackbone: graphify # one combined pass, all languages, no per-root gate — proven, 265 real cross-module edges
+crossPackageBackbone: codegraph # one combined CodeGraph index over the common ancestor of all given roots, scoped via ProjectConfig.exclude — migrated from Graphify (docs/solution/E6-cross-package-backbone-evaluation.md); proven against Fineract (charge/core/security/provider), Waltz (3-module), a reference Python microservices repo, and a TS/DynamoDB fixture

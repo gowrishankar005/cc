@@ -51,11 +51,10 @@
          ▼                         ▼
   Scanner adapters           Rules / catalogues (YAML)
   • CodeGraph (routes,       • signal catalogue
-    decorators)              • node / relationship / control maps
-  • Graphify (structural     • persistence / messaging / HTTP-client
-    backbone, cross-root)      detection catalogues
-  • OpenAPI, k8s manifests,  • scope-limitations
-    Spring config, SBOM
+    decorators, cross-root   • node / relationship / control maps
+    structural backbone)     • persistence / messaging / HTTP-client
+  • OpenAPI, k8s manifests,    detection catalogues
+    Spring config, SBOM      • scope-limitations
          │
          ▼
   typed-facts.json  ──►  architecture.calm.json (+ IR, coverage, unmapped)
@@ -155,7 +154,6 @@ tools/                    ← standalone tooling
 ### Prerequisites
 
 - Node.js 20+
-- **Optional but recommended:** the [Graphify](https://pypi.org/project/graphifyy/) CLI on `PATH`, for cross-package relationship detection — `pip install graphifyy` installs a command named **`graphify`** (no double-y; only the PyPI package name has one). **Missing it does not fail a run** — Weaver catches the failure, logs a warning, and continues with same-file detection only (no cross-package edges). Confirm it's really on `PATH` with `graphify --version`, not `graphifyy --version`.
 
 ### Try it now (2 minutes, no target repo needed)
 
@@ -273,7 +271,7 @@ table exists to prevent.
 
 | Mechanism | Runs by default? | How to reach it |
 |---|---|---|
-| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, relationship fact-identity assignment (`TypedRelationship.id`, T-CL-1), status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
+| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, cross-package reconciliation, relationship grading, relationship fact-identity assignment (`TypedRelationship.id`, T-CL-1), status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
 | Incremental merge against the prior run's `typed-facts.json` in the same `--out` directory (T-CL-2) — unaffected facts (including a human-`reviewed` status) carry forward unchanged; a fact whose evidence changed after being `reviewed` is flagged `requires-review`, never silently overwritten either way. Writes `merge-report.json` and appends to `fact-history.json` (T-CL-3, retrievable who/when/why a status changed) | **Always** | No flag — a no-op (nothing to merge) the first time a given `--out` directory is used |
 | OpenAPI/Swagger ingestion | **Always** | No flag — auto-discovers `openapi.yaml`/`.json` at each package root |
 | Spring config file reading (`application.yml`/`.properties`) | **Always** | No flag — auto-discovers config files at each package root |
@@ -320,7 +318,7 @@ anyone deciding what the product can do.
 - Have Kubernetes manifests for the system? → `--k8s-manifests <dir>`. You get shared-secret trust edges AND `deployed-in` runtime-placement edges (which namespace each service actually runs in) for free; if a manifest's datastore image disagrees with a Spring-config-sourced unit's JDBC scheme, that unit is also automatically forced to `requires-review` (no extra flag).
 - Also want low-confidence env-var-name correlation edges on top of that? → add `--enable-env-soft-graph` (does nothing without `--k8s-manifests`).
 - System is deployed via CloudFormation/SAM (API Gateway → Lambda)? → `--cfn-manifests <dir>`.
-- Hit a case where CodeGraph/Graphify can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--auto-codeql` (or `--codeql-source-root`/`--codeql-build-command` for a hand-tuned build) — see the dedicated section below first: real cost, license-gated, local-only.
+- Hit a case where CodeGraph can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--auto-codeql` (or `--codeql-source-root`/`--codeql-build-command` for a hand-tuned build) — see the dedicated section below first: real cost, license-gated, local-only.
 - Re-running CALM generation after tweaking `--modules` or an override, without re-scanning source? → `--from-facts <typed-facts.json>` instead of re-running the whole scan.
 - A human already corrected a wrong classification? → `--overrides <dir>`; add `--strict-overrides` in CI so a malformed/orphaned override fails the build instead of silently no-op'ing.
 - Debugging why a route didn't get detected? → `--strict-detect` turns a silent zero-routes result into a hard failure you'll actually notice.
@@ -329,7 +327,7 @@ anyone deciding what the product can do.
 #### Optional: CodeQL DI-resolution (`--codeql-source-root` / `--codeql-build-command`)
 
 Resolves a Spring interface field to its real implementation via two shapes
-neither CodeGraph nor Graphify can see at all: a `@Bean`-factory method
+CodeGraph can't see at all: a `@Bean`-factory method
 inside a `@Configuration` class, or 2+ real `implements` candidates
 disambiguated by a stereotype annotation — see
 [`docs/solution/E1b-codeql-di-resolution-experiment.md`](./docs/solution/E1b-codeql-di-resolution-experiment.md)
@@ -532,4 +530,4 @@ A clean L0+L1 result on a fixture does not imply L2 on a real multi-module syste
 
 ## License / provenance
 
-The pipeline depends on open-source tools including `@colbymchenry/codegraph`, `graphifyy`, and `@finos/calm-cli`. Check upstream licenses before redistributing any generated artefacts derived from proprietary source.
+The pipeline depends on open-source tools including `@colbymchenry/codegraph` and `@finos/calm-cli`. Check upstream licenses before redistributing any generated artefacts derived from proprietary source.

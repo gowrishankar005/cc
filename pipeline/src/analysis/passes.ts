@@ -1,7 +1,7 @@
 import { AnalysisContext, AnalysisPass, existingServiceFilePaths, overridableServiceFilePaths, findOverridableServiceUnit, pushAll } from './pass-registry';
 import { composeRoutesForFile } from './route-composer-registry';
 import { mapSignalsToUnits } from './signal-mapper';
-import { runGraphifyPass } from '../scanner/graphify-provider';
+import { runCodegraphCrossrootPass } from '../scanner/codegraph-crossroot-provider';
 import { detectPersistenceUnits } from './cross_package/persistence-detector';
 import { reconcileCrossPackageEdges } from './cross_package/graphify-reconciler';
 import { ignoreLowConfidence } from './ignored-items';
@@ -90,13 +90,16 @@ export const mapSignalsPass: AnalysisPass = {
   },
 };
 
-/** One combined Graphify pass (all roots) + persistence-unit detection. Failure here is caught and stored, not thrown — reconcilePass checks ctx.graphifyRun before proceeding, same graceful-degradation behavior as before this refactor. */
+/** One combined CodeGraph cross-root pass (all roots) + persistence-unit detection. Failure here is caught and stored, not thrown — reconcilePass checks ctx.crossPackageRun before proceeding, same graceful-degradation behavior as before this refactor. */
 export const detectPersistencePass: AnalysisPass = {
   name: 'detectPersistence',
-  run(ctx: AnalysisContext) {
+  async run(ctx: AnalysisContext) {
     if (ctx.packageRoots.length === 0) return;
     try {
-      ctx.graphifyRun = runGraphifyPass(ctx.packageRoots, ctx.outDir);
+      // ctx.outDir cache-location fix (onboarding-fixes) becomes moot here —
+      // CodeGraph's own .codegraph cache convention is unrelated and not
+      // configurable the same way; superseded by removal, not dropped.
+      ctx.crossPackageRun = await runCodegraphCrossrootPass(ctx.packageRoots);
       // T-LR-3 real-data finding — overridableServiceFilePaths(ctx) names
       // files whose ONLY existing 'service' unit evidence is a bare,
       // weak stereotype (no real route/security-control signal of its
@@ -109,9 +112,9 @@ export const detectPersistencePass: AnalysisPass = {
       // platform class surfaced: real `@Service` AND real `JdbcTemplate`
       // usage on the same file).
       const overridable = overridableServiceFilePaths(ctx);
-      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.graphifyRun, existingServiceFilePaths(ctx), overridable);
+      const { unitsByRoot: persistenceUnitsByRoot, excludedTestFiles } = detectPersistenceUnits(ctx.crossPackageRun, existingServiceFilePaths(ctx), overridable);
       for (const [root, persistenceUnits] of persistenceUnitsByRoot) {
-        console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via graphify`);
+        console.log(`[run-slice] ${root}: ${persistenceUnits.length} persistence unit(s) detected via codegraph cross-root pass`);
         let replacedCount = 0;
         for (const pu of persistenceUnits) {
           if (!overridable.has(pu.filePath)) continue;
@@ -145,23 +148,23 @@ export const detectPersistencePass: AnalysisPass = {
       }
       if (excludedTestFiles.length > 0) console.log(`[run-slice] ${excludedTestFiles.length} test file(s) excluded from persistence detection`);
     } catch (err) {
-      ctx.graphifyError = err;
-      console.warn(`[run-slice] WARNING: graphify pass failed, continuing without cross-package relationships: ${err}`);
+      ctx.crossPackageError = err;
+      console.warn(`[run-slice] WARNING: codegraph cross-root pass failed, continuing without cross-package relationships: ${err}`);
     }
   },
 };
 
-/** Cross-package/same-package relationship reconciliation, from the Graphify run detectPersistencePass produced. */
+/** Cross-package/same-package relationship reconciliation, from the run detectPersistencePass produced. */
 export const reconcilePass: AnalysisPass = {
   name: 'reconcile',
   run(ctx: AnalysisContext) {
-    if (!ctx.graphifyRun) return; // Graphify pass didn't run or failed — already logged by detectPersistencePass
+    if (!ctx.crossPackageRun) return; // cross-root pass didn't run or failed — already logged by detectPersistencePass
     // T-P0-1 (E2) round 3 — appends now, not overwrites, so it can run
     // AFTER multiHopBridgePass without discarding what that pass already
     // added; ctx.multiHopExaminedPairs (populated by that earlier pass)
     // tells graded-fact admission which edges are already someone else's
     // territory.
-    const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.graphifyRun, ctx.unitsByRoot, ctx.multiHopExaminedPairs, ctx.multiHopExaminedFiles);
+    const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.crossPackageRun, ctx.unitsByRoot, ctx.multiHopExaminedPairs, ctx.multiHopExaminedFiles);
     pushAll(ctx.relationships, relationships);
     // T-P0-1 (E2) — graded-fact-admission placeholders (kind: 'unresolved').
     // Pushed into ctx.allUnits (not ctx.unitsByRoot) since they're not real
@@ -171,7 +174,7 @@ export const reconcilePass: AnalysisPass = {
     pushAll(ctx.allUnits, unresolvedUnits);
     const crossCount = relationships.filter((r) => r.crossPackage).length;
     console.log(
-      `[run-slice] graphify: ${relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${relationships.length - crossCount} same-package)${unresolvedUnits.length > 0 ? `, ${unresolvedUnits.length} admitted via unresolved-endpoint placeholder` : ''}`
+      `[run-slice] cross-package: ${relationships.length} relationship(s) reconciled (${crossCount} cross-package, ${relationships.length - crossCount} same-package)${unresolvedUnits.length > 0 ? `, ${unresolvedUnits.length} admitted via unresolved-endpoint placeholder` : ''}`
     );
   },
 };

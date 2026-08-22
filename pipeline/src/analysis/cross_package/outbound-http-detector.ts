@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { GraphifyRun, parseSourceLocation } from '../../scanner/graphify-provider';
+import { CrossPackageGraphRun, parseSourceLocation } from '../../scanner/codegraph-crossroot-provider';
 import { IgnoredItem } from '../../types/typed-facts';
 import { loadHttpClientDetectionCatalogue, importOnlyHttpClientLibraries } from '../../rules/http-client-detection-schema';
 import { findLibraryImportEdges } from './graphify-import-strategy-detector';
@@ -27,7 +27,7 @@ import { isTestPath } from '../../rules/test-path';
  * since a file importing two different HTTP-client libraries is two real
  * findings here, not one unit.
  */
-export function detectOutboundHttpClients(run: GraphifyRun): IgnoredItem[] {
+export function detectOutboundHttpClients(run: CrossPackageGraphRun): IgnoredItem[] {
   const catalogue = loadHttpClientDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
   const libraries = importOnlyHttpClientLibraries(catalogue);
 

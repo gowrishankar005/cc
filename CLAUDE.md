@@ -102,8 +102,6 @@ See `coe-lab/ISOLATION.md`. Gold paths are also listed in `.cursorignore` / `.gr
 
 ## Build and run
 
-**Prerequisite:** Python with `graphifyy` on `PATH` (`pip install graphifyy`) — required for the Graphify cross-package pass. Missing it doesn't fail the build; it degrades cross-package detection instead (caught, logged as a warning, run continues without cross-package relationships).
-
 ```bash
 cd pipeline && npm install && npm run build
 node dist/orchestration/run-slice.js <package-root> [<package-root> ...] --out <dir>
@@ -119,11 +117,10 @@ cd ../tools/review-session && python3 -m unittest discover -s . -p "test_*.py"  
 
 Four layers: Scanner → Rules → Analysis → Orchestration → Modules, with `typed-facts.json` (`pipeline/src/types/typed-facts.ts`) as the fixed, versioned contract between Analysis and any downstream module. `calm-generator`, `threat-signals`, and `resilience-lens` are the three built modules.
 
-**Dual-engine scanner** — each tool doing what it's verified good at:
+**CodeGraph-based scanner** (migrated off a second engine, Graphify, in the drop-graphify-backbone change — see `docs/solution/E6-cross-package-backbone-evaluation.md`):
 - **CodeGraph** (`scanner/codegraph-provider.ts`) — per-package indexing; native `route` typing where its resolver covers the framework, plus `extractFromSource()`-based decorator/annotation facts for frameworks it doesn't natively type (e.g. JAX-RS, JPA).
-- **Graphify** (`scanner/graphify-provider.ts`) — one combined pass across all package roots given to a run, used as the cross-package structural backbone. A single combined extraction (not one pass per root) is required for cross-package edges to be possible at all — Graphify has no per-root gate, so it captures cross-root edges natively once invoked this way.
-- Both are real dependencies, not optional. `analysis/cross_package/persistence-detector.ts` uses Graphify's raw import/contains edges to recover persistence signal CodeGraph's native typing misses entirely (e.g. bare ORM usage with no framework-native route).
-- A fourth structured-file-provider pattern (`k8s-manifest-provider.ts`, `openapi-provider.ts`, `spring-config-provider.ts`, `cdxgen-provider.ts`) reads deterministic, non-code evidence sources (Kubernetes manifests, OpenAPI specs, Spring configuration files, dependency manifests via an external SBOM tool) the two structural engines can't reach.
+- **CodeGraph, cross-root** (`scanner/codegraph-crossroot-provider.ts`) — one combined CodeGraph index over the common ancestor of every package root given to a run, scoped via `ProjectConfig.exclude` (not `include`, which is additive-only), used as the cross-package structural backbone. A single combined index (not one per root) is required for cross-package edges to be possible at all. `analysis/cross_package/persistence-detector.ts` uses its raw import/contains edges to recover persistence signal `codegraph-provider.ts`'s native typing misses entirely (e.g. bare ORM usage with no framework-native route).
+- A third structured-file-provider pattern (`k8s-manifest-provider.ts`, `openapi-provider.ts`, `spring-config-provider.ts`, `cdxgen-provider.ts`) reads deterministic, non-code evidence sources (Kubernetes manifests, OpenAPI specs, Spring configuration files, dependency manifests via an external SBOM tool) the two CodeGraph-based providers can't reach.
 
 **Catalogue-driven CALM construction** — `build-calm.ts` reads `node-type-mapping.yml` and `relationship-type-mapping.yml` to construct CALM nodes/relationships instead of hardcoding type-casts; a control catalogue (`control-requirement-catalogue.yml`) and `control-builder.ts` attach evidence-backed `controls` to nodes. Relationship shapes (`connects`/`interacts`/`deployed-in`/`composed-of`) map to the real, distinct CALM 1.2 schema shapes, not a single generic edge type.
 

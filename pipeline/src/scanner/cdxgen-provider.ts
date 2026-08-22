@@ -5,7 +5,7 @@ import * as path from 'path';
 
 /**
  * Real, deterministic dependency-name corroboration via `@cyclonedx/cdxgen`
- * (OWASP, npm), shelled out the same way `graphify-provider.ts` already
+ * (OWASP, npm), shelled out the same way `codegraph-crossroot-provider.ts` already
  * shells out to Graphify — a structured EXTERNAL TOOL OUTPUT provider, not
  * a new mechanism class.
  *

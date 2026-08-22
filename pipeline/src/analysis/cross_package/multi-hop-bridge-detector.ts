@@ -1,4 +1,4 @@
-import { GraphifyRun } from '../../scanner/graphify-provider';
+import { CrossPackageGraphRun } from '../../scanner/codegraph-crossroot-provider';
 import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
 import { relationshipTrust } from '../fact-trust-matrix';
@@ -89,7 +89,7 @@ function dedupeByUnitId(matches: NodeUnitMatch[]): NodeUnitMatch[] {
 }
 
 export function detectMultiHopBridgeRelationships(
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   unitsByRoot: Map<string, TypedUnit[]>,
   /**
    * T-LR-3 — raw signal names (e.g. "Service") that count as bridge-
@@ -316,7 +316,7 @@ export function detectMultiHopBridgeRelationships(
         const uniqueStoreImplementers = [...new Map(storeImplementers.map((m) => [m.unit.id, m])).values()];
         if (uniqueStoreImplementers.length === 1) {
           const candidate = uniqueStoreImplementers[0];
-          const wouldBeConfidence = relationshipTrust('graphify', 'r2-phase1', fromMatch.root === candidate.root ? 'same-root' : 'cross-root');
+          const wouldBeConfidence = relationshipTrust('codegraph', 'r2-phase1', fromMatch.root === candidate.root ? 'same-root' : 'cross-root');
           const key = `${fromMatch.unit.id}|${bridgeNodeId}|tier-b-single-candidate`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -406,8 +406,8 @@ export function detectMultiHopBridgeRelationships(
       to: to.unit.id,
       kind: 'calls', // distinct from R1's 'imports'/'connects' — this is an inferred call chain through a bridge, not a direct import (§2.2)
       crossPackage: !sameRoot,
-      source: 'graphify',
-      confidence: relationshipTrust('graphify', mechanism, sameRoot ? 'same-root' : 'cross-root'), // T-LR-6, fact-trust-matrix.ts — the single source of truth for this tier
+      source: 'codegraph',
+      confidence: relationshipTrust('codegraph', mechanism, sameRoot ? 'same-root' : 'cross-root'), // T-LR-6, fact-trust-matrix.ts — the single source of truth for this tier
       mechanism, // T-L2-1 — r2-phase1 vs r2b, distinguishable without decoding the confidence value
       status: PENDING_STATUS,
       id: PENDING_RELATIONSHIP_ID,
