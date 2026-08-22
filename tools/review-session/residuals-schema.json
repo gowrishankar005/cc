@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver residual review session — residuals.json",
-  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). T-FS-1 (BACKLOG.md 'Tier-B residual detection') closed the prior 'no trigger produces tier B' gap: multi-hop-single-candidate-below-threshold (multi-hop-bridge-detector.ts's tier-b-single-candidate ignored-item, a single real store candidate found among a bridge's several syntactic implementers) now maps to tier 'B'.",
+  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. Sources: review-queue.json triggers (S1/S2/S5/low-architecture-coverage, T-FS-1, T-FS-3) plus unmapped-signal-cluster (class catalogue-candidate) and ignored INSUFFICIENT_EVIDENCE / AMBIGUOUS_BOUNDARY leftovers that are not already a queue item. Extra-read spans are appended to evidence/packs.json by pack.py fetch-span (architect-run).",
   "type": "object",
   "required": ["generatedAt", "items"],
   "properties": {

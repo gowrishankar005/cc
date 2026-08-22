@@ -86,6 +86,24 @@ class TestChatModeSafety(unittest.TestCase):
     def test_design_authority_linked(self):
         self.assertIn("Architect_Residual_Review_Session.md", self.text)
 
+    def test_tools_exclude_unbounded_workspace_search(self):
+        """Token-conscious: pack is the corpus. codebase/search/usages are
+        workspace-wide and would re-read the repo."""
+        m = re.search(r"^---\n(.*?)\n---\n", self.text, re.DOTALL)
+        tools_match = re.search(r"tools:\s*\[(.*?)\]", m.group(1))
+        declared = [t.strip().strip("'\"").lower() for t in tools_match.group(1).split(",") if t.strip()]
+        for banned in ("codebase", "search", "usages"):
+            self.assertNotIn(banned, declared, f"{banned} must not be in chatmode tools: (pack-only extra-read is CLI fetch-span)")
+        self.assertIn("editfiles", declared)
+
+    def test_fetch_span_command_is_printed_not_executed(self):
+        self.assertIn("pack.py fetch-span", self.text)
+        self.assertIn("--residual-id", self.text)
+
+    def test_discovery_parity_markers_present(self):
+        for marker in ("cannot_decide", "typical Spring", "VALID_OVERRIDE_TYPES"):
+            self.assertIn(marker, self.text, f"expected discovery-parity marker {marker!r}")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -96,6 +96,9 @@ class TestCardDeterminism(unittest.TestCase):
             "missing-intermediates-not-in-scan",
             "single-candidate-below-threshold",
             "contradicting-evidence",
+            "catalogue-candidate",
+            "insufficient-evidence",
+            "ambiguous-boundary",
             "unclassified",
         ):
             residual = {"id": "R-001", "tier": "A", "class": cls, "unitIds": [], "rationale": "r"}

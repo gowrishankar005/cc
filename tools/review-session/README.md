@@ -1,6 +1,6 @@
 # Weaver residual review session tools
 
-Offline tooling that turns a `run-slice` output directory into an architect-friendly **Session Pack** for reviewing what a scan left open (S1/S2/S5/low-architecture-coverage residuals), then applies decisions back through Weaver's existing Decision Record + Override mechanism.
+Offline tooling that turns a `run-slice` output directory into an architect-friendly **Session Pack** for reviewing what a scan left open (S1/S2/S5/low-architecture-coverage, plus unmapped-signal clusters and ignored INSUFFICIENT_EVIDENCE / AMBIGUOUS_BOUNDARY leftovers), then applies decisions back through Weaver's existing Decision Record + Override mechanism. Extra-read of source, if the pack is short, is `pack.py fetch-span` — architect-run, never Copilot, never MCP.
 
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
 **Status:** The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. Tier B drafting's PRIMARY path is in-chat — Copilot Chat's own `editFiles` tool, bound by the §5.1 rules in `.github/chatmodes/residual-review.chatmode.md`; `draft_tier_b.py` is a secondary, headless/scripted alternative, not the default. T-FS-1 (`docs/solution/AGENT_TASKS_Ext_Fact_Semantics.md`, `BACKLOG.md` "Tier-B residual detection") gave `triage.py` its first real Tier B producer — `multi-hop-single-candidate-below-threshold`, from `multi-hop-bridge-detector.ts`'s own `tier-b-single-candidate` ignored-item (one real store candidate among a bridge's several syntactic implementers). `draft_tier_b.py`'s live-model path is still unexercised against a real API key — see its own module docstring. T-RT-1 (`bulk_apply.py`, replicate one answered residual across its similar-class siblings), T-RT-2 (`consequence.py`/`queue_rank.py`, consequence-ranked backlog), and T-RT-4 (`advisory.py`, reviewer-assistance advisory layer — explains evidence, proposes hypotheses, drafts catalogue-rule candidates, **never writes a fact**) are done — see `docs/solution/Claim_Register.md`'s `T-RT-1-bulk-residual-authoring` / `T-RT-2-consequence-ranked-queue` / `T-RT-4-reviewer-assistance-advisory` rows for evidence and honest scope limits (bulk-apply not yet run against a real multi-residual scan; consequence signals are named proxies, not a real PII detector; advisory.py's live-model path is unexercised against a real API key, same disclosed gap as `draft_tier_b.py`). T-RT-3 (call-site security controls, beyond the 4 named vocabularies) is not started. Hardening/portability work is next — see the design doc for what's built vs. not yet.
@@ -27,8 +27,8 @@ Full detail and rationale for each: `Architect_Residual_Review_Session.md` §0.3
 ```
 tools/review-session/
   README.md              this file
-  pack.py                 run-slice out-dir -> Session Pack
-  triage.py               builds residuals.json (Tier A/B/C) from review-queue.json
+  pack.py                 run-slice out-dir -> Session Pack; also `pack.py fetch-span` (HITL extra-read)
+  triage.py               builds residuals.json (Tier A/B/C) from review-queue.json + unmapped clusters + ignored leftovers
   redact.py               S8 secret-redaction, used by pack.py before any snippet reaches disk
   cards.py                deterministic choice-card generator, fixed per-class templates
   residuals-schema.json   JSON Schema for residuals.json

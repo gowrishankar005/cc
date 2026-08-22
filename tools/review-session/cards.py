@@ -81,6 +81,35 @@ def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) 
     ]
 
 
+def _catalogue_candidate_options(residual: dict, unit_index: dict) -> list[dict]:
+    """Unmapped-signal cluster: catalogue lane first (S11), optional
+    one-off construct only if a packed sample already names a real unit —
+    never auto-merge signal-catalogue.yml."""
+    return [
+        {"key": "1", "label": "Catalogue-rule candidate", "detail": "propose a signal-catalogue.yml row (suggest-rules lane) — not a one-off CALM node"},
+        {"key": "2", "label": "One-off construct from a packed sample", "detail": "only if a sample ref in this pack already names a real unit — HITL still applies"},
+        {"key": "3", "label": "Ignore this cluster for this run", "detail": "document as not-in-scope / noise for this scan"},
+    ]
+
+
+def _insufficient_evidence_options(residual: dict, unit_index: dict) -> list[dict]:
+    """Ignored INSUFFICIENT_EVIDENCE leftover (not an unmapped catalogue miss)."""
+    return [
+        {"key": "1", "label": "Promote — the snippet is enough to type/connect this unit", "detail": "draft a CALM construct only from packed evidence; otherwise cannot_decide"},
+        {"key": "2", "label": "Confirmed insufficient — leave as a known gap", "detail": "scope-limitation, not a fabricated node"},
+        {"key": "3", "label": "Need a bounded extra-read", "detail": "architect runs pack.py fetch-span for this residual — Copilot does not read the repo"},
+    ]
+
+
+def _ambiguous_boundary_options(residual: dict, unit_index: dict) -> list[dict]:
+    """Ignored AMBIGUOUS_BOUNDARY leftover (not a T-FS-3 contradiction)."""
+    return [
+        {"key": "1", "label": "Pick the boundary named in the packed evidence", "detail": "only if exactly one candidate is named in this residual's snippet"},
+        {"key": "2", "label": "Leave ambiguous — do not pick", "detail": "0 or 2+ candidates → cannot_decide, same as R2"},
+        {"key": "3", "label": "Need a bounded extra-read", "detail": "architect runs pack.py fetch-span for this residual — Copilot does not read the repo"},
+    ]
+
+
 def _contradicting_evidence_options(residual: dict, unit_index: dict) -> list[dict]:
     """T-FS-3: two real evidence sources assert DIFFERENT values for the
     same fact (e.g. a k8s deployment manifest names one datastore engine,
@@ -102,6 +131,9 @@ _CLASS_TEMPLATES = {
     "missing-intermediates-not-in-scan": _missing_intermediates_options,
     "single-candidate-below-threshold": _single_candidate_below_threshold_options,
     "contradicting-evidence": _contradicting_evidence_options,
+    "catalogue-candidate": _catalogue_candidate_options,
+    "insufficient-evidence": _insufficient_evidence_options,
+    "ambiguous-boundary": _ambiguous_boundary_options,
 }
 
 
@@ -151,6 +183,19 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
 def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> list[str]:
     seen_refs = set()
     out = []
+
+    def _add(ref: str) -> None:
+        if not ref or ref in seen_refs:
+            return
+        seen_refs.add(ref)
+        snippet = evidence_packs.get(ref)
+        if not snippet:
+            return
+        preview = next((line for line in snippet.splitlines() if line.strip()), "")
+        out.append(f"`{ref}`: {preview}")
+
+    for ref in residual.get("evidenceRefs") or []:
+        _add(ref)
     for unit_id in residual.get("unitIds", []):
         unit = unit_index.get(unit_id)
         if not unit:
@@ -160,14 +205,7 @@ def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> l
         # the same line) — real, not a bug in the underlying data, but the
         # card must show each ref once, not once per evidence entry.
         for ref in unit.get("evidenceRefs", []):
-            if ref in seen_refs:
-                continue
-            seen_refs.add(ref)
-            snippet = evidence_packs.get(ref)
-            if not snippet:
-                continue
-            preview = next((line for line in snippet.splitlines() if line.strip()), "")
-            out.append(f"`{ref}`: {preview}")
+            _add(ref)
     return out
 
 

@@ -137,5 +137,57 @@ class TestApplyBaseline(unittest.TestCase):
         self.assertEqual(out[0]["class"], "missing-intermediates-not-in-scan")
 
 
+class TestLeftoverFuel(unittest.TestCase):
+    def test_unmapped_cluster_becomes_catalogue_candidate(self):
+        rq = {"items": []}
+        unmapped = {
+            "clusters": [
+                {"signal": "@WeirdDecorator", "count": 12, "sampleRefs": ["svc.py:4", "svc.py:10"]},
+            ]
+        }
+        residuals = build_residuals(rq, unmapped=unmapped)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["trigger"], "unmapped-signal-cluster")
+        self.assertEqual(residuals[0]["class"], "catalogue-candidate")
+        self.assertEqual(residuals[0]["tier"], "A")
+        self.assertEqual(residuals[0]["evidenceRefs"], ["svc.py:4", "svc.py:10"])
+        self.assertEqual(residuals[0]["id"], "R-001")
+
+    def test_unmapped_caps_at_max_clusters(self):
+        clusters = [{"signal": f"sig-{i}", "count": 1, "sampleRefs": [f"a.py:{i}"]} for i in range(25)]
+        residuals = build_residuals({"items": []}, unmapped={"clusters": clusters})
+        self.assertEqual(len(residuals), 20)
+
+    def test_ignored_insufficient_not_double_counted_as_unmapped(self):
+        ignored = [
+            {"ref": "a.py:3", "reason": "INSUFFICIENT_EVIDENCE", "detail": 'No signal-catalogue.yml rule matched raw signal "@Foo"'},
+            {"ref": "b.py:9", "reason": "INSUFFICIENT_EVIDENCE", "detail": "Confidence 12 below the review-queue threshold (40)"},
+        ]
+        unmapped = {"clusters": [{"signal": "@Foo", "count": 1, "sampleRefs": ["a.py:3"]}]}
+        residuals = build_residuals({"items": []}, unmapped=unmapped, ignored=ignored)
+        classes = [r["class"] for r in residuals]
+        self.assertIn("catalogue-candidate", classes)
+        self.assertIn("insufficient-evidence", classes)
+        self.assertEqual(len(residuals), 2)
+        insuf = next(r for r in residuals if r["class"] == "insufficient-evidence")
+        self.assertEqual(insuf["evidenceRefs"], ["b.py:9"])
+
+    def test_contradiction_ignored_item_not_duplicated(self):
+        ignored = [
+            {"ref": "db", "reason": "AMBIGUOUS_BOUNDARY", "detail": "contradiction: spring-config vs k8s"},
+        ]
+        residuals = build_residuals({"items": []}, ignored=ignored)
+        self.assertEqual(residuals, [])
+
+    def test_queue_ids_stay_stable_when_leftovers_append(self):
+        rq = {"items": [{"trigger": "S2-http-without-security-control", "unitId": "svc.py", "unitKind": "service", "confidence": 60, "rationale": "r"}]}
+        unmapped = {"clusters": [{"signal": "@X", "count": 1, "sampleRefs": ["z.py:1"]}]}
+        residuals = build_residuals(rq, unmapped=unmapped)
+        self.assertEqual(residuals[0]["id"], "R-001")
+        self.assertEqual(residuals[0]["trigger"], "S2-http-without-security-control")
+        self.assertEqual(residuals[1]["id"], "R-002")
+        self.assertEqual(residuals[1]["trigger"], "unmapped-signal-cluster")
+
+
 if __name__ == "__main__":
     unittest.main()
