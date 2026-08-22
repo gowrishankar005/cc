@@ -6,6 +6,7 @@ import { discoverDeployableManifests } from '../scanner/deployable-manifest-prov
 import { runDetectGateSmokeTest } from '../scanner/detect-gate-smoketest';
 import { loadEngineCapabilityMatrix, logEngineCapabilitySummary } from '../scanner/engine-capability-matrix';
 import { detectCodeqlBuildConfig } from '../scanner/codeql-auto-detect';
+import { cleanupCodeqlDatabases } from '../scanner/codeql-database-cache';
 import { loadSignalCatalogue } from '../rules/rule-schema';
 import { runModules } from '../modules/registry';
 import { resolveModules, DEFAULT_MODULE_NAMES } from '../modules/available-modules';
@@ -169,6 +170,7 @@ async function runSlice(
   };
   await runPasses(DEFAULT_PASSES, ctx);
   logMem('after runPasses');
+  cleanupCodeqlDatabases(); // every CodeQL-based pass that could use the shared database has now run
   const { coverage, unmapped } = writePlatformArtefacts(ctx, outDir);
   logMem('after writePlatformArtefacts');
 

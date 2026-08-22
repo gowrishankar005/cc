@@ -2,6 +2,7 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
 
 /**
  * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — a second real structural
@@ -58,15 +59,6 @@ export interface CodeQLDiBinding {
   implFile: string;
 }
 
-function codeqlBinaryAvailable(): boolean {
-  try {
-    execFileSync('codeql', ['version', '--format=terse'], { stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * `buildTargetRoot` is the real, compilable root the build command runs
  * in — the query itself resolves across the WHOLE database, so a caller
@@ -80,30 +72,23 @@ function codeqlBinaryAvailable(): boolean {
  * captures zero source) rather than an honest error.
  */
 export function runCodeQLDiResolution(sourceRoot: string, buildCommand: string): CodeQLDiBinding[] {
-  if (!codeqlBinaryAvailable()) {
-    console.warn('[codeql-di] WARNING: codeql CLI not found on PATH, continuing without CodeQL DI-resolution evidence');
-    return [];
-  }
   if (!fs.existsSync(DI_RESOLUTION_QUERY)) {
     console.warn(`[codeql-di] WARNING: query file missing at ${DI_RESOLUTION_QUERY}, continuing without CodeQL DI-resolution evidence`);
     return [];
   }
 
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-'));
-  const dbPath = path.join(workDir, 'db');
+  // T-onboarding-18b — shared across every CodeQL-based provider: builds
+  // the real database at most once per (sourceRoot, buildCommand) per
+  // process, regardless of how many mechanisms query it. See
+  // codeql-database-cache.ts's own doc comment for the real bug this fixes
+  // (a second independent `database create` against the same source could
+  // silently return an empty extraction via Gradle's build cache).
+  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand);
+  if (!dbPath) return []; // binary/build failure already warned by the shared cache
+
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-di-out-'));
   const bqrsPath = path.join(workDir, 'out.bqrs');
   const csvPath = path.join(workDir, 'out.csv');
-
-  try {
-    execFileSync('codeql', ['database', 'create', dbPath, '--language=java', `--source-root=${sourceRoot}`, `--command=${buildCommand}`], {
-      stdio: 'pipe',
-      timeout: 10 * 60 * 1000,
-    });
-  } catch (err) {
-    console.warn(`[codeql-di] WARNING: CodeQL database creation failed (build likely broke, or produced no source-backed database), continuing without CodeQL DI-resolution evidence: ${err}`);
-    fs.rmSync(workDir, { recursive: true, force: true });
-    return [];
-  }
 
   try {
     execFileSync('codeql', ['query', 'run', '-d', dbPath, '-o', bqrsPath, '--', DI_RESOLUTION_QUERY], { stdio: 'pipe', timeout: 5 * 60 * 1000 });

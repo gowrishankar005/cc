@@ -19,6 +19,7 @@ import { cfnRoutePass } from './cfn-route-pass';
 import { contradictionPass } from './contradiction-pass';
 import { assignStatuses } from './status-assignment';
 import { codeqlDiPass } from './codeql-di-pass';
+import { codeqlCommandDispatchPass } from './codeql-command-dispatch-pass';
 import { assignFactIds } from './fact-identity';
 
 export const CONFIDENCE_FLOOR = 40;
@@ -283,6 +284,12 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // gradeRelationshipsPass/assignStatusPass (so any relationship or unit it
   // introduces still gets graded/statused like every other real fact).
   codeqlDiPass,
+  // #18 — same opt-in gate as codeqlDiPass (ctx.codeqlSourceRoot/
+  // codeqlBuildCommand), a separate real mechanism sharing the same flags
+  // and the same database when both fire. Ordered after codeqlDiPass so
+  // its own "never contest an existing edge" check also sees any
+  // relationship codeqlDiPass already produced for the same pair.
+  codeqlCommandDispatchPass,
   gradeRelationshipsPass,
   factIdentityPass,
   assignStatusPass,

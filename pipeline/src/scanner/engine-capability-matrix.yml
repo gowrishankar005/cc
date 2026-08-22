@@ -89,6 +89,12 @@ relationshipMechanisms:
     evidenceLevel: proven
     note: "T-LR-5/E1b: 2105 real bindings, whole-codebase scale, Fineract. E2 (2026-08-21) generalization check: mechanism safe (no false positives, correct refusal) on spring-petclinic/finos-spring-bot, yield near-zero on both — real per-repo architecture-density dependency (how much ambiguous-interface/bean-factory shape a codebase has), not a framework-identity dependency. See CodeQL-engine-synthesis-2026-08-22.md."
 
+  - language: java
+    framework: [any] # generic string-keyed registration/lookup join — not framework-specific like the DI mechanisms above (Fineract's own convention is plain, hand-rolled, no framework annotation involved)
+    mechanism: codeql-command-dispatch
+    evidenceLevel: proven
+    note: "#18/E1: originally evaluated 2026-08-13 (E1-codeql-engine-evaluation.md, 7 real edges), never shipped. Re-verified and shipped 2026-08-22 after the original query was found to have never left gitignored soln/ — reconstructed from the memo's own mechanism description, 408 real bindings at whole-fineract-provider-tree scale, including a genuine second real dispatch convention (InteropWrapperBuilder) found unprompted, the exact 'generalizes to a second convention' check E1's own 'what's next' section named but never ran."
+
   - language: typescript
     framework: [nestjs]
     mechanism: codeql-nestjs-token-di

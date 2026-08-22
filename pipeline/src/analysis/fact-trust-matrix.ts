@@ -82,6 +82,19 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // relationship-edge fact type at all: this is CodeQL asserting a class
   // exists and is real, not resolving an edge between two already-known units.
   { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-di', scope: 'n/a', confidence: 10, evidence: 'Claim_Register.md T-LR-5-codeql-di; 56 new units introduced, fineract-charge+fineract-provider run, 2026-08-19' },
+
+  // Command-bus dispatch join (#18, codeql-command-dispatch-pass.ts).
+  // Placed at the SAME tier as DI resolution's mechanisms (7/4) — comparably
+  // real, whole-codebase-scale evidence, not a different number invented
+  // without justification. Originally evaluated in E1-codeql-engine-evaluation.md
+  // (7 real edges, Fineract-only scope) but never shipped (T-LR-5 scoped DI
+  // resolution as the smaller safe first unit); re-verified and shipped
+  // 2026-08-22 after the original query was found never to have left
+  // gitignored soln/ and had to be reconstructed from the memo's own
+  // mechanism description.
+  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-command-dispatch', scope: 'same-root', confidence: 7, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, 408 real bindings whole-fineract-provider-tree scale, including a second real dispatch convention (InteropWrapperBuilder) found unprompted' },
+  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-command-dispatch', scope: 'cross-root', confidence: 4, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, 408 real bindings whole-fineract-provider-tree scale, including a second real dispatch convention (InteropWrapperBuilder) found unprompted' },
+  { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-command-dispatch', scope: 'n/a', confidence: 10, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, real command-handler classes CodeQL alone identified' },
 ];
 
 function lookup(engine: TrustEngine, factType: TrustFactType, mechanism: string, scope: TrustScope): TrustMatrixEntry {

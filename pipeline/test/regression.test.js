@@ -4602,6 +4602,12 @@ test('T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — CodeQL binary absent degrade
     throw new Error('spawn codeql ENOENT');
   };
   delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+  // T-onboarding-18b — codeql-di-provider.ts and codeql-command-dispatch-provider.ts
+  // now share codeql-database-cache.ts's module-level cache; reset it so this
+  // test's binary-absence check isn't silently satisfied by a cache entry
+  // another test already populated for the same (sourceRoot, buildCommand).
+  const { resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
   try {
     const { runCodeQLDiResolution } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
     const bindings = runCodeQLDiResolution('/fake/source-root', './gradlew compileJava');
@@ -4609,6 +4615,7 @@ test('T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — CodeQL binary absent degrade
   } finally {
     cp.execFileSync = originalExecFileSync;
     delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+    resetCodeqlDatabaseCacheForTests();
   }
 });
 
@@ -5617,4 +5624,217 @@ test('warnIfMechanismUnverified: warns on an unrecorded mechanism firing, silent
   } finally {
     console.warn = originalWarn;
   }
+});
+
+test('#18 — CodeQL binary absent degrades to an empty result, never a crash (codeql-command-dispatch-provider.ts)', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  cp.execFileSync = () => {
+    throw new Error('spawn codeql ENOENT');
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+  const { resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    const { runCodeQLCommandDispatchResolution } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+    const bindings = runCodeQLCommandDispatchResolution('/fake/source-root', './gradlew compileJava');
+    assert.deepEqual(bindings, [], 'missing codeql binary must degrade to an empty result, matching codeql-di-provider.ts\'s own convention');
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
+test('T-onboarding-18b — getOrBuildCodeqlDatabase builds at most once per (sourceRoot, buildCommand), reused across both DI and command-dispatch providers', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  let createCallCount = 0;
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args[0] === 'version') return ''; // codeqlBinaryAvailable() check — must succeed for this test
+    if (Array.isArray(args) && args[0] === 'database' && args[1] === 'create') {
+      createCallCount++;
+      return '';
+    }
+    throw new Error(`unexpected execFileSync call in this test: ${cmd} ${JSON.stringify(args)}`);
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+  const { getOrBuildCodeqlDatabase, resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    const db1 = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile');
+    const db2 = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile'); // identical key -> must reuse, not rebuild
+    assert.equal(createCallCount, 1, 'a second call with the identical (sourceRoot, buildCommand) must reuse the first real database, never rebuild it — this is the real fix for the silent-empty-second-extraction bug found running DI resolution + command dispatch together against Fineract');
+    assert.equal(db1, db2);
+
+    const db3 = getOrBuildCodeqlDatabase('/fake/root', 'mvn -Pother compile'); // different build command -> a real, different database
+    assert.equal(createCallCount, 2);
+    assert.notEqual(db3, db1);
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
+test('#18 — parseCommandDispatchCsv parses command_dispatch.ql\'s real 5-column output shape (real rows, re-verified 2026-08-22 against a live Fineract build, v2 real-caller fix)', () => {
+  const { parseCommandDispatchCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+  // Real rows, copied verbatim from a real `codeql bqrs decode --format=csv`
+  // run against a real CodeQL database built from the whole fineract-provider
+  // tree, 2026-08-22 — the exact flagship chain
+  // Architect_Pilot_Feedback_Notes.md hand-traced and OOS_Registry.md's
+  // OOS-command-bus row names as the real evidenced instance, reproduced
+  // exactly by the query's real-caller hop (v2): the dispatcher is the real
+  // REST resource that CALLS the builder method, not the builder utility
+  // class itself (found and fixed 2026-08-22 — the first reconstruction
+  // attempt selected the wrong node and every row was silently refused by
+  // the live pass's own dispatcherUnit-must-exist gate).
+  const realCsv = [
+    '"dispatcherClass","dispatchMethod","handlerClass","dispatcherFile","handlerFile"',
+    '"ChargesApiResource","createCharge","CreateChargeDefinitionCommandHandler","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/handler/CreateChargeDefinitionCommandHandler.java"',
+    '"TaxComponentApiResource","createTaxComponent","CreateTaxComponentCommandHandler","fineract-tax/src/main/java/org/apache/fineract/portfolio/tax/api/TaxComponentApiResource.java","fineract-tax/src/main/java/org/apache/fineract/portfolio/tax/handler/CreateTaxComponentCommandHandler.java"',
+  ].join('\n');
+  const bindings = parseCommandDispatchCsv(realCsv);
+  assert.equal(bindings.length, 2);
+  const flagship = bindings.find((b) => b.dispatchMethod === 'createCharge');
+  assert.ok(flagship, 'expected the real flagship binding to parse');
+  assert.equal(flagship.dispatcherClass, 'ChargesApiResource', 'the dispatcher must be the real REST resource that calls the builder, not the builder utility itself');
+  assert.equal(flagship.handlerClass, 'CreateChargeDefinitionCommandHandler');
+  assert.equal(flagship.dispatcherFile, 'fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java');
+
+  // Header-only / empty CSV -> 0 real bindings, not an error.
+  assert.deepEqual(parseCommandDispatchCsv('"dispatcherClass","dispatchMethod","handlerClass","dispatcherFile","handlerFile"'), []);
+  assert.deepEqual(parseCommandDispatchCsv(''), []);
+});
+
+test('#18 — codeqlCommandDispatchPass introduces a unit + relationship at its own tier, never contests an existing edge, never crosses an unscanned root boundary', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+  const originalRun = provider.runCodeQLCommandDispatchResolution;
+
+  const dispatcherUnit = {
+    id: 'CommandWrapperBuilder.java',
+    kind: 'service',
+    name: 'CommandWrapperBuilder',
+    filePath: 'src/main/java/example/CommandWrapperBuilder.java',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }],
+    confidence: 40,
+  };
+
+  provider.runCodeQLCommandDispatchResolution = () => [
+    {
+      dispatcherClass: 'CommandWrapperBuilder',
+      dispatchMethod: 'createCharge',
+      handlerClass: 'CreateChargeDefinitionCommandHandler',
+      dispatcherFile: 'root/src/main/java/example/CommandWrapperBuilder.java',
+      handlerFile: 'root/src/main/java/example/CreateChargeDefinitionCommandHandler.java',
+    },
+    // Same dispatcher, a SECOND binding whose handler is OUTSIDE the
+    // scanned root entirely — must be skipped, never guessed at.
+    {
+      dispatcherClass: 'CommandWrapperBuilder',
+      dispatchMethod: 'otherAction',
+      handlerClass: 'OtherActionHandler',
+      dispatcherFile: 'root/src/main/java/example/CommandWrapperBuilder.java',
+      handlerFile: 'unscanned-root/src/main/java/example/OtherActionHandler.java',
+    },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  const { codeqlCommandDispatchPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [dispatcherUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [dispatcherUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlCommandDispatchPass.run(ctx);
+
+    assert.equal(ctx.allUnits.length, 2, 'expected exactly 1 new unit introduced (the in-root binding), the out-of-root one skipped');
+    const introduced = ctx.allUnits.find((u) => u.id !== dispatcherUnit.id);
+    assert.equal(introduced.kind, 'service');
+    assert.equal(introduced.name, 'CreateChargeDefinitionCommandHandler');
+    assert.equal(introduced.confidence, 10);
+    assert.equal(introduced.evidence[0].source, 'codeql-di');
+
+    assert.equal(ctx.relationships.length, 1, 'expected exactly 1 new relationship (the out-of-root binding produced none)');
+    const rel = ctx.relationships[0];
+    assert.equal(rel.from, dispatcherUnit.id);
+    assert.equal(rel.to, introduced.id);
+    assert.equal(rel.source, 'codeql');
+    assert.equal(rel.mechanism, 'codeql-command-dispatch');
+    assert.equal(rel.confidence, 7);
+    assert.equal(rel.crossPackage, false);
+
+    // Trust tier: running the SAME pass again over a context that already
+    // has this exact relationship must never duplicate it.
+    provider.runCodeQLCommandDispatchResolution = () => [
+      {
+        dispatcherClass: 'CommandWrapperBuilder',
+        dispatchMethod: 'createCharge',
+        handlerClass: 'CreateChargeDefinitionCommandHandler',
+        dispatcherFile: 'root/src/main/java/example/CommandWrapperBuilder.java',
+        handlerFile: 'root/src/main/java/example/CreateChargeDefinitionCommandHandler.java',
+      },
+    ];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+    const { codeqlCommandDispatchPass: pass2 } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+    pass2.run(ctx);
+    assert.equal(ctx.relationships.length, 1, 'must never duplicate a relationship this same pass already produced for the same (from, to) pair');
+  } finally {
+    provider.runCodeQLCommandDispatchResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  }
+});
+
+test('#18 — a binding with an empty handlerClass never introduces an empty-name unit', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+  const originalRun = provider.runCodeQLCommandDispatchResolution;
+  const dispatcherUnit = { id: 'X.java', kind: 'service', name: 'x', filePath: 'src/main/java/example/X.java', startLine: 1, endLine: 1, evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }], confidence: 40 };
+  provider.runCodeQLCommandDispatchResolution = () => [
+    { dispatcherClass: 'X', dispatchMethod: 'doThing', handlerClass: '', dispatcherFile: 'root/src/main/java/example/X.java', handlerFile: 'root/src/main/java/example/X.java' },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  const { codeqlCommandDispatchPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [dispatcherUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [dispatcherUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlCommandDispatchPass.run(ctx);
+    assert.equal(ctx.allUnits.length, 1, 'an empty-name binding must never introduce a unit');
+    assert.equal(ctx.relationships.length, 0);
+  } finally {
+    provider.runCodeQLCommandDispatchResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  }
+});
+
+test('#18 — codeqlCommandDispatchPass is a no-op unless BOTH codeqlSourceRoot and codeqlBuildCommand are set (opt-in only, never a default-on path)', () => {
+  const { codeqlCommandDispatchPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+  const ctx1 = { packageRoots: ['/fake'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), relationships: [] };
+  codeqlCommandDispatchPass.run(ctx1);
+  assert.equal(ctx1.relationships.length, 0);
+
+  const ctx2 = { packageRoots: ['/fake'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), relationships: [], codeqlSourceRoot: '/fake' };
+  codeqlCommandDispatchPass.run(ctx2); // build command missing -> still a no-op
+  assert.equal(ctx2.relationships.length, 0);
+});
+
+test('engine-capability-matrix.yml: java/codeql-command-dispatch is marked proven (#18 real evidence, re-verified 2026-08-22)', () => {
+  const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
+  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-command-dispatch'), 'the shipped command-dispatch mechanism (408 real Fineract bindings, 2026-08-22) must be recorded as proven');
 });
