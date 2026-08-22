@@ -3,15 +3,20 @@ import { AnalysisContext, AnalysisPass } from './pass-registry';
 import { runCodeQLDiResolution, CodeQLDiBinding } from '../scanner/codeql-di-provider';
 import { TypedUnit, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../types/typed-facts';
 import { relationshipTrust, unitIntroductionTrust } from './fact-trust-matrix';
+import { loadEngineCapabilityMatrix, warnIfMechanismUnverified } from '../scanner/engine-capability-matrix';
 
 /**
  * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — turns CodeQL's real DI-binding
  * table (`codeql-di-provider.ts`) into TypedRelationships/TypedUnits.
  * Opt-in only: `ctx.codeqlSourceRoot`/`ctx.codeqlBuildCommand` are set by
- * run-slice.ts from `--codeql-source-root` / `--codeql-build-command`; a
- * no-op (same as k8sTrustPass/envSoftGraphPass's own opt-in convention)
- * when either is absent. Registered in DEFAULT_PASSES so any facts it
- * produces still get graded/statused; never a default-on path.
+ * run-slice.ts from `--codeql-source-root` / `--codeql-build-command`
+ * (hand-written), or auto-derived via `--auto-codeql` /
+ * `WEAVER_CODEQL_LICENSE_CONFIRMED=1` (`codeql-auto-detect.ts`) — either
+ * way, always a conscious, explicit opt-in at the run-slice.ts CLI layer,
+ * never something this pass itself decides to enable. A no-op (same as
+ * k8sTrustPass/envSoftGraphPass's own opt-in convention) when both context
+ * fields are absent. Registered in DEFAULT_PASSES so any facts it produces
+ * still get graded/statused; never a default-on path.
  *
  * Trust tier (item 5 of the checklist; full matrix is T-LR-6,
  * `fact-trust-matrix.ts`): same-root confidence (7) sits BETWEEN R2b's (8)
@@ -146,5 +151,15 @@ export const codeqlDiPass: AnalysisPass = {
     if (relationshipCount > 0 || introducedCount > 0) {
       console.log(`[codeql-di] ${bindings.length} real DI binding(s) resolved by CodeQL; ${relationshipCount} new relationship(s), ${introducedCount} new unit(s) introduced`);
     }
+
+    // T-onboarding-16 — real, cheap drift check: engine-capability-matrix.yml's
+    // relationshipMechanisms section is this project's own record of which
+    // (language, mechanism) combos have been measured "proven". di_resolution.ql
+    // is Java/Spring-shaped only, so `bindings.length > 0` here always means
+    // real Spring-annotated code was matched — this never fires as a false
+    // alarm on a different framework, only as a warning if the matrix itself
+    // ever falls out of sync with what this pass actually produced.
+    const matrix = loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner'));
+    warnIfMechanismUnverified(matrix, 'java', 'codeql-di-resolution', bindings.length);
   },
 };

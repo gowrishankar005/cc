@@ -916,9 +916,28 @@ test(
       // same real chain, confirmed against real source before updating
       // this test.
       assert.equal(facts.relationships.filter((r) => r.mechanism === 'r2c').length, 0, 'expected 0 r2c relationships — the real candidates this mechanism used to catch are now real first-class service nodes with their own direct edges');
+      // E6/drop-graphify-backbone update (2026-08-22): the original check
+      // banned the bare STRING "JWTAuthenticationFilter" anywhere in a
+      // relationship's `from`, which also (correctly) catches a real,
+      // different, already-existing mechanism this migration surfaced for
+      // the first time here: `admitted-unresolved` graded-fact admission
+      // (T-P0-1/E2, pre-existing). JWTAuthenticationFilter now gets a real
+      // `facts.units` entry, but with `kind: 'unresolved'`, `evidence: []`,
+      // and `status: 'requires-review'` — the SAME explicit, zero-evidence
+      // placeholder kind this mechanism was built to produce (confirmed via
+      // direct scan: `unresolved:class:...`, never a real service/database/
+      // etc. classification). The real invariant this test cares about
+      // (JWTAuthenticationFilter, a sub-floor stereotype-only class, never
+      // becomes a CLASSIFIED unit or anchors a CONFIDENT relationship)
+      // still holds; tightened to check that specifically instead of
+      // banning the substring (or any unit at all) outright.
       assert.ok(
-        !facts.relationships.some((r) => String(r.from).includes('JWTAuthenticationFilter')),
-        'sub-floor source JWTAuthenticationFilter must not anchor a relationship — it is an IgnoredItem, not an emitted unit'
+        !facts.units.some((u) => u.filePath.endsWith('JWTAuthenticationFilter.java') && u.kind !== 'unresolved'),
+        'sub-floor source JWTAuthenticationFilter must never become a real CLASSIFIED unit (an honest, zero-evidence unresolved placeholder is fine)'
+      );
+      assert.ok(
+        !facts.relationships.some((r) => r.from.endsWith('JWTAuthenticationFilter.java') && !r.from.startsWith('unresolved:')),
+        'JWTAuthenticationFilter must never anchor a relationship under its own real (non-placeholder) unit id — only the honest unresolved placeholder, if at all'
       );
 
       // The exact real case grep-verified while building this: SettingsEndpoint
@@ -985,7 +1004,7 @@ test(
       // signal from a different mechanism, not an R2 Phase 1 bridge
       // resolution, so it must not trip this assertion.
       const r2Relationships = facts.relationships.filter(
-        (r) => r.kind === 'calls' && r.source === 'graphify' && ['r2-phase1', 'r2b', 'r2c'].includes(r.mechanism)
+        (r) => r.kind === 'calls' && r.source === 'codegraph' && ['r2-phase1', 'r2b', 'r2c'].includes(r.mechanism)
       );
       assert.equal(r2Relationships.length, 0, 'fineract-charge alone must NOT close its S1 gap via R2 Phase 1 — a real, honestly-predicted residual (design note §1), never a fabricated edge');
 
@@ -1182,13 +1201,20 @@ test(
       // progress — update this test then." ChargeRepositoryWrapper (a real,
       // bare-`@Service` class, grep-verified) now gets its own 'service'
       // unit and has real direct edges to ChargeRepository/Charge within
-      // this module alone — 3 real architecture-grade relationships (2
-      // distinct target pairs, one duplicated `connects`+`calls` edge for
-      // the ChargeRepository target), confirmed via a direct scan before
-      // updating this count. S1 correctly no longer fires for THIS module.
+      // this module alone.
+      //
+      // E6/drop-graphify-backbone update (2026-08-22): count moved 3 -> 5
+      // after the cross-package backbone migrated from Graphify to
+      // CodeGraph — verified via a direct scan (5 distinct, non-duplicate
+      // (from,to,kind) rows, not a regression): ChargesApiResource now ALSO
+      // shows two real edges to Charge (calls + connects) that Graphify's
+      // engine never surfaced, alongside ChargeRepositoryWrapper's 3
+      // pre-existing edges to ChargeRepository/Charge. Same "update the
+      // test when detection genuinely improves" precedent this test's own
+      // comment already established once.
       assert.ok(coverage.completeness.serviceUnitCount >= 1, 'expected at least one service unit');
       assert.ok(coverage.completeness.databaseUnitCount >= 1, 'expected at least one database unit');
-      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 3, 'expected 3 real service-touching relationships from ChargeRepositoryWrapper (T-LR-3 real new coverage)');
+      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 5, 'expected 5 real service-touching relationships (ChargeRepositoryWrapper + ChargesApiResource, T-LR-3 + E6 cross-package-backbone-migration coverage)');
       assert.ok(
         !coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
         'S1 must NOT fire — real service-touching connectivity now exists in this module alone'
@@ -1238,16 +1264,21 @@ test(
       // ChargesApiResource plus 4 real bare-`@Service` classes the new
       // catalogue row makes visible for the first time (ChargeRepositoryWrapper,
       // CreateChargeDefinitionCommandHandler, DeleteChargeDefinitionCommandHandler,
-      // UpdateChargeDefinitionCommandHandler). Of those, exactly 1
-      // (ChargeRepositoryWrapper) has a real architecture-grade outbound
-      // edge within this module alone (-> ChargeRepository/Charge,
-      // confirmed via direct scan); the other 4 (ChargesApiResource + the 3
-      // command handlers) still hit the same honest R2 residual as before
-      // (their real implementer/target lives in fineract-provider, a third
-      // module) — real progress on one shape, the other residual unchanged.
+      // UpdateChargeDefinitionCommandHandler).
+      //
+      // E6/drop-graphify-backbone update (2026-08-22): 1 -> 2 services with
+      // a real architecture-grade outbound edge, after the cross-package
+      // backbone migrated from Graphify to CodeGraph — ChargesApiResource
+      // now ALSO resolves a real edge to Charge (confirmed via direct scan,
+      // same underlying fact as the serviceTouchingRelationshipCount 3->5
+      // update above), alongside ChargeRepositoryWrapper's pre-existing
+      // edge. The 3 command handlers still hit the same honest R2 residual
+      // as before (their real implementer/target lives in fineract-provider,
+      // a third module) — real progress on one shape, the other residual
+      // unchanged.
       assert.equal(coverage.completeness.serviceUnitCount, 5);
-      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 1, 'ChargeRepositoryWrapper now has a real architecture-grade outbound edge; the other 4 services still hit the cross-module R2 residual');
-      assert.equal(coverage.completeness.architectureOutboundCoverage, 0.2, 'expected 20% architecture coverage (1/5 services) for fineract-charge alone');
+      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 2, 'ChargeRepositoryWrapper and ChargesApiResource now have a real architecture-grade outbound edge; the 3 command handlers still hit the cross-module R2 residual');
+      assert.equal(coverage.completeness.architectureOutboundCoverage, 0.4, 'expected 40% architecture coverage (2/5 services) for fineract-charge alone');
     } finally {
       fs.rmSync(charge.outDir, { recursive: true, force: true });
     }
@@ -1266,17 +1297,17 @@ test('Robustness T-R0-5 — Graphify partial/failed visibility: S0 fires in comp
     openApiDocumentsByRoot: new Map(),
   };
 
-  const failedReport = buildCoverageReport({ ...baseCtx, graphifyError: new Error('graphify binary not found') });
+  const failedReport = buildCoverageReport({ ...baseCtx, crossPackageError: new Error('codegraph cross-root pass failed') });
   assert.equal(failedReport.graphifyStatus, 'failed');
   assert.ok(
-    failedReport.completeness.silenceFlags.some((f) => f.startsWith('S0-graphify-backbone-incomplete')),
+    failedReport.completeness.silenceFlags.some((f) => f.startsWith('S0-cross-package-backbone-incomplete')),
     'expected S0 to fire when graphifyStatus is failed'
   );
 
-  const okReport = buildCoverageReport({ ...baseCtx, graphifyRun: { graph: { nodes: [], edges: [] }, resolveRoot: () => undefined } });
+  const okReport = buildCoverageReport({ ...baseCtx, crossPackageRun: { graph: { nodes: [], edges: [] }, resolveRoot: () => undefined } });
   assert.equal(okReport.graphifyStatus, 'ok');
   assert.ok(
-    !okReport.completeness.silenceFlags.some((f) => f.startsWith('S0-graphify-backbone-incomplete')),
+    !okReport.completeness.silenceFlags.some((f) => f.startsWith('S0-cross-package-backbone-incomplete')),
     'S0 must not fire when graphifyStatus is ok'
   );
 });
@@ -1341,9 +1372,9 @@ test('AREC T-E3 — DynamoDB persistence detection + persistence/messaging doubl
     const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
     const storeUnit = facts.units.find((u) => u.id === 'src/orders.service.ts::OrdersDynamoStore');
     assert.ok(storeUnit, 'expected a typed-facts unit for OrdersDynamoStore');
-    assert.ok(storeUnit.evidence.some((e) => e.category === 'persistence' && e.signal === 'ref_aws_sdk_client_dynamodb'));
+    assert.ok(storeUnit.evidence.some((e) => e.category === 'persistence' && e.signal === '@aws-sdk/client-dynamodb'));
     assert.ok(
-      storeUnit.evidence.some((e) => e.category === 'messaging' && e.signal === 'ref_aws_sdk_client_sqs'),
+      storeUnit.evidence.some((e) => e.category === 'messaging' && e.signal === '@aws-sdk/client-sqs'),
       'expected the real SQS evidence merged onto this unit, not silently dropped'
     );
 
@@ -2812,8 +2843,8 @@ test(
       const ignored = JSON.parse(fs.readFileSync(path.join(outDir, 'ignored-items-report.json'), 'utf8'));
       const httpUnresolved = ignored.filter((i) => i.detail?.startsWith('unresolved-http-target:'));
       assert.ok(httpUnresolved.length >= 2, 'expected at least 2 unresolved-http-target ignored items — ExternalCreditBureauIntegrationWritePlatformServiceImpl.java genuinely imports both okhttp3.OkHttpClient and java.net.HttpURLConnection');
-      assert.ok(httpUnresolved.some((i) => i.detail.includes('okhttpclient')), 'okhttp3.OkHttpClient import, grep-verified at ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:46');
-      assert.ok(httpUnresolved.some((i) => i.detail.includes('httpurlconnection')), 'java.net.HttpURLConnection import, grep-verified at ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:33');
+      assert.ok(httpUnresolved.some((i) => i.detail.includes('okhttp3.OkHttpClient')), 'okhttp3.OkHttpClient import, grep-verified at ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:46');
+      assert.ok(httpUnresolved.some((i) => i.detail.includes('java.net.HttpURLConnection')), 'java.net.HttpURLConnection import, grep-verified at ExternalCreditBureauIntegrationWritePlatformServiceImpl.java:33');
       assert.ok(httpUnresolved.every((i) => i.reason === 'CROSS_DOMAIN_UNRESOLVED'));
       // Never a fabricated relationship — no literal, statically-resolvable target exists for either import.
       const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
@@ -3320,7 +3351,13 @@ test(
       // Coverage cross-cutting breakdown (generic fix, T-X0-1 extension) — real counts, not hardcoded mechanism names.
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
       assert.equal(coverage.relationshipsByKind['shares-secret'], 5);
-      assert.equal(coverage.relationshipsBySource.k8s, 5 + 6, 'shares-secret (5) + env-soft-graph connects (6), both source: k8s');
+      // T-MR-3 update (already shipped on main, never previously re-verified
+      // here — this test was silently SKIPPED in every prior run because
+      // spikes/boa wasn't present in that environment): deployed-in
+      // runtime-placement relationships (k8s-deployment-detector.ts) also
+      // tag source: 'k8s'. Real count confirmed via direct run: 5
+      // shares-secret + 6 env-soft-graph + 6 deployed-in = 17.
+      assert.equal(coverage.relationshipsBySource.k8s, 5 + 6 + 6, 'shares-secret (5) + env-soft-graph connects (6) + deployed-in (6), all source: k8s');
       assert.ok(coverage.unresolvedByMechanism['unresolved-env-target'] > 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
@@ -3344,21 +3381,21 @@ test(
       // silence-metrics test above) mean this module no longer has ZERO
       // service-touching relationships, so the OLD "1 service + 2 database,
       // 0 service-touching -> S1x3" baseline no longer holds. Instead,
-      // run-wide architecture coverage sits at 20% (1/5 services with a
-      // real outbound edge), below the 50% review threshold, so
-      // 'low-architecture-coverage' fires for the 4 services with no
+      // run-wide architecture coverage sits below the 50% review threshold,
+      // so 'low-architecture-coverage' fires for the services with no
       // outbound edge — a different, real trigger for the same underlying
-      // honest residual (ChargesApiResource's real implementer still lives
+      // honest residual (the command handlers' real implementer still lives
       // in fineract-provider, a third module), confirmed via a direct scan.
+      //
+      // E6/drop-graphify-backbone update (2026-08-22): 4 -> 3
+      // low-architecture-coverage items, after the cross-package backbone
+      // migrated from Graphify to CodeGraph — ChargesApiResource now
+      // resolves a real outbound edge (see the T-R0-2/silence-metrics test
+      // updates above) and no longer needs review; only the 3 command
+      // handlers remain flagged.
       assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0);
-      assert.equal(queue.items.filter((i) => i.trigger === 'low-architecture-coverage').length, 4);
-      assert.ok(queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')));
-      const chargesApiItem = queue.items.find((i) => i.unitId.endsWith('ChargesApiResource.java'));
-      assert.equal(chargesApiItem.trigger, 'low-architecture-coverage');
-      assert.ok(
-        chargesApiItem.rationale.includes('no real outbound architecture-grade relationship'),
-        `expected the low-architecture-coverage rationale naming the missing outbound edge, got: ${chargesApiItem.rationale}`
-      );
+      assert.equal(queue.items.filter((i) => i.trigger === 'low-architecture-coverage').length, 3);
+      assert.ok(!queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')), 'ChargesApiResource now has a real outbound edge, so it must no longer need review');
       // S2 must NOT fire here — ChargesApiResource has real security-rbac-002
       // call-site control evidence (T-D1), so it correctly has no S2 item.
       assert.equal(queue.items.filter((i) => i.trigger === 'S2-http-without-security-control').length, 0);
@@ -3383,7 +3420,7 @@ test(
 );
 
 test(
-  'Robustness — HITL review trigger: low-architecture-coverage fires on a real reference Java/JAX-RS banking platform (fineract-security module) (17% coverage, S1 does NOT fire), mutually exclusive with S1',
+  'Robustness — HITL review trigger: fineract-security real coverage (S1 does NOT fire), mutually exclusive with S1',
   { skip: !fs.existsSync(JAVA_SAMPLE_SECURITY_ROOT) && 'spikes/fineract/repo/fineract-security not present (scratch clone, see CLAUDE.md)' },
   () => {
     const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
@@ -3391,18 +3428,27 @@ test(
     try {
       const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
-      // Real baseline: fineract-security has real service->database
-      // relationships (S1 does not fire) but only 17% architecture
-      // coverage (1/6 services) — exactly the sparse-but-nonzero case S1
-      // alone was designed to miss.
-      assert.equal(coverage.completeness.architectureOutboundCoverage < 0.5, true, 'expected real sub-50% coverage on this fixture — if this fails, the fixture or catalogue changed and the test needs re-baselining, not silently loosening');
+      // Real baseline (2026-08-09): fineract-security had real
+      // service->database relationships (S1 does not fire) but only 17%
+      // architecture coverage (1/6 services) — exactly the
+      // sparse-but-nonzero case S1 alone was designed to miss, so
+      // low-architecture-coverage fired instead.
+      //
+      // E6/drop-graphify-backbone update (2026-08-22): after the
+      // cross-package backbone migrated from Graphify to CodeGraph,
+      // detection on this fixture genuinely improved — 13 real service
+      // units now resolve (vs. the original 6) and 7 of them have a real
+      // architecture-grade outbound edge: 53.8% coverage, ABOVE the 50%
+      // review threshold. This fixture no longer demonstrates the
+      // sub-threshold case (real progress, not a regression — confirmed
+      // via a direct scan before updating); test/fixtures/'s own
+      // low-architecture-coverage case (fineract-charge, 40%) still covers
+      // that trigger mechanism directly (see the HITL review trigger test
+      // above). This test now asserts the improved, real state instead.
+      assert.ok(coverage.completeness.architectureOutboundCoverage >= 0.5, `expected real >=50% coverage on this fixture post-migration, got ${coverage.completeness.architectureOutboundCoverage} — if this fails, the fixture or catalogue changed and the test needs re-baselining, not silently loosening`);
       const queue = buildReviewQueue(facts, coverage);
       assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0, 'S1 must not fire — real relationships exist');
-      const lowCoverageItems = queue.items.filter((i) => i.trigger === 'low-architecture-coverage');
-      assert.ok(lowCoverageItems.length > 0, 'expected low-architecture-coverage items given real sub-threshold coverage');
-      for (const item of lowCoverageItems) {
-        assert.equal(item.unitKind, 'service');
-      }
+      assert.equal(queue.items.filter((i) => i.trigger === 'low-architecture-coverage').length, 0, 'low-architecture-coverage must not fire once coverage is at/above the 50% threshold');
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -4602,6 +4648,12 @@ test('T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — CodeQL binary absent degrade
     throw new Error('spawn codeql ENOENT');
   };
   delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+  // T-onboarding-18b — codeql-di-provider.ts and codeql-command-dispatch-provider.ts
+  // now share codeql-database-cache.ts's module-level cache; reset it so this
+  // test's binary-absence check isn't silently satisfied by a cache entry
+  // another test already populated for the same (sourceRoot, buildCommand).
+  const { resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
   try {
     const { runCodeQLDiResolution } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
     const bindings = runCodeQLDiResolution('/fake/source-root', './gradlew compileJava');
@@ -4609,6 +4661,7 @@ test('T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — CodeQL binary absent degrade
   } finally {
     cp.execFileSync = originalExecFileSync;
     delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'))];
+    resetCodeqlDatabaseCacheForTests();
   }
 });
 
@@ -5469,4 +5522,365 @@ test('T-onboarding-1b negative case — a method-level decorator with NO matchin
     ignoredItems.some((i) => i.detail && i.detail.includes('SomeUnknownAnnotation')),
     'a genuinely unmapped method-level decorator on a DIFFERENT line than any native route must still be reported, never silently suppressed by this fix'
   );
+});
+
+test('--auto-codeql detection: Gradle root WITH a gradlew wrapper derives a --no-daemon --rerun-tasks build command', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(root, 'build.gradle'), '// real gradle build file\n');
+    fs.writeFileSync(path.join(root, 'gradlew'), '#!/bin/sh\necho gradlew\n', { mode: 0o755 });
+    const result = detectCodeqlBuildConfig([root]);
+    assert.ok(result, 'a real build.gradle + gradlew wrapper must be detected');
+    assert.equal(result.buildTool, 'gradle');
+    assert.equal(result.sourceRoot, root);
+    assert.match(result.buildCommand, /--no-daemon/, 'must always force --no-daemon — a pre-existing daemon silently empties the CodeQL database (found running a real 3-engine benchmark, 2026-08-21)');
+    assert.match(result.buildCommand, /--rerun-tasks/, 'must always force a real recompile — an up-to-date/cached build never re-invokes the compiler');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql detection: Gradle root WITHOUT a gradlew wrapper refuses to guess a system-wide gradle version', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(root, 'build.gradle'), '// real gradle build file, no wrapper checked in\n');
+    const result = detectCodeqlBuildConfig([root]);
+    assert.equal(result, undefined, 'a build.gradle with no gradlew wrapper must not silently fall back to a system gradle install of unknown version');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql detection: Maven root derives a clean-compile build command, preferring ./mvnw over mvn when present', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const rootNoWrapper = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  const rootWithWrapper = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(rootNoWrapper, 'pom.xml'), '<project></project>\n');
+    const noWrapperResult = detectCodeqlBuildConfig([rootNoWrapper]);
+    assert.ok(noWrapperResult);
+    assert.equal(noWrapperResult.buildTool, 'maven');
+    assert.match(noWrapperResult.buildCommand, /^mvn /, 'falls back to plain mvn when no ./mvnw wrapper exists');
+    assert.match(noWrapperResult.buildCommand, /clean compile/, 'must force clean — an up-to-date Maven build never re-invokes javac either, same silent-empty-database failure mode as Gradle');
+
+    fs.writeFileSync(path.join(rootWithWrapper, 'pom.xml'), '<project></project>\n');
+    fs.writeFileSync(path.join(rootWithWrapper, 'mvnw'), '#!/bin/sh\necho mvnw\n', { mode: 0o755 });
+    const wrapperResult = detectCodeqlBuildConfig([rootWithWrapper]);
+    assert.match(wrapperResult.buildCommand, /^\.\/mvnw /, 'prefers the repo-pinned ./mvnw wrapper over a system-wide mvn when both are available');
+  } finally {
+    fs.rmSync(rootNoWrapper, { recursive: true, force: true });
+    fs.rmSync(rootWithWrapper, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql detection: no build.gradle/pom.xml at all returns undefined (never guesses a build)', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(root, 'package.json'), '{}');
+    assert.equal(detectCodeqlBuildConfig([root]), undefined);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--auto-codeql CLI wiring: explicit --codeql-source-root/--codeql-build-command take precedence over --auto-codeql, never overridden', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  try {
+    // A deliberately-inert explicit build command ("true") — this test only
+    // asserts CLI precedence (--auto-codeql must not clobber explicit
+    // flags), not a real CodeQL run; codeql-di-pass.ts's own graceful
+    // degradation (binary/build failure -> WARNING, continue) keeps this
+    // fast and offline either way.
+    execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir, '--codeql-source-root', fixtureRoot, '--codeql-build-command', 'true', '--auto-codeql'], { encoding: 'utf8' });
+    const facts = JSON.parse(fs.readFileSync(path.join(outDir, 'typed-facts.json'), 'utf8'));
+    assert.equal(facts.contractVersion, require(path.join(PIPELINE_ROOT, 'dist/types/typed-facts')).CONTRACT_VERSION, 'run must complete normally — --auto-codeql must not clobber explicit flags nor break the run when both are present');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('WEAVER_CODEQL_LICENSE_CONFIRMED=1 triggers the same auto-detect path as --auto-codeql, with no flag needed', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample'); // no build.gradle/pom.xml — exercises the "detection attempted, nothing found" branch, not a real CodeQL run
+  try {
+    const output = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir], { encoding: 'utf8', env: { ...process.env, WEAVER_CODEQL_LICENSE_CONFIRMED: '1' } });
+    assert.match(output, /WEAVER_CODEQL_LICENSE_CONFIRMED=1:.*no build\.gradle/, 'the env var alone (no --auto-codeql flag) must trigger the same detection attempt, visibly logged');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('WEAVER_CODEQL_LICENSE_CONFIRMED requires the exact value "1" — a stray truthy string must not enable it', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  try {
+    const output = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir], { encoding: 'utf8', env: { ...process.env, WEAVER_CODEQL_LICENSE_CONFIRMED: 'true' } });
+    assert.doesNotMatch(output, /WEAVER_CODEQL_LICENSE_CONFIRMED/, '"true" is not "1" — must not be treated as a deliberate confirmation, avoiding an accidental env var collision or copy-pasted value silently enabling CodeQL');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
+  }
+});
+
+test('--no-auto-codeql suppresses both the --auto-codeql flag and the WEAVER_CODEQL_LICENSE_CONFIRMED env var for a single run', () => {
+  const outDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const outDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  try {
+    const flagOutput = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir1, '--auto-codeql', '--no-auto-codeql'], { encoding: 'utf8' });
+    assert.match(flagOutput, /--no-auto-codeql: suppressing/, '--no-auto-codeql must override --auto-codeql for this run');
+
+    const envOutput = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir2, '--no-auto-codeql'], { encoding: 'utf8', env: { ...process.env, WEAVER_CODEQL_LICENSE_CONFIRMED: '1' } });
+    assert.match(envOutput, /--no-auto-codeql: suppressing/, '--no-auto-codeql must override the env var too, without requiring it to be unset');
+  } finally {
+    fs.rmSync(outDir1, { recursive: true, force: true });
+    fs.rmSync(outDir2, { recursive: true, force: true });
+  }
+});
+
+test('engine-capability-matrix.yml: java/codeql-di-resolution is marked proven (T-LR-5/E1b real evidence)', () => {
+  const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
+  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-di-resolution'), 'the one real, shipped DI-resolution mechanism (T-LR-5, 2105 real Fineract bindings) must be recorded as proven');
+});
+
+test('engine-capability-matrix.yml: exploratory-only mechanisms (NestJS/Guice) are correctly NOT marked proven', () => {
+  const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
+  assert.equal(isRelationshipMechanismProven(matrix, 'typescript', 'codeql-nestjs-token-di'), false, 'E2a is a hand-run exploratory query, not a live pass — must not read as proven');
+  assert.equal(isRelationshipMechanismProven(matrix, 'java', 'codeql-guice-di'), false, 'Tier2 Guice result is real-but-contaminated (208/218 rows), not a clean proven mechanism');
+});
+
+test('warnIfMechanismUnverified: warns on an unrecorded mechanism firing, silent on a proven one, silent on zero bindings', () => {
+  const { warnIfMechanismUnverified } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const fakeMatrix = { version: '0.0.0', routes: [], relationshipMechanisms: [{ language: 'java', framework: ['spring-mvc'], mechanism: 'codeql-di-resolution', evidenceLevel: 'proven' }], crossPackageBackbone: 'graphify' };
+
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (msg) => warnings.push(msg);
+  try {
+    warnIfMechanismUnverified(fakeMatrix, 'java', 'codeql-di-resolution', 5); // proven — must stay silent
+    warnIfMechanismUnverified(fakeMatrix, 'java', 'codeql-di-resolution', 0); // zero bindings — must stay silent regardless of proven-ness
+    warnIfMechanismUnverified(fakeMatrix, 'java', 'codeql-guice-di', 10); // real bindings, no matrix entry at all — must warn
+    assert.equal(warnings.length, 1, `expected exactly 1 warning, got ${warnings.length}: ${JSON.stringify(warnings)}`);
+    assert.match(warnings[0], /codeql-guice-di.*10 real binding/, 'the one warning must name the unrecorded mechanism and the real binding count');
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('#18 — CodeQL binary absent degrades to an empty result, never a crash (codeql-command-dispatch-provider.ts)', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  cp.execFileSync = () => {
+    throw new Error('spawn codeql ENOENT');
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+  const { resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    const { runCodeQLCommandDispatchResolution } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+    const bindings = runCodeQLCommandDispatchResolution('/fake/source-root', './gradlew compileJava');
+    assert.deepEqual(bindings, [], 'missing codeql binary must degrade to an empty result, matching codeql-di-provider.ts\'s own convention');
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
+test('T-onboarding-18b — getOrBuildCodeqlDatabase builds at most once per (sourceRoot, buildCommand), reused across both DI and command-dispatch providers', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  let createCallCount = 0;
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args[0] === 'version') return ''; // codeqlBinaryAvailable() check — must succeed for this test
+    if (Array.isArray(args) && args[0] === 'database' && args[1] === 'create') {
+      createCallCount++;
+      return '';
+    }
+    throw new Error(`unexpected execFileSync call in this test: ${cmd} ${JSON.stringify(args)}`);
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+  const { getOrBuildCodeqlDatabase, resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    const db1 = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile');
+    const db2 = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile'); // identical key -> must reuse, not rebuild
+    assert.equal(createCallCount, 1, 'a second call with the identical (sourceRoot, buildCommand) must reuse the first real database, never rebuild it — this is the real fix for the silent-empty-second-extraction bug found running DI resolution + command dispatch together against Fineract');
+    assert.equal(db1, db2);
+
+    const db3 = getOrBuildCodeqlDatabase('/fake/root', 'mvn -Pother compile'); // different build command -> a real, different database
+    assert.equal(createCallCount, 2);
+    assert.notEqual(db3, db1);
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
+test('#18 — parseCommandDispatchCsv parses command_dispatch.ql\'s real 5-column output shape (real rows, re-verified 2026-08-22 against a live Fineract build, v2 real-caller fix)', () => {
+  const { parseCommandDispatchCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+  // Real rows, copied verbatim from a real `codeql bqrs decode --format=csv`
+  // run against a real CodeQL database built from the whole fineract-provider
+  // tree, 2026-08-22 — the exact flagship chain
+  // Architect_Pilot_Feedback_Notes.md hand-traced and OOS_Registry.md's
+  // OOS-command-bus row names as the real evidenced instance, reproduced
+  // exactly by the query's real-caller hop (v2): the dispatcher is the real
+  // REST resource that CALLS the builder method, not the builder utility
+  // class itself (found and fixed 2026-08-22 — the first reconstruction
+  // attempt selected the wrong node and every row was silently refused by
+  // the live pass's own dispatcherUnit-must-exist gate).
+  const realCsv = [
+    '"dispatcherClass","dispatchMethod","handlerClass","dispatcherFile","handlerFile"',
+    '"ChargesApiResource","createCharge","CreateChargeDefinitionCommandHandler","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/handler/CreateChargeDefinitionCommandHandler.java"',
+    '"TaxComponentApiResource","createTaxComponent","CreateTaxComponentCommandHandler","fineract-tax/src/main/java/org/apache/fineract/portfolio/tax/api/TaxComponentApiResource.java","fineract-tax/src/main/java/org/apache/fineract/portfolio/tax/handler/CreateTaxComponentCommandHandler.java"',
+  ].join('\n');
+  const bindings = parseCommandDispatchCsv(realCsv);
+  assert.equal(bindings.length, 2);
+  const flagship = bindings.find((b) => b.dispatchMethod === 'createCharge');
+  assert.ok(flagship, 'expected the real flagship binding to parse');
+  assert.equal(flagship.dispatcherClass, 'ChargesApiResource', 'the dispatcher must be the real REST resource that calls the builder, not the builder utility itself');
+  assert.equal(flagship.handlerClass, 'CreateChargeDefinitionCommandHandler');
+  assert.equal(flagship.dispatcherFile, 'fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/api/ChargesApiResource.java');
+
+  // Header-only / empty CSV -> 0 real bindings, not an error.
+  assert.deepEqual(parseCommandDispatchCsv('"dispatcherClass","dispatchMethod","handlerClass","dispatcherFile","handlerFile"'), []);
+  assert.deepEqual(parseCommandDispatchCsv(''), []);
+});
+
+test('#18 — codeqlCommandDispatchPass introduces a unit + relationship at its own tier, never contests an existing edge, never crosses an unscanned root boundary', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+  const originalRun = provider.runCodeQLCommandDispatchResolution;
+
+  const dispatcherUnit = {
+    id: 'CommandWrapperBuilder.java',
+    kind: 'service',
+    name: 'CommandWrapperBuilder',
+    filePath: 'src/main/java/example/CommandWrapperBuilder.java',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }],
+    confidence: 40,
+  };
+
+  provider.runCodeQLCommandDispatchResolution = () => [
+    {
+      dispatcherClass: 'CommandWrapperBuilder',
+      dispatchMethod: 'createCharge',
+      handlerClass: 'CreateChargeDefinitionCommandHandler',
+      dispatcherFile: 'root/src/main/java/example/CommandWrapperBuilder.java',
+      handlerFile: 'root/src/main/java/example/CreateChargeDefinitionCommandHandler.java',
+    },
+    // Same dispatcher, a SECOND binding whose handler is OUTSIDE the
+    // scanned root entirely — must be skipped, never guessed at.
+    {
+      dispatcherClass: 'CommandWrapperBuilder',
+      dispatchMethod: 'otherAction',
+      handlerClass: 'OtherActionHandler',
+      dispatcherFile: 'root/src/main/java/example/CommandWrapperBuilder.java',
+      handlerFile: 'unscanned-root/src/main/java/example/OtherActionHandler.java',
+    },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  const { codeqlCommandDispatchPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [dispatcherUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [dispatcherUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlCommandDispatchPass.run(ctx);
+
+    assert.equal(ctx.allUnits.length, 2, 'expected exactly 1 new unit introduced (the in-root binding), the out-of-root one skipped');
+    const introduced = ctx.allUnits.find((u) => u.id !== dispatcherUnit.id);
+    assert.equal(introduced.kind, 'service');
+    assert.equal(introduced.name, 'CreateChargeDefinitionCommandHandler');
+    assert.equal(introduced.confidence, 10);
+    assert.equal(introduced.evidence[0].source, 'codeql-di');
+
+    assert.equal(ctx.relationships.length, 1, 'expected exactly 1 new relationship (the out-of-root binding produced none)');
+    const rel = ctx.relationships[0];
+    assert.equal(rel.from, dispatcherUnit.id);
+    assert.equal(rel.to, introduced.id);
+    assert.equal(rel.source, 'codeql');
+    assert.equal(rel.mechanism, 'codeql-command-dispatch');
+    assert.equal(rel.confidence, 7);
+    assert.equal(rel.crossPackage, false);
+
+    // Trust tier: running the SAME pass again over a context that already
+    // has this exact relationship must never duplicate it.
+    provider.runCodeQLCommandDispatchResolution = () => [
+      {
+        dispatcherClass: 'CommandWrapperBuilder',
+        dispatchMethod: 'createCharge',
+        handlerClass: 'CreateChargeDefinitionCommandHandler',
+        dispatcherFile: 'root/src/main/java/example/CommandWrapperBuilder.java',
+        handlerFile: 'root/src/main/java/example/CreateChargeDefinitionCommandHandler.java',
+      },
+    ];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+    const { codeqlCommandDispatchPass: pass2 } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+    pass2.run(ctx);
+    assert.equal(ctx.relationships.length, 1, 'must never duplicate a relationship this same pass already produced for the same (from, to) pair');
+  } finally {
+    provider.runCodeQLCommandDispatchResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  }
+});
+
+test('#18 — a binding with an empty handlerClass never introduces an empty-name unit', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
+  const originalRun = provider.runCodeQLCommandDispatchResolution;
+  const dispatcherUnit = { id: 'X.java', kind: 'service', name: 'x', filePath: 'src/main/java/example/X.java', startLine: 1, endLine: 1, evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }], confidence: 40 };
+  provider.runCodeQLCommandDispatchResolution = () => [
+    { dispatcherClass: 'X', dispatchMethod: 'doThing', handlerClass: '', dispatcherFile: 'root/src/main/java/example/X.java', handlerFile: 'root/src/main/java/example/X.java' },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  const { codeqlCommandDispatchPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [dispatcherUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [dispatcherUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlCommandDispatchPass.run(ctx);
+    assert.equal(ctx.allUnits.length, 1, 'an empty-name binding must never introduce a unit');
+    assert.equal(ctx.relationships.length, 0);
+  } finally {
+    provider.runCodeQLCommandDispatchResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'))];
+  }
+});
+
+test('#18 — codeqlCommandDispatchPass is a no-op unless BOTH codeqlSourceRoot and codeqlBuildCommand are set (opt-in only, never a default-on path)', () => {
+  const { codeqlCommandDispatchPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-command-dispatch-pass'));
+  const ctx1 = { packageRoots: ['/fake'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), relationships: [] };
+  codeqlCommandDispatchPass.run(ctx1);
+  assert.equal(ctx1.relationships.length, 0);
+
+  const ctx2 = { packageRoots: ['/fake'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), relationships: [], codeqlSourceRoot: '/fake' };
+  codeqlCommandDispatchPass.run(ctx2); // build command missing -> still a no-op
+  assert.equal(ctx2.relationships.length, 0);
+});
+
+test('engine-capability-matrix.yml: java/codeql-command-dispatch is marked proven (#18 real evidence, re-verified 2026-08-22)', () => {
+  const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
+  const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
+  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-command-dispatch'), 'the shipped command-dispatch mechanism (408 real Fineract bindings, 2026-08-22) must be recorded as proven');
 });

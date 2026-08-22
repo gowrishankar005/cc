@@ -312,6 +312,10 @@ export interface TypedRelationship {
   // reach, not a duplicate of those mechanisms — trust-tier-gated,
   // codeql-di-pass.ts never overrides an edge an earlier mechanism already
   // produced for the same pair).
+  // 'codeql-command-dispatch' added for #18 (codeql-command-dispatch-pass.ts)
+  // — a real registration/lookup string-keyed join, structurally distinct
+  // from the DI mechanisms above (a dispatcher/handler join, not an
+  // interface/impl resolution), same trust-tier/never-override discipline.
   // 'cross-repo-api-spec' / 'cross-repo-artifact' / 'cross-repo-service-catalogue'
   // added for T-MR-2 (cross-repo-join-detector.ts) — the three ranked
   // reliability tiers, named in the same order: a shared OpenAPI/AsyncAPI
@@ -331,6 +335,7 @@ export interface TypedRelationship {
     | 'admitted-unresolved'
     | 'codeql-di-bean-factory'
     | 'codeql-di-stereotype'
+    | 'codeql-command-dispatch'
     | 'cross-repo-api-spec'
     | 'cross-repo-artifact'
     | 'cross-repo-service-catalogue';

@@ -51,11 +51,10 @@
          ▼                         ▼
   Scanner adapters           Rules / catalogues (YAML)
   • CodeGraph (routes,       • signal catalogue
-    decorators)              • node / relationship / control maps
-  • Graphify (structural     • persistence / messaging / HTTP-client
-    backbone, cross-root)      detection catalogues
-  • OpenAPI, k8s manifests,  • scope-limitations
-    Spring config, SBOM
+    decorators, cross-root   • node / relationship / control maps
+    structural backbone)     • persistence / messaging / HTTP-client
+  • OpenAPI, k8s manifests,    detection catalogues
+    Spring config, SBOM      • scope-limitations
          │
          ▼
   typed-facts.json  ──►  architecture.calm.json (+ IR, coverage, unmapped)
@@ -155,7 +154,6 @@ tools/                    ← standalone tooling
 ### Prerequisites
 
 - Node.js 20+
-- **Optional but recommended:** the [Graphify](https://pypi.org/project/graphifyy/) CLI on `PATH`, for cross-package relationship detection — `pip install graphifyy` installs a command named **`graphify`** (no double-y; only the PyPI package name has one). **Missing it does not fail a run** — Weaver catches the failure, logs a warning, and continues with same-file detection only (no cross-package edges). Confirm it's really on `PATH` with `graphify --version`, not `graphifyy --version`.
 
 ### Try it now (2 minutes, no target repo needed)
 
@@ -273,7 +271,7 @@ table exists to prevent.
 
 | Mechanism | Runs by default? | How to reach it |
 |---|---|---|
-| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, Graphify reconciliation, relationship grading, relationship fact-identity assignment (`TypedRelationship.id`, T-CL-1), status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
+| Route composition, signal→unit mapping, persistence/messaging detection, outbound-HTTP, multi-hop bridges, cross-package reconciliation, relationship grading, relationship fact-identity assignment (`TypedRelationship.id`, T-CL-1), status assignment (`FactStatus`) | **Always** | No flag — the core pipeline |
 | Incremental merge against the prior run's `typed-facts.json` in the same `--out` directory (T-CL-2) — unaffected facts (including a human-`reviewed` status) carry forward unchanged; a fact whose evidence changed after being `reviewed` is flagged `requires-review`, never silently overwritten either way. Writes `merge-report.json` and appends to `fact-history.json` (T-CL-3, retrievable who/when/why a status changed) | **Always** | No flag — a no-op (nothing to merge) the first time a given `--out` directory is used |
 | OpenAPI/Swagger ingestion | **Always** | No flag — auto-discovers `openapi.yaml`/`.json` at each package root |
 | Spring config file reading (`application.yml`/`.properties`) | **Always** | No flag — auto-discovers config files at each package root |
@@ -283,7 +281,7 @@ table exists to prevent.
 | Kubernetes `deployed-in` runtime-placement relationships (T-MR-3) | Opt-in | `--k8s-manifests <dir>` (same flag — one manifest read produces both trust and placement facts) |
 | Contradiction detection (k8s manifest vs. Spring config) | Opt-in | `--k8s-manifests <dir>` (same flag, no separate one) |
 | Env-key-name soft-graph correlation | Opt-in | `--enable-env-soft-graph` (also requires `--k8s-manifests`) |
-| CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>` — real, non-trivial cost (a real compile + CodeQL database build), never on by default |
+| CodeQL DI-resolution (T-LR-5) | Opt-in | `--codeql-source-root <dir> --codeql-build-command <cmd>`, or `--auto-codeql` to derive both from a detected `build.gradle`/`pom.xml` — real, non-trivial cost (a real compile + CodeQL database build), never on by default either way |
 | Ranked cross-repo joins against another repo's T-MR-1 manifest (T-MR-2) | Opt-in | `--repo-manifests <dir>` — a directory of other repos' `*.weaver-manifest.yml` files; every relationship this mechanism produces is capped at `status: requires-review` and `grade: structural`, regardless of which ranked tier resolved it |
 | Decision Record/Override application | Opt-in | `--overrides <dir>` |
 | calm-generator, threat-signals, resilience-lens modules | **All three, by default** | `--modules <name>,<name>,...` to run a different set |
@@ -310,7 +308,9 @@ anyone deciding what the product can do.
 | `--no-system-node` | No | system node included | Omit the synthetic root `system` node and its `composed-of` edges from CALM output |
 | `--from-facts <typed-facts.json>` | Yes | — | Reconstruct CALM output from a previously-generated, frozen `typed-facts.json` — no rescan. Refuses an incompatible `contractVersion` rather than attempting reconstruction |
 | `--codeql-source-root <dir>` | Yes | — (off) | T-LR-5: the real, compilable root CodeQL should index (must be a common ancestor of every `--modules`-relevant package root). Requires `--codeql-build-command` too. See the CodeQL section below — real, non-trivial cost and a real license constraint, never on by default |
-| `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile** — an up-to-date/cached build never re-invokes the compiler, so CodeQL's tracer observes nothing and the database silently comes back empty (a real failure mode found building this, not a hypothetical) |
+| `--codeql-build-command <cmd>` | Yes | — (off) | The exact build command CodeQL runs to observe a real compile (e.g. `"./gradlew --no-daemon :my-module:compileJava --rerun-tasks"`). **Must force a genuine recompile in a process CodeQL's tracer actually sees** — an up-to-date/cached build never re-invokes the compiler, and for Gradle, a pre-existing daemon runs the real compile *outside* CodeQL's traced process tree even when `--rerun-tasks` forces it — either way the database silently comes back empty rather than erroring (a real failure mode found building this, not a hypothetical). Gradle callers need both `--rerun-tasks` and `--no-daemon` |
+| `--auto-codeql` | No | off | Derives `--codeql-source-root`/`--codeql-build-command` from a detected `build.gradle`/`build.gradle.kts` (with a `gradlew` wrapper) or `pom.xml` (preferring a checked-in `mvnw` wrapper) at the common ancestor of every package root, instead of hand-writing both. **Still requires this explicit flag** — it only removes the friction of deriving the two values, it does not make CodeQL reachable without a conscious opt-in (same license reason `--codeql-source-root`/`--codeql-build-command` are opt-in below). Explicit `--codeql-source-root`/`--codeql-build-command` always take precedence and are never overridden if both are also passed. Refuses to guess a Gradle build with no `gradlew` wrapper checked in (a system-wide `gradle` install could be any version) rather than silently picking one — logs a message and continues without CodeQL evidence instead. The `WEAVER_CODEQL_LICENSE_CONFIRMED=1` environment variable triggers the identical behavior without needing this flag on every invocation — see the CodeQL section below |
+| `--no-auto-codeql` | No | off | Suppresses `--auto-codeql`/`WEAVER_CODEQL_LICENSE_CONFIRMED` for a single run — skip CodeQL for one invocation without unsetting the environment variable |
 | `--repo-manifests <dir>` | Yes | — (off) | T-MR-2: a directory of OTHER repos' `*.weaver-manifest.yml` files (T-MR-1, `scanner/repo-manifest-provider.ts`) to join this run's own evidence against — never this run's own manifest, and the pipeline never writes to any target repo. Resolves in strict order (shared API-spec identity → published artifact coordinates → service-catalogue/DNS), stopping at the first match per candidate; unmatched entries are never guessed at |
 
 **When to reach for which flag:**
@@ -318,7 +318,7 @@ anyone deciding what the product can do.
 - Have Kubernetes manifests for the system? → `--k8s-manifests <dir>`. You get shared-secret trust edges AND `deployed-in` runtime-placement edges (which namespace each service actually runs in) for free; if a manifest's datastore image disagrees with a Spring-config-sourced unit's JDBC scheme, that unit is also automatically forced to `requires-review` (no extra flag).
 - Also want low-confidence env-var-name correlation edges on top of that? → add `--enable-env-soft-graph` (does nothing without `--k8s-manifests`).
 - System is deployed via CloudFormation/SAM (API Gateway → Lambda)? → `--cfn-manifests <dir>`.
-- Hit a case where CodeGraph/Graphify can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--codeql-source-root`/`--codeql-build-command` (see the dedicated section below first — real cost, license-gated, local-only).
+- Hit a case where CodeGraph can't see a Spring `@Bean`-factory or stereotype-disambiguated wiring? → `--auto-codeql` (or `--codeql-source-root`/`--codeql-build-command` for a hand-tuned build) — see the dedicated section below first: real cost, license-gated, local-only.
 - Re-running CALM generation after tweaking `--modules` or an override, without re-scanning source? → `--from-facts <typed-facts.json>` instead of re-running the whole scan.
 - A human already corrected a wrong classification? → `--overrides <dir>`; add `--strict-overrides` in CI so a malformed/orphaned override fails the build instead of silently no-op'ing.
 - Debugging why a route didn't get detected? → `--strict-detect` turns a silent zero-routes result into a hard failure you'll actually notice.
@@ -327,7 +327,7 @@ anyone deciding what the product can do.
 #### Optional: CodeQL DI-resolution (`--codeql-source-root` / `--codeql-build-command`)
 
 Resolves a Spring interface field to its real implementation via two shapes
-neither CodeGraph nor Graphify can see at all: a `@Bean`-factory method
+CodeGraph can't see at all: a `@Bean`-factory method
 inside a `@Configuration` class, or 2+ real `implements` candidates
 disambiguated by a stereotype annotation — see
 [`docs/solution/E1b-codeql-di-resolution-experiment.md`](./docs/solution/E1b-codeql-di-resolution-experiment.md)
@@ -339,8 +339,69 @@ reference Java/Spring monorepo).
 # target — real cost (minutes, not seconds), not a default-on path.
 node dist/orchestration/run-slice.js /path/to/module \
   --codeql-source-root /path/to/repo-root \
-  --codeql-build-command "./gradlew :my-module:compileJava --rerun-tasks"
+  --codeql-build-command "./gradlew --no-daemon :my-module:compileJava --rerun-tasks"
 ```
+
+**Or let it derive both flags from a detected build file:**
+
+```bash
+node dist/orchestration/run-slice.js /path/to/module --auto-codeql
+# [run-slice] --auto-codeql: detected gradle build at /path/to/repo-root,
+# running CodeQL DI-resolution with build command:
+# ./gradlew --no-daemon compileJava --rerun-tasks
+```
+
+`--auto-codeql` always includes `--no-daemon`/`--rerun-tasks` (Gradle) or
+`clean` (Maven) automatically — the two silent-empty-database gotchas below
+are exactly what it exists to avoid making you remember. It only looks at
+the common ancestor of your package roots for `build.gradle`/`pom.xml`, and
+only trusts a `gradlew`/`mvnw` wrapper if one is checked in (never guesses a
+system-wide build-tool version) — if neither is found, it logs a message
+and the run continues without CodeQL evidence, same as omitting the flags
+entirely. **Known limitation**: if a package root has both `build.gradle`
+and `pom.xml` checked in, Gradle is always tried first — on a machine where
+that Gradle build's toolchain doesn't resolve (e.g. a pinned Java version
+with no matching JDK linked) but Maven would have worked against the
+identical source, this degrades to "no CodeQL evidence" rather than falling
+back to Maven (`BACKLOG.md`, found running `E2-java-framework-generalization-experiment.md`).
+
+**Don't want to type `--auto-codeql` on every invocation?** Set
+`WEAVER_CODEQL_LICENSE_CONFIRMED=1` once in your own shell profile or CI job
+config — it triggers the identical auto-detection, with no flag needed:
+
+```bash
+export WEAVER_CODEQL_LICENSE_CONFIRMED=1
+node dist/orchestration/run-slice.js /path/to/module   # CodeQL auto-detected, same as --auto-codeql
+```
+
+**This is a per-environment attestation, not a codebase-wide default.** It
+must equal exactly `1` — not `true`/`yes`/any other truthy string, to avoid
+an unrelated environment variable collision or a copy-pasted value silently
+enabling this. A fresh clone of this repo, or any CI job that hasn't
+explicitly set it, behaves exactly as before: CodeQL stays off. Setting it
+is **your attestation that you've checked your own CodeQL CLI license
+tier** — the free CodeQL CLI license permits automated/unattended use only
+against an Open Source Codebase, or under a paid GitHub Advanced Security
+(GHAS) license; this pipeline has no way to verify which applies to you, it
+only checks that you've consciously set the variable. See GitHub's own
+[CodeQL CLI license terms](https://github.com/github/codeql-cli-binaries/blob/main/LICENSE.md)
+before setting this in an automated/CI context. To skip CodeQL for a single
+run without unsetting the environment variable, pass `--no-auto-codeql` —
+it overrides both the flag and the env var for that one invocation.
+
+**Gradle callers hand-writing the command: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
+failure mode, found running a live three-engine benchmark (Fineract +
+Spring Boot Admin, 2026-08-21): if a Gradle daemon from an earlier local
+build is already running, CodeQL's build tracer only instruments the
+process tree it directly launches — the already-running daemon does the
+real compilation *outside* that tree, so CodeQL sees zero source even
+though Gradle reports `BUILD SUCCESSFUL` with real `javac` output and
+`--rerun-tasks` genuinely forced a recompile. The database still finalizes
+without an error — `codeql-di-provider.ts` logs a WARNING and continues
+with zero bindings, so this degrades silently rather than crashing, but the
+result is misleadingly empty. `./gradlew --stop` before the run, or
+`--no-daemon` in the build command itself, avoids it. Maven callers are not
+affected (no persistent daemon by default).
 
 Real output from an actual `run-slice` invocation with this flag on, against
 a real multi-module Java/Spring monorepo (`Claim_Register.md`'s
@@ -469,4 +530,4 @@ A clean L0+L1 result on a fixture does not imply L2 on a real multi-module syste
 
 ## License / provenance
 
-The pipeline depends on open-source tools including `@colbymchenry/codegraph`, `graphifyy`, and `@finos/calm-cli`. Check upstream licenses before redistributing any generated artefacts derived from proprietary source.
+The pipeline depends on open-source tools including `@colbymchenry/codegraph` and `@finos/calm-cli`. Check upstream licenses before redistributing any generated artefacts derived from proprietary source.

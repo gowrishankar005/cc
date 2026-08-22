@@ -63,4 +63,48 @@ routes:
     primaryEngine: tree-sitter-custom-query
     evidenceLevel: researched-not-built
 
-crossPackageBackbone: graphify # one combined pass, all languages, no per-root gate — proven, 265 real cross-module edges
+# T-onboarding-16 (2026-08-22) — a SEPARATE section from `routes:` above,
+# deliberately not crammed into it: `routes:` answers "how do we TYPE this
+# unit" (per-language/framework route/entity dispatch); DI-resolution is a
+# RELATIONSHIP-resolution capability that cuts across units, a genuinely
+# different shape (the same "mechanism-shape mismatch" codeql-di-pass.ts's
+# own doc comment already names for a different part of this history).
+# Forcing it into `routes:`'s primaryEngine/augmentEngine/fallbackEngine
+# fields would misrepresent what's actually being measured.
+#
+# `evidenceLevel` here is a real/measured-or-not GATE, not a numeric
+# confidence value — this project doesn't have real per-framework confidence
+# NUMBERS (only fact-trust-matrix.ts's per-(engine,mechanism,scope) tiers,
+# which don't vary by framework), and inventing framework-specific numeric
+# deltas without real measurement would violate the same evidence discipline
+# that trust matrix was built on. `logEngineCapabilitySummary` (T-onboarding-16)
+# warns, rather than silently applying full trust-matrix confidence, when a
+# mechanism fires on a (language, framework) combo with no `proven` entry
+# here — catching drift between what's shipped and what this file claims,
+# not scaling confidence per framework.
+relationshipMechanisms:
+  - language: java
+    framework: [spring-mvc, spring-boot]
+    mechanism: codeql-di-resolution
+    evidenceLevel: proven
+    note: "T-LR-5/E1b: 2105 real bindings, whole-codebase scale, Fineract. E2 (2026-08-21) generalization check: mechanism safe (no false positives, correct refusal) on spring-petclinic/finos-spring-bot, yield near-zero on both — real per-repo architecture-density dependency (how much ambiguous-interface/bean-factory shape a codebase has), not a framework-identity dependency. See CodeQL-engine-synthesis-2026-08-22.md."
+
+  - language: java
+    framework: [any] # generic string-keyed registration/lookup join — not framework-specific like the DI mechanisms above (Fineract's own convention is plain, hand-rolled, no framework annotation involved)
+    mechanism: codeql-command-dispatch
+    evidenceLevel: proven
+    note: "#18/E1: originally evaluated 2026-08-13 (E1-codeql-engine-evaluation.md, 7 real edges), never shipped. Re-verified and shipped 2026-08-22 after the original query was found to have never left gitignored soln/ — reconstructed from the memo's own mechanism description, 408 real bindings at whole-fineract-provider-tree scale, including a genuine second real dispatch convention (InteropWrapperBuilder) found unprompted, the exact 'generalizes to a second convention' check E1's own 'what's next' section named but never ran."
+
+  - language: typescript
+    framework: [nestjs]
+    mechanism: codeql-nestjs-token-di
+    evidenceLevel: exploratory-not-shipped
+    note: "E2a (2026-08-22): 15 real bindings on ghostfolio/ghostfolio, zero prior baseline coverage. Hand-run exploratory query against a manually-built database only — no live codeql-js-di-pass.ts exists. One real, disclosed ambiguity (duplicate token registration) not yet refused."
+
+  - language: java
+    framework: [guice]
+    mechanism: codeql-guice-di
+    evidenceLevel: exploratory-not-shipped
+    note: "Tier2 (2026-08-22): real gap confirmed on finos/legend-sdlc, but the first exploratory query's 218 raw bindings were 208/218 main/test-scoping-contaminated (mvn install compiled test source) — only 10 hand-verified clean. Needs source-root/active-Module scoping before this evidenceLevel could honestly move past exploratory."
+
+crossPackageBackbone: codegraph # one combined CodeGraph index over the common ancestor of all given roots, scoped via ProjectConfig.exclude — migrated from Graphify (docs/solution/E6-cross-package-backbone-evaluation.md); proven against Fineract (charge/core/security/provider), Waltz (3-module), a reference Python microservices repo, and a TS/DynamoDB fixture
