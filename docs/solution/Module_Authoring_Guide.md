@@ -35,7 +35,7 @@ import { Module, ModuleContext } from '../registry';
 ```
 
 **Forbidden, explicitly:**
-- **Do not import from `scanner/`** (CodeGraph, Graphify, or the `StructuralEngine` interface). Modules consume facts *after* scanning has already happened — re-entering the Scanner breaks the pipes-and-filters boundary this whole design depends on, and breaks determinism (a module re-scanning could see different source than the run that produced its `TypedFacts`).
+- **Do not import from `scanner/`** (CodeGraph or the `StructuralEngine` interface). Modules consume facts *after* scanning has already happened — re-entering the Scanner breaks the pipes-and-filters boundary this whole design depends on, and breaks determinism (a module re-scanning could see different source than the run that produced its `TypedFacts`).
 - **Do not import from `modules/calm-generator/`'s internals** (the builders, `override-applier.ts`). If you need CALM-shaped data, that's a sign your module should consume `architecture.calm.json` as a file artefact after the fact, not reach into calm-generator's code.
 - **Do not mutate the `TypedFacts` object you're given.** Treat it as read-only. If two modules ran with a shared mutable object and one mutated it, the other's results would depend on registration order — a real, avoidable source of non-determinism.
 

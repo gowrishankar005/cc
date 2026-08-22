@@ -278,7 +278,7 @@ function runFromFacts(
 
   const placeholderCoverage: CoverageReport = {
     generatedAt: facts.generatedAt,
-    graphifyStatus: 'skipped',
+    crossPackageStatus: 'skipped',
     roots: [],
     ignoredByReason: {},
     unmappedSignalCount: 0,

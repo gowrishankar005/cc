@@ -23,8 +23,8 @@ export interface RootCoverage {
   filesByExt: Record<string, number>;
   nativeRouteCount: number;
   decoratorFactCount: number;
-  graphifyNodeCount: number;
-  graphifyEdgeCount: number;
+  crossPackageNodeCount: number;
+  crossPackageEdgeCount: number;
   unitsByKind: Record<string, number>;
   /** T-X4-1's own mitigation: "Absent file -> coverage openapi: absent" — never silently omit the status. */
   openapiStatus: 'present' | 'absent';
@@ -34,8 +34,8 @@ export interface RootCoverage {
 
 export interface CoverageReport {
   generatedAt: string;
-  graphifyStatus: 'ok' | 'failed' | 'skipped';
-  graphifyError?: string;
+  crossPackageStatus: 'ok' | 'failed' | 'skipped';
+  crossPackageError?: string;
   roots: RootCoverage[];
   ignoredByReason: Record<string, number>;
   unmappedSignalCount: number;
@@ -219,13 +219,7 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
 }
 
 export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
-  // Field names on CoverageReport (graphifyStatus/graphifyNodeCount/graphifyEdgeCount/
-  // graphifyError) are kept as-is — external JSON contract, now sourced from
-  // the codegraph cross-root pass (ctx.crossPackageRun), not Graphify. Not
-  // renamed: no functional reason to churn a serialized field name, and
-  // downstream consumers (intelligence-ir.ts, platform-artefacts.ts,
-  // external tooling reading coverage-report.json) key off these names.
-  const graphifyStatus: CoverageReport['graphifyStatus'] = ctx.crossPackageRun ? 'ok' : ctx.crossPackageError ? 'failed' : 'skipped';
+  const crossPackageStatus: CoverageReport['crossPackageStatus'] = ctx.crossPackageRun ? 'ok' : ctx.crossPackageError ? 'failed' : 'skipped';
 
   const roots: RootCoverage[] = ctx.packageRoots.map((root) => {
     const raw = ctx.rawByRoot.get(root);
@@ -233,12 +227,12 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
     const unitsByKind: Record<string, number> = {};
     for (const u of units) unitsByKind[u.kind] = (unitsByKind[u.kind] ?? 0) + 1;
 
-    let graphifyNodeCount = 0;
-    let graphifyEdgeCount = 0;
+    let crossPackageNodeCount = 0;
+    let crossPackageEdgeCount = 0;
     if (ctx.crossPackageRun) {
       const { graph, resolveRoot } = ctx.crossPackageRun;
-      graphifyNodeCount = graph.nodes.filter((n) => resolveRoot(n.source_file)?.root === root).length;
-      graphifyEdgeCount = graph.edges.filter((e) => resolveRoot(e.source_file)?.root === root).length;
+      crossPackageNodeCount = graph.nodes.filter((n) => resolveRoot(n.source_file)?.root === root).length;
+      crossPackageEdgeCount = graph.edges.filter((e) => resolveRoot(e.source_file)?.root === root).length;
     }
 
     const openApiDocs = ctx.openApiDocumentsByRoot?.get(root) ?? [];
@@ -248,8 +242,8 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
       filesByExt: raw?.filesByExt ?? {},
       nativeRouteCount: raw?.nativeRoutes.length ?? 0,
       decoratorFactCount: raw?.decoratorFacts.length ?? 0,
-      graphifyNodeCount,
-      graphifyEdgeCount,
+      crossPackageNodeCount,
+      crossPackageEdgeCount,
       unitsByKind,
       openapiStatus: openApiDocs.length > 0 ? 'present' : 'absent',
       deployableManifests: (raw?.deployableManifests ?? []).map((m) => m.type),
@@ -281,18 +275,18 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   }
 
   const completeness = computeCompleteness(ctx.allUnits, ctx.relationships);
-  // Robustness T-R0-5 — graphifyStatus was already surfaced prominently in
+  // Robustness T-R0-5 — crossPackageStatus was already surfaced prominently in
   // intelligence-ir.md's own header, but living in a DIFFERENT field than
   // silenceFlags meant a reviewer (or the T-E5 hitl-review-trigger.js CLI,
   // which reads exactly this array) could miss that a degraded/failed
-  // Graphify pass is the REAL reason a run looks architecturally empty —
-  // every cross-package edge, persistence-detector unit, and R2 bridge
-  // resolution depends on Graphify; a failure here silently starves S1's
+  // cross-package backbone pass is the REAL reason a run looks architecturally
+  // empty — every cross-package edge, persistence-detector unit, and R2
+  // bridge resolution depends on it; a failure here silently starves S1's
   // own precondition (fewer database units even exist to trigger it).
   // Folding this into the SAME reviewer-facing list closes that gap.
-  if (graphifyStatus !== 'ok') {
+  if (crossPackageStatus !== 'ok') {
     completeness.silenceFlags.push(
-      `S0-cross-package-backbone-incomplete: graphifyStatus is "${graphifyStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
+      `S0-cross-package-backbone-incomplete: crossPackageStatus is "${crossPackageStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
     );
   }
   // T-Y5-1 — the second, CFN-specific half of the HT-ASB-006 class: real
@@ -313,8 +307,8 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
 
   return {
     generatedAt: new Date().toISOString(),
-    graphifyStatus,
-    graphifyError: ctx.crossPackageError ? String(ctx.crossPackageError) : undefined,
+    crossPackageStatus,
+    crossPackageError: ctx.crossPackageError ? String(ctx.crossPackageError) : undefined,
     roots,
     ignoredByReason,
     unmappedSignalCount,

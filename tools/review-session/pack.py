@@ -389,8 +389,6 @@ def _render_agents_md() -> str:
         "No folklore (\"typical Spring\").\n"
         "9. Never run apply.py / run-slice / override-applier / pack.py fetch-span from this chat — "
         "applying and extra-reads are human steps. If evidence is short, PRINT one fetch-span command and stop.\n"
-        "10. Cross-package backbone is CodeGraph. Coverage JSON may still use graphifyStatus* field names "
-        "as a frozen contract — those mean the CodeGraph cross-root pass, not Graphify-the-CLI.\n"
     )
 
 

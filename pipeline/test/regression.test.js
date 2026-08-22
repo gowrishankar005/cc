@@ -1285,7 +1285,7 @@ test(
   }
 );
 
-test('Robustness T-R0-5 — Graphify partial/failed visibility: S0 fires in completeness.silenceFlags when graphifyStatus is not ok, absent when ok', () => {
+test('Robustness T-R0-5 — cross-package backbone partial/failed visibility: S0 fires in completeness.silenceFlags when crossPackageStatus is not ok, absent when ok', () => {
   const { buildCoverageReport } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
   const baseCtx = {
     packageRoots: ['fake-root'],
@@ -1298,17 +1298,17 @@ test('Robustness T-R0-5 — Graphify partial/failed visibility: S0 fires in comp
   };
 
   const failedReport = buildCoverageReport({ ...baseCtx, crossPackageError: new Error('codegraph cross-root pass failed') });
-  assert.equal(failedReport.graphifyStatus, 'failed');
+  assert.equal(failedReport.crossPackageStatus, 'failed');
   assert.ok(
     failedReport.completeness.silenceFlags.some((f) => f.startsWith('S0-cross-package-backbone-incomplete')),
-    'expected S0 to fire when graphifyStatus is failed'
+    'expected S0 to fire when crossPackageStatus is failed'
   );
 
   const okReport = buildCoverageReport({ ...baseCtx, crossPackageRun: { graph: { nodes: [], edges: [] }, resolveRoot: () => undefined } });
-  assert.equal(okReport.graphifyStatus, 'ok');
+  assert.equal(okReport.crossPackageStatus, 'ok');
   assert.ok(
     !okReport.completeness.silenceFlags.some((f) => f.startsWith('S0-cross-package-backbone-incomplete')),
-    'S0 must not fire when graphifyStatus is ok'
+    'S0 must not fire when crossPackageStatus is ok'
   );
 });
 
@@ -3104,7 +3104,7 @@ test('Platform artefacts — coverage-report.json and unmapped-signals-report.js
     assert.equal(coverage.roots.length, 1);
     assert.equal(coverage.roots[0].nativeRouteCount, 3, 'NestJS fixture has 3 native routes');
     assert.equal(coverage.roots[0].filesByExt['.ts'], 1);
-    assert.ok(['ok', 'failed', 'skipped'].includes(coverage.graphifyStatus));
+    assert.ok(['ok', 'failed', 'skipped'].includes(coverage.crossPackageStatus));
 
     const unmapped = JSON.parse(fs.readFileSync(path.join(outDir, 'unmapped-signals-report.json'), 'utf8'));
     assert.equal(unmapped.clusterCount, 0, 'NestJS fixture has no unmapped signals — every decorator matches a catalogue rule');

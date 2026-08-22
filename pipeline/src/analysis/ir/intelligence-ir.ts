@@ -45,7 +45,7 @@ export function renderIntelligenceIR(
 
   h(`## Coverage appendix`);
   lines.push(
-    `- graphifyStatus: \`${coverage.graphifyStatus}\`${coverage.graphifyError ? ` (${coverage.graphifyError})` : ''}`,
+    `- crossPackageStatus: \`${coverage.crossPackageStatus}\`${coverage.crossPackageError ? ` (${coverage.crossPackageError})` : ''}`,
     `- k8sManifestsStatus: \`${coverage.k8sManifestsStatus}\``,
     `- relationships by kind: ${Object.entries(coverage.relationshipsByKind).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     `- relationships by source: ${Object.entries(coverage.relationshipsBySource).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
@@ -80,7 +80,7 @@ export function renderIntelligenceIR(
     lines.push(
       `- files by extension: ${Object.entries(root.filesByExt).map(([e, c]) => `${e}=${c}`).join(', ') || '(none)'}`,
       `- native routes: ${root.nativeRouteCount}, decorator facts: ${root.decoratorFactCount}`,
-      `- graphify nodes: ${root.graphifyNodeCount}, edges: ${root.graphifyEdgeCount}`,
+      `- cross-package nodes: ${root.crossPackageNodeCount}, edges: ${root.crossPackageEdgeCount}`,
       `- units by kind: ${Object.entries(root.unitsByKind).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
       ''
     );

@@ -23,7 +23,7 @@ export function writePlatformArtefacts(ctx: AnalysisContext, outDir: string): { 
   fs.writeFileSync(path.join(outDir, 'unmapped-signals-report.json'), JSON.stringify(unmapped, null, 2));
 
   console.log(
-    `[platform-artefacts] coverage: ${coverage.roots.length} root(s), graphify ${coverage.graphifyStatus}; unmapped: ${unmapped.clusterCount} signal cluster(s), ${unmapped.totalUnmappedOccurrences} occurrence(s)`
+    `[platform-artefacts] coverage: ${coverage.roots.length} root(s), cross-package ${coverage.crossPackageStatus}; unmapped: ${unmapped.clusterCount} signal cluster(s), ${unmapped.totalUnmappedOccurrences} occurrence(s)`
   );
 
   return { coverage, unmapped };
