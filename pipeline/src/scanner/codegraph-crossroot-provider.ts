@@ -178,8 +178,20 @@ function reparentMemberEdgesToEnclosingClass(nodes: CrossPackageNode[], edges: C
   }
   for (const e of edges) {
     if (e.relation === 'contains' || e.relation === 'method') continue;
-    const enclosingClass = enclosingClassByMember.get(e.source);
-    if (enclosingClass) e.source = enclosingClass;
+    const enclosingSource = enclosingClassByMember.get(e.source);
+    if (enclosingSource) e.source = enclosingSource;
+    // Real, evidenced gap (Waltz `UIDEndpoint -> WebUtilities.mkPath`, a
+    // static-member import/call): CodeGraph resolved this MORE precisely
+    // than Graphify did — a real `calls` edge straight to the `mkPath`
+    // METHOD node, not the class — but `buildNodeToUnitMap` matches a node
+    // to its TypedUnit by file+line-span, and a unit built from a narrow
+    // evidence signal (here, WebUtilities' unit spans exactly its one
+    // security-control evidence line) doesn't necessarily cover every
+    // method's own line. Reparenting the TARGET the same way as the source
+    // fixes it at the source of the ambiguity rather than patching the
+    // line-span matcher itself.
+    const enclosingTarget = enclosingClassByMember.get(e.target);
+    if (enclosingTarget) e.target = enclosingTarget;
   }
 }
 
