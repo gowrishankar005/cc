@@ -46,13 +46,13 @@ export interface CodeQLDispatchBinding {
  * rather than building its own — see `codeql-database-cache.ts`'s doc
  * comment for the real silent-empty-extraction bug this fixes.
  */
-export function runCodeQLCommandDispatchResolution(sourceRoot: string, buildCommand: string): CodeQLDispatchBinding[] {
+export function runCodeQLCommandDispatchResolution(sourceRoot: string, buildCommand: string, fallbackBuildCommand?: string): CodeQLDispatchBinding[] {
   if (!fs.existsSync(COMMAND_DISPATCH_QUERY)) {
     console.warn(`[codeql-command-dispatch] WARNING: query file missing at ${COMMAND_DISPATCH_QUERY}, continuing without CodeQL command-dispatch evidence`);
     return [];
   }
 
-  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand);
+  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand, fallbackBuildCommand);
   if (!dbPath) return []; // binary/build failure already warned by the shared cache
 
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-dispatch-out-'));
@@ -70,6 +70,9 @@ export function runCodeQLCommandDispatchResolution(sourceRoot: string, buildComm
 
   const bindings = parseCommandDispatchCsv(fs.readFileSync(csvPath, 'utf8'));
   fs.rmSync(workDir, { recursive: true, force: true });
+  if (bindings.length === 0) {
+    console.log('[codeql-command-dispatch] query ran cleanly, 0 real dispatch bindings found (not a failure — see WARNING above if the database/query itself failed)');
+  }
   return bindings;
 }
 

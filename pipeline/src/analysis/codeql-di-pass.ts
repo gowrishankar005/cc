@@ -58,7 +58,7 @@ export const codeqlDiPass: AnalysisPass = {
 
     let bindings: CodeQLDiBinding[];
     try {
-      bindings = runCodeQLDiResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand);
+      bindings = runCodeQLDiResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand, ctx.codeqlFallbackBuildCommand);
     } catch (err) {
       console.warn(`[codeql-di] WARNING: unexpected failure running CodeQL DI resolution, continuing without it: ${err}`);
       return;

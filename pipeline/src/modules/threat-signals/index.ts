@@ -61,6 +61,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '16', // bumped for CONTRACT_VERSION 16.0.0 (T-MR-2) — TypedRelationship.source gained 'repo-manifest'; this module never reads TypedRelationship at all, filters on Evidence.category only — reviewed, unaffected
+  supportedMajorVersion: '17', // bumped for CONTRACT_VERSION 17.0.0 (JPA entity->table CodeQL candidate) — Evidence.source gained 'codeql-jpa-table'; this module never reads TypedRelationship at all, filters on Evidence.category only — reviewed, unaffected
   run,
 };

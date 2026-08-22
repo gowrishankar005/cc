@@ -96,7 +96,9 @@ async function runSlice(
   cfnManifestsDir?: string,
   codeqlSourceRoot?: string,
   codeqlBuildCommand?: string,
-  repoManifestsDir?: string
+  repoManifestsDir?: string,
+  codeqlFallbackBuildCommand?: string,
+  strictIsolatedNodes = false
 ): Promise<void> {
   const catalogue = loadSignalCatalogue(path.join(__dirname, '..', 'rules'));
   logEngineCapabilitySummary(loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner')));
@@ -167,12 +169,22 @@ async function runSlice(
     codeqlSourceRoot,
     codeqlBuildCommand,
     repoManifestsDir,
+    codeqlFallbackBuildCommand,
   };
   await runPasses(DEFAULT_PASSES, ctx);
   logMem('after runPasses');
   cleanupCodeqlDatabases(); // every CodeQL-based pass that could use the shared database has now run
   const { coverage, unmapped } = writePlatformArtefacts(ctx, outDir);
   logMem('after writePlatformArtefacts');
+
+  // S6 (BACKLOG.md "Isolated-node completeness flag") — soft by default,
+  // same posture as S1/S2/S5 above; --strict-isolated-nodes is the opt-in
+  // gate for a caller who wants a run with orphaned units to fail loudly
+  // instead of only appearing in coverage-report.json's silenceFlags.
+  if (strictIsolatedNodes && coverage.completeness.isolatedNodeCount > 0) {
+    console.error(`[run-slice] FAILED (--strict-isolated-nodes): ${coverage.completeness.isolatedNodeCount} unit(s) have zero relationships touching them — see coverage-report.json's S6 silenceFlag for detail.`);
+    process.exit(1);
+  }
 
   const facts: TypedFacts = {
     contractVersion: CONTRACT_VERSION,
@@ -250,7 +262,8 @@ function runFromFacts(
   moduleNames: string[] = DEFAULT_MODULE_NAMES,
   includeSnippets = true,
   strictOverrides = false,
-  includeSystemNode = true
+  includeSystemNode = true,
+  strictIsolatedNodes = false
 ): void {
   const facts: TypedFacts = JSON.parse(fs.readFileSync(factsPath, 'utf8'));
 
@@ -279,6 +292,16 @@ function runFromFacts(
     // rather than zeroed out with everything else this mode can't recompute.
     completeness: computeCompleteness(facts.units, facts.relationships),
   };
+
+  // Same honesty principle as the S1/S2 comment above — isolatedNodeCount is
+  // real, not a placeholder, in this mode too, so --strict-isolated-nodes
+  // must gate here exactly like the live-scan path (run-slice.ts's runSlice)
+  // does, not silently no-op just because this is reconstruction.
+  if (strictIsolatedNodes && placeholderCoverage.completeness.isolatedNodeCount > 0) {
+    console.error(`[run-slice] FAILED (--strict-isolated-nodes): ${placeholderCoverage.completeness.isolatedNodeCount} unit(s) have zero relationships touching them — see coverage-report.json's S6 silenceFlag for detail.`);
+    process.exit(1);
+  }
+
   const placeholderUnmapped: UnmappedSignalsReport = {
     generatedAt: facts.generatedAt,
     totalUnmappedOccurrences: 0,
@@ -313,6 +336,7 @@ const KNOWN_FLAGS = [
   '--auto-codeql',
   '--no-auto-codeql',
   '--repo-manifests',
+  '--strict-isolated-nodes',
 ];
 
 // Flags that consume the NEXT token as their value — that token must never
@@ -347,7 +371,7 @@ function main() {
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error(
-      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>] [--auto-codeql] [--no-auto-codeql] [--repo-manifests <dir>]\n' +
+      'Usage: run-slice <package-root> [<package-root> ...] [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--strict-detect] [--no-snippets] [--k8s-manifests <dir>] [--cfn-manifests <dir>] [--strict-overrides] [--no-system-node] [--enable-env-soft-graph] [--codeql-source-root <dir> --codeql-build-command <cmd>] [--auto-codeql] [--no-auto-codeql] [--repo-manifests <dir>] [--strict-isolated-nodes]\n' +
         '   or: run-slice --from-facts <typed-facts.json> [--out <dir>] [--overrides <dir>] [--modules <name>,<name>,...] [--no-snippets] [--strict-overrides] [--no-system-node]'
     );
     process.exit(1);
@@ -365,11 +389,13 @@ function main() {
   const strictOverridesIdx = args.indexOf('--strict-overrides');
   const noSystemNodeIdx = args.indexOf('--no-system-node');
   const includeSystemNode = noSystemNodeIdx === -1;
+  const strictIsolatedNodesIdx = args.indexOf('--strict-isolated-nodes');
+  const strictIsolatedNodes = strictIsolatedNodesIdx >= 0;
 
   const fromFactsIdx = args.indexOf('--from-facts');
   if (fromFactsIdx >= 0) {
     const factsPath = path.resolve(args[fromFactsIdx + 1]);
-    runFromFacts(factsPath, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode);
+    runFromFacts(factsPath, outDir, overridesDir, moduleNames, includeSnippets, strictOverrides, includeSystemNode, strictIsolatedNodes);
     return;
   }
 
@@ -385,11 +411,12 @@ function main() {
   let codeqlSourceRoot = codeqlSourceRootIdx >= 0 ? path.resolve(args[codeqlSourceRootIdx + 1]) : undefined;
   const codeqlBuildCommandIdx = args.indexOf('--codeql-build-command');
   let codeqlBuildCommand = codeqlBuildCommandIdx >= 0 ? args[codeqlBuildCommandIdx + 1] : undefined;
+  let codeqlFallbackBuildCommand: string | undefined;
   const autoCodeqlIdx = args.indexOf('--auto-codeql');
   const noAutoCodeqlIdx = args.indexOf('--no-auto-codeql');
   const repoManifestsIdx = args.indexOf('--repo-manifests');
   const repoManifestsDir = repoManifestsIdx >= 0 ? path.resolve(args[repoManifestsIdx + 1]) : undefined;
-  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, autoCodeqlIdx, noAutoCodeqlIdx, repoManifestsIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, autoCodeqlIdx, noAutoCodeqlIdx, repoManifestsIdx, strictIsolatedNodesIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
   // --auto-codeql / WEAVER_CODEQL_LICENSE_CONFIRMED: only fills in a gap
@@ -421,13 +448,15 @@ function main() {
     if (detected) {
       codeqlSourceRoot = detected.sourceRoot;
       codeqlBuildCommand = detected.buildCommand;
-      console.log(`[run-slice] ${trigger}: detected ${detected.buildTool} build at ${detected.sourceRoot}, running CodeQL DI-resolution with build command: ${detected.buildCommand}`);
+      codeqlFallbackBuildCommand = detected.fallbackBuildCommand;
+      const fallbackNote = detected.fallbackBuildCommand ? ` (falls back to Maven if this build fails: ${detected.fallbackBuildCommand})` : '';
+      console.log(`[run-slice] ${trigger}: detected ${detected.buildTool} build at ${detected.sourceRoot}, running CodeQL DI-resolution with build command: ${detected.buildCommand}${fallbackNote}`);
     } else {
       console.log(`[run-slice] ${trigger}: no build.gradle/build.gradle.kts (with gradlew) or pom.xml found at the common package root — continuing without CodeQL DI-resolution evidence`);
     }
   }
 
-  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand, repoManifestsDir).catch((err) => {
+  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand, repoManifestsDir, codeqlFallbackBuildCommand, strictIsolatedNodes).catch((err) => {
     console.error('[run-slice] FAILED:', err);
     process.exit(1);
   });

@@ -52,7 +52,15 @@ export interface Evidence {
   // already use) and timeout config reuses the existing 'structured-config'
   // source (same spring-config-provider.ts flat-key read datasource/broker
   // extraction already uses). Only Evidence.category gained a value.
-  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest' | 'codeql-di';
+  // 'codeql-jpa-table' added in CONTRACT_VERSION 17.0.0 (JPA entity->table
+  // CodeQL candidate, BACKLOG.md) — the real table name string from an
+  // @Entity class's own @Table(name="...") annotation, corroborating an
+  // ALREADY-detected persistence unit's existing 'jpa-entity'/'jpa-table'
+  // decorator evidence (which can see the annotation NAME but never its
+  // string argument) — never a primary detection source, always weight-10
+  // (corroboration tier, same as 'dependency-manifest'), and never attached
+  // to a unit that doesn't already exist.
+  source: 'native-route' | 'decorator' | 'graphify-import' | 'openapi' | 'call' | 'field-type' | 'extends' | 'structured-file' | 'structured-config' | 'dependency-manifest' | 'codeql-di' | 'codeql-jpa-table';
   // 'serverless-entry-point' added in CONTRACT_VERSION 8.0.0 — a Lambda
   // handler's `implements RequestHandler` clause. Deliberately NOT the same category
   // as 'http-entry-point' even though it must win the same kind tie-break
@@ -552,7 +560,7 @@ export interface IgnoredItem {
 // confirmed by adding an explicit row rather than relying on the fallback
 // silently); threat-signals/resilience-lens filter on Evidence.category
 // only, never touch TypedRelationship.source, unaffected.
-export const CONTRACT_VERSION = '16.0.0';
+export const CONTRACT_VERSION = '17.0.0';
 
 export interface TypedFacts {
   contractVersion: string; // this TypedFacts SHAPE's version — see CONTRACT_VERSION

@@ -109,6 +109,21 @@ export interface CoverageReport {
     topicUnitCount: number;
     servicesWithArchitectureOutbound: number;
     architectureOutboundCoverage?: number;
+    /**
+     * S6 — BACKLOG.md "Isolated-node completeness flag". A node with zero
+     * real relationships touching it (neither `from` nor `to` references
+     * its id). Deliberately never counts the synthetic `system`-node
+     * `composed-of` edge (`system-node-builder.ts`) as a relationship —
+     * that edge is built directly from `TypedUnit[]` at CALM-generation
+     * time, strictly AFTER this function runs on `typed-facts.json`'s own
+     * `relationships`, so it structurally cannot appear here; no explicit
+     * exclusion code was needed. Soft flag by default, same posture as
+     * S1/S2/S5 — a lone node is sometimes honestly correct (a newly
+     * detected unit whose relationships haven't been recovered yet), so
+     * this never fails a run on its own; `--strict-isolated-nodes`
+     * (run-slice.ts) is the opt-in gate.
+     */
+    isolatedNodeCount: number;
   };
 }
 
@@ -158,6 +173,25 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     );
   }
 
+  // S6 — a node with zero real relationships touching it, in either
+  // direction. `relationships` here is exactly typed-facts.json's own
+  // TypedRelationship[], computed strictly BEFORE calm-generator's
+  // system-node-builder.ts ever runs (see run-slice.ts's pass ordering) —
+  // the synthetic system `composed-of` edge doesn't exist yet at this point
+  // in the pipeline, so it structurally cannot inflate this count; no
+  // explicit filtering was needed to exclude it.
+  const touchedUnitIds = new Set<string>();
+  for (const rel of relationships) {
+    touchedUnitIds.add(rel.from);
+    touchedUnitIds.add(rel.to);
+  }
+  const isolatedNodeCount = units.filter((u) => !touchedUnitIds.has(u.id)).length;
+  if (isolatedNodeCount > 0) {
+    silenceFlags.push(
+      `S6-isolated-nodes: ${isolatedNodeCount} unit(s) exist but have zero relationships touching them — may be a newly-detected unit whose relationships haven't been recovered yet, not necessarily a dead/unused component; see --strict-isolated-nodes to gate on this`
+    );
+  }
+
   // Robustness T-R0-2 — architecture coverage RATE, same precondition
   // spirit as S1 (only meaningful when a store unit exists to potentially
   // connect to). Outbound only (rel.from), architecture-grade only (never
@@ -180,6 +214,7 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     topicUnitCount,
     servicesWithArchitectureOutbound,
     architectureOutboundCoverage,
+    isolatedNodeCount,
   };
 }
 

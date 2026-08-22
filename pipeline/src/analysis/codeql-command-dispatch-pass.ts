@@ -50,7 +50,7 @@ export const codeqlCommandDispatchPass: AnalysisPass = {
 
     let bindings: CodeQLDispatchBinding[];
     try {
-      bindings = runCodeQLCommandDispatchResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand);
+      bindings = runCodeQLCommandDispatchResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand, ctx.codeqlFallbackBuildCommand);
     } catch (err) {
       console.warn(`[codeql-command-dispatch] WARNING: unexpected failure running CodeQL command-dispatch resolution, continuing without it: ${err}`);
       return;

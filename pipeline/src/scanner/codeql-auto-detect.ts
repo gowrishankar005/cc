@@ -32,11 +32,29 @@ export interface CodeqlAutoDetectResult {
   sourceRoot: string;
   buildCommand: string;
   buildTool: 'gradle' | 'maven';
+  /**
+   * Set only when Gradle is the primary `buildTool` AND a `pom.xml` also
+   * exists at the same `sourceRoot` — real gap found 2026-08-21 running
+   * `spring-petclinic` (checks in both build files): Gradle's toolchain
+   * resolution failed there (`languageVersion=17` unmatched) while Maven,
+   * against the identical source with the identical JDK, compiled cleanly.
+   * `getOrBuildCodeqlDatabase` (`codeql-database-cache.ts`) only tries this
+   * after the primary Gradle build genuinely fails, never speculatively.
+   */
+  fallbackBuildCommand?: string;
+}
+
+function mavenBuildCommand(sourceRoot: string): string {
+  const mvnwName = process.platform === 'win32' ? 'mvnw.cmd' : 'mvnw';
+  const mvnwPath = path.join(sourceRoot, mvnwName);
+  const mvnInvocation = fs.existsSync(mvnwPath) ? (process.platform === 'win32' ? mvnwName : `./${mvnwName}`) : 'mvn';
+  return `${mvnInvocation} -q -DskipTests clean compile`;
 }
 
 export function detectCodeqlBuildConfig(packageRoots: string[]): CodeqlAutoDetectResult | undefined {
   const sourceRoot = packageRoots.length === 1 ? path.resolve(packageRoots[0]) : computeCommonAncestor(packageRoots);
 
+  const hasMavenBuild = fs.existsSync(path.join(sourceRoot, 'pom.xml'));
   const hasGradleBuild = fs.existsSync(path.join(sourceRoot, 'build.gradle')) || fs.existsSync(path.join(sourceRoot, 'build.gradle.kts'));
   if (hasGradleBuild) {
     const gradlewName = process.platform === 'win32' ? 'gradlew.bat' : 'gradlew';
@@ -50,18 +68,15 @@ export function detectCodeqlBuildConfig(packageRoots: string[]): CodeqlAutoDetec
       sourceRoot,
       buildTool: 'gradle',
       buildCommand: `${gradlewInvocation} --no-daemon compileJava --rerun-tasks`,
+      fallbackBuildCommand: hasMavenBuild ? mavenBuildCommand(sourceRoot) : undefined,
     };
   }
 
-  const hasMavenBuild = fs.existsSync(path.join(sourceRoot, 'pom.xml'));
   if (hasMavenBuild) {
-    const mvnwName = process.platform === 'win32' ? 'mvnw.cmd' : 'mvnw';
-    const mvnwPath = path.join(sourceRoot, mvnwName);
-    const mvnInvocation = fs.existsSync(mvnwPath) ? (process.platform === 'win32' ? mvnwName : `./${mvnwName}`) : 'mvn';
     return {
       sourceRoot,
       buildTool: 'maven',
-      buildCommand: `${mvnInvocation} -q -DskipTests clean compile`,
+      buildCommand: mavenBuildCommand(sourceRoot),
     };
   }
 

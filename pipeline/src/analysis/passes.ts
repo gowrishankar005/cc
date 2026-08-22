@@ -20,6 +20,7 @@ import { contradictionPass } from './contradiction-pass';
 import { assignStatuses } from './status-assignment';
 import { codeqlDiPass } from './codeql-di-pass';
 import { codeqlCommandDispatchPass } from './codeql-command-dispatch-pass';
+import { codeqlJpaTablePass } from './codeql-jpa-table-pass';
 import { assignFactIds } from './fact-identity';
 
 export const CONFIDENCE_FLOOR = 40;
@@ -293,6 +294,13 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // its own "never contest an existing edge" check also sees any
   // relationship codeqlDiPass already produced for the same pair.
   codeqlCommandDispatchPass,
+  // JPA entity->table CodeQL candidate — same opt-in gate, a materially
+  // simpler shape (evidence enrichment only, no relationships/units) than
+  // its two neighbors above. Ordered after them for grouping consistency
+  // only; it never reads ctx.relationships and can't conflict with either.
+  // Must still run before assignStatusPass so the evidence it adds is
+  // complete when status is computed.
+  codeqlJpaTablePass,
   gradeRelationshipsPass,
   factIdentityPass,
   assignStatusPass,
