@@ -78,7 +78,11 @@ export interface CrossPackageGraphRun {
   resolveRoot(sourceFile: string): { root: string; relativeFilePath: string } | undefined;
 }
 
-function computeCommonAncestor(roots: string[]): string {
+// Exported for codeql-auto-detect.ts (--auto-codeql) — the "real,
+// compilable root" a caller-independent build-file scan needs to check is
+// the identical common ancestor this pass already computes for its own
+// combined extraction, not a second, possibly-diverging implementation.
+export function computeCommonAncestor(roots: string[]): string {
   const segmentsList = roots.map((r) => path.resolve(r).split(path.sep));
   const minLen = Math.min(...segmentsList.map((s) => s.length));
   const common: string[] = [];

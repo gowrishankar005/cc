@@ -18,6 +18,24 @@
 
 ---
 
+## Cross-package backbone migration (2026-08-22): Graphify → CodeGraph
+
+Every "Graphify" reference below this point is a **dated historical record**
+of real evidence produced while Graphify was the cross-package structural
+backbone — left as-written, not retroactively rewritten, per this file's own
+append-only-ledger discipline. The backbone itself has since migrated to
+CodeGraph (`scanner/codegraph-crossroot-provider.ts`), verified against
+Fineract (charge/core/security/provider), Waltz (3-module), a reference
+Python microservices repo, and a TS/DynamoDB fixture, full regression suite
+(122/122) passing. See `docs/solution/E6-cross-package-backbone-evaluation.md`
+for the evidence and decision trail. The underlying MECHANISM claims below
+(dual-unit structural edges, R0/R1/R2 tiers, admitted-unresolved placeholders)
+are unaffected by which engine produces the raw edges — read "Graphify" in
+anything dated before 2026-08-22 as "the cross-package backbone engine of
+the time."
+
+---
+
 ## Dual-unit Graphify decision (product, not implementation accident)
 
 | Decision | **Dual-unit structural edges are an interim / structural product (R0), not the full definition of "architecture relationship."** |

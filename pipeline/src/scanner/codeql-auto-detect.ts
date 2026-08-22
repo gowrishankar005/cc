@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { computeCommonAncestor } from './graphify-provider';
+import { computeCommonAncestor } from './codegraph-crossroot-provider';
 
 /**
  * `--auto-codeql` (opt-in flag, run-slice.ts) — derives `--codeql-source-root`
