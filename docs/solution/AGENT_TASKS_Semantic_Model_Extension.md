@@ -1,6 +1,14 @@
 # AGENT TASKS — Semantic Model Extension
 
 **Branch:** `feature/semantic-model-extension` (base `main` @ `370b7c7`)
+**Status (updated 2026-08-19):** Sessions A / B / C are **closed as sessions**.
+A built `T-LM-0`/`T-LM-2`/`T-LM-5` (`T-LM-1`/`3`/`4` stay gated — no CVE /
+classification / cost feed). B built `T-FS-1`/`2`/`3`/`4`/`6` (`T-FS-5`
+parked, E5 negative). C built `T-LR-1`/`2`/`3`; `T-LR-4` **closed via T-LR-5**
+(`6173b36`). Remainder in that file is `T-LR-6`. Due-list:
+`AGENT_TASKS_Ext_Execution_Order.md`. Historical P0/A/B/C detail below is
+kept as the record of how we got here.
+
 **Status (updated 2026-08-14):** P0 — T-P0-0/2a/2/3 done (baseline captured,
 licensing resolved, E1/CodeQL command-bus dispatch evaluated positively, see
 `E1-codeql-engine-evaluation.md`); **T-P0-1/E2 run three times — reverted
@@ -27,13 +35,13 @@ Layered Recovery's `[B]` tasks (ungated, see the diagram note in
 (`AGENT_TASKS_Ext_Layered_Recovery.md`); an additional, not-originally-planned
 CodeQL DI-resolution experiment (informally "E1b," motivated by T-LR-3/T-LR-4's
 own evidence-pass requirement) also ran positive, see
-`E1b-codeql-di-resolution-experiment.md` — T-LR-3/T-LR-4 are now unblocked
-but not started; T-LR-5/T-LR-6 (the actual engine integration) are scheduled
-with a 7-item checklist but not started, and will be planned in a separate
-session. **Lens Modules — T-LM-0, T-LM-2 done (2026-08-15, resilience lens: retry-annotation +
-timeout-config detection, gold+scorer built with it); T-LM-1 checked and deferred (no real
-SCA/vulnerability feed in this environment — cdxgen produces an SBOM, not vuln data);
-T-LM-3/4/5 not started.** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
+`E1b-codeql-di-resolution-experiment.md` — **T-LR-3 done**; T-LR-4 closed via
+T-LR-5 (CodeQL `bean-factory` branch; Graphify/CodeGraph still cannot see
+`@Bean` `new X(...)`). T-LR-6 (trust matrix) remains in
+`AGENT_TASKS_Ext_CodeQL_Engine.md`. **Lens Modules —
+T-LM-0, T-LM-2, T-LM-5 done; T-LM-1 checked and deferred (no real
+SCA/vulnerability feed — cdxgen produces an SBOM, not vuln data);
+T-LM-3/4 stay gated (no classification facts / no cost feed).** `Engine_Capability_Research_Java_SpringBoot_JAXRS.md`
 records a deliberate research pause taken partway through. Lane files:
 `AGENT_TASKS_Ext_*.md`.
 **Companion:** requirements/governance live in the research workspace
@@ -190,10 +198,10 @@ pressure — this note is the correction.
 |---|---|---|
 | `AGENT_TASKS_Ext_P0_Experiments.md` | none — runs first | Lens Modules |
 | `AGENT_TASKS_Ext_Fact_Semantics.md` | E2, E5 report | Lens Modules, Layered `[B]` tasks |
-| `AGENT_TASKS_Ext_Layered_Recovery.md` | `[B]` tasks: none. **Session C = T-LR-3/4 only** | Fact Semantics, Lens Modules |
-| `AGENT_TASKS_Ext_CodeQL_Engine.md` | After Session C; E1/E1b + 7-item checklist | Not Session C |
-| `AGENT_TASKS_Ext_Lens_Modules.md` | **none — fully independent. Session A = T-LM-1…4** | everything |
-| `AGENT_TASKS_Ext_Remaining_Lenses.md` | After Session A | — |
+| `AGENT_TASKS_Ext_Layered_Recovery.md` | Session C closed (`T-LR-1`/`2`/`3` done; `T-LR-4` closed via T-LR-5) | — |
+| `AGENT_TASKS_Ext_CodeQL_Engine.md` | T-LR-5 done (`6173b36`). Remainder: T-LR-6 | Not a second T-LR-5 |
+| `AGENT_TASKS_Ext_Lens_Modules.md` | Session A closed (`T-LM-0`/`2`/`5` done; `T-LM-1`/`3`/`4` gated) | — |
+| `AGENT_TASKS_Ext_Remaining_Lenses.md` | T-LM-8 now; T-LM-6/7 need a consumer + gold | — |
 | `AGENT_TASKS_Ext_Contract_Lifecycle.md` | T-CL-5 now; T-CL-1…4 after T-FS-6 | Lens Modules |
 | `AGENT_TASKS_Ext_Review_Throughput.md` | T-FS-1 | Layered Recovery |
 | `AGENT_TASKS_Ext_MultiRepo_Deployment.md` | T-MR-3/5 now; T-MR-1/2 after T-CL-2 | Lens Modules |
@@ -222,6 +230,8 @@ regression suite, secret redaction (closes `CGR-2`).
 | **Access governance over the generated model** (`NFR-60`) | Real need — the model can reveal architecture/security detail more legibly than raw source — but no design in either project | First time the model is shared beyond the team that can already read the source |
 | **Second representation emitter** (`NFR-40` proof) | Portability becomes measurable via emission-coverage (T-CL-5) without building one | A real consumer needing a non-CALM form |
 | **Catalogue authoring-cost tracking** (`CGR-8`) | E4 tests that catalogue-as-data holds; per-convention cost tracking is extra bookkeeping until breadth actually strains | Framework breadth becomes the bottleneck |
+| **Vulnerability / data-flow / green lenses** (`T-LM-1/3/4`) | Session A checked each gate; none has a real feed or fact type yet. Phase 2 — research, inputs, validation. Not a current-phase build | Real SCA feed; real classification/lineage signal; real non-code cost feed — each with gold before any gate |
+| **Probabilistic confidence** (`T-FS-5`) | E5 negative. Phase 2 if a *different* combination rule is researched | Independent-evidence shape where a new formula is more correct |
 
 **Closed by discovery, not by work:** `CGR-11` asked whether the two
 structural engines have value beyond one negative finding. Answered — both are
