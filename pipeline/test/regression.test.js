@@ -1004,7 +1004,7 @@ test(
       // signal from a different mechanism, not an R2 Phase 1 bridge
       // resolution, so it must not trip this assertion.
       const r2Relationships = facts.relationships.filter(
-        (r) => r.kind === 'calls' && r.source === 'graphify' && ['r2-phase1', 'r2b', 'r2c'].includes(r.mechanism)
+        (r) => r.kind === 'calls' && r.source === 'codegraph' && ['r2-phase1', 'r2b', 'r2c'].includes(r.mechanism)
       );
       assert.equal(r2Relationships.length, 0, 'fineract-charge alone must NOT close its S1 gap via R2 Phase 1 — a real, honestly-predicted residual (design note §1), never a fabricated edge');
 
@@ -3351,7 +3351,13 @@ test(
       // Coverage cross-cutting breakdown (generic fix, T-X0-1 extension) — real counts, not hardcoded mechanism names.
       const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
       assert.equal(coverage.relationshipsByKind['shares-secret'], 5);
-      assert.equal(coverage.relationshipsBySource.k8s, 5 + 6, 'shares-secret (5) + env-soft-graph connects (6), both source: k8s');
+      // T-MR-3 update (already shipped on main, never previously re-verified
+      // here — this test was silently SKIPPED in every prior run because
+      // spikes/boa wasn't present in that environment): deployed-in
+      // runtime-placement relationships (k8s-deployment-detector.ts) also
+      // tag source: 'k8s'. Real count confirmed via direct run: 5
+      // shares-secret + 6 env-soft-graph + 6 deployed-in = 17.
+      assert.equal(coverage.relationshipsBySource.k8s, 5 + 6 + 6, 'shares-secret (5) + env-soft-graph connects (6) + deployed-in (6), all source: k8s');
       assert.ok(coverage.unresolvedByMechanism['unresolved-env-target'] > 0);
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });

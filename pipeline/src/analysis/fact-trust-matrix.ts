@@ -34,7 +34,7 @@
  *      can never be entered as the top row.
  */
 
-export type TrustEngine = 'graphify' | 'codeql';
+export type TrustEngine = 'graphify' | 'codegraph' | 'codeql';
 export type TrustFactType = 'relationship-edge' | 'unit-introduction';
 export type TrustScope = 'same-root' | 'cross-root' | 'n/a';
 
@@ -51,6 +51,12 @@ export interface TrustMatrixEntry {
 
 export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // Graphify multi-hop bridge detection (multi-hop-bridge-detector.ts).
+  // Dated historical record — Graphify was the cross-package backbone that
+  // earned these tiers; the backbone migrated to CodeGraph on 2026-08-22
+  // (docs/solution/E6-cross-package-backbone-evaluation.md), and no code
+  // calls relationshipTrust('graphify', ...) anymore. Rows kept, not
+  // rewritten, per this project's own append-only-evidence discipline
+  // (Claim_Register.md) — see the 'codegraph' rows below for what's live.
   // R2 Phase 1 — sole implementer, no ambiguity. Least-inferred tier this matrix covers.
   { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'same-root', confidence: 15, evidence: 'BACKLOG.md R2 gold-charge evaluation; real fineract-charge run' },
   { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'cross-root', confidence: 10, evidence: 'BACKLOG.md R2 gold-charge evaluation; real fineract-charge run' },
@@ -66,6 +72,28 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // Graded fact admission — a raw structural reference this pipeline could not classify into any of the above at all.
   { engine: 'graphify', factType: 'relationship-edge', mechanism: 'admitted-unresolved', scope: 'same-root', confidence: 3, evidence: 'T-P0-1 (E2), BACKLOG.md "Graded fact admission (dual-unit gate)"' },
   { engine: 'graphify', factType: 'relationship-edge', mechanism: 'admitted-unresolved', scope: 'cross-root', confidence: 2, evidence: 'T-P0-1 (E2), BACKLOG.md "Graded fact admission (dual-unit gate)"' },
+
+  // CodeGraph cross-package backbone (2026-08-22 migration, codegraph-crossroot-provider.ts)
+  // — the LIVE rows every call site actually uses now. Same mechanism
+  // classes, same confidence numbers as the graphify rows above (not new
+  // numbers invented for the occasion): the underlying algorithm
+  // (multi-hop-bridge-detector.ts/graphify-reconciler.ts) is unchanged, only
+  // which engine supplies the raw cross-package edges changed. Evidence:
+  // E6-cross-package-backbone-evaluation.md (the migration decision trail)
+  // plus a real 3-repo pre/post benchmark (Fineract charge/core/security/
+  // provider, a Python two-root fixture, Waltz 3-module) showing identical
+  // unit counts and equal-or-more resolved relationships on every repo
+  // checked, confirming these tiers hold under the new engine.
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'same-root', confidence: 15, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'cross-root', confidence: 10, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2-stereotype', scope: 'same-root', confidence: 12, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2-stereotype', scope: 'cross-root', confidence: 7, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2b', scope: 'same-root', confidence: 8, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2b', scope: 'cross-root', confidence: 5, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2c', scope: 'same-root', confidence: 6, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2c', scope: 'cross-root', confidence: 3, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'admitted-unresolved', scope: 'same-root', confidence: 3, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
+  { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'admitted-unresolved', scope: 'cross-root', confidence: 2, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
 
   // CodeQL DI resolution (T-LR-5, codeql-di-pass.ts). Deliberately placed
   // strictly between r2b (8/5) and r2c (6/3) — real, verified accuracy

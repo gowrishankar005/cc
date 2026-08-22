@@ -45,8 +45,8 @@ export interface NodeUnitMatch {
 // Values live in `fact-trust-matrix.ts` (T-LR-6, mechanism 'admitted-unresolved')
 // — re-exported here so this is the only import site that changes if the
 // tier moves, not a second hardcoded copy of the number.
-export const ADMITTED_SAME_ROOT_CONFIDENCE = relationshipTrust('graphify', 'admitted-unresolved', 'same-root');
-export const ADMITTED_CROSS_ROOT_CONFIDENCE = relationshipTrust('graphify', 'admitted-unresolved', 'cross-root');
+export const ADMITTED_SAME_ROOT_CONFIDENCE = relationshipTrust('codegraph', 'admitted-unresolved', 'same-root');
+export const ADMITTED_CROSS_ROOT_CONFIDENCE = relationshipTrust('codegraph', 'admitted-unresolved', 'cross-root');
 
 /**
  * AREC Wave 3 T-C1 — extracted so multi-hop-bridge-detector.ts (R2) can
