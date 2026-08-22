@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { GraphifyRun } from '../../scanner/graphify-provider';
+import { CrossPackageGraphRun } from '../../scanner/codegraph-crossroot-provider';
 import { loadMessagingDetectionCatalogue, importOnlyMessagingLibraries } from '../../rules/messaging-detection-schema';
 import { loadWiringAnnotationCatalogue, wiringAnnotationNames } from '../../rules/wiring-annotation-schema';
 import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
@@ -27,7 +27,7 @@ import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-im
  * test (T-X2-1) would catch it the moment a real fixture triggers it.
  */
 export function detectMessagingUnits(
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   existingServiceFilePaths: Set<string> = new Set(),
   overridableServiceFilePaths: Set<string> = new Set()
 ): ImportStrategyResult {

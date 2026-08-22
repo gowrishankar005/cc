@@ -3,12 +3,12 @@ import { detectMessagingUnits } from './cross_package/messaging-detector';
 
 /**
  * T-X7-2 — a separate pass from detectPersistencePass (passes.ts), even
- * though both read the SAME ctx.graphifyRun, to keep each pass's name
+ * though both read the SAME ctx.crossPackageRun, to keep each pass's name
  * matching its actual scope (one is genuinely "persistence," this is
  * genuinely "messaging") rather than quietly widening detectPersistencePass
  * into a general "Graphify-based detection" pass. Does NOT re-run Graphify —
  * reuses the GraphifyRun detectPersistencePass already produced; a no-op
- * when that pass didn't run or failed (ctx.graphifyRun undefined), same
+ * when that pass didn't run or failed (ctx.crossPackageRun undefined), same
  * graceful-degradation convention as reconcilePass.
  *
  * B-msg-prod-sqs (Robustness, real re-check) — AREC Wave 3 T-E3's original
@@ -42,10 +42,10 @@ import { detectMessagingUnits } from './cross_package/messaging-detector';
 export const detectMessagingPass: AnalysisPass = {
   name: 'detectMessaging',
   run(ctx: AnalysisContext) {
-    if (!ctx.graphifyRun) return;
+    if (!ctx.crossPackageRun) return;
     const overridable = overridableServiceFilePaths(ctx);
     const { unitsByRoot: messagingUnitsByRoot, excludedTestFiles } = detectMessagingUnits(
-      ctx.graphifyRun,
+      ctx.crossPackageRun,
       existingServiceFilePaths(ctx),
       overridable
     );

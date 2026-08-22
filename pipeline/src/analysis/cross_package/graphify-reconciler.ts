@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { GraphifyRun, GraphifyEdge, parseSourceLocation } from '../../scanner/graphify-provider';
+import { CrossPackageGraphRun, CrossPackageEdge, parseSourceLocation } from '../../scanner/codegraph-crossroot-provider';
 import { TypedUnit, TypedRelationship, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { findJavaImportForBareName, getJavaPackageDeclaration } from '../../rules/java-import-resolver';
 import { relationshipTrust } from '../fact-trust-matrix';
@@ -13,13 +13,13 @@ import { relationshipTrust } from '../fact-trust-matrix';
  * roots. Replaces a from-scratch FQN-stitcher (v0.6 §4 Option B) — see the
  * plan's Context section for why.
  *
- * Rewritten to work off ONE global GraphifyRun instead of a
+ * Rewritten to work off ONE global CrossPackageGraphRun instead of a
  * Map<root, graph> — the earlier per-root-Map design could only ever look up
  * both endpoints of an edge under the SAME root prefix, which made
  * `crossPackage: true` structurally unreachable regardless of what Graphify
  * actually found (confirmed: real cross-module a reference Java/JAX-RS banking platform edges existed in a
  * combined extraction but were invisible to per-root buckets). Node ids
- * within one GraphifyRun's graph are already globally unique (one extraction
+ * within one CrossPackageGraphRun's graph are already globally unique (one extraction
  * pass), so no root-prefixing is needed for the lookup itself — only
  * `resolveRoot()` to know which root a matched unit's node came from, for
  * the crossPackage flag.
@@ -55,7 +55,7 @@ export const ADMITTED_CROSS_ROOT_CONFIDENCE = relationshipTrust('graphify', 'adm
  * filePath/line-span matching logic. Behavior unchanged from before this
  * extraction (verified: full regression suite unchanged after the split).
  */
-export function buildNodeToUnitMap(run: GraphifyRun, unitsByRoot: Map<string, TypedUnit[]>): Map<string, NodeUnitMatch> {
+export function buildNodeToUnitMap(run: CrossPackageGraphRun, unitsByRoot: Map<string, TypedUnit[]>): Map<string, NodeUnitMatch> {
   const nodeToUnit = new Map<string, NodeUnitMatch>();
 
   for (const node of run.graph.nodes) {
@@ -111,11 +111,11 @@ export function buildNodeToUnitMap(run: GraphifyRun, unitsByRoot: Map<string, Ty
  * exact same false-positive pair.
  */
 function isBareNameCollision(
-  edge: GraphifyEdge,
+  edge: CrossPackageEdge,
   from: NodeUnitMatch,
   to: NodeUnitMatch,
   nodeById: Map<string, { label: string }>,
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   fileLineCache: Map<string, string[]>,
   collisionCache: Map<string, boolean>
 ): boolean {
@@ -158,7 +158,7 @@ function isBareNameCollision(
  */
 function buildPlaceholderMatch(
   nodeId: string,
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   placeholders: Map<string, NodeUnitMatch>,
   implementsTargetFiles: Set<string>
 ): NodeUnitMatch | undefined {
@@ -219,7 +219,7 @@ function buildPlaceholderMatch(
 }
 
 export function reconcileCrossPackageEdges(
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   unitsByRoot: Map<string, TypedUnit[]>,
   /**
    * T-P0-1 (E2) round 3 — `${edge.source}|${edge.target}` pairs a more
@@ -303,7 +303,7 @@ export function reconcileCrossPackageEdges(
       to: to.unit.id,
       kind: edge.relation === 'imports' ? 'imports' : edge.relation === 'calls' ? 'calls' : 'connects',
       crossPackage,
-      source: 'graphify',
+      source: 'codegraph',
       status: PENDING_STATUS,
       id: PENDING_RELATIONSHIP_ID,
       ...(admitted

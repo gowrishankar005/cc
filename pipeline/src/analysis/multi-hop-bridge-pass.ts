@@ -3,7 +3,7 @@ import { detectMultiHopBridgeRelationships } from './cross_package/multi-hop-bri
 import { bridgeStereotypeSignals } from '../rules/rule-schema';
 
 /**
- * AREC Wave 3 T-C1 (R2). Reuses the SAME ctx.graphifyRun detectPersistencePass
+ * AREC Wave 3 T-C1 (R2). Reuses the SAME ctx.crossPackageRun detectPersistencePass
  * already produced (no re-run) — a no-op when that pass didn't run/failed,
  * same graceful-degradation convention as reconcilePass/k8sTrustPass.
  *
@@ -20,9 +20,9 @@ import { bridgeStereotypeSignals } from '../rules/rule-schema';
 export const multiHopBridgePass: AnalysisPass = {
   name: 'multiHopBridge',
   run(ctx: AnalysisContext) {
-    if (!ctx.graphifyRun) return;
+    if (!ctx.crossPackageRun) return;
     const { relationships, ignoredItems, examinedPairs, examinedBridgeFiles } = detectMultiHopBridgeRelationships(
-      ctx.graphifyRun,
+      ctx.crossPackageRun,
       ctx.unitsByRoot,
       bridgeStereotypeSignals(ctx.catalogue)
     );

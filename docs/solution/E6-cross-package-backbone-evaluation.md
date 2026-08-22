@@ -78,13 +78,25 @@ untested empirical question.
 — re-verified directly against a live clone of the reference platform
 (import at line 50, field at line 69, both still present).
 
-**Method:** wrote a temporary `codegraph.json` at the reference repo's root
-scoping `include` to `fineract-charge/**` and `fineract-core/**` only
-(mirroring the two modules Graphify's own combined pass covered), ran
-`CodeGraph.init(root, { index: true })` as ONE project over that scoped root,
-then queried the confirmed real public API (`getNodesByName`,
-`getFileDependencies`/`getFileDependents`, `findPath`) for a resolved edge
-between the two symbols.
+**Method (with one correction made after the fact — see below):** wrote a
+temporary `codegraph.json` at the reference repo's root, ran
+`CodeGraph.init(root, { index: true })` as ONE project, then queried the
+confirmed real public API (`getNodesByName`, `getFileDependencies`/
+`getFileDependents`, `findPath`) for a resolved edge between the two
+symbols.
+
+**Correction:** the first pass scoped via `ProjectConfig.include`, on the
+assumption it acted as a restrictive whitelist. Re-reading the SDK's own
+`.d.ts` doc comments (and confirming empirically) shows `include` is
+additive-only — "force IN despite `.gitignore`" — never restrictive;
+`exclude` is CodeGraph's actual scope-narrowing mechanism. A follow-up
+check (`exclude`-ing every sibling of the two target modules) confirmed the
+real behavior: `getStats().fileCount` came back **881** (matching the two
+target modules' real file count), not the full monorepo's 6,704 Java files
+— so `exclude` genuinely restricts scope; the finding below still holds
+either way (a wider, unscoped index still contains the same real edge), but
+the real provider (see the follow-on migration plan) scopes via `exclude`,
+not `include`.
 
 **Result — a real, resolved multi-hop path, not a raw dump:**
 

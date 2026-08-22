@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { GraphifyRun, GraphifyEdge } from '../../scanner/graphify-provider';
+import { CrossPackageGraphRun, CrossPackageEdge } from '../../scanner/codegraph-crossroot-provider';
 import { TypedUnit, Evidence, PENDING_STATUS } from '../../types/typed-facts';
 import { resolveJavaImportPackage, javaImportMatchesPackage } from '../../rules/java-import-resolver';
 import { classExtendsBaseClass, classDeclaresFieldOfType, classHasAnnotation } from '../../rules/class-ownership-resolver';
@@ -41,7 +41,7 @@ import { isTestPath } from '../../rules/test-path';
  * for ANY Java driver-import library, not just the one T-MR-4 adds. Latent
  * until now because no Java catalogue row had ever set ownerBaseClass.
  */
-function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<string>, fileLineCache: Map<string, string[]>): { qualified: string; catalogueLib: string } | undefined {
+function resolveJavaMatch(run: CrossPackageGraphRun, edge: CrossPackageEdge, libraries: Set<string>, fileLineCache: Map<string, string[]>): { qualified: string; catalogueLib: string } | undefined {
   if (!edge.source_file.endsWith('.java')) return undefined;
   const resolved = run.resolveRoot(edge.source_file);
   if (!resolved) return undefined;
@@ -65,7 +65,7 @@ function resolveJavaMatch(run: GraphifyRun, edge: GraphifyEdge, libraries: Set<s
  * consumer fold however its real semantics require, instead of forcing a
  * single dedup policy that would be wrong for one of them.
  */
-export function findLibraryImportEdges(run: GraphifyRun, libraries: Set<string>, fileLineCache: Map<string, string[]> = new Map()): GraphifyEdge[] {
+export function findLibraryImportEdges(run: CrossPackageGraphRun, libraries: Set<string>, fileLineCache: Map<string, string[]> = new Map()): CrossPackageEdge[] {
   return run.graph.edges.filter((e) => {
     // Real false-positive, confirmed via a real fixture: Graphify parses
     // package.json's own JSON structure into synthetic 'imports' edges, one
@@ -87,7 +87,7 @@ export function findLibraryImportEdges(run: GraphifyRun, libraries: Set<string>,
 }
 
 /** Convenience wrapper over findLibraryImportEdges for consumers that only need the unique set of matching files (not per-edge detail). */
-export function findFilesImportingLibraries(run: GraphifyRun, libraries: Set<string>): string[] {
+export function findFilesImportingLibraries(run: CrossPackageGraphRun, libraries: Set<string>): string[] {
   return [...new Set(findLibraryImportEdges(run, libraries).map((e) => e.source_file))];
 }
 
@@ -126,7 +126,7 @@ export interface ImportStrategyUnitConfig {
  * separate pass over different evidence (Graphify imports, not decorators).
  */
 export function detectUnitsByImportStrategy(
-  run: GraphifyRun,
+  run: CrossPackageGraphRun,
   libraries: Set<string>,
   config: ImportStrategyUnitConfig,
   existingServiceFilePaths: Set<string> = new Set(),
