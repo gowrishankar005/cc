@@ -82,6 +82,8 @@ If a pack for this run already exists with unapplied drafts, this refuses to ove
 - **Tier B — the assistant may draft, you approve.** Only when the evidence bar is fully met; otherwise it correctly says "cannot decide" rather than guessing.
 - **Tier C — nobody invents.** Things like an unresolvable external call or a dynamic dispatch pattern get documented as out-of-scope, not fabricated into a relationship that doesn't exist.
 
+**Set your expectations before you open the pack:** most real residuals today will be Tier A. Only one real detector currently produces Tier B (a specific multi-hop-bridge shape — one clear candidate among several syntactic implementers, below the auto-include confidence bar); everything else routes to Tier A or C. Seeing an all-Tier-A pack on your first run is normal, not a sign the tool skipped something.
+
 ## Step 3 — Work the pack
 
 The chat mode lives at `.github/chatmodes/residual-review.chatmode.md` — it's a real file checked into this repo, not something to fetch separately. It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
@@ -98,6 +100,8 @@ The chat mode lives at `.github/chatmodes/residual-review.chatmode.md` — it's 
 **Practical guidance while you're in the chat, any host:** always approve file writes individually, and never grant a blanket "allow all edits this session" permission — that's needless exposure, not a required convenience, given Step 5 is the real gate either way.
 
 **Optional, before you even open the chat: `pack.py --with-dossier`.** Re-run Step 2 with this flag added and every open residual (any tier) gets a real, evidence-grounded explanation attached before you start — Copilot Chat (or you, reading `SESSION.md` by hand) sees the reasoning up front instead of a bare choice card. Needs the `claude` CLI already authenticated on your `PATH` (same convenience as Copilot Chat itself — no separate key to manage); real cost/latency measured at $0.08–$0.32 and 40–132 seconds per residual, so it's opt-in, not the default, and worth skipping on a pack with a lot of open items unless you want the extra explanation for all of them.
+
+**Known gap, real, not yet fixed:** if your repo's residual comes from a Spring config file (`application.yml`-derived database/queue units), `--with-dossier` will currently come back saying no evidence was provided for it — a real coverage hole in how evidence snippets get built for that unit shape (tracked in `BACKLOG.md`), not a sign the dossier pass is broken. Source-code-derived units (the common case) aren't affected.
 
 **If a card's evidence snippet is too short to decide from:** the chat prints one `pack.py fetch-span` command instead of guessing — it never runs this itself. Copy it into your terminal, run it, and the extra source lines land in the pack for you to keep reviewing. Two forms: an exact `--start-line`/`--end-line` range, or `--anchor <file:line> --context-lines <n>` for "N lines either side of this line" without hand-computing the range yourself. Capped per session (10 extra reads / 400 lines) so this can't quietly balloon into reading the whole repo.
 
