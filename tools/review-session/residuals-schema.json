@@ -77,6 +77,23 @@
             "generatedAt": { "type": "string", "format": "date-time" }
           },
           "required": ["explanation", "hypotheses", "hasCatalogueRuleCandidate", "model", "generatedAt"]
+        },
+        "dossier": {
+          "type": "object",
+          "description": "T-2 (AGENT_TASKS_Residual_Dossier_Module.md) — the opt-in Evidence Dossier pass, run only when pack.py is invoked with --with-dossier (default pack.py behavior is unchanged). Optional, attached only when dossier.py has been run against this residual (any tier) and its response passed every guardrail in parse_and_validate_dossier_response. Same 'never a fact, never a second corroborating signal' discipline as the advisory field above — a human accepting a dossier hypothesis via this residual's own card is ONE human judgement.",
+          "properties": {
+            "explanation": { "type": "string" },
+            "hypotheses": { "type": "array", "items": { "type": "string" } },
+            "evidenceRefsUsed": { "type": "array", "items": { "type": "string" }, "description": "The subset of this residual's own evidenceRefs the dossier response actually cited — never a ref outside what the residual's own pack already contains." },
+            "model": { "type": "string" },
+            "generatedAt": { "type": "string", "format": "date-time" }
+          },
+          "required": ["explanation", "hypotheses", "evidenceRefsUsed", "model", "generatedAt"]
+        },
+        "draftOutcome": {
+          "type": "string",
+          "enum": ["bar-not-met"],
+          "description": "Set by draft_tier_b.py when a Tier B residual was actually attempted and its evidence bar wasn't met (draft_for_residual's own 'cannot_decide' outcome) — distinguishes 'attempted, evidence insufficient' from a residual that was never Tier-B-eligible at all (which has no draftOutcome key). Absent (not null) when draft_tier_b.py has not attempted this residual."
         }
       }
     }

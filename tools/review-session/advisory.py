@@ -57,26 +57,31 @@ Its only outputs are:
      row would cite -- this file does not attempt that aggregation, only
      the durable log it would be computed from.
 
-No `ANTHROPIC_API_KEY` -> reports what would be attempted, writes nothing
-(same convention `suggest-rules.ts` / `draft_tier_b.py` already use for
-"LLM backend optional").
+T-1 (AGENT_TASKS_Residual_Assist_Redesign.md, 2026-08-23): backend is the
+`claude` CLI only, deliberately not a raw `ANTHROPIC_API_KEY` from the
+environment -- this project's own target-customer profile (fintechs)
+doesn't leave API keys in environment variables for an LLM to pick up
+(owner directive, 2026-08-23); the realistic path is an already-
+authenticated coding-assistant CLI, same as draft_tier_b.py. No `claude`
+CLI on `PATH` -> reports what would be attempted, writes nothing (same
+convention `suggest-rules.ts` already uses for "LLM backend optional").
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-import shutil
-import subprocess
 import sys
-import urllib.request
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODEL = "claude-sonnet-4-5-20250929"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import llm_common  # noqa: E402
+from llm_common import _call_llm, _llm_backend_available, _strip_markdown_json_fence  # noqa: E402
+
+MODEL = llm_common.DEFAULT_MODEL
 
 SYSTEM_PROMPT = """You are the reviewer-assistance advisory layer for a Weaver
 residual review session. You are ADVISORY ONLY.
@@ -126,59 +131,9 @@ def build_advisory_prompt(residual: dict, unit_index: dict, packs: dict) -> str:
     """Pure, testable -- same INPUTS-only assembly discipline
     draft_tier_b.py's build_user_prompt already established (scoped to
     this residual's own unit ids only, nothing else leaked into the
-    prompt)."""
-    relevant_units = {uid: info for uid, info in unit_index.items() if uid in residual.get("unitIds", [])}
-    relevant_evidence = {ref: snippet for uid in relevant_units.values() for ref in uid.get("evidenceRefs", []) for r, snippet in packs.items() if r == ref}
-    return json.dumps({"residual": residual, "unit_index": relevant_units, "evidence_snippets": relevant_evidence}, indent=2)
-
-
-def _llm_backend_available(api_key: str | None) -> bool:
-    """T-1 (AGENT_TASKS_Residual_Assist_Redesign.md): mirrors
-    draft_tier_b.py's own gating -- either the already-authenticated
-    `claude` CLI or a raw ANTHROPIC_API_KEY satisfies "no key -> no-op"."""
-    return bool(shutil.which("claude")) or bool(api_key)
-
-
-def _call_llm(system_prompt: str, user_prompt: str, api_key: str | None, model: str = MODEL) -> str:
-    """The only network/subprocess boundary in this file -- mirrors
-    draft_tier_b.py's own _call_llm (same isolation reasoning: kept thin
-    and swappable so the real guardrail below is fully testable without
-    ever calling a live backend). Prefers the `claude` CLI (already
-    authenticated, no separate secret) over a raw API key when both are
-    available -- see draft_tier_b.py's own _call_llm_via_claude_cli for the
-    real, observed `--output-format json` response shape this was built
-    against."""
-    if shutil.which("claude"):
-        result = subprocess.run(
-            [shutil.which("claude"), "-p", "--output-format", "json", "--model", model, "--system-prompt", system_prompt, user_prompt],
-            capture_output=True,
-            text=True,
-            timeout=240,  # T-1 real-run finding, draft_tier_b.py's own CLAUDE_CLI_TIMEOUT_SECONDS: a real call took 131.75s
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"claude CLI exited {result.returncode}: {result.stderr.strip()[:500]}")
-        payload = json.loads(result.stdout)
-        if payload.get("is_error"):
-            raise RuntimeError(f"claude CLI reported an error: {str(payload.get('result'))[:500]}")
-        return payload.get("result", "")
-    if not api_key:
-        raise RuntimeError("no LLM backend available (neither `claude` CLI nor ANTHROPIC_API_KEY)")
-    body = json.dumps(
-        {
-            "model": model,
-            "max_tokens": 1024,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": user_prompt}],
-        }
-    ).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=body,
-        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        payload = json.loads(resp.read())
-    return "".join(block.get("text", "") for block in payload.get("content", []))
+    prompt). Delegates to llm_common.build_evidence_prompt -- the shared
+    implementation both files (and dossier.py) now call."""
+    return llm_common.build_evidence_prompt(residual, unit_index, packs)
 
 
 REQUIRED_ADVISORY_KEYS = {"explanation", "hypotheses", "catalogue_rule_candidate"}
@@ -187,32 +142,6 @@ VALID_MATCH_SOURCES = {"native-route", "decorator", "call", "field-type", "exten
 VALID_CATEGORIES = {"http-entry-point", "framework-bootstrap", "persistence", "messaging", "folder-convention", "security-control", "resilience"}
 VALID_CALM_NODE_TYPES = {"service", "database", "topic"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
-
-
-_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
-
-
-def _strip_markdown_json_fence(text: str) -> str:
-    """T-1 real-run findings (AGENT_TASKS_Residual_Assist_Redesign.md),
-    mirrors draft_tier_b.py's own fix for the same two rounds: (1) a bare
-    ```json ... ``` fence with nothing else, and (2) a second live call
-    that prefixed prose BEFORE the fence, which a leading-strip alone
-    didn't catch. Fixed by searching for a fenced block ANYWHERE in the
-    text first, falling back to the original leading/trailing-only strip,
-    then to the raw text unchanged -- never widens what counts as valid,
-    only what counts as "the JSON, extracted from around it.\""""
-    stripped = text.strip()
-    fenced = _FENCED_JSON_RE.search(stripped)
-    if fenced:
-        return fenced.group(1).strip()
-    if stripped.startswith("```"):
-        lines = stripped.split("\n")
-        if lines and lines[0].strip().lower() in ("```", "```json"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        stripped = "\n".join(lines).strip()
-    return stripped
 
 
 def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
@@ -292,11 +221,11 @@ def _validate_catalogue_rule_candidate(candidate) -> str | None:
     return None
 
 
-def advise_for_residual(residual: dict, unit_index: dict, packs: dict, api_key: str | None) -> dict:
-    if not _llm_backend_available(api_key):
-        return {"outcome": "no_key", "reason": "no LLM backend available (neither `claude` CLI nor ANTHROPIC_API_KEY) -- nothing advised"}
+def advise_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
+    if not _llm_backend_available():
+        return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) -- nothing advised"}
     user_prompt = build_advisory_prompt(residual, unit_index, packs)
-    raw = _call_llm(SYSTEM_PROMPT, user_prompt, api_key)
+    raw = _call_llm(SYSTEM_PROMPT, user_prompt)
     return parse_and_validate_response(raw, residual)
 
 
@@ -304,7 +233,6 @@ def process_advisory_batch(
     residuals: list[dict],
     unit_index: dict,
     packs: dict,
-    api_key: str,
     advise_fn=advise_for_residual,
     now_fn=lambda: datetime.now(timezone.utc).isoformat(),
     id_fn=lambda: uuid.uuid4().hex[:12],
@@ -329,7 +257,7 @@ def process_advisory_batch(
     seen_candidate_ids: set[str] = set()
 
     for residual in residuals:
-        result = advise_fn(residual, unit_index, packs, api_key)
+        result = advise_fn(residual, unit_index, packs)
         episode = {
             "episodeId": id_fn(),
             "residualId": residual["id"],
@@ -380,7 +308,7 @@ def render_advisory_report(residuals: list[dict]) -> str:
     advised = [r for r in residuals if r.get("advisory")]
     lines = ["# Reviewer-assistance advisory notes (T-RT-4)", "", "Advisory only — explanation and hypotheses for a human to weigh, never a decision. Accepting a hypothesis below is ONE human judgement (via the residual's own choice card), never a second corroborating signal for a hard-gated fact.", ""]
     if not advised:
-        lines.append("_No residual in this pack has been advised on yet — run `advisory.py --session-dir ...` (needs `ANTHROPIC_API_KEY`)._")
+        lines.append("_No residual in this pack has been advised on yet — run `advisory.py --session-dir ...` (needs the `claude` CLI on `PATH`)._")
         return "\n".join(lines) + "\n"
 
     for r in advised:
@@ -430,13 +358,12 @@ def main() -> int:
     unit_index = json.loads((session_dir / "evidence" / "unit-index.json").read_text()) if (session_dir / "evidence" / "unit-index.json").exists() else {}
     packs = json.loads((session_dir / "evidence" / "packs.json").read_text()) if (session_dir / "evidence" / "packs.json").exists() else {}
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not _llm_backend_available(api_key):
-        print(f"[advisory] no LLM backend available (neither `claude` CLI nor ANTHROPIC_API_KEY) -- would attempt to advise on {len(targets)} residual(s), writing nothing: {[r['id'] for r in targets]}")
+    if not _llm_backend_available():
+        print(f"[advisory] no LLM backend available (`claude` CLI not found on PATH) -- would attempt to advise on {len(targets)} residual(s), writing nothing: {[r['id'] for r in targets]}")
         return 0
-    print(f"[advisory] backend: {'claude CLI' if shutil.which('claude') else 'ANTHROPIC_API_KEY (direct)'}")
+    print("[advisory] backend: claude CLI")
 
-    updated_targets, episodes, candidates = process_advisory_batch(targets, unit_index, packs, api_key)
+    updated_targets, episodes, candidates = process_advisory_batch(targets, unit_index, packs)
 
     updated_by_id = {r["id"]: r for r in updated_targets}
     pack["items"] = [updated_by_id.get(r["id"], r) for r in all_residuals]

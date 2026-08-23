@@ -1,8 +1,9 @@
 """Tests for advisory.py (T-RT-4). Tests parse_and_validate_response and
 process_advisory_batch -- the actual guardrails -- against SYNTHETIC raw-
-response text, never a live model call (no ANTHROPIC_API_KEY in this
-environment; see advisory.py's own module docstring for the honest
-disclosure this shares with draft_tier_b.py)."""
+response text, never a live model call in this suite itself (T-1,
+AGENT_TASKS_Residual_Assist_Redesign.md, already exercised the real
+`claude` CLI backend live and separately; see advisory.py's own module
+docstring for the full disclosure)."""
 
 import json
 import os
@@ -169,10 +170,10 @@ class TestBuildAdvisoryPrompt(unittest.TestCase):
 
 class TestProcessAdvisoryBatch(unittest.TestCase):
     def test_advisory_attached_never_mutates_input_dict(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "advised", "explanation": "e", "hypotheses": ["h"], "catalogue_rule_candidate": None}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertNotIn("advisory", RESIDUAL, "the input residual dict must never be mutated in place")
         self.assertIn("advisory", updated[0])
         self.assertEqual(updated[0]["advisory"]["explanation"], "e")
@@ -182,10 +183,10 @@ class TestProcessAdvisoryBatch(unittest.TestCase):
         self.assertEqual(candidates, [])
 
     def test_candidate_appended_with_episode_metadata(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "advised", "explanation": "e", "hypotheses": [], "catalogue_rule_candidate": GOOD_CANDIDATE}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0]["status"], "proposed")
         self.assertEqual(candidates[0]["sourceResidualId"], "R-001")
@@ -195,29 +196,29 @@ class TestProcessAdvisoryBatch(unittest.TestCase):
     def test_duplicate_candidate_id_within_batch_refused_not_overwritten(self):
         residual2 = dict(RESIDUAL, id="R-002")
 
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "advised", "explanation": "e", "hypotheses": [], "catalogue_rule_candidate": GOOD_CANDIDATE}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL, residual2], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL, residual2], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertEqual(len(candidates), 1, "only the FIRST residual's candidate should be written -- the second must be refused, not silently overwrite it")
         outcomes = {e["residualId"]: e["outcome"] for e in episodes}
         self.assertEqual(outcomes["R-001"], "advised")
         self.assertEqual(outcomes["R-002"], "candidate_id_collision")
 
     def test_no_key_outcome_logged_not_treated_as_advised(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "no_key", "reason": "no ANTHROPIC_API_KEY set -- nothing advised"}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, None, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertNotIn("advisory", updated[0])
         self.assertEqual(episodes[0]["outcome"], "no_key")
         self.assertEqual(candidates, [])
 
     def test_invalid_response_outcome_never_attaches_advisory(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "invalid_response", "reason": "malformed"}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertNotIn("advisory", updated[0])
         self.assertEqual(episodes[0]["outcome"], "invalid_response")
 

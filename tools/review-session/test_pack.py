@@ -9,12 +9,14 @@ uses for scratch-clone-dependent fixtures.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 TOOLS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TOOLS_DIR.parents[1]
@@ -95,6 +97,47 @@ class TestPackEndToEnd(unittest.TestCase):
         )
         self.assertNotEqual(run.returncode, 0)
         self.assertFalse(self.session_dir.exists())
+
+    def test_with_dossier_flag_no_backend_still_succeeds_no_dossier_field(self):
+        """T-2 (AGENT_TASKS_Residual_Dossier_Module.md): --with-dossier set
+        but no `claude` CLI on PATH -> pack.py still writes a normal,
+        dossier-less pack (exit 0), logging what would have been attempted."""
+        subprocess.run(["node", str(RUN_SLICE), str(NESTJS_FIXTURE), "--out", str(self.out_dir)], capture_output=True, text=True, check=True)
+        env = dict(os.environ)
+        # Strip only `claude` from PATH (node stays reachable -- pack.py's
+        # own review-queue regeneration via hitl-review-trigger.js needs
+        # it, unrelated to the LLM backend this test is actually about).
+        node_dir = str(Path(shutil.which("node")).parent) if shutil.which("node") else ""
+        env["PATH"] = node_dir
+        run = subprocess.run(
+            [sys.executable, str(TOOLS_DIR / "pack.py"), "--out-dir", str(self.out_dir), "--session-dir", str(self.session_dir), "--with-dossier"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("no LLM backend available", run.stdout)
+        residuals = json.loads((self.session_dir / "residuals.json").read_text())
+        self.assertGreaterEqual(len(residuals["items"]), 1)
+        self.assertTrue(all("dossier" not in r for r in residuals["items"]), "no-backend path must never attach a dossier field")
+
+    def test_without_with_dossier_flag_backend_check_never_invoked(self):
+        """No --with-dossier at all -> pack.py must not even check for a
+        `claude` CLI backend (Simplicity First: the default path stays
+        exactly what it was before this pass existed)."""
+        subprocess.run(["node", str(RUN_SLICE), str(NESTJS_FIXTURE), "--out", str(self.out_dir)], capture_output=True, text=True, check=True)
+        sys.path.insert(0, str(TOOLS_DIR))
+        import pack
+
+        with mock.patch.object(pack, "_llm_backend_available") as mock_backend:
+            argv_backup = sys.argv
+            sys.argv = ["pack.py", "--out-dir", str(self.out_dir), "--session-dir", str(self.session_dir)]
+            try:
+                rc = pack.pack_main()
+            finally:
+                sys.argv = argv_backup
+        self.assertEqual(rc, 0)
+        mock_backend.assert_not_called()
 
 
 if __name__ == "__main__":

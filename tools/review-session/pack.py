@@ -34,6 +34,8 @@ from redact import redact  # noqa: E402
 from triage import build_residuals, apply_baseline  # noqa: E402
 from cards import build_all_cards  # noqa: E402
 from consequence import annotate_residuals  # noqa: E402
+import dossier  # noqa: E402
+from llm_common import _llm_backend_available  # noqa: E402
 
 # Wider than the original +/- 3: most "need 20 more lines" cases stay in
 # the pack. Hard cap on the window so one residual cannot dump a file.
@@ -61,6 +63,7 @@ def pack_main() -> int:
     parser.add_argument("--baseline", help="a prior Session Pack dir — residuals already decided there are carried forward, not re-asked; residuals whose evidence shape changed since are flagged re-confirm")
     parser.add_argument("--max-residuals", type=int, default=None, help="keep the N highest-consequence askable residuals (carried_forward always kept). Token cap, not a correctness cap.")
     parser.add_argument("--context-lines", type=int, default=DEFAULT_CONTEXT_LINES, help=f"lines either side of an Evidence.ref (default {DEFAULT_CONTEXT_LINES}; window capped at {MAX_SNIPPET_WINDOW})")
+    parser.add_argument("--with-dossier", action="store_true", help="opt-in Evidence Dossier pass (T-2): calls the `claude` CLI to attach an additive `dossier` field to every open residual (any tier). Off by default -- needs the `claude` CLI on PATH; no backend -> reports what would have been attempted, writes a normal dossier-less pack.")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir).resolve()
@@ -137,6 +140,12 @@ def pack_main() -> int:
     context_lines = max(0, args.context_lines)
     packs = _build_evidence_packs(residuals, unit_index, package_roots, context_lines)
     (session_dir / "evidence" / "packs.json").write_text(json.dumps(packs, indent=2))
+
+    # T-2 (AGENT_TASKS_Residual_Dossier_Module.md): opt-in only -- with no
+    # --with-dossier flag, pack.py behaves exactly as it did before this
+    # pass existed (doesn't even check for a `claude` CLI backend).
+    if args.with_dossier:
+        residuals = _run_dossier_pass(residuals, unit_index, packs)
 
     # Deterministic choice cards, generated from the fixed
     # per-class templates in cards.py (never LLM-invented), attached
@@ -246,6 +255,30 @@ def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots
         if snippet is not None:
             packs[ref] = redact(snippet)
     return packs
+
+
+def _run_dossier_pass(residuals: list[dict], unit_index: dict, packs: dict) -> list[dict]:
+    """T-2's opt-in Evidence Dossier pass, over every OPEN residual
+    regardless of tier. No `claude` CLI on PATH (even with --with-dossier
+    set) -> log what would have been attempted, return residuals
+    unchanged so the rest of pack.py writes a normal dossier-less pack."""
+    targets = [r for r in residuals if r.get("status") == "open"]
+    if not targets:
+        print("[pack] --with-dossier set but no open residual(s) to build a dossier for -- nothing to do")
+        return residuals
+    if not _llm_backend_available():
+        print(f"[pack] --with-dossier set but no LLM backend available (`claude` CLI not found on PATH) -- would attempt a dossier for {len(targets)} residual(s), writing a dossier-less pack: {[r['id'] for r in targets]}")
+        return residuals
+    print("[pack] --with-dossier: backend claude CLI")
+
+    updated_targets, episodes = dossier.process_dossier_batch(targets, unit_index, packs)
+    updated_by_id = {r["id"]: r for r in updated_targets}
+    for episode in episodes:
+        if episode["outcome"] == "dossiered":
+            print(f"[pack] dossier {episode['residualId']}: dossiered")
+        else:
+            print(f"[pack] dossier {episode['residualId']}: {episode['outcome']} -- {episode.get('reason', '')}")
+    return [updated_by_id.get(r["id"], r) for r in residuals]
 
 
 def _window_for_line(line_1indexed: int, n_lines: int, context_lines: int) -> tuple[int, int]:

@@ -1,8 +1,9 @@
 """The 6-fixture fabricate-trap suite. Tests parse_and_validate_response — the
 actual guardrail — against SYNTHETIC raw-response text, never a live model
-call (no ANTHROPIC_API_KEY in this environment; see draft_tier_b.py's own
-module docstring for the full honest disclosure of what is and isn't
-proven here).
+call in this suite itself (T-1, AGENT_TASKS_Residual_Assist_Redesign.md,
+already exercised the real `claude` CLI backend live and separately; see
+draft_tier_b.py's own module docstring for the full disclosure of what's
+backend-only here and what T-1 proved live).
 
 Honest note on fixture 3 (§5.1 hard rule 3, "no prior-knowledge fill"):
 whether a model's answer came from genuine training-data recall is not
@@ -24,7 +25,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from draft_tier_b import build_user_prompt, parse_and_validate_response, process_tier_b_batch
+from draft_tier_b import _apply_bar_not_met_outcomes, build_user_prompt, parse_and_validate_response, process_tier_b_batch
 
 TOOLS_DIR = Path(__file__).resolve().parent
 
@@ -217,12 +218,12 @@ class TestCrossResidualCollision(unittest.TestCase):
 
         # Both "model responses" reuse the SAME decision_id/override_id —
         # a real, plausible failure mode (a model defaulting to generic ids).
-        def fake_draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key):
+        def fake_draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids):
             decision = dict(GOOD_DECISION, target_ref=residual["unitIds"][0])
             override = dict(GOOD_RELATIONSHIP_ADD_OVERRIDE, override_type="type_change", target_ref=residual["unitIds"][0], new_value="database", decision_record_ref="D-001")
             return {"outcome": "drafted", "decision": decision, "override": override}
 
-        results = process_tier_b_batch([residual1, residual2], {}, {}, {"svc.py", "other.py"}, set(), "fake-key", self.decisions_dir, self.overrides_dir, draft_fn=fake_draft_fn)
+        results = process_tier_b_batch([residual1, residual2], {}, {}, {"svc.py", "other.py"}, set(), self.decisions_dir, self.overrides_dir, draft_fn=fake_draft_fn)
 
         outcomes = {r[0]: r[1] for r in results}
         self.assertEqual(outcomes["R-001"], "drafted")
@@ -239,17 +240,55 @@ class TestCrossResidualCollision(unittest.TestCase):
 
         counter = {"n": 0}
 
-        def fake_draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key):
+        def fake_draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids):
             counter["n"] += 1
             decision = dict(GOOD_DECISION, decision_id=f"D-{counter['n']:03d}", target_ref=residual["unitIds"][0])
             override = dict(GOOD_RELATIONSHIP_ADD_OVERRIDE, override_id=f"O-{counter['n']:03d}", override_type="type_change", target_ref=residual["unitIds"][0], new_value="database", decision_record_ref=f"D-{counter['n']:03d}")
             return {"outcome": "drafted", "decision": decision, "override": override}
 
-        results = process_tier_b_batch([residual1, residual2], {}, {}, {"svc.py", "other.py"}, set(), "fake-key", self.decisions_dir, self.overrides_dir, draft_fn=fake_draft_fn)
+        results = process_tier_b_batch([residual1, residual2], {}, {}, {"svc.py", "other.py"}, set(), self.decisions_dir, self.overrides_dir, draft_fn=fake_draft_fn)
 
         self.assertTrue(all(r[1] == "drafted" for r in results))
         self.assertEqual(len(list(self.decisions_dir.glob("*.json"))), 2)
         self.assertEqual(len(list(self.overrides_dir.glob("*.json"))), 2)
+
+
+class TestApplyBarNotMetOutcomes(unittest.TestCase):
+    """T-2's §3 draftOutcome state (AGENT_TASKS_Residual_Dossier_Module.md):
+    a Tier B residual that was actually attempted and whose evidence bar
+    wasn't met must gain draftOutcome: 'bar-not-met' -- otherwise it reads
+    identically to a residual that was never Tier-B-eligible at all."""
+
+    def test_cannot_decide_outcome_gets_bar_not_met(self):
+        residual = dict(RESIDUAL, id="R-001")
+        tier_b_by_id = {"R-001": residual}
+        results = [("R-001", "cannot_decide", "missing evidence: no import found")]
+        changed = _apply_bar_not_met_outcomes(results, tier_b_by_id)
+        self.assertTrue(changed)
+        self.assertEqual(residual["draftOutcome"], "bar-not-met")
+
+    def test_drafted_outcome_gets_no_draft_outcome_field(self):
+        residual = dict(RESIDUAL, id="R-001")
+        tier_b_by_id = {"R-001": residual}
+        results = [("R-001", "drafted", "D-001 / O-001")]
+        changed = _apply_bar_not_met_outcomes(results, tier_b_by_id)
+        self.assertFalse(changed)
+        self.assertNotIn("draftOutcome", residual)
+
+    def test_no_key_outcome_gets_no_draft_outcome_field(self):
+        """Evidence bar unmet is a different state from 'no backend was even
+        available to try' -- only cannot_decide should ever mean bar-not-met."""
+        residual = dict(RESIDUAL, id="R-001")
+        tier_b_by_id = {"R-001": residual}
+        results = [("R-001", "no_key", "no LLM backend available")]
+        changed = _apply_bar_not_met_outcomes(results, tier_b_by_id)
+        self.assertFalse(changed)
+        self.assertNotIn("draftOutcome", residual)
+
+    def test_returns_false_when_no_residuals_changed(self):
+        tier_b_by_id = {"R-001": dict(RESIDUAL, id="R-001")}
+        changed = _apply_bar_not_met_outcomes([], tier_b_by_id)
+        self.assertFalse(changed)
 
 
 class TestNoKeyCliPath(unittest.TestCase):
