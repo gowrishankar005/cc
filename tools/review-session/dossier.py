@@ -65,8 +65,12 @@ propose no hypotheses, and leave evidenceRefsUsed empty):
      evidence is thin, say so; do not manufacture a hypothesis to fill a
      gap.
   3. evidenceRefsUsed must list only file:line refs that already appear in
-     this residual's own evidenceRefs -- never a ref you have not actually
-     been given.
+     this residual's own evidenceRefs OR in the evidenceRefs of one of the
+     unit_index entries for this residual's own unit ids (both are part of
+     your input, both are real evidence -- residual.evidenceRefs is often
+     EMPTY for a whole-unit trigger, with the real evidence living on the
+     unit's own evidenceRefs instead; that is not a reason to refuse) --
+     never a ref you have not actually been given from either source.
   4. Output format is fixed JSON, EXACTLY these top-level keys, nothing
      else:
      {"explanation": "<1-3 sentences, plain language, evidence-only>",
