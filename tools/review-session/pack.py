@@ -426,18 +426,32 @@ def _render_agents_md() -> str:
 
 
 def fetch_span_main(argv: list[str]) -> int:
-    """Architect-run extra-read. The chat mode is instructed to print the command, not run it."""
+    """Architect-run extra-read. The chat mode is instructed to print the command, not run it.
+
+    Two mutually-exclusive ways to specify the same bounded/redacted/capped read:
+      --path <file> --start-line <n> --end-line <n>   (exact range)
+      --anchor <file:line> [--context-lines <n>]      (windowed around a line, via _window_for_line)
+    """
     parser = argparse.ArgumentParser(
         prog="pack.py fetch-span",
         description="Append a bounded, redacted source span to an existing Session Pack (HITL extra-read). Copilot must not run this.",
     )
     parser.add_argument("--session-dir", required=True)
     parser.add_argument("--residual-id", required=True, help="must match an id in this pack's residuals.json")
-    parser.add_argument("--path", required=True, help="source path under a packageRoot (or an existing evidence path prefix)")
-    parser.add_argument("--start-line", type=int, required=True)
-    parser.add_argument("--end-line", type=int, required=True)
+    parser.add_argument("--path", help="source path under a packageRoot (or an existing evidence path prefix) — exact-range mode only")
+    parser.add_argument("--start-line", type=int, default=None, help="exact-range mode only")
+    parser.add_argument("--end-line", type=int, default=None, help="exact-range mode only")
+    parser.add_argument("--anchor", help="<file:line> — alternate to --path/--start-line/--end-line, windowed by --context-lines via _window_for_line")
+    parser.add_argument("--context-lines", type=int, default=DEFAULT_CONTEXT_LINES, help=f"--anchor mode only (default {DEFAULT_CONTEXT_LINES}, window capped at {MAX_SNIPPET_WINDOW})")
     parser.add_argument("--max-lines", type=int, default=FETCH_SPAN_DEFAULT_MAX_LINES)
     args = parser.parse_args(argv)
+
+    anchor_mode = args.anchor is not None
+    exact_given = args.path is not None or args.start_line is not None or args.end_line is not None
+    if anchor_mode and exact_given:
+        parser.error("--anchor cannot be combined with --path/--start-line/--end-line")
+    if not anchor_mode and (args.path is None or args.start_line is None or args.end_line is None):
+        parser.error("exact-range mode requires --path, --start-line, and --end-line (or use --anchor instead)")
 
     session_dir = Path(args.session_dir).resolve()
     residual_id = args.residual_id
@@ -466,11 +480,55 @@ def fetch_span_main(argv: list[str]) -> int:
         print(f"[fetch-span] session cap {FETCH_SPAN_SESSION_MAX_CALLS} extra-reads reached — remaining items stay cannot_decide", file=sys.stderr)
         return 1
 
-    start = args.start_line
-    end = args.end_line
-    if start < 1 or end < start:
-        print("[fetch-span] start-line must be >= 1 and end-line >= start-line", file=sys.stderr)
+    roots = [Path(r).resolve() for r in (manifest.get("packageRoots") or [])]
+    if not roots:
+        print("[fetch-span] pack has no packageRoots", file=sys.stderr)
         return 1
+
+    if anchor_mode:
+        m = _REF_RE.match(args.anchor)
+        if not m:
+            print(f"[fetch-span] --anchor must be <file:line>: {args.anchor}", file=sys.stderr)
+            return 1
+        anchor_path_str, anchor_line_str = m.group(1), m.group(2)
+        anchor_line = int(anchor_line_str)
+        if anchor_line < 1:
+            print("[fetch-span] --anchor line must be >= 1", file=sys.stderr)
+            return 1
+        candidate = _resolve_under_roots(anchor_path_str, roots)
+        if candidate is None:
+            print(f"[fetch-span] path is outside packageRoots / evidence prefix: {anchor_path_str}", file=sys.stderr)
+            return 1
+        try:
+            file_lines = candidate.read_text(errors="replace").splitlines()
+        except OSError as err:
+            print(f"[fetch-span] cannot read {candidate}: {err}", file=sys.stderr)
+            return 1
+        if anchor_line > len(file_lines):
+            print(f"[fetch-span] anchor line {anchor_line} past end of file ({len(file_lines)} lines)", file=sys.stderr)
+            return 1
+        context_lines = max(0, args.context_lines)
+        window_start, window_end = _window_for_line(anchor_line, len(file_lines), context_lines)
+        start, end = window_start + 1, window_end
+    else:
+        start = args.start_line
+        end = args.end_line
+        if start < 1 or end < start:
+            print("[fetch-span] start-line must be >= 1 and end-line >= start-line", file=sys.stderr)
+            return 1
+        candidate = _resolve_under_roots(args.path, roots)
+        if candidate is None:
+            print(f"[fetch-span] path is outside packageRoots / evidence prefix: {args.path}", file=sys.stderr)
+            return 1
+        try:
+            file_lines = candidate.read_text(errors="replace").splitlines()
+        except OSError as err:
+            print(f"[fetch-span] cannot read {candidate}: {err}", file=sys.stderr)
+            return 1
+        if start > len(file_lines):
+            print(f"[fetch-span] start-line {start} past end of file ({len(file_lines)} lines)", file=sys.stderr)
+            return 1
+
     max_lines = min(max(1, args.max_lines), FETCH_SPAN_HARD_CAP_LINES)
     span_len = end - start + 1
     if span_len > max_lines:
@@ -480,23 +538,6 @@ def fetch_span_main(argv: list[str]) -> int:
         print(f"[fetch-span] session line cap {FETCH_SPAN_SESSION_MAX_LINES} would be exceeded", file=sys.stderr)
         return 1
 
-    roots = [Path(r).resolve() for r in (manifest.get("packageRoots") or [])]
-    if not roots:
-        print("[fetch-span] pack has no packageRoots", file=sys.stderr)
-        return 1
-
-    candidate = _resolve_under_roots(args.path, roots)
-    if candidate is None:
-        print(f"[fetch-span] path is outside packageRoots / evidence prefix: {args.path}", file=sys.stderr)
-        return 1
-    try:
-        file_lines = candidate.read_text(errors="replace").splitlines()
-    except OSError as err:
-        print(f"[fetch-span] cannot read {candidate}: {err}", file=sys.stderr)
-        return 1
-    if start > len(file_lines):
-        print(f"[fetch-span] start-line {start} past end of file ({len(file_lines)} lines)", file=sys.stderr)
-        return 1
     slice_end = min(end, len(file_lines))
     snippet = redact("\n".join(file_lines[start - 1 : slice_end]))
     actual_lines = slice_end - start + 1

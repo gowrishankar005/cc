@@ -109,6 +109,13 @@ python3 advisory.py --session-dir ../../review-sessions/my-run
 # default; needs the `claude` CLI on PATH (not a raw API key); no backend -> writes a normal,
 # dossier-less pack.
 python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run --with-dossier
+
+# extra-read (architect-run, never Copilot): exact range, or --anchor <file:line> for N lines
+# of context around a line (same caps/redaction, shared session cap across both modes)
+python3 pack.py fetch-span --session-dir ../../review-sessions/my-run --residual-id R-014 \
+  --path <under packageRoots> --start-line 40 --end-line 60
+python3 pack.py fetch-span --session-dir ../../review-sessions/my-run --residual-id R-014 \
+  --anchor <under packageRoots>:50 --context-lines 15
 ```
 
 `pack.py` refuses to overwrite a session dir that already has unapplied drafts (fails loud, exit code 1) — apply or discard first.

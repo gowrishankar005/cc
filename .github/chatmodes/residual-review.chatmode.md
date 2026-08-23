@@ -172,6 +172,8 @@ Do not invoke `fetch-span` yourself even if this host would technically let
 you. If pack evidence is short for a **named residual**, print **one**
 command and stop. Do not search the repo.
 
+Exact range:
+
 ```
 python3 tools/review-session/pack.py fetch-span \
   --session-dir <this pack> \
@@ -181,10 +183,23 @@ python3 tools/review-session/pack.py fetch-span \
   --max-lines 40
 ```
 
+Or, when you just want N lines of context around a line rather than
+hand-computing exact bounds — anchor mode (same caps, same redaction):
+
+```
+python3 tools/review-session/pack.py fetch-span \
+  --session-dir <this pack> \
+  --residual-id R-014 \
+  --anchor <under packageRoots>:N \
+  --context-lines 15
+```
+
+`--anchor` and `--path`/`--start-line`/`--end-line` are mutually exclusive.
 `--residual-id` is required. Path outside package roots fails. Session cap
-is 10 extra-reads / 400 extra lines (enforced by the CLI). After the
-architect runs it, the span is in `evidence/packs.json` and may be cited.
-If the extra-read still yields 0 or 2+ candidates → `cannot_decide`.
+is 10 extra-reads / 400 extra lines (enforced by the CLI, shared across both
+modes). After the architect runs it, the span is in `evidence/packs.json`
+and may be cited. If the extra-read still yields 0 or 2+ candidates →
+`cannot_decide`.
 
 ## When you're not sure
 

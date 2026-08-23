@@ -18,6 +18,7 @@ class TestFetchSpan(unittest.TestCase):
         self.root = self.tmp / "pkg"
         self.root.mkdir()
         (self.root / "svc.py").write_text("line1\nline2\nSECRET=AKIAIOSFODNN7EXAMPLE\nline4\nline5\n")
+        (self.root / "long.py").write_text("\n".join(f"line{i}" for i in range(1, 101)) + "\n")
         self.session = self.tmp / "session"
         (self.session / "evidence").mkdir(parents=True)
         (self.session / "drafts" / "decisions").mkdir(parents=True)
@@ -82,6 +83,67 @@ class TestFetchSpan(unittest.TestCase):
         run = self._run(["--residual-id", "R-001", "--path", "svc.py", "--start-line", "1", "--end-line", "1"])
         self.assertNotEqual(run.returncode, 0)
         self.assertIn("cap", run.stderr)
+
+    def test_anchor_mode_matches_equivalent_exact_range(self):
+        from pack import _window_for_line
+
+        w_start, w_end = _window_for_line(50, 100, 5)  # 0-indexed
+        exact = self._run(
+            ["--residual-id", "R-001", "--path", "long.py", "--start-line", str(w_start + 1), "--end-line", str(w_end)]
+        )
+        self.assertEqual(exact.returncode, 0, exact.stderr)
+        exact_packs = json.loads((self.session / "evidence" / "packs.json").read_text())
+
+        # separate session dir for the anchor-mode call, same fixture, same expected window
+        session2 = self.tmp / "session2"
+        (session2 / "evidence").mkdir(parents=True)
+        (session2 / "drafts" / "decisions").mkdir(parents=True)
+        (session2 / "drafts" / "overrides").mkdir(parents=True)
+        (session2 / "manifest.json").write_text(json.dumps({"packageRoots": [str(self.root)], "extraReadCount": 0, "extraReadLines": 0}))
+        (session2 / "residuals.json").write_text(
+            json.dumps({"items": [{"id": "R-001", "tier": "A", "class": "insufficient-evidence", "evidenceRefs": [], "status": "open"}]})
+        )
+        (session2 / "evidence" / "packs.json").write_text("{}")
+        anchor = subprocess.run(
+            [sys.executable, str(PACK), "fetch-span", "--session-dir", str(session2),
+             "--residual-id", "R-001", "--anchor", "long.py:50", "--context-lines", "5"],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(anchor.returncode, 0, anchor.stderr)
+        anchor_packs = json.loads((session2 / "evidence" / "packs.json").read_text())
+
+        self.assertIn(f"long.py:{w_start + 1}", anchor_packs)
+        self.assertEqual(anchor_packs[f"long.py:{w_start + 1}"], exact_packs[f"long.py:{w_start + 1}"])
+
+    def test_anchor_past_eof_fails(self):
+        run = self._run(["--residual-id", "R-001", "--anchor", "svc.py:999"])
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("past end of file", run.stderr)
+
+    def test_anchor_outside_roots_fails(self):
+        outsider = self.tmp / "outside.py"
+        outsider.write_text("nope\n")
+        run = self._run(["--residual-id", "R-001", "--anchor", f"{outsider}:1"])
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("outside", run.stderr.lower() + run.stdout.lower())
+
+    def test_anchor_combined_with_start_line_rejected(self):
+        run = self._run(["--residual-id", "R-001", "--anchor", "svc.py:1", "--start-line", "1", "--end-line", "2"])
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("cannot be combined", run.stderr)
+
+    def test_anchor_and_exact_share_session_caps(self):
+        anchor = self._run(["--residual-id", "R-001", "--anchor", "long.py:50", "--context-lines", "5"])
+        self.assertEqual(anchor.returncode, 0, anchor.stderr)
+        extra = json.loads((self.session / "evidence" / "extra-reads.json").read_text())
+        self.assertEqual(len(extra["calls"]), 1)
+        first_total = extra["totalLines"]
+
+        exact = self._run(["--residual-id", "R-001", "--path", "svc.py", "--start-line", "1", "--end-line", "2"])
+        self.assertEqual(exact.returncode, 0, exact.stderr)
+        extra = json.loads((self.session / "evidence" / "extra-reads.json").read_text())
+        self.assertEqual(len(extra["calls"]), 2)
+        self.assertEqual(extra["totalLines"], first_total + 2)
 
 
 class TestRankAndCap(unittest.TestCase):
