@@ -217,7 +217,11 @@ First-class Override types today emphasize **nodes** and **connects** (`node_add
 This table is the mechanically-enforced link between "a residual exists in
 the code" and "an architect can find out about it here." Populated by
 grepping the actual producers, not carried forward from an earlier draft
-of this doc.
+of this doc. **The enforcement is real, not aspirational**: `pipeline/scripts/check-residual-taxonomy-sync.js`
+(CI-wired via `.github/workflows/residual-taxonomy-sync.yml`) fails a diff
+that changes `coverage-report.ts`'s `silenceFlags`, `typed-facts.ts`'s
+`IgnoredItem.reason` union, or `triage.py`'s `_TRIGGER_MAP` without this
+section also changing in the same diff.
 
 **`coverage-report.ts`'s `silenceFlags`** (surfaced via `review-queue.json`, `hitl-review-trigger.ts`):
 
@@ -228,6 +232,7 @@ of this doc.
 | `S5-zero-service-units-with-store-present` | `coverage-report.ts` `computeCompleteness` | A | ontology-judgment |
 | `S5-cfn-routes-found-but-unbound` | `coverage-report.ts` `computeCompleteness` | C | missing-intermediates-not-in-scan |
 | `S6-isolated-nodes` | `coverage-report.ts` `computeCompleteness` | — (soft flag, informational; not a `review-queue.json` residual trigger today — `--strict-isolated-nodes` is the hard-gate opt-in, not a pack input) | — |
+| `S0-cross-package-backbone-incomplete` | `coverage-report.ts` `computeCompleteness` | — (soft flag, informational; not a `review-queue.json` residual trigger today — same pattern as `S6` above) | — |
 | `low-architecture-coverage` | `hitl-review-trigger.ts` | A | multi-candidate-bridge |
 
 **`typed-facts.ts`'s `IgnoredItem.reason` union** — only two of the eight declared reasons are actually pulled into a Session Pack today (`triage.py`'s `_IGNORED_REASONS` frozenset); the rest are either filtered as noise or currently unused by any producer, checked directly, not assumed:

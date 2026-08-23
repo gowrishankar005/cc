@@ -1,0 +1,54 @@
+name: residual taxonomy sync
+
+# Runs check-residual-taxonomy-sync.js (T-4) — a mechanical guard against the
+# exact drift that already happened once for real: a new residual producer
+# (a coverage-report.ts silenceFlags entry, a typed-facts.ts IgnoredItem.reason
+# member, or a triage.py _TRIGGER_MAP key) landing without
+# docs/solution/Architect_Residual_Review_Session.md's own §3 producer
+# registry being updated in the same diff.
+#
+# A separate, narrower workflow rather than a step in pipeline-test.yml,
+# deliberately: two of the three producer files
+# (tools/review-session/triage.py, and the registry doc itself) live outside
+# pipeline/, so pipeline-test.yml's `paths: ['pipeline/**', ...]` filter
+# would never fire for a triage.py-only or doc-only change — which is
+# exactly the drift case that motivated this check in the first place (the
+# original miss was a triage.py-only commit). Folding this into
+# pipeline-test.yml would mean either widening that workflow's paths to
+# things with nothing to do with the pipeline (e.g. a
+# tools/review-session/README.md typo), or leaving the gap open. This
+# workflow also doesn't need `npm ci`/`npm test` — the check script itself
+# has no dependencies beyond Node's built-ins — so bundling it into the
+# pipeline regression job would also pay an unrelated install cost on every
+# doc/triage-only change.
+on:
+  push:
+    paths:
+      - 'pipeline/src/analysis/coverage-report.ts'
+      - 'pipeline/src/types/typed-facts.ts'
+      - 'tools/review-session/**'
+      - 'docs/solution/Architect_Residual_Review_Session.md'
+      - 'pipeline/scripts/check-residual-taxonomy-sync.js'
+      - '.github/workflows/residual-taxonomy-sync.yml'
+  pull_request:
+    paths:
+      - 'pipeline/src/analysis/coverage-report.ts'
+      - 'pipeline/src/types/typed-facts.ts'
+      - 'tools/review-session/**'
+      - 'docs/solution/Architect_Residual_Review_Session.md'
+      - 'pipeline/scripts/check-residual-taxonomy-sync.js'
+      - '.github/workflows/residual-taxonomy-sync.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed so origin/main is a real, comparable ref for the check script below
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: node pipeline/scripts/check-residual-taxonomy-sync.js origin/main
