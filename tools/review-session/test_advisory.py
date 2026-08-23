@@ -111,6 +111,26 @@ class TestParseAndValidateResponse(unittest.TestCase):
         result = parse_and_validate_response(raw, RESIDUAL)
         self.assertEqual(result["outcome"], "advised", result.get("reason"))
 
+    # Regression test (found live during T-2's dossier.py work, 2026-08-23,
+    # BACKLOG.md): residual.evidenceRefs is genuinely EMPTY for whole-unit
+    # trigger classes (e.g. S2-http-without-security-control) -- the real
+    # evidence lives on the unit's own evidenceRefs in unit_index instead.
+    # A response citing that unit-level evidence must not be spuriously
+    # rejected as "not in the pack".
+    def test_ref_only_on_unit_index_not_residual_evidence_refs_is_accepted(self):
+        residual_with_empty_refs = dict(RESIDUAL, evidenceRefs=[])
+        unit_index = {"svc.py": {"kind": "service", "confidence": 100, "evidenceRefs": ["svc.py:10"]}}
+        raw = json.dumps({"explanation": "svc.py:10 shows the route with no auth control.", "hypotheses": [], "catalogue_rule_candidate": None})
+        result = parse_and_validate_response(raw, residual_with_empty_refs, unit_index)
+        self.assertEqual(result["outcome"], "advised", result.get("reason"))
+
+    def test_ref_on_neither_residual_nor_unit_index_still_rejected(self):
+        residual_with_empty_refs = dict(RESIDUAL, evidenceRefs=[])
+        unit_index = {"svc.py": {"kind": "service", "confidence": 100, "evidenceRefs": ["svc.py:10"]}}
+        raw = json.dumps({"explanation": "ghost.py:1 shows a route.", "hypotheses": [], "catalogue_rule_candidate": None})
+        result = parse_and_validate_response(raw, residual_with_empty_refs, unit_index)
+        self.assertEqual(result["outcome"], "invalid_response")
+
     # --- catalogue_rule_candidate shape validation ---
     def test_candidate_missing_field_rejected(self):
         bad = dict(GOOD_CANDIDATE)

@@ -144,16 +144,26 @@ VALID_CALM_NODE_TYPES = {"service", "database", "topic"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
 
-def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
+def parse_and_validate_response(raw_text: str, residual: dict, unit_index: dict | None = None) -> dict:
     """Pure, fully testable without any network call -- the actual
     guardrail (hard rules 1-4 above), not the model's own good behavior,
     which this tool structurally cannot verify or trust on its own.
+
+    `unit_index` (optional, defaults to {}) matches dossier.py's own
+    parse_and_validate_dossier_response fix (found live, 2026-08-23,
+    BACKLOG.md): residual.evidenceRefs is genuinely EMPTY for whole-unit
+    trigger classes (e.g. S2-http-without-security-control) -- the real
+    evidence that reached the model's prompt lives on the unit's own
+    evidenceRefs in unit_index instead. Without this, a real, correctly
+    evidence-grounded response citing unit-level evidence would be
+    spuriously rejected.
 
     Returns {"outcome": "advised", "explanation": ..., "hypotheses": [...],
     "catalogue_rule_candidate": ... or None}
     or {"outcome": "invalid_response", "reason": ...} -- a REJECTION,
     never silently treated as advice, no matter how plausible-looking the
     response is (README S6: never fabricate, never guess)."""
+    unit_index = unit_index or {}
     try:
         parsed = json.loads(_strip_markdown_json_fence(raw_text))
     except (json.JSONDecodeError, TypeError):
@@ -194,7 +204,7 @@ def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
     # fields, adapted for prose (see that file's module docstring for the
     # same honest disclosure: this can't detect prior-knowledge USE, only
     # reject any concrete ref that isn't actually in the pack).
-    known_refs = set(residual.get("evidenceRefs", []))
+    known_refs = llm_common.known_evidence_refs(residual, unit_index)
     free_text = explanation + " " + " ".join(hypotheses) + " " + (candidate.get("rationale", "") if isinstance(candidate, dict) else "")
     for match in _EVIDENCE_REF_RE.finditer(free_text):
         ref = f"{match.group(1)}:{match.group(2)}"
@@ -226,7 +236,7 @@ def advise_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
         return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) -- nothing advised"}
     user_prompt = build_advisory_prompt(residual, unit_index, packs)
     raw = _call_llm(SYSTEM_PROMPT, user_prompt)
-    return parse_and_validate_response(raw, residual)
+    return parse_and_validate_response(raw, residual, unit_index)
 
 
 def process_advisory_batch(
