@@ -4,48 +4,59 @@ tools: ['editFiles']
 ---
 
 <!--
-SAFETY: no autonomous apply (S4, see Architect_Residual_Review_Session.md §0.3).
+SAFETY: no autonomous apply (S4, see Architect_Residual_Review_Session.md
+§0.3 and §4.4 for full reasoning). Read this before trusting any weaker claim
+elsewhere about what this chat mode "can't" do — this is the corrected,
+canonical version; nothing else should restate it differently.
 
-The `tools:` list above is the real enforcement mechanism in VS Code Copilot
-Chat, not just an instruction below asking the model to behave — VS Code
-Copilot Chat can only invoke a tool that is declared in this frontmatter.
-This list deliberately excludes every terminal/command/task-execution tool
-(no `runCommands`, `runInTerminal`, `runTasks`, or equivalent for whatever
-VS Code version is in use).
+**What this file's `tools: ['editFiles']` list actually does, and doesn't,
+guarantee:** Copilot Chat (in VS Code or any other host) can propose
+invoking any tool made available to it, including a terminal/run-command
+tool — that is how Copilot Chat's agentic behavior has worked since near
+its own launch, organized today under what Copilot calls "tools." This
+file's declared `tools:` list restricts which tools are even offered to the
+model in THIS mode — a real, worthwhile restriction, worth keeping in sync
+with new VS Code tool names — but it is friction, not a sandbox: a host is
+free to ignore a chat-mode's declared list entirely (see below), and even
+where it's honored, a proposed run action's own confirmation step is itself
+a configurable IDE setting (VS Code documents `chat.tools.autoApprove` /
+`chat.tools.terminal.autoApprove` allow/deny lists, plus a sandboxed-terminal
+mode that auto-approves with no prompt at all — `code.visualstudio.com
+/docs/agents/run/approvals`). Never assert that this file makes running a
+script "impossible" — it doesn't, on its own, in any host.
 
-If you are updating this file for a newer VS Code/Copilot release: before
-adding ANY new entry to `tools:`, confirm it is not a terminal/command/task
-tool. This is the one line in this file that must never be edited casually
-— see Architect_Residual_Review_Session.md §4.4 for the full reasoning
-(agent-mode Copilot Chat CAN execute terminal commands and edit arbitrary
-files when granted permission — this file's whole safety claim rests on
-never granting that permission to this mode).
+**The one guarantee that actually holds, in every host, regardless of any
+IDE setting:** `apply.py` — the only code path that ever writes to
+`architecture.calm.json` from a Session Pack — is this repo's own Python
+code, not an IDE preference. It refuses to run without its own separate,
+explicit confirmation (a typed `apply` at an interactive prompt, or the
+explicit `--i-confirm-apply` flag for scripted use), regardless of what any
+chat client, host, or auto-approve setting already did upstream. A drafted
+`drafts/decisions/`/`drafts/overrides/` file is inert — it changes nothing —
+until that one, independent, this-repo-controlled step runs. State THIS as
+the safety guarantee, not this file's `tools:` list or any host's
+confirmation prompt.
 
-VERIFICATION STATUS (updated 2026-08-10, real architect pilot — see
-Architect_Pilot_Feedback_Notes.md Entries 9 and 16; the earlier version of
-this note said this had never been exercised live anywhere, which is now
-stale for both hosts tested):
+**What was actually observed in real pilots (real data, keep for the
+record, doesn't change the above):** `Architect_Pilot_Feedback_Notes.md`
+Entries 9 and 16, dated 2026-08-10 — a VS Code + GitHub Copilot Chat session
+that day had no code path from this file's declared tools to a terminal
+command; a Claude Code chat session that day had live `Bash` tool access
+despite the identical frontmatter. Both are consistent with the corrected
+framing above: a host MAY choose to honor a declared tool list, and even
+where it does, that was never the operative safety boundary — `apply.py`'s
+own gate was, and is, in both cases.
 
-- **VS Code + GitHub Copilot Chat: CONFIRMED — the safety claim is
-  structurally true here.** A real session wrote a Decision Record via its
-  `editFiles` tool, then stopped; the architect had to open the integrated
-  terminal and run `validate_drafts.py`/`apply.py` themselves. The chat
-  genuinely has no code path to a terminal command in this host — "can't",
-  not "won't".
-- **Claude Code chat: CONFIRMED FALSE — do not trust this claim in that
-  host.** A real session in Claude Code chat had live `Bash` tool access
-  despite this exact same `tools:` frontmatter, and used it (read-only
-  commands, in that particular session, but nothing in the frontmatter
-  prevented more). This chat-mode file's `tools:` allowlist is evidently a
-  VS-Code-Copilot-Chat-specific enforcement mechanism, not a universal one —
-  a different host is free to ignore it. **If you are using this chat mode
-  from Claude Code (or any host other than VS Code Copilot Chat), the only
-  real safety gate is that host's own per-action permission prompt: always
-  approve file writes individually, and NEVER grant a blanket "allow all
-  edits this session" — that removes the one thing actually protecting you.**
-- Live-model API cost/behavior for the Tier B drafting path: still
-  untested against a real key in this project's own dev environment (works
-  normally for a pilot operator with their own Copilot/API access).
+If you are updating this file for a newer VS Code/Copilot release: keep
+`tools:` free of terminal/command/task tool names as a matter of good
+hygiene (defense-in-depth is still worth having), but do not update the
+VERIFICATION STATUS section above to reassert a "can't" claim — it's
+deliberately written to not need re-verification, because it no longer
+depends on any one host's or version's behavior.
+
+Live-model API cost/behavior for the Tier B drafting path: still untested
+against a real key in this project's own dev environment (works normally
+for a pilot operator with their own Copilot/API access).
 -->
 
 # Weaver residual review
@@ -76,8 +87,11 @@ Never use workspace search. The `tools:` list above does not include
    `drafts/overrides/`.** Never write anywhere else in the repository.
 3. **Never run `apply.py`, `node dist/orchestration/run-slice.js`, or
    anything that invokes `override-applier.ts`** — applying is a human step,
-   outside this chat mode entirely (and, per this file's `tools:` list,
-   outside what this mode can technically do regardless of instruction).
+   outside this chat mode entirely. This rule matters regardless of whether
+   this host would technically let you: `apply.py` refuses to run without
+   its own separate, explicit human confirmation either way (see header
+   comment above), so obey this rule as an instruction — don't rely on
+   being unable to try.
 4. **Tier A items are the architect's decision.** Present the card's fixed
    options; do not pick one on the architect's behalf, do not editorialize
    toward an option, do not treat silence as an answer.
@@ -152,10 +166,11 @@ Never use workspace search. The `tools:` list above does not include
 - Never blend Copilot confidence into `x-aac-confidence` (pipeline-owned).
 - Clearing L2 / standing exams is not a goal of this session.
 
-## Extra-read (architect-run CLI — you cannot execute this)
+## Extra-read (architect-run CLI — do not run this yourself)
 
-This chat mode has **no terminal**. If pack evidence is short for a **named
-residual**, print **one** command and stop. Do not search the repo.
+Do not invoke `fetch-span` yourself even if this host would technically let
+you. If pack evidence is short for a **named residual**, print **one**
+command and stop. Do not search the repo.
 
 ```
 python3 tools/review-session/pack.py fetch-span \

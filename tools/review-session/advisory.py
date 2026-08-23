@@ -68,6 +68,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import urllib.request
 import uuid
@@ -130,12 +132,37 @@ def build_advisory_prompt(residual: dict, unit_index: dict, packs: dict) -> str:
     return json.dumps({"residual": residual, "unit_index": relevant_units, "evidence_snippets": relevant_evidence}, indent=2)
 
 
-def _call_llm(system_prompt: str, user_prompt: str, api_key: str, model: str = MODEL) -> str:
-    """The only network boundary in this file -- mirrors draft_tier_b.py's
-    _call_llm (same isolation reasoning: kept thin and swappable so the
-    real guardrail below is fully testable without ever calling a live
-    API). Never exercised in this environment (no ANTHROPIC_API_KEY) --
-    same honest disclosure as draft_tier_b.py's own module docstring."""
+def _llm_backend_available(api_key: str | None) -> bool:
+    """T-1 (AGENT_TASKS_Residual_Assist_Redesign.md): mirrors
+    draft_tier_b.py's own gating -- either the already-authenticated
+    `claude` CLI or a raw ANTHROPIC_API_KEY satisfies "no key -> no-op"."""
+    return bool(shutil.which("claude")) or bool(api_key)
+
+
+def _call_llm(system_prompt: str, user_prompt: str, api_key: str | None, model: str = MODEL) -> str:
+    """The only network/subprocess boundary in this file -- mirrors
+    draft_tier_b.py's own _call_llm (same isolation reasoning: kept thin
+    and swappable so the real guardrail below is fully testable without
+    ever calling a live backend). Prefers the `claude` CLI (already
+    authenticated, no separate secret) over a raw API key when both are
+    available -- see draft_tier_b.py's own _call_llm_via_claude_cli for the
+    real, observed `--output-format json` response shape this was built
+    against."""
+    if shutil.which("claude"):
+        result = subprocess.run(
+            [shutil.which("claude"), "-p", "--output-format", "json", "--model", model, "--system-prompt", system_prompt, user_prompt],
+            capture_output=True,
+            text=True,
+            timeout=240,  # T-1 real-run finding, draft_tier_b.py's own CLAUDE_CLI_TIMEOUT_SECONDS: a real call took 131.75s
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"claude CLI exited {result.returncode}: {result.stderr.strip()[:500]}")
+        payload = json.loads(result.stdout)
+        if payload.get("is_error"):
+            raise RuntimeError(f"claude CLI reported an error: {str(payload.get('result'))[:500]}")
+        return payload.get("result", "")
+    if not api_key:
+        raise RuntimeError("no LLM backend available (neither `claude` CLI nor ANTHROPIC_API_KEY)")
     body = json.dumps(
         {
             "model": model,
@@ -162,6 +189,32 @@ VALID_CALM_NODE_TYPES = {"service", "database", "topic"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
 
+_FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
+
+
+def _strip_markdown_json_fence(text: str) -> str:
+    """T-1 real-run findings (AGENT_TASKS_Residual_Assist_Redesign.md),
+    mirrors draft_tier_b.py's own fix for the same two rounds: (1) a bare
+    ```json ... ``` fence with nothing else, and (2) a second live call
+    that prefixed prose BEFORE the fence, which a leading-strip alone
+    didn't catch. Fixed by searching for a fenced block ANYWHERE in the
+    text first, falling back to the original leading/trailing-only strip,
+    then to the raw text unchanged -- never widens what counts as valid,
+    only what counts as "the JSON, extracted from around it.\""""
+    stripped = text.strip()
+    fenced = _FENCED_JSON_RE.search(stripped)
+    if fenced:
+        return fenced.group(1).strip()
+    if stripped.startswith("```"):
+        lines = stripped.split("\n")
+        if lines and lines[0].strip().lower() in ("```", "```json"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        stripped = "\n".join(lines).strip()
+    return stripped
+
+
 def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
     """Pure, fully testable without any network call -- the actual
     guardrail (hard rules 1-4 above), not the model's own good behavior,
@@ -173,7 +226,7 @@ def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
     never silently treated as advice, no matter how plausible-looking the
     response is (README S6: never fabricate, never guess)."""
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(_strip_markdown_json_fence(raw_text))
     except (json.JSONDecodeError, TypeError):
         return {"outcome": "invalid_response", "reason": "response was not valid JSON -- rejected, not guessed at"}
 
@@ -240,8 +293,8 @@ def _validate_catalogue_rule_candidate(candidate) -> str | None:
 
 
 def advise_for_residual(residual: dict, unit_index: dict, packs: dict, api_key: str | None) -> dict:
-    if not api_key:
-        return {"outcome": "no_key", "reason": "no ANTHROPIC_API_KEY set -- nothing advised"}
+    if not _llm_backend_available(api_key):
+        return {"outcome": "no_key", "reason": "no LLM backend available (neither `claude` CLI nor ANTHROPIC_API_KEY) -- nothing advised"}
     user_prompt = build_advisory_prompt(residual, unit_index, packs)
     raw = _call_llm(SYSTEM_PROMPT, user_prompt, api_key)
     return parse_and_validate_response(raw, residual)
@@ -378,9 +431,10 @@ def main() -> int:
     packs = json.loads((session_dir / "evidence" / "packs.json").read_text()) if (session_dir / "evidence" / "packs.json").exists() else {}
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        print(f"[advisory] no ANTHROPIC_API_KEY set -- would attempt to advise on {len(targets)} residual(s), writing nothing: {[r['id'] for r in targets]}")
+    if not _llm_backend_available(api_key):
+        print(f"[advisory] no LLM backend available (neither `claude` CLI nor ANTHROPIC_API_KEY) -- would attempt to advise on {len(targets)} residual(s), writing nothing: {[r['id'] for r in targets]}")
         return 0
+    print(f"[advisory] backend: {'claude CLI' if shutil.which('claude') else 'ANTHROPIC_API_KEY (direct)'}")
 
     updated_targets, episodes, candidates = process_advisory_batch(targets, unit_index, packs, api_key)
 

@@ -15,11 +15,16 @@ not optional) -> node dist/orchestration/run-slice.js --from-facts
 --overrides --out -> summarize into apply-report.md.
 
 S4 in practice: the bound chat-mode (.github/chatmodes/residual-review.chatmode.md)
-has no terminal tool at all, so it structurally cannot reach this script.
-A human running this directly from a real terminal (a TTY) still gets an
-explicit interactive confirmation prompt; a non-interactive invocation
-(no TTY, e.g. from some other script) is refused unless --i-confirm-apply
-is passed explicitly — this tool never auto-confirms either way.
+is instructed never to invoke this script, and its declared tools: list
+excludes terminal tools as additional friction — but neither is this
+script's own real guarantee (a chat host, or a user's IDE auto-approve
+settings, could still get a run proposed and approved upstream). THIS
+script is the actual backstop: a human running it directly from a real
+terminal (a TTY) still gets its own explicit interactive confirmation
+prompt; a non-interactive invocation (no TTY, e.g. from some other script,
+including a chat client that did get through) is refused unless
+--i-confirm-apply is passed explicitly — this tool never auto-confirms
+either way, regardless of what ran it.
 """
 
 from __future__ import annotations

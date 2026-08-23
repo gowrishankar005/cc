@@ -276,9 +276,14 @@ class TestNoKeyCliPath(unittest.TestCase):
     def test_no_key_writes_nothing_and_exits_zero(self):
         env = dict(os.environ)
         env.pop("ANTHROPIC_API_KEY", None)
+        # T-1 (AGENT_TASKS_Residual_Assist_Redesign.md): neutralize PATH so
+        # this proves "no backend at all," not "no API key, but `claude`
+        # happens to be on this machine's PATH" -- deterministic regardless
+        # of the environment this test runs in.
+        env["PATH"] = ""
         run = subprocess.run([sys.executable, str(TOOLS_DIR / "advisory.py"), "--session-dir", str(self.session_dir)], capture_output=True, text=True, env=env)
         self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertIn("no ANTHROPIC_API_KEY set", run.stdout)
+        self.assertIn("no LLM backend available", run.stdout)
         self.assertIn("R-999-synthetic", run.stdout)
         residuals_after = json.loads((self.session_dir / "residuals.json").read_text())
         self.assertNotIn("advisory", residuals_after["items"][0], "no-key path must never attach advisory")
@@ -297,6 +302,12 @@ class TestNoKeyCliPath(unittest.TestCase):
         (self.session_dir / "residuals.json").write_text(json.dumps({"generatedAt": "x", "items": [dict(RESIDUAL, id="R-999-synthetic"), residual2]}))
         env = dict(os.environ)
         env.pop("ANTHROPIC_API_KEY", None)
+        # This test is about --residual filtering reaching the no-key path
+        # for the right id, not about exercising a live backend -- strip
+        # PATH so it stays deterministic regardless of what's installed
+        # on the machine running it (T-1, same reasoning as the no-key test
+        # above).
+        env["PATH"] = ""
         run = subprocess.run([sys.executable, str(TOOLS_DIR / "advisory.py"), "--session-dir", str(self.session_dir), "--residual", "R-999-synthetic"], capture_output=True, text=True, env=env)
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("R-999-synthetic", run.stdout)

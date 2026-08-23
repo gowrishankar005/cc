@@ -277,9 +277,15 @@ class TestNoKeyCliPath(unittest.TestCase):
     def test_no_key_writes_nothing_and_exits_zero(self):
         env = dict(os.environ)
         env.pop("ANTHROPIC_API_KEY", None)
+        # T-1 (AGENT_TASKS_Residual_Assist_Redesign.md): this test must prove
+        # the "no backend at all" path, not "no API key, but a `claude` CLI
+        # happens to be on this machine's PATH" -- neutralize PATH so
+        # shutil.which("claude") is deterministically None regardless of the
+        # environment this test happens to run in.
+        env["PATH"] = ""
         run = subprocess.run([sys.executable, str(TOOLS_DIR / "draft_tier_b.py"), "--session-dir", str(self.session_dir)], capture_output=True, text=True, env=env)
         self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertIn("no ANTHROPIC_API_KEY set", run.stdout)
+        self.assertIn("no LLM backend available", run.stdout)
         self.assertIn("R-999-synthetic", run.stdout)
         self.assertEqual(list((self.session_dir / "drafts" / "decisions").glob("*.json")), [])
         self.assertEqual(list((self.session_dir / "drafts" / "overrides").glob("*.json")), [])

@@ -1,7 +1,11 @@
-"""Safety-critical: a static, checkable proof that the chat-mode
+"""Defense-in-depth check: a static, checkable proof that the chat-mode
 file's own tools: allowlist excludes every terminal/command/task-execution
-tool name — the real enforcement mechanism S4 depends on, not just the
-prose instructions in the file's body.
+tool name. This is worthwhile friction, not S4's real enforcement mechanism
+— that's apply.py's own independent, explicit confirmation gate (see the
+chatmode file's own header comment), which holds regardless of whether a
+given host honors this allowlist or a user's IDE settings auto-approve tool
+calls. Never present a passing run of this test as proof that a chat session
+"can't" run a script.
 
 Honest limit, stated in the chatmode file's own header too: this cannot
 verify LIVE Copilot Chat behavior (no VS Code/Copilot environment exists in

@@ -326,7 +326,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "(a real terminal prompt, or `--i-confirm-apply`). Nothing here is auto-applied, ever.",
         "- Reply to a card with its option key (e.g. `1`) or `other: <rationale>`.",
         "- If a card says evidence is short, Copilot prints a `pack.py fetch-span` command. "
-        "**You** run it (Copilot has no terminal). Then continue the chat. "
+        "**You** run it — the chat mode is instructed never to run it itself. Then continue the chat. "
         f"Session cap: {FETCH_SPAN_SESSION_MAX_CALLS} extra-reads / {FETCH_SPAN_SESSION_MAX_LINES} extra lines.",
         "- Ranked backlog: `python3 tools/review-session/queue_rank.py --session-dir <this pack>` (T-RT-2). "
         "Similar residuals can be bulk-applied with `bulk_apply.py` (T-RT-1) — still one Decision Record each.",
@@ -370,9 +370,9 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
 def _render_agents_md() -> str:
     return (
         "# Bound agent playbook for this Session Pack\n\n"
-        "This is the per-pack copy of the rules already enforced repo-wide by "
-        "`.github/chatmodes/residual-review.chatmode.md` — read that file's "
-        "`tools:` frontmatter for how autonomous apply is structurally prevented, not just instructed against.\n\n"
+        "This is the per-pack copy of the rules already stated repo-wide by "
+        "`.github/chatmodes/residual-review.chatmode.md` — read that file's header comment for the real "
+        "safety guarantee: apply.py's own explicit confirmation gate, not this file's tools: list.\n\n"
         "**Mode: Guided (v1's only mode — design §5)** — ask all Tier A items as choice cards; "
         "Tier B may be drafted in-chat (editFiles, per the chat-mode's own §5.1 hard rules) and is always shown as "
         "Accept / Reject / Edit rationale, never auto-accepted; the architect approves every apply.\n\n"
@@ -393,7 +393,7 @@ def _render_agents_md() -> str:
 
 
 def fetch_span_main(argv: list[str]) -> int:
-    """Architect-run extra-read. Copilot prints the command; it cannot execute it."""
+    """Architect-run extra-read. The chat mode is instructed to print the command, not run it."""
     parser = argparse.ArgumentParser(
         prog="pack.py fetch-span",
         description="Append a bounded, redacted source span to an existing Session Pack (HITL extra-read). Copilot must not run this.",
