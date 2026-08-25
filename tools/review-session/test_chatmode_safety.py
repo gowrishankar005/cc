@@ -21,7 +21,7 @@ import re
 import unittest
 from pathlib import Path
 
-CHATMODE_PATH = Path(__file__).resolve().parents[2] / ".github" / "chatmodes" / "residual-review.chatmode.md"
+CHATMODE_PATH = Path(__file__).resolve().parents[2] / ".github" / "agents" / "residual-review.agent.md"
 
 # Best-effort, not asserted exhaustive (see module docstring) — every
 # terminal/command/task-execution tool name known at the time this was

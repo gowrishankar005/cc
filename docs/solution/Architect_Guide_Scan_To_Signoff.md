@@ -94,12 +94,12 @@ If a pack for this run already exists with unapplied drafts, this refuses to ove
 
 ## Step 3 — Work the pack
 
-The chat mode lives at `.github/chatmodes/residual-review.chatmode.md` — it's a real file checked into this repo, not something to fetch separately. It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
+The custom agent lives at `.github/agents/residual-review.agent.md` — it's a real file checked into this repo, not something to fetch separately. (If you're on an older Copilot Chat that still expects `.github/chatmodes/*.chatmode.md`, this file won't be picked up from its current location — see your Copilot Chat version, or ask about migrating back, if the agent picker comes up empty.) It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
 
 **VS Code + GitHub Copilot Chat (the primary, intended path).**
 1. Open this repo as a workspace in VS Code (the desktop app, not the terminal).
-2. Open the Copilot Chat panel and find its chat-mode picker (usually a dropdown near the chat input).
-3. Select the mode matching this file's `description` frontmatter ("Weaver residual review session...").
+2. Open the Copilot Chat panel and find its agent picker — a dropdown near the chat input (or type `/agents` in the chat box to open it directly).
+3. Select **"Weaver residual review session"** (this file's own `name:`/`description:` frontmatter).
 4. Point it at your pack, e.g.: `Read review-sessions/<run-id>/SESSION.md and start the residual review.`
 5. No `ANTHROPIC_API_KEY` or any other secret to set up — Copilot Chat uses whatever model your own Copilot subscription already provides.
 

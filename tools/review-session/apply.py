@@ -14,7 +14,7 @@ own split-directory layout doesn't match that, so this merge is required,
 not optional) -> node dist/orchestration/run-slice.js --from-facts
 --overrides --out -> summarize into apply-report.md.
 
-S4 in practice: the bound chat-mode (.github/chatmodes/residual-review.chatmode.md)
+S4 in practice: the bound chat-mode (.github/agents/residual-review.agent.md)
 is instructed never to invoke this script, and its declared tools: list
 excludes terminal tools as additional friction — but neither is this
 script's own real guarantee (a chat host, or a user's IDE auto-approve

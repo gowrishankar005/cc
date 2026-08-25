@@ -18,7 +18,7 @@ not a raw `ANTHROPIC_API_KEY` from the environment.** This project's own
 target-customer profile (fintechs) doesn't leave API keys in environment
 variables for an LLM to pick up; the realistic path is an already-
 authenticated coding-assistant CLI (`claude`, or the in-chat Copilot path
-this same drafting logic is bound to via `.github/chatmodes/`), never a
+this same drafting logic is bound to via `.github/agents/`), never a
 bare secret. No `claude` CLI on `PATH` -> for every Tier B residual found,
 prints what would be attempted and writes nothing (matches
 suggest-rules.ts's own established convention in this codebase for "LLM

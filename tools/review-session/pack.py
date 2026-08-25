@@ -334,7 +334,7 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "Cross-package backbone on this run is **CodeGraph** (not Graphify).",
         "2. `pack.py` built this Session Pack from that scan's out-dir — the step you just did.",
         "3. Open this pack in VS Code and start a chat using the `residual-review` chat mode "
-        "(`.github/chatmodes/residual-review.chatmode.md`) — or, if that chat mode's tools are disabled by "
+        "(`.github/agents/residual-review.agent.md`) — or, if that chat mode's tools are disabled by "
         "your org's Copilot policy, just read this file and `residuals.json` directly (the degraded path — see below).",
         "4. The agenda below is already split into Tier A (you decide), Tier B (the chat agent may draft "
         "in-conversation, per its own bound rules), and Tier C (never invented, document or leave open).",
@@ -404,7 +404,7 @@ def _render_agents_md() -> str:
     return (
         "# Bound agent playbook for this Session Pack\n\n"
         "This is the per-pack copy of the rules already stated repo-wide by "
-        "`.github/chatmodes/residual-review.chatmode.md` — read that file's header comment for the real "
+        "`.github/agents/residual-review.agent.md` — read that file's header comment for the real "
         "safety guarantee: apply.py's own explicit confirmation gate, not this file's tools: list.\n\n"
         "**Mode: Guided (v1's only mode — design §5)** — ask all Tier A items as choice cards; "
         "Tier B may be drafted in-chat (editFiles, per the chat-mode's own §5.1 hard rules) and is always shown as "

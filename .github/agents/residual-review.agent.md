@@ -1,4 +1,5 @@
 ---
+name: 'Weaver residual review session'
 description: 'Weaver residual review session — reads one Session Pack, presents choice cards, drafts under drafts/ only. Never applies.'
 tools: ['editFiles']
 ---
