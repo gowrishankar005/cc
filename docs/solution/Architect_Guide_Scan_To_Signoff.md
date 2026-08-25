@@ -62,6 +62,14 @@ This produces the raw materials in `<out-dir>`: `typed-facts.json`, `coverage-re
 
 **What to look at before moving on:** `<out-dir>/coverage-report.json`'s `silenceFlags`. If it includes `S1`, the scan genuinely didn't recover part of the architecture's shape for this repo — that's real information you'll want in hand before promising a stakeholder "this is the architecture," not something the next steps quietly paper over.
 
+**Optional, only if `S1` shows up on a real Java/Spring repo: CodeQL DI-resolution.** CodeGraph (the default scanner) can miss a real dependency wired through a Spring `@Bean`-factory method or disambiguated by a stereotype annotation — CodeQL can see both, at real cost (a full compile + database build, minutes not seconds). Simplest way in:
+
+```bash
+node pipeline/dist/orchestration/run-slice.js <package-root> --out <out-dir> --auto-codeql
+```
+
+This detects your `build.gradle`/`pom.xml` and derives the right build command itself (including the two known Gradle gotchas — a stale daemon, a missing `--no-daemon` — that would otherwise silently produce zero bindings). **Before you use this, read the license note**: the free CodeQL CLI license only permits automated use against an Open Source Codebase, or under a paid GitHub Advanced Security license — this pipeline can't verify which applies to you, so `--auto-codeql` is a conscious opt-in, never on by default. If you're running this repeatedly, set `WEAVER_CODEQL_LICENSE_CONFIRMED=1` once in your shell profile instead of typing the flag every time — same effect, same license attestation. Full detail (hand-writing `--codeql-source-root`/`--codeql-build-command` yourself, the Gradle-daemon failure mode, what "silently zero bindings" looks like) is in `README.md`'s own CodeQL section — this is the fast path, that's the reference.
+
 ## Step 2 — Build your Session Pack
 
 ```bash
