@@ -99,7 +99,7 @@ The custom agent lives at `.github/agents/residual-review.agent.md` — it's a r
 **VS Code + GitHub Copilot Chat (the primary, intended path).**
 1. Open this repo as a workspace in VS Code (the desktop app, not the terminal).
 2. Open the Copilot Chat panel and find its agent picker — a dropdown near the chat input (or type `/agents` in the chat box to open it directly).
-3. Select **"Weaver residual review session"** (this file's own `name:`/`description:` frontmatter).
+3. Select **"CALM File reviewer"** (this file's own `name:` frontmatter).
 4. Point it at your pack, e.g.: `Read review-sessions/<run-id>/SESSION.md and start the residual review.`
 5. No `ANTHROPIC_API_KEY` or any other secret to set up — Copilot Chat uses whatever model your own Copilot subscription already provides.
 

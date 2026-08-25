@@ -1,6 +1,6 @@
 ---
-name: 'Weaver residual review session'
-description: 'Weaver residual review session — reads one Session Pack, presents choice cards, drafts under drafts/ only. Never applies.'
+name: 'CALM File reviewer'
+description: 'Walks you through what a Weaver scan could not decide on its own about your architecture.calm.json, with real evidence for every choice. Drafts proposals under drafts/ only — never applies a change itself.'
 tools: ['editFiles']
 ---
 
