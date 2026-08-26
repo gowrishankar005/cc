@@ -103,6 +103,20 @@ The custom agent lives at `.github/agents/residual-review.agent.md` — it's a r
 4. Point it at your pack, e.g.: `Read review-sessions/<run-id>/SESSION.md and start the residual review.`
 5. No `ANTHROPIC_API_KEY` or any other secret to set up — Copilot Chat uses whatever model your own Copilot subscription already provides.
 
+**How to actually decide a Tier A card — a real question, not a formality.** A pack with 20+ Tier A cards is normal on a real multi-service repo, and "you decide" isn't much help on its own. What actually works:
+- **Read the evidence blockquote, and only the evidence blockquote.** That's the whole point of a choice card — the answer is either supported by what's shown, or it isn't. Don't reach for "what a Spring Boot app like this usually does," even if you're confident — if the evidence doesn't show it, it doesn't count, no matter how experienced you are with the framework.
+- **Evidence too short to be sure? Ask for more before deciding**, don't fill the gap from memory. The chat prints a `pack.py fetch-span` command for exactly this (see below) — run it, then keep reading.
+- **`--with-dossier`'s explanation (if you built the pack with it) is a second opinion, not a second vote.** It's a legitimate aid for reading the evidence faster, not a replacement for you actually deciding — and it's never treated as independent corroboration of anything.
+- **"Leave open" is a complete, correct answer, not a cop-out.** This system is built so you never have to force a confident answer you don't actually have — it was the single most common real answer across two prior pilot sessions. If the evidence genuinely doesn't tell you, say so and move on.
+- **For a big batch, don't decide every card independently from scratch.** Once you've answered one for real and its card's "Similar residuals this session" note lists others, replicate that exact decision across them — still one real Decision Record per residual, never a blanket record:
+  ```bash
+  python3 tools/review-session/bulk_apply.py --session-dir review-sessions/<run-id> --anchor <the-residual-id-you-just-answered> --i-confirm-bulk-apply
+  ```
+  Want to work highest-impact-first instead of top-to-bottom through 20+ cards? Rank the backlog by real consequence signals first:
+  ```bash
+  python3 tools/review-session/queue_rank.py --session-dir review-sessions/<run-id>
+  ```
+
 **The real safety guarantee, wherever you run the chat mode (VS Code, Claude Code, or any other host) — read this, not folklore about what a given host "can't" do:** Copilot Chat can propose invoking any tool available to it in any host, including a terminal command — that's normal agentic behavior, not a bug, and it is *not* something this chat-mode file's declared `tools:` list can categorically prevent (a host is free to ignore that list, and even where it's honored, the per-action confirmation prompt that would gate a run is itself a configurable IDE setting someone could turn off). **The one thing that actually holds, in every host, no exceptions**: `apply.py` — the only code path that ever writes to `architecture.calm.json` — is this repo's own code, not an IDE preference, and it refuses to run without its own separate, explicit confirmation (Step 5), regardless of what the chat client did upstream. A drafted file under `drafts/` is inert until you run Step 5 yourself. Treat that as the guarantee — not "this host can't run scripts."
 
 **Practical guidance while you're in the chat, any host:** always approve file writes individually, and never grant a blanket "allow all edits this session" permission — that's needless exposure, not a required convenience, given Step 5 is the real gate either way.
