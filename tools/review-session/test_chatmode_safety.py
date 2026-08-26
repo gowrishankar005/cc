@@ -78,7 +78,7 @@ class TestChatModeSafety(unittest.TestCase):
     def test_tier_b_in_chat_drafting_rules_present(self):
         """The chat mode is the PRIMARY Tier B drafting path (editFiles
         writes drafts/ directly, in-conversation) — draft_tier_b.py is a
-        secondary, headless alternative. This checks the real §5.1 hard
+        secondary, headless alternative. This checks the real §6.1 hard
         rules the in-chat path must follow are actually spelled out here,
         not just asserted in prose elsewhere."""
         for marker in ("llm-advisory:", "cannot_decide", "drafts/decisions", "drafts/overrides", "Accept / Reject / Edit"):
@@ -107,6 +107,22 @@ class TestChatModeSafety(unittest.TestCase):
     def test_discovery_parity_markers_present(self):
         for marker in ("cannot_decide", "typical Spring", "VALID_OVERRIDE_TYPES"):
             self.assertIn(marker, self.text, f"expected discovery-parity marker {marker!r}")
+
+    def test_one_residual_at_a_time_rule_present(self):
+        """Entry 24, Architect_Pilot_Feedback_Notes.md: real, live failure --
+        asked to "start the review," the model silently decided all 23
+        residuals itself in a single reply (e.g. "R-001: 1 -- Reason: ..."),
+        never presenting a single card, option, or evidence line, and
+        reported the batch as if it were the outcome. A direct violation of
+        "do not pick one on the architect's behalf" that the earlier hard
+        rule 4 wording didn't structurally prevent, because nothing told the
+        model to stop after one card and wait. Pins the new explicit rule."""
+        for marker in (
+            "Process residuals ONE AT A TIME",
+            "then STOP",
+            "is never permission to work through the queue",
+        ):
+            self.assertIn(marker, self.text, f"expected one-at-a-time marker {marker!r} (Entry 24)")
 
     def test_recommendation_is_never_authored_live_by_the_chat_model(self):
         """Entry 23, Architect_Pilot_Feedback_Notes.md: two earlier attempts

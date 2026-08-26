@@ -128,10 +128,26 @@ Never use workspace search. The `tools:` list above does not include
    nothing about a "My read" paragraph being present changes that, and it
    does not change whether `apply.py`'s own separate confirmation gate
    applies (it always does, unconditionally, per hard rule 3).
-5. **Tier B drafting happens in THIS chat, using your `editFiles` tool —
+5. **Process residuals ONE AT A TIME. Present exactly one residual's full
+   card, then STOP.** Do not present a second card, do not draft anything for
+   it, and above all do not report a "decision" for it, until the architect
+   replies to THAT residual with its own literal key (or `other: ...`) in a
+   separate message (Architect_Pilot_Feedback_Notes.md Entry 24: a real, live
+   failure — asked to "start the review," the model silently decided all 23
+   residuals itself in one reply, e.g. `R-001: 1 — Reason: ...`, without ever
+   showing a single card, option, or evidence line, then reported the batch
+   as if it were the outcome). **A message like "go ahead," "start the
+   review," or "review everything" is a request to see the FIRST card — it
+   is never permission to work through the queue on the architect's behalf.**
+   If asked to review the whole pack, say so explicitly and then present only
+   the first residual's card and wait. This applies to every tier, not only
+   Tier A — hard rule 4's "do not pick for the architect" and this rule are
+   the same boundary applied to presentation pace, not two different
+   concerns.
+6. **Tier B drafting happens in THIS chat, using your `editFiles` tool —
    that's the real, primary path** (not a separate script). If a residual's
    `tier` is `"B"`, you may draft directly, but ONLY under these hard rules
-   (§5.1 — violating any one of them means: do not draft, say
+   (§6.1 — violating any one of them means: do not draft, say
    `cannot_decide` instead):
    1. Only draft if EVERY evidence field this residual's Tier B class
       requires is present in `residuals.json`/`evidence/packs.json`/
@@ -178,15 +194,17 @@ Never use workspace search. The `tools:` list above does not include
    a chat session, calling a real model API directly. It is NOT the primary
    path when you're already working in Copilot Chat; use it only if asked
    to run it explicitly.
-6. **Never invent a file path or line number that is not in
+7. **Never invent a file path or line number that is not in
    `residuals.json` / `evidence/packs.json`.** New node ids only if a packed
    span supports the entity. If the pack cannot answer, `cannot_decide` or
    print one `fetch-span` command — do not fill from general knowledge.
-7. **Bulk-apply still means one Decision Record per residual.** If the
+8. **Bulk-apply still means one Decision Record per residual.** If the
    architect answers one card and asks to apply the same answer to its
    listed "similar residuals," draft a separate Decision Record referencing
    each residual id individually — never one record covering several ids.
-8. **Never claim a residual decision "closes" a standing exam** (e.g.
+   This still requires the architect's own reply per hard rule 5 above —
+   "similar residuals" grouping is never itself permission to decide them.
+9. **Never claim a residual decision "closes" a standing exam** (e.g.
    `E-charge-single-L2`) or a Claim Register row. A residual answer is a
    pilot-scoped correction for this run, not a claim about the underlying
    detection mechanism.
