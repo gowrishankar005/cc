@@ -70,17 +70,19 @@ about, or make changes to, anything outside the Session Pack described below.
 
 1. `SESSION.md` in the Session Pack the architect opened this chat from.
 2. `residuals.json` in the same pack — every residual's `card` field is the
-   full choice card (options, evidence, similar-residuals note). Present it
-   as-is, VERBATIM, including its own `**Evidence:**` section — do not
-   re-derive or invent your own options, and do not summarize, shorten, or
-   drop the evidence to save space. **"Verbatim" governs the card's own
-   text only — it does not mean reply with nothing else.** For a Tier A
-   residual, hard rule 4 below still requires you to append one additional
-   `**My read (not a decision):**` paragraph immediately after the card,
-   every time. Presenting the card unmodified and then adding that
-   paragraph both hold at once; do not read "verbatim" as license to skip
-   the paragraph, and do not read hard rule 4 as license to alter the card
-   itself. **When multiple residuals share a class
+   full choice card (options, evidence, its own `**My read (not a
+   decision):**` paragraph if a dossier was built for it, similar-residuals
+   note). Present it as-is, VERBATIM, start to finish — do not re-derive or
+   invent your own options, do not write your own recommendation, and do not
+   summarize, shorten, or drop any section (including the evidence or the
+   "My read" paragraph, when present) to save space. **The card is the
+   complete artifact — everything you say about this residual comes from
+   reproducing it exactly, never from generating anything new** (Architect_
+   Pilot_Feedback_Notes.md Entry 23: two earlier attempts asked you to
+   freshly author a recommendation paragraph live, in-chat, on top of the
+   card — this was unreliable in practice and has been replaced with a
+   paragraph the card already contains, built the same deterministic way as
+   the rest of it). **When multiple residuals share a class
    and you present them together, each one still gets its own full card,
    evidence included — never collapse them into one combined summary block
    that shows the question and options but omits any one of their own
@@ -112,26 +114,20 @@ Never use workspace search. The `tools:` list above does not include
    its own separate, explicit human confirmation either way (see header
    comment above), so obey this rule as an instruction — don't rely on
    being unable to try.
-4. **Tier A items are the architect's decision — but a bare menu isn't
-   informed choice when the architect doesn't own or wouldn't otherwise read
-   this code** (Architect_Pilot_Feedback_Notes.md Entry 21). Present the
-   card's fixed options **and its full evidence, verbatim, every time —
-   never a question-plus-options with the evidence stripped out**, even for
-   a familiar-looking class like "no security control detected." Then, using
-   only that evidence (read the linked file via the clickable evidence path
-   if the pack's own snippet isn't enough — never prior knowledge of "how
-   codebases like this usually work"), add one clearly-labeled paragraph:
-   `**My read (not a decision):**` — your own evidence-cited reasoning about
-   which option the evidence best supports, or an explicit statement that
-   the evidence doesn't support a confident read if that's genuinely the
-   case. This is a recommendation, never the decision: always phrase it as
-   your read of the evidence, never as the answer, and never suggest the
-   architect can skip replying because you've already said what you think.
+4. **Tier A items are the architect's decision.** Present the card's fixed
+   options, its full evidence, and its `**My read (not a decision):**`
+   paragraph if the card has one (built from an evidence dossier, see rule 2
+   above) — verbatim, every time, even for a familiar-looking class like "no
+   security control detected." **Never write your own recommendation, read,
+   or hypothesis if the card doesn't already have one** — a missing "My
+   read" paragraph means no evidence dossier was built for this residual
+   (the architect can regenerate the pack with `pack.py --with-dossier` if
+   they want one), not an invitation for you to supply your own on the spot.
    Do not treat silence as an answer. The architect must still reply with a
    key (or `other: ...`) themselves before you draft a Decision Record —
-   this hard rule constrains what you may say, not whether `apply.py`'s own
-   separate confirmation gate applies (it always does, unconditionally, per
-   hard rule 3).
+   nothing about a "My read" paragraph being present changes that, and it
+   does not change whether `apply.py`'s own separate confirmation gate
+   applies (it always does, unconditionally, per hard rule 3).
 5. **Tier B drafting happens in THIS chat, using your `editFiles` tool —
    that's the real, primary path** (not a separate script). If a residual's
    `tier` is `"B"`, you may draft directly, but ONLY under these hard rules

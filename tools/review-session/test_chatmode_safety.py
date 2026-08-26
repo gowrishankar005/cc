@@ -108,30 +108,23 @@ class TestChatModeSafety(unittest.TestCase):
         for marker in ("cannot_decide", "typical Spring", "VALID_OVERRIDE_TYPES"):
             self.assertIn(marker, self.text, f"expected discovery-parity marker {marker!r}")
 
-    def test_verbatim_does_not_suppress_the_recommendation_paragraph(self):
-        """Entry 22, Architect_Pilot_Feedback_Notes.md: real, live reproduction
-        against the Bank of Anthos pack -- Entry 21's "My read (not a
-        decision):" paragraph never appeared, in a fresh chat session (ruling
-        out staleness). Root cause: rule 2's forceful, first-read "VERBATIM...
-        do not re-derive or invent" instruction (written for Entry 18) has no
-        carve-out saying an appended paragraph after the card is still
-        compatible with "verbatim" -- a model can plausibly read the two
-        rules as contradictory and drop the addition to stay safely inside
-        "verbatim." Pins the reconciling language so this can't regress."""
-        for marker in ("does not mean reply with nothing else", "both hold at once"):
-            self.assertIn(marker, self.text, f"expected verbatim/recommendation reconciliation marker {marker!r} (Entry 22)")
-
-    def test_tier_a_recommendation_rule_present_and_bounded(self):
-        """Entry 21, Architect_Pilot_Feedback_Notes.md: the architect asked
-        for the LLM to actually recommend an answer for Tier A residuals
-        (not just present a bare menu), since they often don't own or
-        wouldn't otherwise read the code being reviewed. Hard Rule 4 was
-        changed to require a labeled, evidence-cited recommendation --
-        but this must stay bounded: never the decision itself, never a
-        license to skip the architect's own reply, and apply.py's separate
-        confirmation gate must still be stated as unconditional."""
-        for marker in ("My read (not a decision)", "Do not treat silence as an answer", "separate confirmation gate applies (it always does"):
-            self.assertIn(marker, self.text, f"expected Tier A recommendation marker {marker!r} (Entry 21)")
+    def test_recommendation_is_never_authored_live_by_the_chat_model(self):
+        """Entry 23, Architect_Pilot_Feedback_Notes.md: two earlier attempts
+        (Entries 21/22) asked the live chat model to author its own "My read
+        (not a decision):" paragraph in-chat, on top of the card. Both failed
+        in real, live reproduction (the paragraph never appeared, even in a
+        fresh session) -- per this repo's own "two failed fix attempts is a
+        stop signal" rule, the mechanism was re-derived rather than patched a
+        third time: the paragraph is now rendered deterministically into the
+        card itself by cards.py from a validated dossier.py response, and the
+        chat model's only job is to reproduce it verbatim like every other
+        card section. This pins that the instruction file no longer asks the
+        model to freshly author a recommendation, and instead explicitly
+        forbids it from supplying one when the card doesn't have one."""
+        self.assertIn("My read (not a decision)", self.text)
+        self.assertIn("Never write your own recommendation, read", self.text)
+        self.assertIn("Do not treat silence as an answer", self.text)
+        self.assertIn("does not change whether `apply.py`'s own separate confirmation gate", self.text)
 
     def test_verbatim_evidence_anti_compaction_rule_present(self):
         """Entry 18, Architect_Pilot_Feedback_Notes.md: a real, reproduced-

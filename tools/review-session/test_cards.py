@@ -178,6 +178,40 @@ class TestCardDeterminism(unittest.TestCase):
         card = render_card_markdown(residual, {}, packs, [], context_lines=5)
         self.assertIn("REAL_MATCH_HERE", card)
 
+    def test_dossier_paragraph_rendered_verbatim_from_residual_when_present(self):
+        """Entry 23, Architect_Pilot_Feedback_Notes.md: the "My read (not a
+        decision):" paragraph must come from residual["dossier"] (dossier.py's
+        own validated {explanation, hypotheses, evidenceRefsUsed} shape),
+        deterministically -- never generated live by whatever chat model
+        later reads the card."""
+        residual = {
+            "id": "R-001",
+            "tier": "A",
+            "class": "security-authority-policy",
+            "unitIds": [],
+            "rationale": "r",
+            "dossier": {
+                "explanation": "This controller has HTTP entry points but no visible auth annotation in the shown evidence.",
+                "hypotheses": ["Auth may be enforced upstream (gateway/mesh), not in this class."],
+                "evidenceRefsUsed": ["Foo.java:10"],
+            },
+        }
+        card = render_card_markdown(residual, {}, {}, [])
+        self.assertIn("**My read (not a decision):** This controller has HTTP entry points", card)
+        self.assertIn("Auth may be enforced upstream", card)
+        self.assertIn("Foo.java:10", card)
+
+    def test_dossier_paragraph_states_none_available_when_absent_not_a_blank_gap(self):
+        """No dossier field (no --with-dossier, or no LLM backend at
+        pack-build time) must render an explicit "none available" line --
+        never a blank gap that invites the reading chat model to fill it in
+        with its own live-authored recommendation (the exact failure mode
+        Entries 21/22 found live)."""
+        residual = {"id": "R-001", "tier": "A", "class": "security-authority-policy", "unitIds": [], "rationale": "r"}
+        card = render_card_markdown(residual, {}, {}, [])
+        self.assertIn("**My read (not a decision):** no evidence dossier available", card)
+        self.assertIn("--with-dossier", card)
+
     def test_bulk_apply_note_says_one_dr_per_residual(self):
         residuals = [
             {"id": "R-001", "tier": "A", "class": "security-authority-policy", "unitIds": ["a.py"], "rationale": "r"},

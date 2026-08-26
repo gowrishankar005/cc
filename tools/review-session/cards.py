@@ -166,7 +166,21 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
     (which is only relative to whichever package root produced it, not to
     the workspace root an architect has open). Optional and defaulted so
     every existing caller/test that only ever passed a bare ref->snippet
-    dict keeps working unchanged."""
+    dict keeps working unchanged.
+
+    Architect_Pilot_Feedback_Notes.md Entry 23: the "My read (not a
+    decision):" recommendation paragraph is rendered HERE, deterministically,
+    from residual["dossier"] (dossier.py's own validated {explanation,
+    hypotheses, evidenceRefsUsed} shape, attached by pack.py's
+    _run_dossier_pass BEFORE cards are built when --with-dossier is set) --
+    it is never left to the live chat model to author on demand. Two real,
+    live-reproduced attempts (Entries 21/22) showed that asking the ambient
+    chat model to freshly generate a grounded paragraph on every card is
+    unreliable, the same class of problem dossier.py's own structured-
+    response validation exists to avoid for exactly this reason. When no
+    dossier is present (no --with-dossier, or no LLM backend at pack-build
+    time), the card says so plainly instead of asking the chat model to
+    invent one."""
     options = build_options(residual, unit_index)
     lines = [
         f"### {residual['id']} (Tier {residual['tier']}: {residual['class']})",
@@ -187,11 +201,32 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
         lines.append("**Evidence:** none captured for this residual's unit(s) in this pack.")
     lines.append("")
 
+    lines.append(_dossier_block(residual.get("dossier")))
+    lines.append("")
+
     if similar_ids:
         lines.append(f"**Similar residuals this session:** {', '.join(similar_ids)} (same class — you may answer once and apply to all, but each still gets its own Decision Record, S9)")
     else:
         lines.append("**Similar residuals this session:** none yet")
     lines.append("")
+    return "\n".join(lines)
+
+
+def _dossier_block(dossier: dict | None) -> str:
+    """Renders dossier.py's own validated {explanation, hypotheses,
+    evidenceRefsUsed} shape as the card's "My read (not a decision):"
+    paragraph (Entry 23) -- deterministic reproduction of an already-
+    validated LLM response, never live authoring by whatever chat model is
+    reading this card. No dossier -> say so plainly; never a blank gap that
+    invites the reading model to fill it in on its own."""
+    if not dossier or not dossier.get("explanation"):
+        return "**My read (not a decision):** no evidence dossier available for this residual (run `pack.py --with-dossier` to generate one) — this is not a recommendation, decide from the evidence above."
+    lines = [f"**My read (not a decision):** {dossier['explanation']}"]
+    for h in dossier.get("hypotheses") or []:
+        lines.append(f"- {h}")
+    used = dossier.get("evidenceRefsUsed") or []
+    if used:
+        lines.append(f"  _(based on: {', '.join(used)})_")
     return "\n".join(lines)
 
 
