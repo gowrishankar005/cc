@@ -151,13 +151,22 @@ def build_options(residual: dict, unit_index: dict) -> list[dict]:
     return options
 
 
-def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict, similar_ids: list[str], context_lines: int = 15) -> str:
+def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict, similar_ids: list[str], context_lines: int = 15, evidence_paths: dict | None = None) -> str:
     """§4.4: renders as ordinary Copilot Chat markdown — numbered options,
     an evidence blockquote, a follow-up reply of a key or 'other: ...'.
     context_lines must match whatever pack.py actually used to build
     evidence_packs's snippets (default 15 = pack.py's own
     DEFAULT_CONTEXT_LINES) -- see _anchor_line_preview's own docstring for
-    why this has to agree with the real build-time value."""
+    why this has to agree with the real build-time value.
+
+    evidence_paths (Architect_Pilot_Feedback_Notes.md Entry 20): optional
+    ref -> REPO_ROOT-relative "path:line" map from pack.py's
+    _build_evidence_packs. When present for a ref, the evidence line shows
+    that real, VS-Code-workspace-openable path instead of the raw scan ref
+    (which is only relative to whichever package root produced it, not to
+    the workspace root an architect has open). Optional and defaulted so
+    every existing caller/test that only ever passed a bare ref->snippet
+    dict keeps working unchanged."""
     options = build_options(residual, unit_index)
     lines = [
         f"### {residual['id']} (Tier {residual['tier']}: {residual['class']})",
@@ -169,7 +178,7 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
         lines.append(f"- **[{opt['key']}]** {opt['label']} — {opt['detail']}")
     lines.append("")
 
-    evidence_lines = _evidence_lines(residual, unit_index, evidence_packs, context_lines)
+    evidence_lines = _evidence_lines(residual, unit_index, evidence_packs, context_lines, evidence_paths)
     if evidence_lines:
         lines.append("**Evidence:**")
         for e in evidence_lines:
@@ -221,9 +230,10 @@ def _anchor_line_preview(ref: str, snippet: str, context_lines: int) -> str:
     return next((line for line in lines if line.strip()), "")
 
 
-def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict, context_lines: int = 15) -> list[str]:
+def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict, context_lines: int = 15, evidence_paths: dict | None = None) -> list[str]:
     seen_refs = set()
     out = []
+    evidence_paths = evidence_paths or {}
 
     def _add(ref: str) -> None:
         if not ref or ref in seen_refs:
@@ -233,7 +243,8 @@ def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict, cont
         if not snippet:
             return
         preview = _anchor_line_preview(ref, snippet, context_lines)
-        out.append(f"`{ref}`: {preview}")
+        label = evidence_paths.get(ref, ref)
+        out.append(f"`{label}`: {preview}")
 
     for ref in residual.get("evidenceRefs") or []:
         _add(ref)
@@ -261,16 +272,17 @@ def group_by_class(residuals: list[dict]) -> dict[tuple, list[str]]:
     return groups
 
 
-def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict, context_lines: int = 15) -> dict:
+def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict, context_lines: int = 15, evidence_paths: dict | None = None) -> dict:
     """Returns {residual_id: markdown_card}. Also computes the real
     'similar residuals' grouping (same tier+class), shared across all cards
     in the group — not per-card in isolation. context_lines must match
     whatever pack.py actually used to build evidence_packs (see
-    render_card_markdown's own docstring)."""
+    render_card_markdown's own docstring). evidence_paths is optional (see
+    render_card_markdown's own docstring, Entry 20)."""
     groups = group_by_class(residuals)
 
     cards = {}
     for r in residuals:
         siblings = [rid for rid in groups[(r["tier"], r["class"])] if rid != r["id"]]
-        cards[r["id"]] = render_card_markdown(r, unit_index, evidence_packs, siblings, context_lines)
+        cards[r["id"]] = render_card_markdown(r, unit_index, evidence_packs, siblings, context_lines, evidence_paths)
     return cards

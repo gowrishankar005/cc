@@ -57,6 +57,7 @@ class TestPackEndToEnd(unittest.TestCase):
         self.assertTrue((self.session_dir / "drafts" / "overrides").is_dir())
         self.assertTrue((self.session_dir / "evidence" / "unit-index.json").exists())
         self.assertTrue((self.session_dir / "evidence" / "packs.json").exists())
+        self.assertTrue((self.session_dir / "evidence" / "paths.json").exists())
 
         # NestJS fixture's real S2 residual (Controller with no security-control evidence) must be present.
         # Leftover fuel (unmapped/ignored) may append further residuals after it.
@@ -68,6 +69,21 @@ class TestPackEndToEnd(unittest.TestCase):
         session_md = (self.session_dir / "SESSION.md").read_text()
         self.assertIn("CodeGraph", session_md)
         self.assertIn("fetch-span", session_md)
+
+        # Architect_Pilot_Feedback_Notes.md Entry 20: the NestJS fixture lives
+        # under REPO_ROOT (pipeline/test/fixtures/...), so at least one
+        # evidence ref must resolve to a real, REPO_ROOT-relative clickable
+        # path -- not just the bare package-root-relative scan ref -- and
+        # that path must actually appear in the residual's own rendered card.
+        paths = json.loads((self.session_dir / "evidence" / "paths.json").read_text())
+        self.assertGreater(len(paths), 0, "expected at least one clickable evidence path for the NestJS fixture (lives under REPO_ROOT)")
+        clickable = next(iter(paths.values()))
+        self.assertIn("pipeline/test/fixtures/nestjs-sample", clickable)
+        all_cards_text = "\n".join(r["card"] for r in residuals["items"])
+        self.assertTrue(
+            any(p in all_cards_text for p in paths.values()),
+            "at least one rendered card must show a clickable REPO_ROOT-relative evidence path, not just the bare scan ref",
+        )
 
     def test_refuses_overwrite_when_unapplied_drafts_exist(self):
         subprocess.run(["node", str(RUN_SLICE), str(NESTJS_FIXTURE), "--out", str(self.out_dir)], capture_output=True, text=True, check=True)

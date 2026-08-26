@@ -340,6 +340,18 @@ Checked directly against the real pack data (not assumed): `R-001`'s actual `res
 
 ---
 
+## Entry 20 — evidence citations showed bare package-root-relative paths, not something an architect could click to the real file
+
+**Observed:** After reviewing real cards against the Bank of Anthos pack, the architect asked directly: "may be link the file name to the source so that architect can go read the file/section... now all that the architect has is file names (good enough to decide?)." Checked directly: every evidence citation in a card (e.g. `` `src/main/java/anthos/samples/bankofanthos/ledgerwriter/LedgerWriterController.java:108` ``) is relative to whichever scanned package root produced it — never to the VS Code workspace root an architect actually has open (confirmed via `manifest.json`'s `packageRoots`, stored as absolute filesystem paths, and the scan ref itself, stored root-relative). That combination isn't resolvable as a clickable path on its own, and isn't even the same string as a path from the workspace root.
+
+**What it means:** A real, deterministic gap, not an LLM issue — the fix belongs in `pack.py`/`cards.py`, not agent instructions. `pack.py`'s `_read_snippet` already resolves each ref to a real absolute `Path` while reading the file for its context window; that resolved path was being discarded rather than surfaced.
+
+**Fix — same session:** `_read_snippet` now returns `(snippet, resolved_path)`. `_build_evidence_packs` returns a companion `ref -> REPO_ROOT-relative "path:line"` map (`evidence/paths.json`, written alongside `evidence/packs.json`) wherever the resolved file lives inside `REPO_ROOT` — the normal case for this repo's own fixtures/spikes and any workspace opened at the repo root — and omits the entry rather than guess when it doesn't. `cards.py`'s `render_card_markdown`/`build_all_cards`/`_evidence_lines` gained an optional `evidence_paths` param: when present for a ref, the card's evidence blockquote shows that real, clickable path instead of the bare scan ref. Optional and defaulted, so every existing caller/test with a bare `ref -> snippet` dict (no paths) keeps working unchanged. Verified against two different instances: the NestJS fixture (new end-to-end assertion in `test_pack.py`, real `run-slice` + `pack.py` run) and the real Bank of Anthos pack directly (`spikes/boa/repo/.../LedgerWriterController.java:108` now shown verbatim in `R-001`'s real evidence blockquote, content re-checked against the actual file).
+
+**Honest limit, stated plainly:** only covers files that live inside `REPO_ROOT` — a package root scanned from outside the repo (unusual for this project's own workflow, but possible) still falls back to the bare scan ref, since guessing a wrong clickable path would be worse than showing none.
+
+---
+
 ## Entry 19 — real bug, not an LLM issue this time: `cards.py`'s own deterministic evidence preview showed the wrong line, for every unmapped-signal-cluster residual
 
 **Observed:** After Entry 18's fix, the architect re-ran the residual session (VS Code + GitHub Copilot Chat) against the same Bank of Anthos pack. The agent now correctly reproduced every card verbatim, evidence included — but the evidence itself looked wrong. All 20 `unmapped-signal` cluster residuals (`R-004`...`R-023`, e.g. "Column" clustered 21 times, "HttpStatus" clustered 20 times) showed evidence lines that didn't contain the claimed signal at all — random-looking import statements, javadoc fragments, blank comment lines.

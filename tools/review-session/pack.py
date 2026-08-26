@@ -30,6 +30,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 from redact import redact  # noqa: E402
 from triage import build_residuals, apply_baseline  # noqa: E402
 from cards import build_all_cards  # noqa: E402
@@ -138,8 +140,9 @@ def pack_main() -> int:
     residuals = _rank_and_cap(residuals, args.max_residuals)
 
     context_lines = max(0, args.context_lines)
-    packs = _build_evidence_packs(residuals, unit_index, package_roots, context_lines)
+    packs, evidence_paths = _build_evidence_packs(residuals, unit_index, package_roots, context_lines)
     (session_dir / "evidence" / "packs.json").write_text(json.dumps(packs, indent=2))
+    (session_dir / "evidence" / "paths.json").write_text(json.dumps(evidence_paths, indent=2))
 
     # T-2 (AGENT_TASKS_Residual_Dossier_Module.md): opt-in only -- with no
     # --with-dossier flag, pack.py behaves exactly as it did before this
@@ -154,7 +157,7 @@ def pack_main() -> int:
     # residuals never get a full choice card — they're not being
     # asked again — just a short note.
     askable = [r for r in residuals if r.get("status") != "carried_forward"]
-    card_markdown = build_all_cards(askable, unit_index, packs, context_lines)
+    card_markdown = build_all_cards(askable, unit_index, packs, context_lines, evidence_paths)
     for r in residuals:
         r["card"] = card_markdown.get(r["id"], f"### {r['id']} (carried forward)\n\n{r['rationale']}\n")
     (session_dir / "residuals.json").write_text(json.dumps({"generatedAt": _now(), "items": residuals}, indent=2))
@@ -234,12 +237,23 @@ def _rank_and_cap(residuals: list[dict], max_residuals: int | None) -> list[dict
     return carried + askable[: max(0, max_residuals)]
 
 
-def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots: list[str], context_lines: int = DEFAULT_CONTEXT_LINES) -> dict:
+def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots: list[str], context_lines: int = DEFAULT_CONTEXT_LINES) -> tuple[dict, dict]:
     """Redacted source snippets for every residual's referenced units and
     residual.evidenceRefs, bounded window, only ever read from within a
-    scanned package root — never an arbitrary path (S8, path-traversal-safe)."""
+    scanned package root — never an arbitrary path (S8, path-traversal-safe).
+
+    Also returns a companion ref -> clickable-path map (Architect_Pilot_
+    Feedback_Notes.md Entry 20): the stored `ref` itself is only relative to
+    whichever scanned package root produced it, not to the VS Code workspace
+    root an architect actually has open, so it isn't directly openable. Where
+    the resolved absolute file lives inside REPO_ROOT (the normal case for
+    this repo's own fixtures/spikes and any workspace opened at REPO_ROOT),
+    we can compute a real REPO_ROOT-relative "path:line" that VS Code's own
+    file-link auto-detection resolves. Falls back to omitting the entry
+    (never a wrong/guessed path) when the file lives outside REPO_ROOT."""
     resolved_roots = [Path(r).resolve() for r in package_roots]
-    packs = {}
+    packs: dict[str, str] = {}
+    paths: dict[str, str] = {}
     refs: list[str] = []
     for residual in residuals:
         refs.extend(residual.get("evidenceRefs") or [])
@@ -251,10 +265,19 @@ def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots
     for ref in refs:
         if ref in packs:
             continue
-        snippet = _read_snippet(ref, resolved_roots, context_lines)
-        if snippet is not None:
-            packs[ref] = redact(snippet)
-    return packs
+        result = _read_snippet(ref, resolved_roots, context_lines)
+        if result is None:
+            continue
+        snippet, resolved_path = result
+        packs[ref] = redact(snippet)
+        try:
+            rel = resolved_path.relative_to(REPO_ROOT)
+        except ValueError:
+            continue
+        m = _REF_RE.match(ref)
+        if m:
+            paths[ref] = f"{rel.as_posix()}:{m.group(2)}"
+    return packs, paths
 
 
 def _run_dossier_pass(residuals: list[dict], unit_index: dict, packs: dict) -> list[dict]:
@@ -295,7 +318,14 @@ def _window_for_line(line_1indexed: int, n_lines: int, context_lines: int) -> tu
     return start, end
 
 
-def _read_snippet(ref: str, resolved_roots: list[Path], context_lines: int = DEFAULT_CONTEXT_LINES) -> str | None:
+def _read_snippet(ref: str, resolved_roots: list[Path], context_lines: int = DEFAULT_CONTEXT_LINES) -> tuple[str, Path] | None:
+    """Returns (snippet, resolved_absolute_path) so callers can also build
+    a real, clickable evidence link — the stored `ref` itself is only
+    relative to whichever scanned package root it came from (e.g.
+    src/main/java/.../Foo.java), not to the VS Code workspace root an
+    architect actually has open, so it's not directly openable on its
+    own (found live: an architect asked for clickable evidence links,
+    Architect_Pilot_Feedback_Notes.md Entry 20)."""
     m = _REF_RE.match(ref)
     if not m:
         return None
@@ -315,7 +345,7 @@ def _read_snippet(ref: str, resolved_roots: list[Path], context_lines: int = DEF
         except OSError:
             continue
         start, end = _window_for_line(line_str, len(lines), context_lines)
-        return "\n".join(lines[start:end])
+        return "\n".join(lines[start:end]), candidate
     return None
 
 
