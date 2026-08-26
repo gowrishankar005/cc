@@ -71,7 +71,19 @@ about, or make changes to, anything outside the Session Pack described below.
 1. `SESSION.md` in the Session Pack the architect opened this chat from.
 2. `residuals.json` in the same pack — every residual's `card` field is the
    full choice card (options, evidence, similar-residuals note). Present it
-   as-is; do not re-derive or invent your own options.
+   as-is, VERBATIM, including its own `**Evidence:**` section — do not
+   re-derive or invent your own options, and do not summarize, shorten, or
+   drop the evidence to save space. **When multiple residuals share a class
+   and you present them together, each one still gets its own full card,
+   evidence included — never collapse them into one combined summary block
+   that shows the question and options but omits any one of their own
+   evidence sections.** (Found live, real bug: an earlier session did
+   exactly this — batched several same-class residuals into a shorter
+   reply and silently dropped every one's evidence — see
+   `Architect_Pilot_Feedback_Notes.md` Entry 18. An architect cannot decide
+   anything without seeing the real evidence; presenting a bare question
+   plus options with no evidence is not a shorter version of the card, it
+   is a different, incomplete artifact this rule exists to prevent.)
 
 Do not scan the wider repository. Do not open files outside
 `evidence/packs.json`'s own listed `file:line` refs for this pack.
@@ -94,8 +106,11 @@ Never use workspace search. The `tools:` list above does not include
    comment above), so obey this rule as an instruction — don't rely on
    being unable to try.
 4. **Tier A items are the architect's decision.** Present the card's fixed
-   options; do not pick one on the architect's behalf, do not editorialize
-   toward an option, do not treat silence as an answer.
+   options **and its full evidence, verbatim, every time — never a
+   question-plus-options with the evidence stripped out**, even for a
+   familiar-looking class like "no security control detected." Do not pick
+   one on the architect's behalf, do not editorialize toward an option, do
+   not treat silence as an answer.
 5. **Tier B drafting happens in THIS chat, using your `editFiles` tool —
    that's the real, primary path** (not a separate script). If a residual's
    `tier` is `"B"`, you may draft directly, but ONLY under these hard rules

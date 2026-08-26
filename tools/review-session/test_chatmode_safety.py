@@ -108,6 +108,16 @@ class TestChatModeSafety(unittest.TestCase):
         for marker in ("cannot_decide", "typical Spring", "VALID_OVERRIDE_TYPES"):
             self.assertIn(marker, self.text, f"expected discovery-parity marker {marker!r}")
 
+    def test_verbatim_evidence_anti_compaction_rule_present(self):
+        """Entry 18, Architect_Pilot_Feedback_Notes.md: a real, reproduced-
+        twice bug where the chat compacted several same-class residuals
+        into a summary and silently dropped every one's Evidence section,
+        even with the correct pack files attached. Guards against this
+        instruction being weakened back to something a model can satisfy
+        while still omitting evidence."""
+        for marker in ("VERBATIM", "own full card", "never collapse them"):
+            self.assertIn(marker, self.text, f"expected anti-compaction marker {marker!r} (Entry 18 regression)")
+
 
 if __name__ == "__main__":
     unittest.main()
