@@ -340,6 +340,18 @@ Checked directly against the real pack data (not assumed): `R-001`'s actual `res
 
 ---
 
+## Entry 22 — real, live reproduction: Entry 21's recommendation paragraph never appeared, even in a fresh session — a genuine rule conflict, not a flaky model
+
+**Observed:** Architect started a fresh Copilot Chat session (confirmed, not a stale one) after Entry 21 shipped, and pasted the resulting `R-001` reply. It was the deterministic card, presented correctly and verbatim — but with no `**My read (not a decision):**` paragraph at all, contradicting Hard Rule 4 as written.
+
+**What it means — checked directly in the agent file, not assumed:** a real conflict between two instructions the model reads in the same file. The "Read first" section's rule 2 says, forcefully and first: *"Present it as-is, VERBATIM... do not re-derive or invent your own options."* That wording was written for Entry 18, specifically to stop the model from altering the card. Hard Rule 4, several paragraphs later, asks the model to append one more paragraph after the same card — but nothing in rule 2's phrasing said an appended paragraph is still compatible with "verbatim." A model that weighs the earlier, more forceful "VERBATIM... do not invent" framing more heavily than a later, less emphatic addition can reasonably resolve the apparent conflict by dropping the addition and staying safely inside "verbatim" — which is what happened.
+
+**Fix — same session:** rule 2 now states explicitly that "verbatim" governs the card's own text only, names hard rule 4's paragraph requirement inline, and states both instructions hold at once — presenting the card unmodified and appending the recommendation are not in tension. New regression test `test_verbatim_does_not_suppress_the_recommendation_paragraph` pins the reconciling language.
+
+**Honest limit, stated plainly:** same class of limit as every other agent-instruction fix in this file — wording, not a structural guarantee. This is also the second real instance of the same underlying failure mode in this file (Entry 18: a strong "be concise/be exact" instinct silently overriding a less emphatic requirement) — per this project's own "second occurrence of a mistake fixes the process, not the instance" rule, worth watching for a *third* occurrence; if one shows up, the fix should probably become a structural check (a lint pass over the agent file for instructions that could plausibly read as mutually exclusive) rather than a fourth prose patch. Not yet re-verified live — the next real Bank of Anthos run should confirm the paragraph actually appears before this is considered proven.
+
+---
+
 ## Entry 21 — a bare Tier A menu isn't informed choice when the architect doesn't own the code; Hard Rule 4 widened to require a labeled recommendation
 
 **Observed:** After Entry 20's clickable-link fix, the architect asked directly for more: "I was expecting the LLM to read those files and recommend (of course based on the evidence) what to choose" — reasoning that "we can't expect an architect to understand the code (that they didn't write or own) and decide how it works."

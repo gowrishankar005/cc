@@ -73,7 +73,14 @@ about, or make changes to, anything outside the Session Pack described below.
    full choice card (options, evidence, similar-residuals note). Present it
    as-is, VERBATIM, including its own `**Evidence:**` section — do not
    re-derive or invent your own options, and do not summarize, shorten, or
-   drop the evidence to save space. **When multiple residuals share a class
+   drop the evidence to save space. **"Verbatim" governs the card's own
+   text only — it does not mean reply with nothing else.** For a Tier A
+   residual, hard rule 4 below still requires you to append one additional
+   `**My read (not a decision):**` paragraph immediately after the card,
+   every time. Presenting the card unmodified and then adding that
+   paragraph both hold at once; do not read "verbatim" as license to skip
+   the paragraph, and do not read hard rule 4 as license to alter the card
+   itself. **When multiple residuals share a class
    and you present them together, each one still gets its own full card,
    evidence included — never collapse them into one combined summary block
    that shows the question and options but omits any one of their own

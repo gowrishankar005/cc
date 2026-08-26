@@ -108,6 +108,19 @@ class TestChatModeSafety(unittest.TestCase):
         for marker in ("cannot_decide", "typical Spring", "VALID_OVERRIDE_TYPES"):
             self.assertIn(marker, self.text, f"expected discovery-parity marker {marker!r}")
 
+    def test_verbatim_does_not_suppress_the_recommendation_paragraph(self):
+        """Entry 22, Architect_Pilot_Feedback_Notes.md: real, live reproduction
+        against the Bank of Anthos pack -- Entry 21's "My read (not a
+        decision):" paragraph never appeared, in a fresh chat session (ruling
+        out staleness). Root cause: rule 2's forceful, first-read "VERBATIM...
+        do not re-derive or invent" instruction (written for Entry 18) has no
+        carve-out saying an appended paragraph after the card is still
+        compatible with "verbatim" -- a model can plausibly read the two
+        rules as contradictory and drop the addition to stay safely inside
+        "verbatim." Pins the reconciling language so this can't regress."""
+        for marker in ("does not mean reply with nothing else", "both hold at once"):
+            self.assertIn(marker, self.text, f"expected verbatim/recommendation reconciliation marker {marker!r} (Entry 22)")
+
     def test_tier_a_recommendation_rule_present_and_bounded(self):
         """Entry 21, Architect_Pilot_Feedback_Notes.md: the architect asked
         for the LLM to actually recommend an answer for Tier A residuals
