@@ -44,6 +44,11 @@ class TestChatModeSafety(unittest.TestCase):
     def setUp(self):
         self.assertTrue(CHATMODE_PATH.exists(), f"chatmode file not found at {CHATMODE_PATH}")
         self.text = CHATMODE_PATH.read_text()
+        # Whitespace-collapsed view for markers that are multi-word prose
+        # fragments -- immune to which exact word this file's hand-wrapping
+        # happens to break a line after, so a wrap-only edit can't fail a
+        # test that isn't actually checking anything about line layout.
+        self.flat = " ".join(self.text.split())
 
     def test_frontmatter_exists_and_parses(self):
         m = re.match(r"^---\n(.*?)\n---\n", self.text, re.DOTALL)
@@ -122,7 +127,7 @@ class TestChatModeSafety(unittest.TestCase):
             "then STOP",
             "is never permission to work through the queue",
         ):
-            self.assertIn(marker, self.text, f"expected one-at-a-time marker {marker!r} (Entry 24)")
+            self.assertIn(marker, self.flat, f"expected one-at-a-time marker {marker!r} (Entry 24)")
 
     def test_recommendation_is_never_authored_live_by_the_chat_model(self):
         """Entry 23, Architect_Pilot_Feedback_Notes.md: two earlier attempts
@@ -137,10 +142,10 @@ class TestChatModeSafety(unittest.TestCase):
         card section. This pins that the instruction file no longer asks the
         model to freshly author a recommendation, and instead explicitly
         forbids it from supplying one when the card doesn't have one."""
-        self.assertIn("My read (not a decision)", self.text)
-        self.assertIn("Never write your own recommendation, read", self.text)
-        self.assertIn("Do not treat silence as an answer", self.text)
-        self.assertIn("does not change whether `apply.py`'s own separate confirmation gate", self.text)
+        self.assertIn("My read (not a decision)", self.flat)
+        self.assertIn("Never write your own recommendation, read", self.flat)
+        self.assertIn("Do not treat silence as an answer", self.flat)
+        self.assertIn("does not change whether `apply.py`'s own separate confirmation gate", self.flat)
 
     def test_verbatim_evidence_anti_compaction_rule_present(self):
         """Entry 18, Architect_Pilot_Feedback_Notes.md: a real, reproduced-
