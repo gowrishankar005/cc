@@ -13,6 +13,8 @@ run's own facts — never an invented/fabricated node name.
 
 from __future__ import annotations
 
+import re
+
 OTHER_OPTION = {"key": "other", "label": "Other…", "detail": "free text — requires a 1-line rationale, captured verbatim into the Decision Record"}
 LEAVE_OPEN_OPTION = {"key": "leave-open", "label": "Leave open", "detail": "insufficient confidence to decide now — stays flagged for a future session"}
 
@@ -149,9 +151,13 @@ def build_options(residual: dict, unit_index: dict) -> list[dict]:
     return options
 
 
-def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict, similar_ids: list[str]) -> str:
+def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict, similar_ids: list[str], context_lines: int = 15) -> str:
     """§4.4: renders as ordinary Copilot Chat markdown — numbered options,
-    an evidence blockquote, a follow-up reply of a key or 'other: ...'."""
+    an evidence blockquote, a follow-up reply of a key or 'other: ...'.
+    context_lines must match whatever pack.py actually used to build
+    evidence_packs's snippets (default 15 = pack.py's own
+    DEFAULT_CONTEXT_LINES) -- see _anchor_line_preview's own docstring for
+    why this has to agree with the real build-time value."""
     options = build_options(residual, unit_index)
     lines = [
         f"### {residual['id']} (Tier {residual['tier']}: {residual['class']})",
@@ -163,7 +169,7 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
         lines.append(f"- **[{opt['key']}]** {opt['label']} — {opt['detail']}")
     lines.append("")
 
-    evidence_lines = _evidence_lines(residual, unit_index, evidence_packs)
+    evidence_lines = _evidence_lines(residual, unit_index, evidence_packs, context_lines)
     if evidence_lines:
         lines.append("**Evidence:**")
         for e in evidence_lines:
@@ -180,7 +186,42 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
     return "\n".join(lines)
 
 
-def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> list[str]:
+_REF_RE = re.compile(r"^(.*):(\d+)$")
+
+
+def _anchor_line_preview(ref: str, snippet: str, context_lines: int) -> str:
+    """Real bug found live (Architect_Pilot_Feedback_Notes.md Entry 19):
+    evidence_packs[ref] is a multi-line CONTEXT WINDOW built by pack.py's
+    _read_snippet/_window_for_line -- context_lines before AND after the
+    ref's own claimed line, not starting at that line. The old code just
+    took the snippet's first non-blank line as "the evidence at this
+    ref," which is almost always context padding, not the actual match
+    (confirmed: a real "Column" cluster ref showed an unrelated import
+    line instead of the real @Column(...) annotation 15 lines later).
+
+    Recomputes the SAME window-start math pack.py's own _window_for_line
+    uses (start = max(0, line - 1 - context_lines)) to find the anchor
+    line's own position within the snippet, without needing pack.py's
+    n_lines (this repo's default context_lines=15 never triggers
+    _window_for_line's own MAX_SNIPPET_WINDOW re-centering, since
+    15+15+1=31 <= 40 -- only a much larger custom --context-lines would).
+    Falls back to the old first-non-blank-line heuristic whenever the
+    computed index doesn't land inside the actual snippet -- e.g. a
+    custom context_lines that DID trigger re-centering, or a
+    synthetic/test snippet that isn't a real windowed capture -- rather
+    than indexing out of bounds or guessing."""
+    lines = snippet.splitlines()
+    m = _REF_RE.match(ref)
+    if m:
+        line_1indexed = int(m.group(2))
+        window_start = max(0, line_1indexed - 1 - context_lines)
+        anchor_idx = (line_1indexed - 1) - window_start
+        if 0 <= anchor_idx < len(lines) and lines[anchor_idx].strip():
+            return lines[anchor_idx]
+    return next((line for line in lines if line.strip()), "")
+
+
+def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict, context_lines: int = 15) -> list[str]:
     seen_refs = set()
     out = []
 
@@ -191,7 +232,7 @@ def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> l
         snippet = evidence_packs.get(ref)
         if not snippet:
             return
-        preview = next((line for line in snippet.splitlines() if line.strip()), "")
+        preview = _anchor_line_preview(ref, snippet, context_lines)
         out.append(f"`{ref}`: {preview}")
 
     for ref in residual.get("evidenceRefs") or []:
@@ -220,14 +261,16 @@ def group_by_class(residuals: list[dict]) -> dict[tuple, list[str]]:
     return groups
 
 
-def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict) -> dict:
+def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict, context_lines: int = 15) -> dict:
     """Returns {residual_id: markdown_card}. Also computes the real
     'similar residuals' grouping (same tier+class), shared across all cards
-    in the group — not per-card in isolation."""
+    in the group — not per-card in isolation. context_lines must match
+    whatever pack.py actually used to build evidence_packs (see
+    render_card_markdown's own docstring)."""
     groups = group_by_class(residuals)
 
     cards = {}
     for r in residuals:
         siblings = [rid for rid in groups[(r["tier"], r["class"])] if rid != r["id"]]
-        cards[r["id"]] = render_card_markdown(r, unit_index, evidence_packs, siblings)
+        cards[r["id"]] = render_card_markdown(r, unit_index, evidence_packs, siblings, context_lines)
     return cards

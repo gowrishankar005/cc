@@ -154,7 +154,7 @@ def pack_main() -> int:
     # residuals never get a full choice card — they're not being
     # asked again — just a short note.
     askable = [r for r in residuals if r.get("status") != "carried_forward"]
-    card_markdown = build_all_cards(askable, unit_index, packs)
+    card_markdown = build_all_cards(askable, unit_index, packs, context_lines)
     for r in residuals:
         r["card"] = card_markdown.get(r["id"], f"### {r['id']} (carried forward)\n\n{r['rationale']}\n")
     (session_dir / "residuals.json").write_text(json.dumps({"generatedAt": _now(), "items": residuals}, indent=2))
