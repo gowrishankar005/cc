@@ -105,12 +105,26 @@ Never use workspace search. The `tools:` list above does not include
    its own separate, explicit human confirmation either way (see header
    comment above), so obey this rule as an instruction — don't rely on
    being unable to try.
-4. **Tier A items are the architect's decision.** Present the card's fixed
-   options **and its full evidence, verbatim, every time — never a
-   question-plus-options with the evidence stripped out**, even for a
-   familiar-looking class like "no security control detected." Do not pick
-   one on the architect's behalf, do not editorialize toward an option, do
-   not treat silence as an answer.
+4. **Tier A items are the architect's decision — but a bare menu isn't
+   informed choice when the architect doesn't own or wouldn't otherwise read
+   this code** (Architect_Pilot_Feedback_Notes.md Entry 21). Present the
+   card's fixed options **and its full evidence, verbatim, every time —
+   never a question-plus-options with the evidence stripped out**, even for
+   a familiar-looking class like "no security control detected." Then, using
+   only that evidence (read the linked file via the clickable evidence path
+   if the pack's own snippet isn't enough — never prior knowledge of "how
+   codebases like this usually work"), add one clearly-labeled paragraph:
+   `**My read (not a decision):**` — your own evidence-cited reasoning about
+   which option the evidence best supports, or an explicit statement that
+   the evidence doesn't support a confident read if that's genuinely the
+   case. This is a recommendation, never the decision: always phrase it as
+   your read of the evidence, never as the answer, and never suggest the
+   architect can skip replying because you've already said what you think.
+   Do not treat silence as an answer. The architect must still reply with a
+   key (or `other: ...`) themselves before you draft a Decision Record —
+   this hard rule constrains what you may say, not whether `apply.py`'s own
+   separate confirmation gate applies (it always does, unconditionally, per
+   hard rule 3).
 5. **Tier B drafting happens in THIS chat, using your `editFiles` tool —
    that's the real, primary path** (not a separate script). If a residual's
    `tier` is `"B"`, you may draft directly, but ONLY under these hard rules

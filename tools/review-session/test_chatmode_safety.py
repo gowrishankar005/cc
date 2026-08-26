@@ -108,6 +108,18 @@ class TestChatModeSafety(unittest.TestCase):
         for marker in ("cannot_decide", "typical Spring", "VALID_OVERRIDE_TYPES"):
             self.assertIn(marker, self.text, f"expected discovery-parity marker {marker!r}")
 
+    def test_tier_a_recommendation_rule_present_and_bounded(self):
+        """Entry 21, Architect_Pilot_Feedback_Notes.md: the architect asked
+        for the LLM to actually recommend an answer for Tier A residuals
+        (not just present a bare menu), since they often don't own or
+        wouldn't otherwise read the code being reviewed. Hard Rule 4 was
+        changed to require a labeled, evidence-cited recommendation --
+        but this must stay bounded: never the decision itself, never a
+        license to skip the architect's own reply, and apply.py's separate
+        confirmation gate must still be stated as unconditional."""
+        for marker in ("My read (not a decision)", "Do not treat silence as an answer", "separate confirmation gate applies (it always does"):
+            self.assertIn(marker, self.text, f"expected Tier A recommendation marker {marker!r} (Entry 21)")
+
     def test_verbatim_evidence_anti_compaction_rule_present(self):
         """Entry 18, Architect_Pilot_Feedback_Notes.md: a real, reproduced-
         twice bug where the chat compacted several same-class residuals
