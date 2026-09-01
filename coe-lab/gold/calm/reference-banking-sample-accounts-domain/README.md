@@ -1,6 +1,6 @@
-# boa-accounts-domain — solid, well-connected gold for testing Weaver
+# reference-banking-sample-accounts-domain — solid, well-connected gold for testing Weaver
 
-**What this is:** a hand-authored FINOS CALM 1.2 gold file for the real, wild-type Bank of Anthos accounts bounded context (`google/bank-of-anthos`, local clone `spikes/boa/repo`) — `frontend` + `userservice` + `contacts` + `accounts-db`. Authored specifically to be **solid and well-connected**, after `coe-lab/docs/findings/gold-calm-relationship-connectivity-audit.md` found several existing hand-authored lab-fixture gold packages had disconnected nodes (missing same-package `connects` edges even where an API obviously talks to its own entity).
+**What this is:** a hand-authored FINOS CALM 1.2 gold file for a real, wild-type reference Java microservices banking sample's accounts bounded context (a real public multi-service reference repo, local clone `spikes/refbank/repo`) — `frontend` + `userservice` + `contacts` + `accounts-db`. Authored specifically to be **solid and well-connected**, after `coe-lab/docs/findings/gold-calm-relationship-connectivity-audit.md` found several existing hand-authored lab-fixture gold packages had disconnected nodes (missing same-package `connects` edges even where an API obviously talks to its own entity).
 
 **Every fact is grep-verified against real source and real k8s manifests, cited at file:line** — routes, JWT issue/verify call sites, database engine construction, service-to-service env-var wiring, shared-secret mounts. Nothing inferred from README/docs/diagrams (this repo's own gold-authoring rule, `gold/calm/README.md`).
 
@@ -10,8 +10,8 @@
 
 ```bash
 cd pipeline
-npx --no-install calm validate -u ../coe-lab/gold/calm/boa-accounts-domain/url-mapping.json \
-  -a ../coe-lab/gold/calm/boa-accounts-domain/architecture.calm.json -f pretty
+npx --no-install calm validate -u ../coe-lab/gold/calm/reference-banking-sample-accounts-domain/url-mapping.json \
+  -a ../coe-lab/gold/calm/reference-banking-sample-accounts-domain/architecture.calm.json -f pretty
 # Summary — Errors: no (0), Warnings: no (0)
 ```
 
@@ -25,10 +25,10 @@ npx --no-install calm validate -u ../coe-lab/gold/calm/boa-accounts-domain/url-m
 ```bash
 cd pipeline
 node dist/orchestration/run-slice.js \
-  ../spikes/boa/repo/src/frontend \
-  ../spikes/boa/repo/src/accounts/userservice \
-  ../spikes/boa/repo/src/accounts/contacts \
-  --out /tmp/boa-weaver-out
+  ../spikes/refbank/repo/src/frontend \
+  ../spikes/refbank/repo/src/accounts/userservice \
+  ../spikes/refbank/repo/src/accounts/contacts \
+  --out /tmp/refbank-weaver-out
 ```
 
 Real output, this session: **6 nodes, 3 relationships** (vs. gold's 7/7). Diffed against gold, not just counted:

@@ -8,5 +8,5 @@
   "https://project-owned-placeholder.invalid/controls/openapi-http-basic.requirement.json": "/Users/gowri/Innovation/codescanner/pipeline/dist/rules/control-requirements/security-contract-http-basic-001.requirement.json",
   "https://project-owned-placeholder.invalid/controls/openapi-apikey.requirement.json": "/Users/gowri/Innovation/codescanner/pipeline/dist/rules/control-requirements/security-contract-apikey-001.requirement.json",
   "https://project-owned-placeholder.invalid/controls/openapi-oauth2.requirement.json": "/Users/gowri/Innovation/codescanner/pipeline/dist/rules/control-requirements/security-contract-oauth2-001.requirement.json",
-  "https://project-owned-placeholder.invalid/controls/jwt-issue.requirement.json": "/Users/gowri/Innovation/codescanner/coe-lab/gold/calm/boa-accounts-domain/controls/jwt-issue.requirement.json"
+  "https://project-owned-placeholder.invalid/controls/jwt-issue.requirement.json": "/Users/gowri/Innovation/codescanner/coe-lab/gold/calm/reference-banking-sample-accounts-domain/controls/jwt-issue.requirement.json"
 }
