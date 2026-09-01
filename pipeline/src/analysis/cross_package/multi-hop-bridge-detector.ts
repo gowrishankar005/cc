@@ -35,7 +35,7 @@ export const TIER_B_SINGLE_CANDIDATE_PREFIX = 'tier-b-single-candidate: "';
 
 /**
  * The actual confidence values for r2-phase1/r2b/r2c/r2-stereotype
- * (same-root and cross-root) live in `fact-trust-matrix.ts` (T-LR-6), not as
+ * (same-root and cross-root) live in `fact-trust-matrix.ts`, not as
  * local constants here — the ordering this file's mechanisms rely on (R2
  * below R1's implicit primary tier; R2-stereotype above R2b above R2c;
  * cross-root always below its same-root pairing) is asserted there, in one
@@ -47,21 +47,21 @@ export interface MultiHopBridgeResult {
   relationships: TypedRelationship[];
   ignoredItems: IgnoredItem[];
   /**
-   * T-P0-1 (E2) round 3 — every raw edge (`${edge.source}|${edge.target}`)
+   * Every raw edge (`${edge.source}|${edge.target}`)
    * this detector took ownership of examining, whether it went on to
    * resolve (r2-phase1/r2b/r2c) or honestly refuse (an
    * `unresolved-multi-hop` ignored item). Consumed by
    * `reconcileCrossPackageEdges`'s graded-admission path so a blunter,
    * earlier-running catch-all never races this detector's own careful,
    * ambiguity-aware decision for the exact same edge — the generic fix for
-   * the real conflict found running E2 against `r2b-implementer-hop-sample`
-   * (round 2) and `r2c-direct-delegate-sample` (round 3): admission getting
+   * the real conflict found testing against `r2b-implementer-hop-sample`
+   * and `r2c-direct-delegate-sample`: admission getting
    * to an edge first and admitting a low-confidence fact for something this
    * detector was about to examine far more carefully.
    */
   examinedPairs: Set<string>;
   /**
-   * T-P0-1 (E2) round 3 continued — `examinedPairs` alone proved
+   * `examinedPairs` alone proved
    * insufficient against `r2c-direct-delegate-sample`: Graphify emits a
    * SEPARATE `calls` edge straight to the bridge candidate's individual
    * METHOD node (e.g. `ThingService.retrieveAll`), distinct from the
@@ -92,10 +92,10 @@ export function detectMultiHopBridgeRelationships(
   run: CrossPackageGraphRun,
   unitsByRoot: Map<string, TypedUnit[]>,
   /**
-   * T-LR-3 — raw signal names (e.g. "Service") that count as bridge-
+   * Raw signal names (e.g. "Service") that count as bridge-
    * disambiguating stereotype evidence, read from signal-catalogue.yml's
    * `bridgeStereotype: true` rows (rule-schema.ts's bridgeStereotypeSignals()).
-   * Catalogue-driven, never a hardcoded name here — same discipline T-LR-1's
+   * Catalogue-driven, never a hardcoded name here — same discipline the
    * `wiringOnlyAnnotations` parameter established for
    * graphify-import-strategy-detector.ts, after that file's first pass
    * hardcoded `'Configuration'` as a literal and was flagged on review.
@@ -110,7 +110,7 @@ export function detectMultiHopBridgeRelationships(
   const examinedPairs = new Set<string>();
   const examinedBridgeFiles = new Set<string>();
   const seen = new Set<string>(); // dedupe: a service can reference the same bridge from multiple AST sites/methods
-  // T-LR-3 — the stereotype-disambiguation filter (below) is invariant per
+  // The stereotype-disambiguation filter (below) is invariant per
   // bridge, but this detector's outer loop examines a bridge once per
   // service that references it (potentially many). Memoized here so a
   // bridge referenced from N call sites computes its stereotype candidates
@@ -202,7 +202,7 @@ export function detectMultiHopBridgeRelationships(
       return true;
     });
     if (implementers.length !== 1) {
-      // T-LR-2 — 0 implementers doesn't only mean "the interface's
+      // 0 implementers doesn't only mean "the interface's
       // implementer isn't in scanned roots" (the case the ignored-item
       // below was originally written for). It's ALSO the exact shape a
       // concrete class referenced directly, with no interface at all,
@@ -230,7 +230,7 @@ export function detectMultiHopBridgeRelationships(
         }
       }
 
-      // T-LR-3 — 2+ implementers is not automatically ambiguous when
+      // 2+ implementers is not automatically ambiguous when
       // exactly one of them carries real, catalogue-recognized `@Service`
       // stereotype evidence and the rest don't. This narrows genuine
       // ambiguity using an extra real fact (the same disambiguation-by-
@@ -239,9 +239,9 @@ export function detectMultiHopBridgeRelationships(
       // stereotype-carrying implementers that correctly stay refused —
       // E1b-codeql-di-resolution-experiment.md). Never applies to the
       // implementers.length === 0 case above (there is nothing to
-      // disambiguate among). Runs BEFORE T-FS-1's tier-b check below: this
+      // disambiguate among). Runs BEFORE the tier-b check below: this
       // branch can auto-resolve a real relationship (stronger evidence);
-      // T-FS-1's check only ever produces a human-review item, so it must
+      // that check only ever produces a human-review item, so it must
       // never shadow an auto-resolvable case.
       //
       // disambiguatedNonTerminal, set only in the exactly-one-stereotype
@@ -286,8 +286,8 @@ export function detectMultiHopBridgeRelationships(
         }
       }
 
-      // T-FS-1 (Tier-B residual class, BACKLOG.md "Tier-B residual
-      // detection") — implementers.length >= 2 is SYNTACTIC ambiguity (N
+      // The Tier-B residual class (BACKLOG.md "Tier-B residual
+      // detection"): implementers.length >= 2 is SYNTACTIC ambiguity (N
       // classes implement this bridge interface). That is not always
       // SEMANTIC ambiguity: Phase 1's own terminal test (is the implementer
       // itself a real database/topic TypedUnit?) already tells apart a real
@@ -303,7 +303,7 @@ export function detectMultiHopBridgeRelationships(
       // guess" rule is untouched) — this only changes what gets WRITTEN to
       // ignoredItems, so a downstream reader (hitl-review-trigger.ts) can
       // tell the two shapes apart and route the single-candidate case to a
-      // human decision instead of silence. Reached only when T-LR-3's
+      // human decision instead of silence. Reached only when the
       // stereotype disambiguation above did NOT already auto-resolve a
       // relationship (checked on the raw implementers list either way —
       // the two checks look at different evidence, stereotype vs.
@@ -330,12 +330,12 @@ export function detectMultiHopBridgeRelationships(
         }
       }
 
-      // 0 (no implementer in scanned roots, AND (T-LR-2) not itself a
+      // 0 (no implementer in scanned roots, and not itself a
       // direct delegate either — the real single-module case seen in a
       // reference Java/JAX-RS banking platform, per the design note), 2+
-      // with no stereotype disambiguation possible (T-LR-3) and no single
-      // store candidate (T-FS-1), or 2+ with a disambiguated implementer
-      // that still isn't a store — never guess (§2.2/§2.4.1).
+      // with no stereotype disambiguation possible and no single
+      // store candidate, or 2+ with a disambiguated implementer
+      // that still isn't a store — never guess.
       const key = `${fromMatch.unit.id}|${bridgeNodeId}|unresolved`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -407,8 +407,8 @@ export function detectMultiHopBridgeRelationships(
       kind: 'calls', // distinct from R1's 'imports'/'connects' — this is an inferred call chain through a bridge, not a direct import (§2.2)
       crossPackage: !sameRoot,
       source: 'codegraph',
-      confidence: relationshipTrust('codegraph', mechanism, sameRoot ? 'same-root' : 'cross-root'), // T-LR-6, fact-trust-matrix.ts — the single source of truth for this tier
-      mechanism, // T-L2-1 — r2-phase1 vs r2b, distinguishable without decoding the confidence value
+      confidence: relationshipTrust('codegraph', mechanism, sameRoot ? 'same-root' : 'cross-root'), // fact-trust-matrix.ts — the single source of truth for this tier
+      mechanism, // r2-phase1 vs r2b, distinguishable without decoding the confidence value
       status: PENDING_STATUS,
       id: PENDING_RELATIONSHIP_ID,
     });

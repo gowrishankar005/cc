@@ -18,7 +18,7 @@ import { isTestPath } from '../../rules/test-path';
  */
 
 /**
- * T-R1-3 — Java `imports`-relation edges target the bare, lowercased LAST
+ * Java `imports`-relation edges target the bare, lowercased LAST
  * SYMBOL (`utils`), never the qualified package (`org.postgresql`), so a
  * plain `libraries.has(e.target)` check never matches a Java driver row
  * (`java-import-resolver.ts` has the full real-evidence writeup). This
@@ -31,14 +31,14 @@ import { isTestPath } from '../../rules/test-path';
  * pass (not module-global — stays scoped to one run, no cross-test/cross-run
  * leakage) so a file with many matching import lines is only read once.
  *
- * T-MR-4 — returns BOTH the real resolved qualified import (used as
+ * Returns BOTH the real resolved qualified import (used as
  * evidence.signal, unchanged) AND which catalogue library name it matched
  * (`catalogueLib`). Real, generic gap this fixes: ownerBaseClasses/
  * ownerFieldTypes lookups are keyed by the catalogue's own library name
  * (e.g. "org.postgresql"), but the qualified import text a Java match
  * resolves to is never that literal string (e.g.
  * "org.postgresql.core.Utils") — a plain `map.get(qualified)` can never hit
- * for ANY Java driver-import library, not just the one T-MR-4 adds. Latent
+ * for ANY Java driver-import library. Latent
  * until now because no Java catalogue row had ever set ownerBaseClass.
  */
 function resolveJavaMatch(run: CrossPackageGraphRun, edge: CrossPackageEdge, libraries: Set<string>, fileLineCache: Map<string, string[]>): { qualified: string; catalogueLib: string } | undefined {
@@ -91,7 +91,7 @@ export function findFilesImportingLibraries(run: CrossPackageGraphRun, libraries
   return [...new Set(findLibraryImportEdges(run, libraries).map((e) => e.source_file))];
 }
 
-/** T-TC1-3 — excludedTestFiles is real, relative file paths skipped as test code despite matching a catalogued library import; the caller (persistence/messaging pass) turns each into a real IgnoredItem. */
+/** excludedTestFiles is real, relative file paths skipped as test code despite matching a catalogued library import; the caller (persistence/messaging pass) turns each into a real IgnoredItem. */
 export interface ImportStrategyResult {
   unitsByRoot: Map<string, TypedUnit[]>;
   excludedTestFiles: string[];
@@ -138,13 +138,13 @@ export function detectUnitsByImportStrategy(
    */
   ownerBaseClasses: Map<string, string> = new Map(),
   /**
-   * T-MR-4 — the composition-ownership counterpart to ownerBaseClasses
+   * The composition-ownership counterpart to ownerBaseClasses
    * (persistence-detection-schema.ts's driverImportOwnerFieldTypes()).
    * Only libraries present here get the extra field-ownership check.
    */
   ownerFieldTypes: Map<string, string> = new Map(),
   /**
-   * T-LR-1 — class-level annotation names that mark a class as a
+   * Class-level annotation names that mark a class as a
    * dependency-wiring factory, never a real user/owner of what it wires
    * (`wiring-annotation-catalogue.yml`, `wiringAnnotationNames()`). Data,
    * not code: adding a new ecosystem's equivalent convention is a catalogue
@@ -154,7 +154,7 @@ export function detectUnitsByImportStrategy(
    */
   wiringOnlyAnnotations: string[] = [],
   /**
-   * T-LR-3 real-data finding — a SUBSET of `existingServiceFilePaths`
+   * Real-data finding — a SUBSET of `existingServiceFilePaths`
    * (`pass-registry.ts`'s `overridableServiceFilePaths`): files whose only
    * `service` unit evidence is a bare, weak class-level stereotype (no real
    * route/security-control signal of its own). For these files, this
@@ -175,7 +175,7 @@ export function detectUnitsByImportStrategy(
   for (const file of files) {
     const resolved = run.resolveRoot(file);
     if (!resolved) continue; // outside every given package root
-    // T-TC1-3 (B-test-code-exclusion) — real, confirmed contamination: 17
+    // Real, confirmed contamination: 17
     // real /test/-path files in one a reference Java/JAX-RS banking platform scan were typed as database
     // units purely because they happened to import a real catalogued
     // driver library (test setup/fixture code, not real persistence).
@@ -185,7 +185,7 @@ export function detectUnitsByImportStrategy(
       excludedTestFiles.push(resolved.relativeFilePath);
       continue;
     }
-    // T-LR-3 real-data finding — a file whose ONLY service evidence is a
+    // Real-data finding — a file whose ONLY service evidence is a
     // weak, bare stereotype (overridableServiceFilePaths) is NOT skipped
     // here; the calling pass replaces that weak unit with whatever this
     // detector produces below, instead of silently losing real persistence/
@@ -210,22 +210,22 @@ export function detectUnitsByImportStrategy(
       // Same fileNodeId-based lookup the original detectors used (not the
       // file-string-keyed match from findFilesImportingLibraries) — exact
       // parity with the pre-consolidation algorithm. Falls back to the Java
-      // qualified-import resolution (T-R1-3) when no literal/ref_ target
+      // qualified-import resolution when no literal/ref_ target
       // matched — surfaces the REAL package name as evidence.signal (e.g.
       // "org.postgresql.core.Utils") instead of the generic unknown-lib text.
       const fileEdges = graph.edges.filter((e) => e.source === fileNodeId);
       const literalMatch = fileEdges.find((e) => libraries.has(e.target))?.target;
       const javaMatch = literalMatch === undefined ? fileEdges.map((e) => resolveJavaMatch(run, e, libraries, fileLineCache)).find((m) => m !== undefined) : undefined;
       const matchedLibrary = literalMatch ?? javaMatch?.qualified;
-      // T-MR-4 — the catalogue's OWN library name (e.g. "org.postgresql"),
+      // The catalogue's OWN library name (e.g. "org.postgresql"),
       // for ownerBaseClasses/ownerFieldTypes lookups. Distinct from
       // matchedLibrary (the evidence.signal text below) because a Java
       // match's resolved qualified import (e.g. "org.postgresql.core.Utils")
       // is never itself a catalogue key — see resolveJavaMatch's doc comment.
       const matchedCatalogueLibrary = literalMatch ?? javaMatch?.catalogueLib;
 
-      // T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
-      // driver-import evidence") — a class whose only relationship to a
+      // BACKLOG.md's "@Configuration classes mis-typed database via
+      // driver-import evidence" — a class whose only relationship to a
       // matched library is via factory-wiring (any annotation in
       // wiringOnlyAnnotations, catalogue-driven, never a hardcoded name
       // here) is never a real owner/user of it, regardless of which
@@ -255,7 +255,7 @@ export function detectUnitsByImportStrategy(
         if (!classExtendsBaseClass(absPath, classNode.source_location, requiredBaseClass, fileLineCache)) continue;
       }
 
-      // T-MR-4 — the composition-ownership counterpart: a library like the
+      // The composition-ownership counterpart: a library like the
       // AWS SDK's Dynamo clients is never subclassed, so ownership can only
       // be proven by a real field of the client's own type (see
       // class-ownership-resolver.ts's classDeclaresFieldOfType doc comment).
