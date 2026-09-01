@@ -4,7 +4,7 @@ import { CalmDocument, CalmNode, CalmNodeType, CalmRelationship, CalmMetadataEnt
 import { DecisionRecord, Override, OverrideApplicationResult } from '../../types/overrides';
 
 /**
- * T-FS-6 — the only place `x-aac-status: 'reviewed'` is ever set (see
+ * The only place `x-aac-status: 'reviewed'` is ever set (see
  * TypedUnit.status/TypedRelationship.status's own doc comment in
  * typed-facts.ts: Analysis never writes 'reviewed', only override-applier.ts
  * does, on the element an ACTIVE Override actually touched). Replaces any
@@ -16,7 +16,7 @@ function withReviewedStatus(metadata: CalmMetadataEntry[]): CalmMetadataEntry[] 
   return [...metadata.filter((m) => m.key !== 'x-aac-status'), { key: 'x-aac-status', value: 'reviewed' }];
 }
 
-/** T-X6-2 — records a "target not found" rejection as BOTH a rejection (existing behavior, unchanged) and an orphan (new, dedicated classification) — see OverrideApplicationResult.orphans' own doc comment for why these are reported separately from other rejection causes. */
+/** Records a "target not found" rejection as BOTH a rejection (existing behavior, unchanged) and an orphan (a dedicated classification) — see OverrideApplicationResult.orphans' own doc comment for why these are reported separately from other rejection causes. */
 function reportOrphan(result: OverrideApplicationResult, override: Override, reason: string): void {
   result.rejected.push({ override_id: override.override_id, reason });
   result.orphans.push({ override_id: override.override_id, override_type: override.override_type, target_ref: override.target_ref, reason });
@@ -62,16 +62,15 @@ function isValidCalmNode(value: unknown): value is CalmNode {
 }
 
 /**
- * T-X6-1 — "connects shape validated" per the task's own acceptance
- * criterion: relationship_add only accepts the `connects` relationship-type
- * shape, the only one this pipeline emits from the deterministic core today
- * (v0.9 §1's interacts/connects fix). A future override supporting
+ * relationship_add only accepts the `connects` relationship-type
+ * shape, the only one this pipeline emits from the deterministic core
+ * today. A future override supporting
  * interacts/deployed-in/composed-of would need this extended deliberately,
  * not silently — same "don't build ahead of a real need" discipline as
  * node_remove's already-existing four-shape cleanup logic below.
  */
 /**
- * T-MR-5 — `boundary_change`'s own new_value shape: which `composed-of`
+ * `boundary_change`'s own new_value shape: which `composed-of`
  * CONTAINER node the target node should belong to now (`container: null`
  * moves it out of every boundary it's currently in, without placing it in a
  * new one — an honest "no boundary" outcome, not a silently-refused case).
@@ -119,7 +118,7 @@ function isValidConnectsRelationship(value: unknown): value is CalmRelationship 
  * Supports node_add / type_change / node_remove / node_rename /
  * relationship_add / relationship_remove — the hard predecessor for
  * human-in-the-loop-completed edges; those mitigations were false claims
- * until this shipped. `boundary_change` (T-MR-5) reassigns which
+ * until this shipped. `boundary_change` reassigns which
  * `composed-of` container node a target node belongs to — the first override
  * type to touch the `composed-of` relationship shape (relationship_add stays
  * `connects`-only, per isValidConnectsRelationship's own doc comment); moves
@@ -348,7 +347,7 @@ export function applyOverrides(calm: CalmDocument, overridesDir: string): { calm
           } else {
             relationships.push({
               'unique-id': `${container}--composed-of--override`,
-              description: `${container} is composed-of ${override.target_ref} (T-MR-5 boundary_change override)`,
+              description: `${container} is composed-of ${override.target_ref} (boundary_change override)`,
               'relationship-type': { 'composed-of': { container, nodes: [override.target_ref] } },
               metadata: withReviewedStatus([{ key: 'x-aac-override-provenance', value: override.decision_record_ref }]),
             });
