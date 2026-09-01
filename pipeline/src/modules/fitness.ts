@@ -2,8 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * T-LM-5 (AGENT_TASKS_Ext_Lens_Modules.md, BR-110) — "fitness-for-purpose
- * must be measured, not assumed... a lens with no current fitness
+ * "Fitness-for-purpose must be measured, not assumed... a lens with no current fitness
  * measurement may inform, but must not gate, a governance decision." Before
  * this, a module's measured status (P/R against `coe-lab/gold/modules/`)
  * lived ONLY as Claim_Register.md prose — real, but not machine-readable,

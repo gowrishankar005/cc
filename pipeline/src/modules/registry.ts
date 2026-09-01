@@ -12,7 +12,7 @@ import { TypedFacts } from '../types/typed-facts';
 export interface ModuleContext {
   outDir: string;
   overridesDir?: string;
-  /** T-X7-3 — --no-system-node; only calm-generator reads this, other modules ignore it safely. */
+  /** --no-system-node; only calm-generator reads this, other modules ignore it safely. */
   includeSystemNode?: boolean;
 }
 
