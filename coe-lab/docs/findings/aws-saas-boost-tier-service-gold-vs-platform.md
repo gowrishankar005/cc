@@ -110,9 +110,9 @@ See `coe-lab-hard-test-backlog.md` HT-ASB-*.
 
 **Promoted to product (2026-08-08):** HT-ASB-001 → `docs/solution/BACKLOG.md` **B-lambda-http**; HT-ASB-002 → **B-dynamo-handler-kind**. Claim Register: **U-http-serverless** (`specified-unbuilt`). This finding remains the standing exam evidence, not CoE-only noise.
 
-### Why Fidelity docs did not surface this earlier
+### Why the target-customer docs did not surface this earlier
 
-Fidelity named Lambda, but the programme **binned cloud under deploy (k8s)** and productized only Dynamo + SQS/SNS from the AWS half of the yardstick. Annotation-framework HTTP (U-http) stayed the only HTTP claim cell. Full process RCA: `docs/solution/Claim_Register.md` § “Process note — how Lambda was in Fidelity but not on the build queue.”
+The target customer named Lambda, but the programme **binned cloud under deploy (k8s)** and productized only Dynamo + SQS/SNS from the AWS half of the yardstick. Annotation-framework HTTP (U-http) stayed the only HTTP claim cell. Full process RCA: `docs/solution/Claim_Register.md` § “Process note — how Lambda was named but not on the build queue.” (this quote may need to match that file's own header text exactly — see its current wording if this feels stale)
 **Not implemented this session** (eval isolation): Lambda/API-GW catalogue rows, Dynamo ontology, test exclusion.
 
 ---

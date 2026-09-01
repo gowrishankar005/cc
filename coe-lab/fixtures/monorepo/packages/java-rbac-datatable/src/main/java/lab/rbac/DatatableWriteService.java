@@ -4,7 +4,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Lab fixture — authorization-enforcing service layer with NO HTTP surface
- * (Fineract DatatableWriteService-shaped). Platform should emit a service
+ * (a reference Java/JAX-RS banking platform's DatatableWriteService-shaped). Platform should emit a service
  * unit from @PreAuthorize alone and attach RBAC control evidence.
  */
 public interface DatatableWriteService {

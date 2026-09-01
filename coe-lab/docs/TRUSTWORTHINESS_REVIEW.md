@@ -12,8 +12,8 @@
 | Question | Answer |
 |---|---|
 | Is the lab **trustworthy enough to start evaluating** the platform? | **Yes.** Core tier has measured scores (all core packages **pass** after scorer/fixture fixes). |
-| Does it **align with requirements**? | **Strongly for Slice 1/2 languages and Fidelity-aligned *signal menu***; intentionally incomplete for out-of-scope matrix cells (frontend, Scala, gRPC). |
-| Biggest remaining trust risk | **Representativeness** — lab is tiny; still need wild-type (a reference Java microservices banking sample / Fineract). Stretch packages correctly show **0 recall** until messaging/cloud land. |
+| Does it **align with requirements**? | **Strongly for Slice 1/2 languages and financial-services-aligned *signal menu***; intentionally incomplete for out-of-scope matrix cells (frontend, Scala, gRPC). |
+| Biggest remaining trust risk | **Representativeness** — lab is tiny; still need wild-type (a reference Java microservices banking sample / a reference Java/JAX-RS banking platform). Stretch packages correctly show **0 recall** until messaging/cloud land. |
 | Second risk | Nest dual **openapi.yaml** unit (mitigated in gold ignore); Java packages use thin poms, not full Spring Boot apps. |
 
 **One line:** Lab is now a **measurement-capable** core gate (nodes/interfaces/rels on controlled packages) **plus** stretch probes for open platform gaps — not a substitute for real monorepos.
@@ -97,7 +97,7 @@ Legend: **G** = gold + fixture exist · **P** = partial/stretch · **—** = del
 
 | Claim | Reality |
 |---|---|
-| “Fidelity stack” | **Signal menu** from hiring + v0.14 — honest in research doc |
+| “Target-customer stack” | **Signal menu** from hiring + v0.14 — honest in research doc |
 | “Many fintech frameworks” | Good for Java/Python/TS **in pipeline scope** |
 | Production monorepo mess | **Not** represented (half-migrations, multi-module Maven reactor, codegen OpenAPI) |
 | Scale | Packages are tiny — no 7k-file stress |
@@ -114,7 +114,7 @@ Legend: **G** = gold + fixture exist · **P** = partial/stretch · **—** = del
 | ts-nestjs-users | Interfaces plausible; OpenAPI present | Depends on Nest extraction quality of stubs | **Yes with caution** |
 | ts-orders-dynamo | Stretch gaps documented | Expect FN on dynamo/network | **Stretch only** |
 | java-spring-payments | Annotations + minimal pom | **Empirical pass** (3 native routes) | **Yes** |
-| java-jaxrs-charges | Fineract-shaped + pom | **Empirical pass** (decorator path, 0 native) | **Yes** |
+| java-jaxrs-charges | a reference Java/JAX-RS banking platform-shaped + pom | **Empirical pass** (decorator path, 0 native) | **Yes** |
 | java-kafka-settlement | Stretch | Expect FN network | **Stretch only** |
 | lib-fintech-common | Strong trap | Must stay zero services | **Yes — precision gate** |
 | deploy-k8s-trust | Stretch | Expect fail until X5 | **Stretch only** |
@@ -130,7 +130,7 @@ Legend: **G** = gold + fixture exist · **P** = partial/stretch · **—** = del
 | **@PreAuthorize / jwt.decode packages** | Controls are in-scope requirements | **P1** |
 | **Spring Data repository package** | v0.12/v0.14 persistence shape | **P1** |
 | **FastAPI package** | Coverage matrix Python routes diversity | **P1** |
-| **SNS** (alongside SQS) | Fidelity cloud messaging | **P2** |
+| **SNS** (alongside SQS) | the target customer's cloud messaging | **P2** |
 | **Relationship-rich gold** (service→service HTTP client) | Edge recall under-tested | **P1** |
 | **CI workflow** for core tier | Continuous trust | **P1** |
 | **Aggregator report** (all packages one table) | Pilot scorecard | **P1** |
@@ -148,7 +148,7 @@ Use this **acceptance bar** before treating lab results as platform quality:
 3. At least **one multi-root** Python score exists.  
 4. Stretch packages may fail; failures map to **expectedPlatformGaps** or a new gap class — not silent.  
 5. Same commit of gold + fixtures used for score.  
-6. Parallel **wild-type** note: a reference Java microservices banking sample and/or Fineract still pass regression suite.  
+6. Parallel **wild-type** note: a reference Java microservices banking sample and/or a reference Java/JAX-RS banking platform still pass regression suite.  
 7. No platform PR that both opens gold and changes catalogues without an eval-only miss write-up.
 
 ---
@@ -170,9 +170,9 @@ Use this **acceptance bar** before treating lab results as platform quality:
 
 | | |
 |---|---|
-| **Requirements alignment** | **Good** for languages/frameworks in Slice 1/2 and Fidelity *signal* coverage; honest about stretch and out-of-scope. |
+| **Requirements alignment** | **Good** for languages/frameworks in Slice 1/2 and target-customer *signal* coverage; honest about stretch and out-of-scope. |
 | **Trustworthiness now** | **Design-trustworthy, measurement-not-yet-proven.** Isolation and methodology are solid; **empirical baselines are the missing seal.** |
 | **Safe use** | Use core packages + trap for regression-style eval after baselines; use stretch to track X2/X5/X7. |
-| **Unsafe use** | “Lab all green ⇒ ready for Fidelity monorepo” without wild-type and without fixing detect()/stub risks. |
+| **Unsafe use** | “Lab all green ⇒ ready for the target customer's monorepo” without wild-type and without fixing detect()/stub risks. |
 
 **Honest summary:** The CoE lab is a **credible evaluation design** aligned with your requirements and dual goals. It becomes **trustworthy evidence** only after you **run the scorer against real pipeline output** on core packages and fix any fixture/detect gaps those runs expose — until then, treat it as an excellent **spec for validation**, not yet a completed **validation result**.

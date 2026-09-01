@@ -1,4 +1,4 @@
-# Wild-type Fineract gold (under coe-lab only)
+# Wild-type a reference Java/JAX-RS banking platform gold (under coe-lab only)
 
 **Location:** `coe-lab/gold/calm/fineract-*` — never under `spikes/`.
 
@@ -10,7 +10,7 @@ Spikes/clones are disposable experiment state. Gold for evaluation lives only in
 
 ## Recommendation (why three docs, not one mega-file)
 
-Full Apache Fineract ≈ 171 JAX-RS resources and ≈ 256 JPA entities across ~34 modules. A single complete hand gold is multi-week and will bit-rot. Project success needs **honest depth where the platform is judged** and **honest grain elsewhere**:
+The full reference platform is ≈ 171 JAX-RS resources and ≈ 256 JPA entities across ~34 modules. A single complete hand gold is multi-week and will bit-rot. Project success needs **honest depth where the platform is judged** and **honest grain elsewhere**:
 
 | Gold package | Grain | Purpose |
 |---|---|---|
@@ -30,7 +30,7 @@ Full Apache Fineract ≈ 171 JAX-RS resources and ≈ 256 JPA entities across ~3
 
 ## Source used for this revision
 
-Authoring evidence was taken from a local Apache Fineract tree (module paths as in gold metadata). That clone is **not** the gold; only these JSON files are.
+Authoring evidence was taken from a local reference Java/JAX-RS banking platform tree (module paths as in gold metadata). That clone is **not** the gold; only these JSON files are.
 
 ## Validate
 

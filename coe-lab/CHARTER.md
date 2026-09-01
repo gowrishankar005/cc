@@ -12,9 +12,9 @@ Provide a **versioned, reproducible benchmark** for the Architecture-as-Code pla
 
 ## Design stance (from product recommendation)
 
-- **Benchmark lab**, not “rebuild Fidelity as many products.”
-- **Fidelity stack = strong menu of signals**, not a claim to clone Fidelity.
-- **Public proxies** (a reference Java microservices banking sample, Fineract) remain **wild-type** checks; lab is **controlled trial**.
+- **Benchmark lab**, not “rebuild a large financial-services organization as many products.”
+- **Target customer's stack = strong menu of signals**, not a claim to clone it.
+- **Public proxies** (a reference Java microservices banking sample, a reference Java/JAX-RS banking platform) remain **wild-type** checks; lab is **controlled trial**.
 - Prefer **one monorepo, many packages** (matches pipeline multi-root reality).
 
 ## In scope
@@ -23,7 +23,7 @@ Provide a **versioned, reproducible benchmark** for the Architecture-as-Code pla
 |---|---|
 | Multi-language packages | Java, Python, TypeScript/Node within platform Slice 1/2 languages |
 | Fintech-popular frameworks | Spring-style, JAX-RS-style, Flask, NestJS, cloud SDK patterns |
-| Fidelity-aligned signals | REST/Spring Boot, OpenAPI/Swagger, Kafka/SQS/SNS, DynamoDB, PostgreSQL-class persistence, OAuth2/JWT-style controls, k8s shared secrets |
+| Financial-services-aligned signals | REST/Spring Boot, OpenAPI/Swagger, Kafka/SQS/SNS, DynamoDB, PostgreSQL-class persistence, OAuth2/JWT-style controls, k8s shared secrets |
 | Gold architecture | Nodes, interfaces, relationships, must-not-detect, out-of-scope |
 | Scoring harness | Deterministic P/R vs gold |
 | Isolation | Gold hidden from implementation agents |
@@ -33,7 +33,7 @@ Provide a **versioned, reproducible benchmark** for the Architecture-as-Code pla
 | Item | Why |
 |---|---|
 | Full business products / UIs | Cost and identity crisis; Angular frontend deferred (language scope) |
-| Scala/Spark data platform | Evidenced at Fidelity but out of Slice 1/2 generator language scope for now |
+| Scala/Spark data platform | Evidenced at the target customer but out of Slice 1/2 generator language scope for now |
 | .NET / mainframe | Common in fintech; not in current pipeline languages |
 | LLM-as-ground-truth | Non-reproducible; not used as oracle |
 | Training detectors by reading gold | Breaks evaluation integrity |

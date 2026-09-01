@@ -2,7 +2,7 @@
   "packageId": "java-jaxrs-charges",
   "goldVersion": "0.1.0",
   "tier": "core",
-  "description": "JAX-RS charges API + JPA Charge entity (Fineract-shaped).",
+  "description": "JAX-RS charges API + JPA Charge entity (a reference Java/JAX-RS banking platform-shaped).",
   "platformMinContract": "1.0.0",
   "fixturePath": "fixtures/monorepo/packages/java-jaxrs-charges",
   "changelog": "v0.1.0 initial",

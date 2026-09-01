@@ -7,7 +7,7 @@
 
 ## What is wild-type gold
 
-Hand-authored (or independently reviewed) expected architecture for **real external codebases** used as evidence (Apache Fineract modules, later Ghostfolio slices, etc.), not synthetic lab fixtures.
+Hand-authored (or independently reviewed) expected architecture for **real external codebases** used as evidence (a reference Java/JAX-RS banking platform's modules, later Ghostfolio slices, etc.), not synthetic lab fixtures.
 
 | Location | Role |
 |---|---|
@@ -25,7 +25,7 @@ Hand-authored (or independently reviewed) expected architecture for **real exter
 | **Platform implementers** | Must **not** read gold to invent detectors (ISOLATION.md) |
 | **Refresh trigger** | Fixture/module source intent change; claim register cell change; AREC strategy ship that changes expected story |
 
-Cadence: when Fineract gold or claim cells change; not every platform commit.
+Cadence: when a reference Java/JAX-RS banking platform gold or claim cells change; not every platform commit.
 
 ---
 
@@ -35,7 +35,7 @@ Cadence: when Fineract gold or claim cells change; not every platform commit.
 |---|---|---|
 | **L0** | Always after authoring | calm validate |
 | **L1** | Unit/path/control presence | Semantic match |
-| **L2** | Architecture story | Service→db (etc.) per gold; **Fineract L2 fails today** |
+| **L2** | Architecture story | Service→db (etc.) per gold; **a reference Java/JAX-RS banking platform L2 fails today** |
 | **Extras** | Extra gen entities | Soft for core entity inventory; hard only if gold `mustNotDetect` |
 
 **Lab core green does not supersede wild gold.**  

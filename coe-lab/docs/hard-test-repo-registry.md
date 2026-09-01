@@ -61,4 +61,4 @@ One clone → one or more **package-ids** (scoped roots). Prefer deep slices.
 | Date | Note |
 |---|---|
 | 2026-08-08 | Hard-test #3 **aws-saas-boost-tenant-service** compared — generalizes WDL-1; HT-ASB-002 not reproduced (handler has no Dynamo import) |
-| 2026-08-08 | Initial registry from local spikes inventory; Fineract gold already present |
+| 2026-08-08 | Initial registry from local spikes inventory; a reference Java/JAX-RS banking platform's gold already present |

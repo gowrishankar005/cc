@@ -1,5 +1,5 @@
 /**
- * Lab fixture — cloud-native order store (Fidelity-aligned AWS patterns).
+ * Lab fixture — cloud-native order store (target-customer-aligned AWS patterns).
  * Real @aws-sdk packages are not required at install time; import paths are
  * the detection signal for the platform catalogue.
  */

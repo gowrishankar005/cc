@@ -68,7 +68,7 @@
 
 | Date | Note |
 |---|---|
-| 2026-08-08 | File created; hard-test track prepared; Fineract historical notes seeded so we don’t re-RCA blindly |
+| 2026-08-08 | File created; hard-test track prepared; a reference Java/JAX-RS banking platform's historical notes seeded so we don’t re-RCA blindly |
 | 2026-08-08 | **maven-doxia-system-map** first hard-test cycle complete: HT-DOX-001…005; empty CALM / no module map |
 | 2026-08-08 | **aws-saas-boost-tier-service** second hard-test: HT-ASB-001…006; Dynamo yes, Lambda HTTP no, TierService mis-kinded database |
 | 2026-08-08 | **HT-ASB-001/002 promoted to product P1** — `B-lambda-http`, `B-dynamo-handler-kind` in `docs/solution/BACKLOG.md`; Claim **U-http-serverless** |

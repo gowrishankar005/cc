@@ -57,7 +57,7 @@ Verdict legend: ✅ BUILT · 🟡 PARTIAL · ❌ MISSING
 | Deterministic, reproducible output + regression suite (57 tests) | Not addressed at all in the research doc's pipeline |
 | Claim Register / AREC — machine-checked honesty about what completeness may be claimed | No equivalent anywhere in the field surveyed, including FINOS |
 | Ignored-items + unmapped-signal + silence metrics (misses are visible, not silent) | FINOS's LLM skill has no equivalent; static tools generally drop what they can't classify |
-| Multi-root/monorepo cross-package edges (265 real Fineract edges) | Research doc scoped to a single repo; Weaver already handles the harder shape |
+| Multi-root/monorepo cross-package edges (265 real edges from a reference Java/JAX-RS banking platform) | Research doc scoped to a single repo; Weaver already handles the harder shape |
 | Polyglot (Java+Python+TS) under one contract | Research doc is Spring-only by design |
 | Catalogue-driven extensibility (new signal = data row) | jQAssistant needs Cypher; LLM skill needs prompt editing; Weaver's is the cleanest extension model of the options surveyed |
 | Confidence scoring + HITL trigger on low architecture coverage | No surveyed alternative has any confidence model |

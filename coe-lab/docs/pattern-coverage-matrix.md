@@ -26,7 +26,7 @@
 
 ## Mechanism × sample (qualitative)
 
-| Mechanism | Fineract | a reference Java microservices banking sample | Ghostfolio | Lab |
+| Mechanism | a reference Java/JAX-RS banking platform | a reference Java microservices banking sample | Ghostfolio | Lab |
 |---|---|---|---|---|
 | HTTP units | strong | strong (Flask/Spring) | strong Nest | strong |
 | Entity units | strong | partial Java | n/a (Prisma import) | strong |
@@ -44,10 +44,10 @@
 
 | Rank | Family | Claim cell | Why high risk | Density signal |
 |---|---|---|---|---|
-| **1** | Multi-hop layered service→store | R2 | Fineract gold L2 fail; core APIs rarely import entities | 2/11 domain imports |
-| **2** | Call-site auth / permission APIs | C-call | validateHasReadPermission ≫ PreAuthorize on Fineract HTTP | 12 vs 4 in core; 3 in charge |
+| **1** | Multi-hop layered service→store | R2 | a reference Java/JAX-RS banking platform gold L2 fail; core APIs rarely import entities | 2/11 domain imports |
+| **2** | Call-site auth / permission APIs | C-call | validateHasReadPermission ≫ PreAuthorize on a reference Java/JAX-RS banking platform HTTP | 12 vs 4 in core; 3 in charge |
 | **3** | Import-graph ontology (service vs database) | U-persist-import | Prisma DTO imports vs real stores | Ghostfolio fixed FP; modelling open |
-| **4** | Messaging producers | U-msg-producer | Spec’d unbuilt | Lab + Fineract evidence elsewhere |
+| **4** | Messaging producers | U-msg-producer | Spec’d unbuilt | Lab + a reference Java/JAX-RS banking platform evidence elsewhere |
 | **5** | Entity–entity R0 noise vs architecture | R0 quality | Core 64 rels, 0 service-touching | Full pipeline evidence |
 | **6** | Spring Data / jOOQ | U-spring-data | Catalogue not fully dispatched | Requirements backlog |
 | **7** | Contract auth (OpenAPI) | C-contract | Partial fixture only | Lab nest openapi |
@@ -56,7 +56,7 @@
 
 ## Explicit non-run
 
-Full platform scan of all samples **not** required for this ranking. Deep pipeline evidence already exists for Fineract charge/core and Ghostfolio access slice.
+Full platform scan of all samples **not** required for this ranking. Deep pipeline evidence already exists for a reference Java/JAX-RS banking platform charge/core and Ghostfolio access slice.
 
 ---
 
@@ -104,16 +104,16 @@ Note: `rest`/`entity`/`preauth`/`validateHas` counts differ from Wave 1-B3's own
 | Rank (R3-1) | Family | Claim cell | Status vs Wave 1-B3 | Why |
 |---|---|---|---|---|
 | ~~1~~ | Multi-hop layered service→store | R2 | **CLOSED** for the flagship case (T-R1-2/T-R1-3, Robustness Phase R1) | Real `fineract-charge`+`fineract-provider` multi-root: `ChargesApiResource → ChargeReadPlatformServiceImpl`, `calm validate` 0 errors. 11+3+3 further real closures across `fineract-provider`/`fineract-core`. Demoted off the ranked list — no longer the standing #1 risk. |
-| ~~2~~ | Call-site auth / permission APIs | C-call | **Substantially advanced** (T-R2-2) | 2 vocabularies → 4 (added Waltz `hasRole`, Fineract `isAuthenticated`). Still not exhaustive — see new rank 1 below. |
+| ~~2~~ | Call-site auth / permission APIs | C-call | **Substantially advanced** (T-R2-2) | 2 vocabularies → 4 (added a reference Java governance platform `hasRole`, a reference Java/JAX-RS banking platform `isAuthenticated`). Still not exhaustive — see new rank 1 below. |
 | **1** | Import-graph ontology (service vs database) | U-persist-import | Unchanged, still open | Prisma DTO-vs-store ambiguity (Q13) decided-but-not-code-fixed; real risk any time a file imports an ORM's generated types for typing only, not persistence. |
 | **2** | Messaging producers beyond Kafka field-type | U-msg-producer | Partially advanced (Kafka field-type built, T-E1), SQS/SNS producer still open | `lab-ts-orders-dynamo` probe confirms BOTH dynamodb+sqs imports in one real fixture — the exact double-detector shape already tested, but SQS *producer* detection itself (as opposed to persistence) remains unbuilt. |
 | **3** | Entity–entity R0 noise vs architecture | R0 quality | Unchanged, structurally permanent | `fineract-provider` alone: 91 real `@Entity` classes — R0 entity-mesh volume only grows as more real modules are scanned; grading (T-A2) mitigates the mislabeling risk but the noise volume itself isn't reduced. |
 | **4** | Spring Data / jOOQ | U-spring-data | **CLOSED** (T-E3 Spring Data, T-R1-3 jOOQ) | `waltz-data` alone: 229 real jOOQ-detected units. `fineract-provider`: 90 real Spring Data repository interfaces. Demoted off the ranked list. |
 | **5** | Contract auth (OpenAPI) | C-contract | Unchanged, still narrow | Still lab-fixture-only real evidence (no OpenAPI file found in any newly-probed real repo this round — `waltz`/`fineract-provider` neither ship one at these module roots). |
-| **6** *(new)* | Call-site auth beyond the now-4 named vocabularies | C-call | New, named honestly | `fineract-provider`'s 72 real `validateHas*` call sites vs only 1 `isAuthenticated` and 0 `hasRole` (Waltz-specific) confirms the catalogue is still Fineract/Waltz-shaped — a fifth real repo's own vocabulary (not yet sampled) would very likely add a fifth row, the same way this round added a third and fourth. |
+| **6** *(new)* | Call-site auth beyond the now-4 named vocabularies | C-call | New, named honestly | `fineract-provider`'s 72 real `validateHas*` call sites vs only 1 `isAuthenticated` and 0 `hasRole` (a reference Java governance platform-specific) confirms the catalogue is still a reference Java/JAX-RS banking platform/a reference Java governance platform-shaped — a fifth real repo's own vocabulary (not yet sampled) would very likely add a fifth row, the same way this round added a third and fourth. |
 
 Two real, load-bearing corrections from this refresh, not just re-ranking: (1) ranks 1 and 2 from Wave 1-B3 are **retired**, not carried forward unchanged — a discovery cadence that never retires a closed risk isn't actually tracking current risk, it's accumulating a todo list; (2) the new rank 6 names the SAME kind of gap rank 2 named originally (vocabulary breadth), at a smaller, honestly-scoped size — this is what "the risk shrinks, doesn't vanish" looks like in practice, worth stating explicitly rather than letting the family quietly disappear.
 
 ## Explicit non-run (unchanged from Wave 1-B3)
 
-Full platform scan of all 18 samples **not** required for this ranking. Deep pipeline evidence already exists for Fineract charge/core/security/provider (Phase R1/R2 work), Waltz data/web (same), Ghostfolio access slice, and the `ts-orders-dynamo` lab fixture (regression suite).
+Full platform scan of all 18 samples **not** required for this ranking. Deep pipeline evidence already exists for a reference Java/JAX-RS banking platform charge/core/security/provider (Phase R1/R2 work), a reference Java governance platform data/web (same), Ghostfolio access slice, and the `ts-orders-dynamo` lab fixture (regression suite).

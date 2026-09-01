@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   Lab fixture — API Gateway path/method wiring, split from lambda-functions.yaml
-  on purpose (mirrors real aws-saas-boost-private-api.yaml + saas-boost-svc-tier.yaml
+  on purpose (mirrors a reference AWS SaaS sample's private-api.yaml + svc-tier.yaml
   split — the path tree and the Lambda Handler binding live in different real
   files). Tests the multi-file, same-directory join scope decided in
   Serverless_HTTP_and_Dynamo_Ownership_Design.md §2.

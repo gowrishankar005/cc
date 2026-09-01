@@ -51,7 +51,7 @@ Before writing JSON, record in registry + gold metadata:
 | Intent | routes + DBs + key connects + controls (what we *judge*) |
 | Out of scope | e.g. “not every entity”, command-bus, frontend |
 
-Prefer **deep slice** over whole monorepo (Fineract gold model: charge/core, not 6618 files in one gold).
+Prefer **deep slice** over whole monorepo (a reference Java/JAX-RS banking platform's gold model: charge/core, not 6618 files in one gold).
 
 ### A.2 Authoring rules
 
@@ -127,7 +127,7 @@ Use `validate-calm-pair.mjs --package <id> [--require-l2]` when package is regis
 
 1. Scorecard table (L0–L3)  
 2. Strengths (what platform got right)  
-3. Weaknesses / gaps (mechanism class, not “fix Fineract”)  
+3. Weaknesses / gaps (mechanism class, not “fix the reference platform”)  
 4. Issues / errors (crashes, schema fail, timeouts)  
 5. RCA only if **errors** or **systematic miss** (1 page max): symptom → chain → not-causes  
 6. Claim language: allowed vs forbidden after this sample  

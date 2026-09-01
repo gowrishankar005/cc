@@ -2,7 +2,7 @@
   "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
   "unique-id": "coe-lab-java-jaxrs-charges",
   "name": "CoE Lab \u2014 JAX-RS Charges",
-  "description": "Hand-authored gold architecture for Fineract-shaped JAX-RS ChargesApiResource + JPA Charge entity.",
+  "description": "Hand-authored gold architecture for a reference Java/JAX-RS banking platform-shaped JAX-RS ChargesApiResource + JPA Charge entity.",
   "metadata": [
     {
       "key": "x-lab-gold-source",
