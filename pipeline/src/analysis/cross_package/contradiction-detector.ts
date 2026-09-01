@@ -3,9 +3,8 @@ import { TypedUnit, IgnoredItem } from '../../types/typed-facts';
 import { jdbcScheme } from '../jdbc-url';
 
 /**
- * T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources").
- *
- * BACKLOG's own named gap: two evidence sources asserting DIFFERENT VALUES
+ * BACKLOG.md's own named gap ("Contradiction detection between evidence
+ * sources"): two evidence sources asserting DIFFERENT VALUES
  * for the same real-world fact currently just both add weight in
  * confidence-scorer.ts — contradiction raises confidence instead of
  * lowering it, and nothing forces a human to look. Evidenced class: a
@@ -14,16 +13,16 @@ import { jdbcScheme } from '../jdbc-url';
  *
  * DELIBERATE DESIGN CHOICE: this does NOT touch scoreConfidence or any
  * unit's own confidence number — averaging two conflicting values (or
- * silently picking one to "win") is exactly the failure mode this task
- * exists to prevent (T-FS-5/E5 already found averaging correlated
- * multi-clause evidence makes decisions LESS correct; a genuine value-level
- * contradiction is worse to average than that). Each source's own
+ * silently picking one to "win") is exactly the failure mode this
+ * exists to prevent (a confidence-replay experiment already found averaging
+ * correlated multi-clause evidence makes decisions LESS correct; a genuine
+ * value-level contradiction is worse to average than that). Each source's own
  * evidence-based confidence stays exactly what it already was. Instead,
  * this only ever WRITES a new, distinguishable IgnoredItem
  * (reason: AMBIGUOUS_BOUNDARY, detail prefixed "contradiction: ") that
  * hitl-review-trigger.ts turns into an always-on review-queue trigger
- * (never gated behind a silence flag, same convergent design as T-FS-1's
- * tier-b-single-candidate) — forcing a human decision, never a silent
+ * (never gated behind a silence flag, same convergent design as the
+ * tier-b-single-candidate class) — forcing a human decision, never a silent
  * pick, never a blended number.
  *
  * SCOPE (see scope-limitations.yml's tier-b-single-candidate-scope
@@ -123,8 +122,7 @@ export function detectValueContradictions(deployments: DeploymentManifest[], uni
   for (const unit of units) {
     if (unit.kind !== 'database') continue;
     // Real second key found verifying this against a reference Java/JAX-RS
-    // banking platform (T-FS-3
-    // real-instance pass, 2026-08-15): spring-config-pass.ts's
+    // banking platform's real-instance pass (2026-08-15): spring-config-pass.ts's
     // extractDatasource() also falls back to spring.datasource.hikari.jdbcUrl
     // when spring.datasource.url is absent — same real fact, different
     // property key, so this check must accept either signal prefix.

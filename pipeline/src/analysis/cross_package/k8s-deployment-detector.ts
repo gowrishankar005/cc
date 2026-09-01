@@ -4,7 +4,7 @@ import { namespaceNodeId } from '../../modules/calm-generator/k8s-namespace-node
 import { findUnitForDeployment } from './deployment-correlation';
 
 /**
- * T-MR-3 — runtime PLACEMENT half of the k8s manifest provider (the trust
+ * Runtime PLACEMENT half of the k8s manifest provider (the trust
  * half, shares-secret, is k8s-trust-detector.ts). Flat/pre-rendered
  * manifests only, same scope boundary as the rest of this provider
  * (`OOS-helm-kustomize`).

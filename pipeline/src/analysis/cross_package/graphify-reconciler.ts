@@ -36,20 +36,20 @@ export interface NodeUnitMatch {
   unit: TypedUnit;
 }
 
-// T-P0-1 (E2, graded fact admission) — BACKLOG.md's "Graded fact admission
+// BACKLOG.md's "Graded fact admission
 // (dual-unit gate)" row. Below multi-hop-bridge-detector.ts's R2b tier
 // (8/5), the lowest confidence this pipeline emits before this change: an
 // admitted edge is weaker evidence than a 2-hop bridge inference — it's a
 // raw structural reference to a target this pipeline could not classify at
 // all, not an inference chained through units it DID classify.
-// Values live in `fact-trust-matrix.ts` (T-LR-6, mechanism 'admitted-unresolved')
+// Values live in `fact-trust-matrix.ts` (mechanism 'admitted-unresolved')
 // — re-exported here so this is the only import site that changes if the
 // tier moves, not a second hardcoded copy of the number.
 export const ADMITTED_SAME_ROOT_CONFIDENCE = relationshipTrust('codegraph', 'admitted-unresolved', 'same-root');
 export const ADMITTED_CROSS_ROOT_CONFIDENCE = relationshipTrust('codegraph', 'admitted-unresolved', 'cross-root');
 
 /**
- * AREC Wave 3 T-C1 — extracted so multi-hop-bridge-detector.ts (R2) can
+ * Extracted so multi-hop-bridge-detector.ts (R2) can
  * reuse the EXACT same node->unit resolution reconcileCrossPackageEdges
  * already uses, instead of a second, potentially-drifting copy of the same
  * filePath/line-span matching logic. Behavior unchanged from before this
@@ -144,7 +144,7 @@ function isBareNameCollision(
 }
 
 /**
- * T-P0-1 (E2) — synthesizes a NodeUnitMatch for a raw Graphify node that
+ * Synthesizes a NodeUnitMatch for a raw Graphify node that
  * didn't resolve to any real TypedUnit, so an edge touching it can be
  * admitted instead of silently dropped. Only ever built from REAL data
  * already on the node (source_file/source_location/label) — never a fake
@@ -153,7 +153,7 @@ function isBareNameCollision(
  * failing means this pipeline genuinely doesn't know what root/file this
  * is, and admitting a fact with a fabricated location would violate the
  * same "never guess" discipline this codebase already holds everywhere
- * else (v0.9 §1). Memoized by raw node id so the same unresolved node
+ * else. Memoized by raw node id so the same unresolved node
  * referenced by multiple edges gets exactly one placeholder unit, not one
  * per edge.
  */
@@ -168,7 +168,7 @@ function buildPlaceholderMatch(
 
   const node = run.graph.nodes.find((n) => n.id === nodeId);
   if (!node) return undefined;
-  // T-P0-1 (E2) — real, evidenced regression found while building this:
+  // Real, evidenced regression found while building this:
   // a node whose FILE also declares a real `implements`-edge target (e.g.
   // an interface something in the repo implements, or any other member —
   // a method node, say — in that same interface's file) is exactly a
@@ -186,7 +186,7 @@ function buildPlaceholderMatch(
   // left unresolved — never admitted; defer entirely to the specialized
   // detector.
   if (node.source_file && implementsTargetFiles.has(node.source_file)) return undefined;
-  // T-P0-1 (E2) — real, evidenced regression found while building this:
+  // Real, evidenced regression found while building this:
   // Graphify emits `source_file: ''`/`source_location: ''` for a bare
   // symbol it could never attribute to a real file at all (confirmed via
   // test/fixtures/nestjs-sample's checked-in graph.json — 'Controller',
@@ -223,12 +223,12 @@ export function reconcileCrossPackageEdges(
   run: CrossPackageGraphRun,
   unitsByRoot: Map<string, TypedUnit[]>,
   /**
-   * T-P0-1 (E2) round 3 — `${edge.source}|${edge.target}` pairs a more
+   * `${edge.source}|${edge.target}` pairs a more
    * specialized detector (today: `multi-hop-bridge-detector.ts`) has
    * already taken ownership of examining, whether it resolved or honestly
-   * refused. Real conflict found running E2 against both
-   * `r2b-implementer-hop-sample` (round 2) and `r2c-direct-delegate-sample`
-   * (round 3): this pass runs before that detector in the default pass
+   * refused. Real conflict found testing against both
+   * `r2b-implementer-hop-sample` and `r2c-direct-delegate-sample`:
+   * this pass runs before that detector in the default pass
    * order, so without this, admission reaches an edge first and admits a
    * blunt, low-confidence fact for exactly the edge the specialized
    * detector was about to examine far more carefully — never guess when a
@@ -237,7 +237,7 @@ export function reconcileCrossPackageEdges(
    */
   reservedPairs: Set<string> = new Set(),
   /**
-   * T-P0-1 (E2) round 3 continued — source files of every bridge candidate
+   * Source files of every bridge candidate
    * `multi-hop-bridge-detector.ts` examined. `reservedPairs` alone proved
    * insufficient against `r2c-direct-delegate-sample`: Graphify emits a
    * SEPARATE `calls` edge straight to the bridge candidate's individual
@@ -254,7 +254,7 @@ export function reconcileCrossPackageEdges(
   const fileLineCache = new Map<string, string[]>();
   const collisionCache = new Map<string, boolean>();
   const placeholders = new Map<string, NodeUnitMatch>();
-  // T-P0-1 (E2) — file-level, not node-id-level; see buildPlaceholderMatch's
+  // File-level, not node-id-level; see buildPlaceholderMatch's
   // doc comment for why. Built from the same `implements` edges
   // multi-hop-bridge-detector.ts's `implementersByTarget` uses. Kept
   // alongside the new edge-pair-level `reservedPairs` check above, not
@@ -272,7 +272,7 @@ export function reconcileCrossPackageEdges(
   for (const edge of run.graph.edges) {
     let from = nodeToUnit.get(edge.source);
     let to = nodeToUnit.get(edge.target);
-    // T-P0-1 (E2) — previously `if (!from || !to) continue` dropped the
+    // Previously `if (!from || !to) continue` dropped the
     // edge outright whenever EITHER side didn't resolve. Now: if exactly
     // one side is missing, try to admit it via a synthesized placeholder;
     // if BOTH are missing, there's no real endpoint to anchor a fact to at

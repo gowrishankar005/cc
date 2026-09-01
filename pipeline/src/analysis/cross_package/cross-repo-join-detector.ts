@@ -5,8 +5,8 @@ import { repoRootNodeId, externalContractNodeId } from '../../modules/calm-gener
 import { TypedRelationship, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 
 /**
- * T-MR-2 (`AGENT_TASKS_Ext_MultiRepo_Deployment.md`) — ranked cross-repo
- * joins, strictly in the order the task's own acceptance text names: shared
+ * Ranked cross-repo joins (`AGENT_TASKS_Ext_MultiRepo_Deployment.md`),
+ * strictly in the order the task's own acceptance text names: shared
  * API-spec identity -> published artifact coordinates -> service-catalogue/
  * DNS. Per package root, per candidate manifest entry, tiers are tried IN
  * ORDER and stop at the first match — never "collect every tier that
@@ -27,7 +27,7 @@ export interface RootJoinInputs {
   // real bug (2026-08-20, caught by inspecting actual generated CALM
   // output, not by reading the code) had this be the full resolved
   // absolute path, baking the scanning machine's own filesystem layout
-  // into the CALM node id/name and breaking T-CL-1 fact-identity stability
+  // into the CALM node id/name and breaking fact-identity stability
   // across two runs from different checkout locations.
   root: string;
   openApiDocuments: OpenApiDocument[];
