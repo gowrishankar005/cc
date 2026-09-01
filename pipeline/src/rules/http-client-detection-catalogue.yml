@@ -1,6 +1,6 @@
-# Catalogue for outbound-http-detector.ts (T-X8-3a/T-X8-3, G-L2-13 — "the
-# biggest missing code-level relationship class after DB" per the review's
-# own §2.1 Tier-1 ranking). Same strategy-catalogue pattern as
+# Catalogue for outbound-http-detector.ts ("the
+# biggest missing code-level relationship class after DB" per an early
+# review's own ranking). Same strategy-catalogue pattern as
 # persistence-detection-catalogue.yml / messaging-detection-catalogue.yml.
 #
 # Real evidence checked BEFORE building this (not assumed): grepped both

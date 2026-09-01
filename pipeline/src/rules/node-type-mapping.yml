@@ -22,7 +22,7 @@ mappings:
     interfaceCategories: []
     descriptiveCategories: [persistence, spring-config]
 
-  # T-X7-1 — a message queue/topic (Kafka topic, JMS queue, SQS queue, SNS
+  # A message queue/topic (Kafka topic, JMS queue, SQS queue, SNS
   # topic) maps to CALM's `network` node-type, not a new CALM-side
   # construct — matches this project's own established convention of
   # reusing an existing CALM enum value for a new architectural category
@@ -33,7 +33,7 @@ mappings:
     interfaceCategories: []
     descriptiveCategories: [messaging, spring-config]
 
-  # T-P0-1 (E2, graded fact admission) — a placeholder unit
+  # Graded fact admission — a placeholder unit
   # graphify-reconciler.ts synthesizes for the unresolved endpoint of an
   # otherwise-dropped Graphify edge (real reference, target not classifiable
   # into service/database/topic). calmNodeType is deliberately NOT one of

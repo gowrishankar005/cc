@@ -160,9 +160,9 @@ rules:
     weight: 10
     calmNodeType: database
 
-  # --- T-LR-3 (BACKLOG.md "Plain-interface bridge detection"): bare Spring
-  # @Service stereotype (requirements v0.10-era gap, named directly in
-  # Architect_Pilot_Feedback_Notes.md Entry 13). Real evidence: a reference
+  # --- BACKLOG.md "Plain-interface bridge detection": bare Spring
+  # @Service stereotype, named directly in
+  # Architect_Pilot_Feedback_Notes.md Entry 13. Real evidence: a reference
   # Java/JAX-RS banking platform's PortfolioCommandSourceWritePlatformServiceImpl
   # carries a bare `@Service` with no other framework marker (no `@Path`,
   # no `@Entity`, no `@PreAuthorize`) — before this row, signal-catalogue.yml
@@ -196,7 +196,7 @@ rules:
     category: framework-bootstrap
     weight: 40
     calmNodeType: service
-    # T-LR-3 — this row is ALSO the sole source of which stereotype names
+    # This row is ALSO the sole source of which stereotype names
     # multi-hop-bridge-detector.ts's disambiguation branch treats as
     # corroborating evidence (rule-schema.ts's bridgeStereotypeSignals()).
     # Never a second, hardcoded copy of "Service" in the detector itself —
@@ -258,8 +258,8 @@ rules:
     weight: 40
     calmNodeType: service
 
-  # --- AREC Wave 3 T-D1 (C-call): call-site security-control evidence ---
-  # v0.10 §0 specified TWO control-detection mechanisms: decorator (built
+  # --- C-call: call-site security-control evidence ---
+  # Two control-detection mechanisms: decorator (built
   # above, spring-preauthorize) and call-based (never built until now).
   # Real evidence, verified via a direct extractFromSource() probe before
   # writing this row (not assumed): a reference Java/JAX-RS banking platform's ChargesApiResource.java calls
@@ -281,8 +281,8 @@ rules:
     weight: 40
     calmNodeType: service
 
-  # T-R2-2 (C-call expansion, Catalogue_Intake.md). Real evidence, verified
-  # directly against real a reference Java governance platform source, not assumed:
+  # C-call expansion (Catalogue_Intake.md). Real evidence, verified
+  # directly against real reference Java governance platform source, not assumed:
   # `WebUtilities.requireRole()` (the reference platform's own WebUtilities.java:127-150)
   # calls `userRoleService.hasRole(user, requiredRoles)` and THROWS
   # `NotAuthorizedException()` when it returns false — a genuine, definite
@@ -302,7 +302,7 @@ rules:
     weight: 40
     calmNodeType: service
 
-  # T-R2-2 (C-call expansion). Real evidence: a reference Java/JAX-RS banking platform's OWN
+  # C-call expansion. Real evidence: a reference Java/JAX-RS banking platform's OWN
   # PlatformSecurityContext (the same class java-call-site-permission-check
   # above already keys off) also exposes `isAuthenticated()` — confirmed via
   # its real implementation (the reference platform's SpringSecurityPlatformSecurityContext.java:81):
@@ -344,7 +344,7 @@ rules:
     weight: 20
     calmNodeType: service
 
-  # --- Java: messaging consumers (T-X7-2, G-L2-03) ---
+  # --- Java: messaging consumers ---
   # @KafkaListener/@JmsListener are consumer-side markers, decorator-detected
   # via the SAME proven extractFromSource()/decorates-ref mechanism as every
   # other Java signal above — no new extraction mechanism needed, matching
@@ -377,7 +377,7 @@ rules:
     weight: 40
     calmNodeType: topic
 
-  # --- AREC Wave 3 T-E1: messaging PRODUCER (typed-field-producer strategy) ---
+  # --- Messaging PRODUCER (typed-field-producer strategy) ---
   # Closes messaging-detection-catalogue.yml's own "typed-field-producer"
   # gap, previously status: not-implemented. Real evidence, verified via a
   # direct extractFromSource() probe before writing this row: a reference Java/JAX-RS banking platform's
@@ -398,7 +398,7 @@ rules:
   # jpa-entity's own weight-40 comment already uses. Re-verified after the
   # fix: real KafkaExternalEventProducer.java now correctly produces a
   # `topic` unit.
-  # --- AREC Wave 3 T-E3: Spring Data repository (persistence, extends-based) ---
+  # --- Spring Data repository (persistence, extends-based) ---
   # Closes persistence-detection-catalogue.yml's own "spring-data-repository"
   # gap, previously status: not-implemented. Real evidence, verified via a
   # direct extractFromSource() probe before writing this row: a reference Java/JAX-RS banking platform's
@@ -438,7 +438,7 @@ rules:
   # kind tie-break in signal-mapper.ts (treated identically to
   # 'http-entry-point' there) but stays descriptive-only for interfaces
   # until Y4 supplies a real path via CFN/SAM join. Real counterexample
-  # this closes: a reference AWS SaaS sample-tier-service's TierService (HT-ASB-002),
+  # this closes: a reference AWS SaaS sample-tier-service's TierService,
   # mirrored in this project's own java-lambda-apigw lab fixture's
   # LegacyTierHandler.
   - id: lambda-request-handler-implements
@@ -459,7 +459,7 @@ rules:
     weight: 40
     calmNodeType: topic
 
-  # --- T-LM-2 (Lens Modules lane): retry-annotation resilience evidence ---
+  # --- Lens Modules lane: retry-annotation resilience evidence ---
   # Two real, independently-published Java resilience libraries' retry
   # annotations — decorator-detected via the SAME proven
   # extractFromSource()/decorates-ref mechanism as every other Java signal

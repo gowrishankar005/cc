@@ -19,13 +19,12 @@ controls:
     matchSignal: "PreAuthorize"
     requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac.requirement.json"
 
-  # AREC Wave 3 T-D1 (C-call) — same real-world control (permission/role
+  # C-call — same real-world control (permission/role
   # enforcement) as security-rbac-001 above, detected via a different
   # mechanism (call-site, not decorator). Kept as its own controlId, not
   # folded into security-rbac-001: `detectionMechanism` differs, and
-  # collapsing them would hide the C-dec vs C-call distinction the AREC
-  # pillar exists to make visible (S3 — narrative honesty about HOW a
-  # control was found).
+  # collapsing them would hide the C-dec vs C-call distinction — narrative
+  # honesty about HOW a control was found.
   - controlId: security-rbac-002
     name: "Role-Based Access Control (call-site)"
     description: "Method or endpoint access restricted by role/authority, enforced via an explicit call-site permission check (e.g. a reference Java/JAX-RS banking platform's validateHasReadPermission) rather than a decorator/annotation"
@@ -34,12 +33,12 @@ controls:
     matchSignal: "validateHasReadPermission|validateHasPermission|validateHasCheckerPermission"
     requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac-call-site.requirement.json"
 
-  # T-R2-2 (C-call expansion) — same real-world control family as
+  # C-call expansion — same real-world control family as
   # security-rbac-002 (fine-grained role/permission enforcement, confirmed
   # via WebUtilities.requireRole()'s real NotAuthorizedException throw), a
   # DIFFERENT real repo's own vocabulary (a reference Java governance platform, not a reference Java/JAX-RS banking platform). Own
   # controlId, not folded into security-rbac-002, for the same reason
-  # security-rbac-002 itself isn't folded into security-rbac-001 — S3
+  # security-rbac-002 itself isn't folded into security-rbac-001 —
   # narrative honesty about which real framework's own API was matched.
   - controlId: security-rbac-003
     name: "Role-Based Access Control (call-site, a reference Java governance platform)"
@@ -49,7 +48,7 @@ controls:
     matchSignal: "hasRole"
     requirementUrl: "https://project-owned-placeholder.invalid/controls/rbac-call-site-waltz.requirement.json"
 
-  # T-R2-2 (C-call expansion) — a DIFFERENT, WEAKER claim than
+  # C-call expansion — a DIFFERENT, WEAKER claim than
   # security-rbac-002, kept as its own controlId deliberately: this is
   # authentication (is a user logged in), not authorization (is this user
   # allowed to do this specific thing). Real evidence: a reference Java/JAX-RS banking platform's
@@ -84,7 +83,7 @@ controls:
     matchSignal: "jwt.decode"
     requirementUrl: "https://project-owned-placeholder.invalid/controls/jwt-decode-call.requirement.json"
 
-  # AREC Wave 3 T-E4 (C-contract expand) — OpenAPI/Swagger securitySchemes,
+  # C-contract expand — OpenAPI/Swagger securitySchemes,
   # matched against their real structural type/scheme fields (never the
   # author-chosen scheme NAME — see openapi-pass.ts's openApiSecuritySchemeSignal),
   # so these rows generalize across any real spec regardless of naming

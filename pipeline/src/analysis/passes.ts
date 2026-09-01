@@ -63,7 +63,7 @@ export const mapSignalsPass: AnalysisPass = {
       for (const u of units) {
         if (u.confidence < CONFIDENCE_FLOOR) {
           ctx.allIgnoredItems.push(ignoreLowConfidence(u.id, u.confidence));
-          // T-LR-3 follow-up bugfix — same "service, framework-bootstrap-only"
+          // Follow-up bugfix — same "service, framework-bootstrap-only"
           // criterion overridableServiceFilePaths uses, kept even sub-floor so
           // detectPersistencePass/detectMessagingPass can still merge this
           // stereotype's evidence onto a real unit they build for the same
@@ -80,7 +80,7 @@ export const mapSignalsPass: AnalysisPass = {
         }
       }
       pushAll(ctx.allIgnoredItems, ignoredItems);
-      // T-TC1-2 (B-test-code-exclusion) — real, visible record of every
+      // B-test-code-exclusion — real, visible record of every
       // file excluded from extraction as test code, never a silent skip.
       for (const filePath of raw.excludedTestFiles) {
         ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: `Excluded from architectural extraction — matched a real test-path/filename convention (isTestPath())` });
@@ -101,7 +101,7 @@ export const detectPersistencePass: AnalysisPass = {
       // CodeGraph's own .codegraph cache convention is unrelated and not
       // configurable the same way; superseded by removal, not dropped.
       ctx.crossPackageRun = await runCodegraphCrossrootPass(ctx.packageRoots);
-      // T-LR-3 real-data finding — overridableServiceFilePaths(ctx) names
+      // Real-data finding — overridableServiceFilePaths(ctx) names
       // files whose ONLY existing 'service' unit evidence is a bare,
       // weak stereotype (no real route/security-control signal of its
       // own). detectPersistenceUnits still builds its own unit for those
@@ -143,7 +143,7 @@ export const detectPersistencePass: AnalysisPass = {
         pushAll(rootUnits, persistenceUnits);
         ctx.unitsByRoot.set(root, rootUnits);
       }
-      // T-TC1-3 (B-test-code-exclusion) — real, visible record, never a silent skip.
+      // B-test-code-exclusion — real, visible record, never a silent skip.
       for (const filePath of excludedTestFiles) {
         ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: 'Excluded from persistence detection — matched a real test-path/filename convention (isTestPath()), despite importing a catalogued driver library' });
       }
@@ -160,14 +160,14 @@ export const reconcilePass: AnalysisPass = {
   name: 'reconcile',
   run(ctx: AnalysisContext) {
     if (!ctx.crossPackageRun) return; // cross-root pass didn't run or failed — already logged by detectPersistencePass
-    // T-P0-1 (E2) round 3 — appends now, not overwrites, so it can run
+    // Appends now, not overwrites, so it can run
     // AFTER multiHopBridgePass without discarding what that pass already
     // added; ctx.multiHopExaminedPairs (populated by that earlier pass)
     // tells graded-fact admission which edges are already someone else's
     // territory.
     const { relationships, unresolvedUnits } = reconcileCrossPackageEdges(ctx.crossPackageRun, ctx.unitsByRoot, ctx.multiHopExaminedPairs, ctx.multiHopExaminedFiles);
     pushAll(ctx.relationships, relationships);
-    // T-P0-1 (E2) — graded-fact-admission placeholders (kind: 'unresolved').
+    // Graded-fact-admission placeholders (kind: 'unresolved').
     // Pushed into ctx.allUnits (not ctx.unitsByRoot) since they're not real
     // per-root architectural units — only relationship endpoints and CALM
     // nodes. gradeRelationshipsPass (last pass) needs them in ctx.allUnits
@@ -180,7 +180,7 @@ export const reconcilePass: AnalysisPass = {
   },
 };
 
-/** AREC Wave 3 T-A2 — grades every relationship the run collectively produced. MUST run LAST: it needs to see the final ctx.relationships array, after every producer (reconcile/k8s-trust/env-soft-graph) has added its own. */
+/** Grades every relationship the run collectively produced. MUST run LAST: it needs to see the final ctx.relationships array, after every producer (reconcile/k8s-trust/env-soft-graph) has added its own. */
 export const gradeRelationshipsPass: AnalysisPass = {
   name: 'gradeRelationships',
   run(ctx: AnalysisContext) {
@@ -189,7 +189,7 @@ export const gradeRelationshipsPass: AnalysisPass = {
 };
 
 /**
- * T-CL-1 — assigns every relationship its stable, content-derived id (see
+ * Assigns every relationship its stable, content-derived id (see
  * fact-identity.ts). Reads only kind/from/to/mechanism/source, none of
  * which gradeRelationshipsPass or assignStatusPass change, so its exact
  * position between them is free — placed here so a relationship's id is
@@ -204,7 +204,7 @@ export const factIdentityPass: AnalysisPass = {
 };
 
 /**
- * T-FS-6 — the true LAST pass, after gradeRelationshipsPass: reads
+ * The true LAST pass, after gradeRelationshipsPass: reads
  * ctx.allUnits/ctx.relationships/ctx.allIgnoredItems, never appends to any
  * of them, so it must run after every producer of all three, including
  * contradictionPass (whose ignored-items this pass cross-references).
@@ -217,12 +217,12 @@ export const assignStatusPass: AnalysisPass = {
 };
 
 /**
- * Default pass order. openApiPass (T-X4-1) added after mapSignalsPass —
+ * Default pass order. openApiPass added after mapSignalsPass —
  * independent of it (reads no shared state), grouped here since both are
- * "unit-producing" passes before persistence/reconcile. k8sTrustPass
- * (T-X5-1), envSoftGraphPass and multiHopBridgePass are all APPEND-only and
+ * "unit-producing" passes before persistence/reconcile. k8sTrustPass,
+ * envSoftGraphPass and multiHopBridgePass are all APPEND-only and
  * need the final ctx.unitsByRoot, so they run after the unit-producing
- * passes above. reconcilePass (T-P0-1, E2 round 3) now also appends rather
+ * passes above. reconcilePass now also appends rather
  * than overwrites ctx.relationships, so its position relative to those three
  * is no longer forced by an overwrite hazard — EXCEPT multiHopBridgePass
  * must still run BEFORE reconcilePass specifically, so
@@ -233,7 +233,7 @@ export const assignStatusPass: AnalysisPass = {
  * nor multiHopExaminedPairs, so their position among these five is
  * otherwise free. gradeRelationshipsPass reads (never appends to)
  * ctx.relationships, so it has to run after every pass that appends to it.
- * T-FS-6's assignStatusPass is now the true final pass — it reads
+ * assignStatusPass is now the true final pass — it reads
  * ctx.allIgnoredItems (including contradictionPass's own output) and
  * ctx.relationships' final `grade`/`confidence`/`mechanism`, so it must run
  * after every producer of all three, gradeRelationshipsPass included.
@@ -242,7 +242,7 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   composeRoutesPass,
   mapSignalsPass,
   openApiPass,
-  // T-Y4-1 — grouped with openApiPass: another structured-external-source
+  // Grouped with openApiPass: another structured-external-source
   // pass that only ENRICHES units mapSignalsPass already produced (never
   // creates new ones), so it just needs to run after mapSignalsPass, same
   // as openApiPass.
@@ -250,7 +250,7 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   detectPersistencePass,
   detectMessagingPass,
   outboundHttpPass,
-  // T-PC1-3…6 (B-spring-config) — runs after mapSignals/openApi/cfnRoute so
+  // B-spring-config — runs after mapSignals/openApi/cfnRoute so
   // its server.port->service-unit attachment sees the root's FINAL service
   // unit set, same ordering reason detectPersistence/detectMessaging/
   // outboundHttp already sit here; before reconcile since it's a
@@ -258,31 +258,31 @@ export const DEFAULT_PASSES: AnalysisPass[] = [
   // structurally match these synthetic config-derived unit ids either way,
   // same honest limitation as any other non-Graphify-sourced unit).
   springConfigPass,
-  // T-CDX-3 (B-cdxgen-reuse) — runs after springConfigPass so its
+  // B-cdxgen-reuse — runs after springConfigPass so its
   // corroboration candidates (persistence/messaging units) include
   // spring-config-derived database/topic units too, not just
   // Graphify-import-derived ones; before reconcile like its neighbors,
-  // since it only mutates existing units' evidence or (T-FS-4) introduces a
+  // since it only mutates existing units' evidence or introduces a
   // new one — never relationships.
   cdxgenCorroborationPass,
   multiHopBridgePass,
   reconcilePass,
   k8sTrustPass,
   envSoftGraphPass,
-  // T-MR-2 — another append-only relationship producer with the same
+  // Another append-only relationship producer with the same
   // ordering freedom as k8sTrustPass/envSoftGraphPass above: reads
   // ctx.openApiDocumentsByRoot (final by now) and its own fresh
   // cdxgen/spring-config discovery, never ctx.relationships or
   // multiHopExaminedPairs. Must still run before gradeRelationshipsPass/
   // factIdentityPass/assignStatusPass, the true-last passes.
   crossRepoJoinPass,
-  // T-FS-3 — needs springConfigPass's database units (already final by this
+  // Needs springConfigPass's database units (already final by this
   // point) and k8sTrustPass's own manifests-dir convention; reads neither
   // ctx.relationships nor multiHopExaminedPairs, so — same as its two
   // neighbors above — its exact position here is otherwise free. Must
   // still run before gradeRelationshipsPass, the true last pass.
   contradictionPass,
-  // T-LR-5 — must run after reconcilePass/multiHopBridgePass (so its
+  // Must run after reconcilePass/multiHopBridgePass (so its
   // trust-tier "never contest an existing edge" check sees every relationship
   // an earlier, more-established mechanism already produced) and before
   // gradeRelationshipsPass/assignStatusPass (so any relationship or unit it

@@ -6,7 +6,7 @@ import { scoreConfidence } from './confidence-scorer';
 import { jdbcScheme } from './jdbc-url';
 
 /**
- * T-PC1-3…6 (B-spring-config) — turns spring-config-provider.ts's raw flat
+ * B-spring-config — turns spring-config-provider.ts's raw flat
  * key-value maps into TypedUnits + Evidence, the "Scanner provider ->
  * TypedFacts" flow this project's own convention requires (openapi-pass.ts
  * is the direct precedent). Vocabulary + two real, mined findings this
@@ -14,7 +14,7 @@ import { jdbcScheme } from './jdbc-url';
  * `docs/solution/language/spring-config-property-vocabulary.md` — do not
  * re-derive the key list from memory if extending this file.
  *
- * Each config file is processed INDEPENDENTLY (T-VM-2's decided
+ * Each config file is processed INDEPENDENTLY (the decided
  * profile-merge policy) — a base `application.yml` and a sibling
  * `application-prod.yml` both setting `spring.datasource.url` produce TWO
  * separate corroborating units, one per file, each citing its own real
@@ -58,10 +58,10 @@ function buildUnit(file: SpringConfigFile, suffix: string, kind: TypedUnit['kind
 }
 
 /**
- * T-SC-3 — spring.datasource.url -> database unit + JDBC scheme (feeds
+ * spring.datasource.url -> database unit + JDBC scheme (feeds
  * build-calm.ts's protocol population).
  *
- * T-FS-3 real-instance verification (2026-08-15) found a real, generic
+ * Real-instance verification (2026-08-15) found a real, generic
  * second key: Spring Boot's default connection pool (HikariCP since Boot
  * 2.0) binds `spring.datasource.hikari.jdbcUrl` (Hikari's own native
  * property name is `jdbcUrl`, not `url`) as an ALTERNATE way a real repo
@@ -92,7 +92,7 @@ function extractDatasource(file: SpringConfigFile): TypedUnit | undefined {
   if (!url) return undefined;
   const scheme = jdbcScheme(url);
   const unit = buildUnit(file, 'spring-datasource', 'database', scheme ? `datasource (${scheme})` : 'datasource', `${key}=${url}`, key);
-  // T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources") —
+  // Contradiction detection between evidence sources (BACKLOG.md) —
   // the raw URL as the evidence's own literal source-line VALUE (Evidence.argument's
   // documented purpose: "the literal source text at that one line," never a
   // resolved runtime value — the URL text already IS that literal text for
@@ -103,7 +103,7 @@ function extractDatasource(file: SpringConfigFile): TypedUnit | undefined {
   return unit;
 }
 
-/** T-SC-4 — Kafka/RabbitMQ/ActiveMQ broker config -> topic (network) unit. */
+/** Kafka/RabbitMQ/ActiveMQ broker config -> topic (network) unit. */
 function extractBrokers(file: SpringConfigFile): TypedUnit[] {
   const units: TypedUnit[] = [];
 
@@ -129,7 +129,7 @@ function extractBrokers(file: SpringConfigFile): TypedUnit[] {
 }
 
 /**
- * T-SC-5 — spring.data.redis.host/.port (or the pre-Boot-3.0
+ * spring.data.redis.host/.port (or the pre-Boot-3.0
  * spring.redis.host/.port fallback — real, mined finding, see the
  * vocabulary doc §2) -> database-kind unit. No existing detector covers
  * this at all today (genuinely new coverage, not a second source for
@@ -186,7 +186,7 @@ function resolveSoleServiceUnit(ctx: AnalysisContext, root: string, file: Spring
 }
 
 /**
- * T-SC-6 — server.port -> a tcp-host-port interface on the root's single
+ * server.port -> a tcp-host-port interface on the root's single
  * `service` unit. Never guesses when 0 or 2+ candidates exist (same "never
  * guess" discipline as openapi-pass.ts's route-overlap merge check) — the
  * port fact is recorded as evidence ONLY when exactly one service unit
@@ -213,7 +213,7 @@ function attachServerPort(ctx: AnalysisContext, root: string, file: SpringConfig
 }
 
 /**
- * T-LM-2 (Lens Modules lane) — resilience4j's real, documented Spring Boot
+ * Resilience4j's real, documented Spring Boot
  * property shape: `resilience4j.timelimiter.instances.<name>.timeout-duration`
  * (the `<name>` segment is an arbitrary, user-chosen instance name, so this
  * is a wildcard match over the flattened key map, not a fixed literal key

@@ -33,15 +33,15 @@ export function mapSignalsToUnits(
   nativeRoutes: NativeRouteFact[],
   decoratorFacts: DecoratorFact[],
   catalogue: SignalCatalogue,
-  callFacts: DecoratorFact[] = [], // AREC Wave 3 T-D1 — optional/defaulted so every existing caller (tests, --from-facts paths) keeps compiling unchanged
-  typeReferenceFacts: DecoratorFact[] = [], // AREC Wave 3 T-E1 — same reason
-  extendsFacts: DecoratorFact[] = [] // AREC Wave 3 T-E3 — same reason
+  callFacts: DecoratorFact[] = [], // optional/defaulted so every existing caller (tests, --from-facts paths) keeps compiling unchanged
+  typeReferenceFacts: DecoratorFact[] = [], // same reason
+  extendsFacts: DecoratorFact[] = [] // same reason
 ): { units: TypedUnit[]; ignoredItems: IgnoredItem[] } {
   const evidenceByFile = new Map<string, Evidence[]>();
   const linesByFile = new Map<string, { start: number; end: number }>();
   const ignoredItems: IgnoredItem[] = [];
 
-  // AP-3 — real class names seen per file, collected from every fact array
+  // Real class names seen per file, collected from every fact array
   // that carries fromNodeKind/fromNodeName (decorators/calls/type-refs/
   // extends all share the DecoratorFact shape). Native routes carry no
   // class info (NativeRouteFact has no fromNode fields) — files typed only
@@ -56,8 +56,8 @@ export function mapSignalsToUnits(
 
   // Node kind is now decided once, at the end, directly from the CATEGORY
   // of a file's aggregated evidence (see the priority order below) — not
-  // from a per-evidence rule.calmNodeType vote collected here. AREC Wave 3
-  // T-D1 found the old per-evidence-vote design gave a wrong answer the
+  // from a per-evidence rule.calmNodeType vote collected here. Found the
+  // old per-evidence-vote design gave a wrong answer the
   // moment a real file had BOTH persistence AND security-control evidence
   // (a reference Java/JAX-RS banking platform's AppUser.java: a real @Entity that also calls
   // validateHasPermission() internally) — "service wins any tie" silently
@@ -139,7 +139,7 @@ export function mapSignalsToUnits(
         category: rule.category, // catalogue-driven, not a hardcoded signal-name check downstream
         weight: rule.weight,
         ref,
-        // AREC Wave 3 T-D2 (C-rich) — real gap found while wiring this
+        // Real gap found while wiring this
         // through for call facts: DecoratorFact has carried `argument`
         // since the original JAX-RS route-assembly work, but it was never
         // threaded into Evidence, so it never reached control-builder.ts
@@ -149,7 +149,7 @@ export function mapSignalsToUnits(
     );
   }
 
-  // AREC Wave 3 T-D1 (C-call) — SAME loop shape as decoratorFacts above,
+  // SAME loop shape as decoratorFacts above,
   // deliberately: a call-site signal (source: 'call') is evidence exactly
   // like a decorator signal, just from a different extraction reference
   // kind. No pre-filtering by signal name here either — an unmatched call
@@ -175,7 +175,7 @@ export function mapSignalsToUnits(
     );
   }
 
-  // AREC Wave 3 T-E1 — SAME loop shape again: a field-type signal (source:
+  // SAME loop shape again: a field-type signal (source:
   // 'field-type') is evidence exactly like a decorator/call signal, just
   // from CodeGraph's `referenceKind: 'references'` entries instead.
   for (const typeRef of typeReferenceFacts) {
@@ -198,7 +198,7 @@ export function mapSignalsToUnits(
     );
   }
 
-  // AREC Wave 3 T-E3 — SAME loop shape again: an extends signal (source:
+  // SAME loop shape again: an extends signal (source:
   // 'extends') is evidence exactly like field-type/call/decorator signals,
   // just from CodeGraph's `referenceKind: 'extends'` entries.
   for (const ext of extendsFacts) {
@@ -226,10 +226,10 @@ export function mapSignalsToUnits(
     const span = linesByFile.get(filePath)!;
     const confidence = scoreConfidence(evidence);
     const categories = new Set(evidence.map((e) => e.category));
-    // T-X7-1/2 — extended to a third vote value, additive not a rewrite (per
+    // Extended to a third vote value, additive not a rewrite (per
     // Contract_Evolution_Policy.md §4's own dry run of this exact change).
     //
-    // AREC Wave 3 T-D1 — real bug found and fixed the moment call-site
+    // Real bug found and fixed the moment call-site
     // evidence made the previously-untested combination actually happen:
     // a reference Java/JAX-RS banking platform's AppUser.java is a genuine @Entity that ALSO calls
     // validateHasPermission() internally. The OLD rule ("service wins any
@@ -247,7 +247,7 @@ export function mapSignalsToUnits(
     // security-control-only (no http/persistence/messaging) falls through to
     // the 'service' default below — the real, proven DatatableWriteService
     // case (a pure RBAC-enforcing interface with no HTTP surface at all).
-    // T-Y3-1 — 'serverless-entry-point' (Lambda `implements RequestHandler`)
+    // 'serverless-entry-point' (Lambda `implements RequestHandler`)
     // treated identically to 'http-entry-point' here: both are decisive,
     // structural entry-point evidence for the kind tie-break. Kept as a
     // DISTINCT category from 'http-entry-point' only for interface-building

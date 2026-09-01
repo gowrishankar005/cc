@@ -45,21 +45,21 @@ mappings:
     calmRelationshipType: connects
     protocol: null
 
-  # T-X5-0 — k8s shared-Secret/ConfigMap trust relationship. Still maps to
+  # k8s shared-Secret/ConfigMap trust relationship. Still maps to
   # `connects` (CALM has no dedicated "trust" relationship-type; `interacts`
   # is actor-fan-out shape, doesn't fit a peer-to-peer trust edge) — the
   # DISTINCTION this pipeline needed wasn't a new CALM shape, it was a named
   # TypedRelationship.kind so the fact isn't silently indistinguishable from
   # a code-level `calls`/`imports` edge upstream of CALM construction.
   # protocol stays null deliberately — a shared Secret name is not itself a
-  # network protocol, and this pipeline never invents one (v0.9 §1 discipline).
+  # network protocol, and this pipeline never invents one.
   - relationshipKind: shares-secret
     sourceNodeType: service
     targetNodeType: service
     calmRelationshipType: connects
     protocol: null
 
-  # T-MR-3 — k8s-derived runtime placement. targetNodeType 'system' is the
+  # k8s-derived runtime placement. targetNodeType 'system' is the
   # synthetic namespace node modules/calm-generator/k8s-namespace-node-builder.ts
   # builds (never a TypedUnit-mapped node-type-mapping.yml row — a namespace
   # has no source file). Real CALM shape this time, not `connects`:
@@ -72,7 +72,7 @@ mappings:
     calmRelationshipType: deployed-in
     protocol: null
 
-  # T-MR-2 — a ranked cross-repo join. Both endpoints are synthetic 'system'
+  # A ranked cross-repo join. Both endpoints are synthetic 'system'
   # node-type nodes (modules/calm-generator/external-repo-node-builder.ts —
   # neither this run's own repo-root anchor nor the other repo's published
   # contract has a source file this run indexed). Already covered by the
