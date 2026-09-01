@@ -2,7 +2,7 @@
 
 **Weaver** is a deterministic Architecture-as-Code pipeline. It reads a real Java / Python / Node-TypeScript monorepo and emits schema-valid [FINOS CALM 1.2](https://calm.finos.org) JSON — services, stores, topics, routes, persistence, security controls, and the relationships between them — with file:line evidence on every claim.
 
-It is **not** an LLM architecture generator, not a CALM governance product, and not a detector tuned to any one sample repo. Public repos (Fineract-shaped banking, Waltz-shaped governance, etc.) are evidence samples used to prove or falsify a generic mechanism.
+It is **not** an LLM architecture generator, not a CALM governance product, and not a detector tuned to any one sample repo. Public repos (a reference Java/JAX-RS banking platform, a reference Java governance platform, etc.) are evidence samples used to prove or falsify a generic mechanism.
 
 ---
 

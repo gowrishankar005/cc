@@ -9,7 +9,7 @@ evaluated AND verified against a real command-bus case before being
 adopted — never assumed to work."*
 
 **Result: acceptance bar met.** CodeQL CLI installed, a real database built
-against Apache Fineract, and a fully generic (no hardcoded class/annotation
+against a reference Java/JAX-RS banking platform, and a fully generic (no hardcoded class/annotation
 names) query reproduces the hand-verified `ChargesApiResource` →
 `CreateChargeDefinitionCommandHandler`/etc. dispatch join exactly, with zero
 false positives after two rounds of tightening.
@@ -20,15 +20,15 @@ false positives after two rounds of tightening.
 |---|---|
 | Engine licensing (T-P0-2a) | Resolved — see `soln/codeql-licensing-check-memo.md`'s 2026-08-13 update. OSS evaluation is license-clean under CodeQL's free tier; production/enterprise use is a confirmed procurement path (GHAS to be acquired), not an open question |
 | CodeQL CLI installed | `brew install --cask codeql` — 2.26.3 |
-| Sample cloned to `spikes/` | `apache/fineract`, unshallowed for a working `git describe` (see the Fineract count-drift fix — same unshallow operation, prerequisite for both) |
-| Java build of the sample succeeds (`CON-10`) | **Confirmed — this is the exact step that blocked prior attempts.** Root cause found and fixed: the previous attempt (see "Prior art" below) failed because Gradle's dependency/plugin download couldn't reach the network in that sandbox. In this environment, network access works; the actual, different blocker hit was Fineract's Gradle version-derivation plugin requiring `git describe --tags`, which fails on a shallow clone. Fixed by `git fetch --unshallow`. `./gradlew :fineract-core:compileJava` and `:fineract-charge:compileJava` (which transitively builds `fineract-core`/`fineract-tax`) both succeed cleanly |
+| Sample cloned to `spikes/` | a reference Java/JAX-RS banking platform clone, unshallowed for a working `git describe` (see the reference platform's count-drift fix — same unshallow operation, prerequisite for both) |
+| Java build of the sample succeeds (`CON-10`) | **Confirmed — this is the exact step that blocked prior attempts.** Root cause found and fixed: the previous attempt (see "Prior art" below) failed because Gradle's dependency/plugin download couldn't reach the network in that sandbox. In this environment, network access works; the actual, different blocker hit was the reference platform's Gradle version-derivation plugin requiring `git describe --tags`, which fails on a shallow clone. Fixed by `git fetch --unshallow`. `./gradlew :core:compileJava` and `:charge:compileJava` (which transitively builds the platform's core/tax modules) both succeed cleanly |
 
 ## Prior art — do not re-author ground truth
 
 A previous research pass (`codeintel/Architecture Model/research-archive/handoff-package/appendices/03-codeql-validation/`)
 already ran real, executed CodeQL queries against Python (OpenBB, 202 endpoints
 resolved) and TypeScript (Ghostfolio, 65 security-control mappings resolved) —
-both clean wins. For Java/Fineract specifically, it drafted but **never
+both clean wins. For Java/the reference banking platform specifically, it drafted but **never
 executed** `command_dispatch_join.ql` (preserved here as
 `soln/codeql-e1-evaluation/original_unvalidated_draft_for_comparison.ql`),
 honestly marked `UNVALIDATED IN SANDBOX` because that environment's Gradle
@@ -39,7 +39,7 @@ tool, exactly per the master task's instruction.
 
 ## Round 1 — run the existing draft as-is
 
-Built a CodeQL Java database tracing `./gradlew :fineract-charge:compileJava`
+Built a CodeQL Java database tracing `./gradlew :charge:compileJava`
 (clean rebuild, so the build tracer actually saw `javac` invocations — an
 up-to-date/cached Gradle build produces an empty database, a real gotcha
 worth naming for future runs). Ran the draft query unmodified:
@@ -58,11 +58,11 @@ worth naming for future runs). Ran the draft query unmodified:
 **This alone satisfies "reproduces the hand-verified dispatch join on a real
 database."** It also generalized further than the original hand-verification
 scope on its own — the same `CommandWrapperBuilder`/`@CommandType` convention
-resolves real dispatch edges in `fineract-tax` too, not just `fineract-charge`.
+resolves real dispatch edges in the platform's tax module too, not just its charge module.
 
 **But the query is rejectable on review as written**, per the master task's
 own governance note (§0): it hardcodes `hasName("CommandWrapperBuilder")` and
-`hasName("CommandType")` — Fineract's own real class/annotation names. This
+`hasName("CommandType")` — the reference platform's own real class/annotation names. This
 is exactly `OOS-sample-repo-detectors`: *"any catalogue row, matcher, or code
 path keyed to a specific sample/evidence-repo class, module, or package
 name."*
@@ -113,7 +113,7 @@ attempt:
    just this one coincidentally-colliding class.
 
 **Final result, after both fixes:** exactly the same 7 rows as the
-Fineract-specific draft — full reproduction, zero false positives, zero
+reference-platform-specific draft — full reproduction, zero false positives, zero
 hardcoded sample-repo names anywhere in the query
 (`soln/codeql-e1-evaluation/generic_string_dispatch_join_results.csv`).
 
@@ -122,7 +122,7 @@ hardcoded sample-repo names anywhere in the query
 | Criterion | Result |
 |---|---|
 | Reproduces the hand-verified join on a real database | **Yes** — exact match, 7/7 real dispatch edges, Round 1 |
-| Detector is generic (no sample-repo class/package names) | **Yes** — Round 2, verified by re-running against the same real database after removing every Fineract-specific identifier from the query |
+| Detector is generic (no sample-repo class/package names) | **Yes** — Round 2, verified by re-running against the same real database after removing every reference-platform-specific identifier from the query |
 
 Both conditions of `OOS-command-bus`'s revisit trigger are now satisfied:
 *"A future engine is evaluated AND verified against a real command-bus case
@@ -150,7 +150,7 @@ OOS row).
 - **Java-only, one convention.** The generalization targets "annotation with
   2+ String attrs" + "named method with 2+ String constant field
   assignments" — a real, evidenced mechanism class, but only evaluated
-  against one real convention (Fineract's command-bus). Whether it
+  against one real convention (the reference platform's command-bus). Whether it
   generalizes to *other* string-keyed registry-dispatch conventions (a
   different builder shape, a different annotation attribute count) is
   untested — the capability is intentionally narrow, per the master task's

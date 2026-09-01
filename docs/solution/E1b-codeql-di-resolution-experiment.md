@@ -24,7 +24,7 @@ Entries 11-13 — not new ground truth authored for this experiment:
    (`ChargeReadPlatformServiceImpl`, `ChargeWritePlatformServiceJpaRepositoryImpl`)
    carry **no stereotype annotation at all** — wired via a dedicated
    `@Configuration`/`@Bean`-factory "starter" class
-   (`ChargeConfiguration`), a real, repo-wide Fineract convention.
+   (`ChargeConfiguration`), a real, repo-wide reference-platform convention.
 
 ## CodeQL's own built-in Spring model doesn't cover either shape — checked, not assumed
 
@@ -32,7 +32,7 @@ Entries 11-13 — not new ground truth authored for this experiment:
 (`SpringBeanAutowiredField.getInjectedComponent()`), but only for fields/
 constructors carrying an explicit `@Autowired`/`@Inject`/`@Resource`
 annotation, or a no-arg constructor. It has no model for `@Bean`-factory
-wiring at all. Checked against real Fineract source before writing any
+wiring at all. Checked against real reference-platform source before writing any
 query: `ChargesApiResource` and
 `PortfolioCommandSourceWritePlatformServiceImpl` both use Lombok's
 `@RequiredArgsConstructor` (generates the constructor for every `final`
@@ -59,8 +59,8 @@ catalogue-driven and mechanism-class fixes.
 
 ## Real result, whole-codebase scale
 
-Ran against a CodeQL Java database covering `fineract-charge` +
-`fineract-provider` (604 source files, the same real build already verified
+Ran against a CodeQL Java database covering the reference Java/JAX-RS banking
+platform's charge + provider modules (604 source files, the same real build already verified
 working for T-P0-3/CON-10):
 
 | Metric | Value |
@@ -121,7 +121,7 @@ Spring wiring — the same bar T-LR-1/T-LR-2 were held to.
   T-LR-5's own expanded acceptance bar (`AGENT_TASKS_Ext_Layered_Recovery.md`)
   — generic detector, explicit build-lifecycle degradation, CI/Docker impact
   resolved, trust tier not blind trust — is unaddressed here.
-- **Only Fineract tested.** One real, large, idiomatic Spring/JAX-RS
+- **Only the reference banking platform tested.** One real, large, idiomatic Spring/JAX-RS
   codebase, not a second independent repo. `Catalogue_Intake.md`'s own
   bug-fix-generalization rule would ask for a second instance before this
   ships as a production mechanism — noted as the natural next check, not
@@ -130,7 +130,7 @@ Spring wiring — the same bar T-LR-1/T-LR-2 were held to.
   multi-implementer cases, and `@Primary`-annotated tie-breaks are all real
   Spring conventions this query doesn't attempt — scoped to the two shapes
   the real evidence named, not a claim of full DI coverage.
-- **Cost/integration shape still unresolved.** Building `fineract-provider`
+- **Cost/integration shape still unresolved.** Building the reference platform's provider module
   (86 tasks, ~65s clean) plus the CodeQL database (604 files, ~50s) is real,
   non-trivial cost per run, same operational-impact question the P0 lane
   file already flagged and never closed out.

@@ -14,7 +14,7 @@ wire CodeQL into `run-slice`. That is this file.
 
 | Task | Status | Depends on | Acceptance |
 |---|---|---|---|
-| **T-LR-5 CodeQL engine, generic** | **Done, 2026-08-19 — 6/7 checklist items closed, item 6 real-blocked and disclosed (below).** Architecturally NOT a `StructuralEngine` implementation despite the task's own framing — CodeQL's DI query is a whole-database batch join, the same shape Graphify's own "one combined pass" already is, not a per-file `extractDecoratorFacts` API. Shipped as `scanner/codeql-di-provider.ts` (build DB + run query + parse) + `analysis/codeql-di-pass.ts` (an opt-in `AnalysisPass`, `--codeql-source-root`/`--codeql-build-command`). Real end-to-end run against `spikes/fineract/repo` (fineract-charge + fineract-provider): 2105 real DI bindings, 731 new relationships, 56 new units introduced, `calm validate` 0 errors/0 warnings — the flagship `ChargesApiResource -> ChargeReadPlatformService -> ChargeReadPlatformServiceImpl` chain resolves (though that specific impl already had a unit via `graphify-import`, so the new-info case verified was `LoanChargesApiResource -> LoanChargeReadPlatformServiceImpl`, confidence 7, grade `architecture`, status `inferred`). A real bug was found and fixed live-testing this: CodeQL's `RefType.getName()` returns an empty string for an anonymous `new SomeInterface() { ... }` implementation — `codeqlDiPass` now skips any binding with an empty `resolvedImpl`/`injectingClass` rather than introduce a CALM-schema-invalid empty-name node (regression-locked). 6 new regression tests. `npm test` 121/121. See `Claim_Register.md`'s `T-LR-5-codeql-di` row for the full evidence. | T-P0-3, E1b; GHAS before any private-repo production use (`CON-20`) | Second `StructuralEngine`, one call site. Mechanism-class detector only |
+| **T-LR-5 CodeQL engine, generic** | **Done, 2026-08-19 — 6/7 checklist items closed, item 6 real-blocked and disclosed (below).** Architecturally NOT a `StructuralEngine` implementation despite the task's own framing — CodeQL's DI query is a whole-database batch join, the same shape Graphify's own "one combined pass" already is, not a per-file `extractDecoratorFacts` API. Shipped as `scanner/codeql-di-provider.ts` (build DB + run query + parse) + `analysis/codeql-di-pass.ts` (an opt-in `AnalysisPass`, `--codeql-source-root`/`--codeql-build-command`). Real end-to-end run against the reference Java/JAX-RS banking platform's own repo (the reference platform's charge + provider modules): 2105 real DI bindings, 731 new relationships, 56 new units introduced, `calm validate` 0 errors/0 warnings — the flagship `ChargesApiResource -> ChargeReadPlatformService -> ChargeReadPlatformServiceImpl` chain resolves (though that specific impl already had a unit via `graphify-import`, so the new-info case verified was `LoanChargesApiResource -> LoanChargeReadPlatformServiceImpl`, confidence 7, grade `architecture`, status `inferred`). A real bug was found and fixed live-testing this: CodeQL's `RefType.getName()` returns an empty string for an anonymous `new SomeInterface() { ... }` implementation — `codeqlDiPass` now skips any binding with an empty `resolvedImpl`/`injectingClass` rather than introduce a CALM-schema-invalid empty-name node (regression-locked). 6 new regression tests. `npm test` 121/121. See `Claim_Register.md`'s `T-LR-5-codeql-di` row for the full evidence. | T-P0-3, E1b; GHAS before any private-repo production use (`CON-20`) | Second `StructuralEngine`, one call site. Mechanism-class detector only |
 | **T-LR-6 Per-(engine, fact-type) trust tiers** | **Done, 2026-08-20.** `pipeline/src/analysis/fact-trust-matrix.ts` is now the single source of truth for every (engine, mechanism, scope) confidence tier this pipeline emits — `r2-phase1`/`r2-stereotype`/`r2b`/`r2c`/`admitted-unresolved` (Graphify) and `codeql-di-stereotype`/`codeql-di-bean-factory`/`codeql-di` unit-introduction (CodeQL), each row carrying a real evidence citation. `multi-hop-bridge-detector.ts`, `graphify-reconciler.ts`, and `codeql-di-pass.ts` now read their confidence values from this matrix instead of each defining its own `_CONFIDENCE` constants (pure refactor, behavior-preserving — `npm test` produced the identical 96/96 pass, 0 fail before and after). "CodeQL is never automatically primary" is enforced structurally two ways: `codegraph`'s own primary-tier relationships never enter the matrix at all (they carry no explicit `confidence`, per `relationship-builder.ts`'s "absence, not a fake 0" convention), and `assertCodeqlNeverPrimary()` asserts no `codeql` row ever reaches or exceeds the strongest tier any other engine holds in the matrix — a regression test (`T-LR-6` in `test/regression.test.js`) both confirms the real matrix satisfies this and confirms the assertion actually fails closed against a deliberately-rigged matrix, not just that it happens to pass today. 2 new regression tests. `npm test` 96/96. | T-LR-5 | Matrix becomes evidence-earned per fact type, not config-declared per framework. CodeQL is never automatically primary |
 
 ### T-LR-5 expanded acceptance — production integration, not an experiment repeat
@@ -43,7 +43,7 @@ about T-LR-3/4. The checklist is authoritative here.
    posture as every `spikes/`-gated regression test.
 4. **Report names the claim triple — partially done.** This session's real
    evidence is a fresh claim triple of its own:
-   `{rootSet: fineract-charge+fineract-provider, terminalGrain: DI-resolved
+   `{rootSet: the reference platform's charge+provider modules, terminalGrain: DI-resolved
    service->impl edges (both stereotype and bean-factory mechanisms),
    evalArtefact: a live run-slice execution + calm validate, 2026-08-19}` —
    2105 bindings, 731 relationships, 56 introduced units, 0 validate
@@ -59,20 +59,20 @@ about T-LR-3/4. The checklist is authoritative here.
    matrix T-LR-6 names now exists as `pipeline/src/analysis/fact-trust-matrix.ts`
    (2026-08-20) — see that task's own row above for what it covers.
 6. **Second real-repo instance — attempted, real-blocked, disclosed.**
-   Waltz (`spikes/waltz/repo`) uses Maven, not Gradle — Maven itself
-   required installing (`brew install maven`, done). The Waltz POM reactor
+   The reference Java governance platform (the reference Java governance platform's own repo) uses Maven, not Gradle — Maven itself
+   required installing (`brew install maven`, done). Its POM reactor
    fails to resolve for EVERY module (including the simplest,
    `waltz-common`, via `-pl`, since Maven still parses the whole reactor)
    with real, pre-existing property-resolution errors
    (`${jooq.group}`/`${jdbc.group}` unresolved in `waltz-schema`'s POM) —
-   consistent with Waltz's own jOOQ Pro (commercial) dependency needing
+   consistent with the reference platform's own jOOQ Pro (commercial) dependency needing
    license-gated Maven profile/settings this environment doesn't have,
    not a defect in this session's code. Two independent attempts (network-
    enabled full reactor build, and a `waltz-common`-only build) hit the
    identical failure. **Genuinely not verified against a second real repo**
    — disclosed here, not silently skipped, per this project's own
    discipline. Revisit trigger: jOOQ Pro credentials/profile become
-   available, or a Waltz module with no jOOQ-codegen dependency is found.
+   available, or a module with no jOOQ-codegen dependency is found.
 7. **Scope decision — DI only, as recommended.** Command-bus dispatch (E1)
    was not built; this ships exactly the "recommended first ship" below.
 

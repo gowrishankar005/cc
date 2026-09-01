@@ -1,6 +1,6 @@
 # Architect Pilot Feedback Notes
 
-Running log of real observations, confusion points, and errors hit while an architect (not the person who built the pipeline) walks through [`Architect_Guide_Scan_To_Signoff.md`](./Architect_Guide_Scan_To_Signoff.md) for the first time, using Fineract as the test repo. Each entry is raw feedback plus what it means and what (if anything) should change — this is a feedback log, not itself the fix. Action items graduate to `BACKLOG.md` when there's a concrete owner/priority decision to track.
+Running log of real observations, confusion points, and errors hit while an architect (not the person who built the pipeline) walks through [`Architect_Guide_Scan_To_Signoff.md`](./Architect_Guide_Scan_To_Signoff.md) for the first time, using a reference Java/JAX-RS banking platform as the test repo. Each entry is raw feedback plus what it means and what (if anything) should change — this is a feedback log, not itself the fix. Action items graduate to `BACKLOG.md` when there's a concrete owner/priority decision to track.
 
 **Status:** in progress — session ongoing, entries added as feedback comes in.
 
@@ -73,9 +73,9 @@ Architect reported no final completion message and assumed the process was hung.
 ```
 Architect asked whether this "looks good."
 
-**What it means:** Correct, expected behavior for this specific case — not a bug, not a regression. `fineract-charge` alone contains the HTTP resource (`ChargesApiResource`) and the JPA entity (`Charge`), but the service/repository layer that bridges them lives in a different module (`fineract-provider`). Scanning `fineract-charge` in isolation means the scanner can't see that bridge, so it correctly reports S1 instead of fabricating a relationship. This matches the project's own known, previously-documented gap (Fineract multi-hop/layered story, `Claim_Register.md` R2 — not built for a single-root scan).
+**What it means:** Correct, expected behavior for this specific case — not a bug, not a regression. `fineract-charge` alone contains the HTTP resource (`ChargesApiResource`) and the JPA entity (`Charge`), but the service/repository layer that bridges them lives in a different module (`fineract-provider`). Scanning `fineract-charge` in isolation means the scanner can't see that bridge, so it correctly reports S1 instead of fabricating a relationship. This matches the project's own known, previously-documented gap (the reference banking platform's multi-hop/layered story, `Claim_Register.md` R2 — not built for a single-root scan).
 
-**Action item:** None for the tool — this is the honesty mechanism working as designed. **Follow-up test, in progress:** rescanning with both `fineract-charge` + `fineract-provider` as roots together to check whether the multi-hop bridge resolves at that scope (per the guide's Fineract example). Outcome to be logged as its own entry.
+**Action item:** None for the tool — this is the honesty mechanism working as designed. **Follow-up test, in progress:** rescanning with both `fineract-charge` + `fineract-provider` as roots together to check whether the multi-hop bridge resolves at that scope (per the guide's reference-banking-platform example). Outcome to be logged as its own entry.
 
 ---
 
@@ -181,7 +181,7 @@ No `Bash`/terminal tool is listed. The file's own header comment states this lis
 
 ## Entry 10 — node `name` is the raw file path for every unit, confirmed via live output — real bug, root cause isolated
 
-**Observed:** Architect noted the CALM viewer only shows file paths as node labels, not readable names, and asked whether a diagram edge meant real DB↔API connectivity. Read the real generated `architecture.calm.json` directly (`/Users/gowri/Innovation/testbed/cc/calm-output/architecture.calm.json`) to get ground truth instead of guessing from the rendered diagram.
+**Observed:** Architect noted the CALM viewer only shows file paths as node labels, not readable names, and asked whether a diagram edge meant real DB↔API connectivity. Read the real generated `architecture.calm.json` directly (local `calm-output/architecture.calm.json`) to get ground truth instead of guessing from the rendered diagram.
 
 **Finding 1 — name bug, confirmed and root-caused precisely:**
 ```
@@ -193,7 +193,7 @@ All three nodes — service and both database units — have `name` set to the f
 
 **Action item:** Derive a human-readable `name` (real class name from decorator evidence if available, else `path.basename(filePath, '.java')`/language-appropriate equivalent as a minimal fallback) instead of the raw path. Candidate: **`B-node-name-from-path`**. Not yet fixed — offered to fix immediately, awaiting architect's go-ahead.
 
-**Fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-3.** `signal-mapper.ts` now derives `name` from a real, unambiguous class name (threaded through as `DecoratorFact.fromNodeName` from CodeGraph's own `Node.name`) when exactly one exists for the file, falling back to the basename otherwise — never guesses between multiple real candidates (verified against `MultiResourceFile.java`'s 2-class shape). Re-ran the exact Fineract repro: `ChargesApiResource.java` now names `ChargesApiResource`, `Charge.java` names `Charge`, `ChargeRepository.java` names `ChargeRepository`. `unique-id` confirmed unchanged in both re-runs. `scope-limitations.yml` updated (`unit-name-derivation`), 3 new locked regression assertions.
+**Fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-3.** `signal-mapper.ts` now derives `name` from a real, unambiguous class name (threaded through as `DecoratorFact.fromNodeName` from CodeGraph's own `Node.name`) when exactly one exists for the file, falling back to the basename otherwise — never guesses between multiple real candidates (verified against `MultiResourceFile.java`'s 2-class shape). Re-ran the exact reference-banking-platform repro: `ChargesApiResource.java` now names `ChargesApiResource`, `Charge.java` names `Charge`, `ChargeRepository.java` names `ChargeRepository`. `unique-id` confirmed unchanged in both re-runs. `scope-limitations.yml` updated (`unit-name-derivation`), 3 new locked regression assertions.
 
 **Finding 2 — connectivity question resolved, confirms prior findings, not a new gap:**
 ```json
@@ -208,7 +208,7 @@ Only two relationships exist: a real `ChargeRepository → Charge` structural ed
 
 ## Entry 11 — real architecture traced by hand, sharper root cause found for the S1 gap
 
-**Observed:** Architect asked to independently verify (not just trust the JSON dump) what the real relationship is between `ChargesApiResource`, `Charge`, and `ChargeRepository` by exploring the actual Fineract source.
+**Observed:** Architect asked to independently verify (not just trust the JSON dump) what the real relationship is between `ChargesApiResource`, `Charge`, and `ChargeRepository` by exploring the actual reference-banking-platform source.
 
 **What was found, tracing the real chain hop by hop:**
 ```
@@ -245,9 +245,9 @@ public class ChargeConfiguration {
     public ChargeWritePlatformService chargeWritePlatformService(...) { return new ChargeWritePlatformServiceJpaRepositoryImpl(...); }
 }
 ```
-This `starter`/`@Bean`-factory pattern is a real, apparently repo-wide Fineract convention (confirmed similarly named `starter`/`SavingsConfiguration.java`, `LoanAccountConfiguration.java`, etc. exist for other modules) — not a one-off. **No detection mechanism in this pipeline's signal catalogue currently recognizes `@Bean`-factory wiring as service-forming evidence.** So even scanning `fineract-provider`, these two impl classes likely still produce zero evidence and zero units — a second, independent invisibility mechanism stacked on top of Entry 11's plain-interface gap, on the very same real story.
+This `starter`/`@Bean`-factory pattern is a real, apparently repo-wide reference-banking-platform convention (confirmed similarly named `starter`/`SavingsConfiguration.java`, `LoanAccountConfiguration.java`, etc. exist for other modules) — not a one-off. **No detection mechanism in this pipeline's signal catalogue currently recognizes `@Bean`-factory wiring as service-forming evidence.** So even scanning `fineract-provider`, these two impl classes likely still produce zero evidence and zero units — a second, independent invisibility mechanism stacked on top of Entry 11's plain-interface gap, on the very same real story.
 
-**Action item:** A new signal-catalogue candidate — detect `@Bean`-annotated factory methods inside `@Configuration` classes as service-forming evidence for whatever type they return, sourcing the "real" class name/kind from the constructed type (e.g. `new ChargeReadPlatformServiceImpl(...)`), not just the configuration class itself. This is a materially different, well-evidenced mechanism from anything currently in the catalogue (JAX-RS/JPA/security-annotation decorators) — likely relevant repo-wide for Fineract, not Charge-specific. No backlog ID assigned yet; candidate name if pursued: `B-spring-bean-factory-detection`.
+**Action item:** A new signal-catalogue candidate — detect `@Bean`-annotated factory methods inside `@Configuration` classes as service-forming evidence for whatever type they return, sourcing the "real" class name/kind from the constructed type (e.g. `new ChargeReadPlatformServiceImpl(...)`), not just the configuration class itself. This is a materially different, well-evidenced mechanism from anything currently in the catalogue (JAX-RS/JPA/security-annotation decorators) — likely relevant repo-wide for the reference banking platform, not Charge-specific. No backlog ID assigned yet; candidate name if pursued: `B-spring-bean-factory-detection`.
 
 **Expectation set for the upcoming multi-root scan (Entry 4's original open item):** should still be run as the real empirical test, but do not expect it to fully recover the `ChargesApiResource → ... → ChargeRepository` chain — two distinct, compounding, now-evidenced detection gaps (plain interfaces + `@Bean`-factory wiring) both sit on this exact story, independent of which roots are included.
 
@@ -283,7 +283,7 @@ This `starter`/`@Bean`-factory pattern is a real, apparently repo-wide Fineract 
 
 ## Entry 15 — a reference Java microservices banking sample's "happy path" scan — clean, as expected, confirms one known gap
 
-**Observed:** Architect ran a fresh scan against a reference Java microservices banking sample's `repo/src/accounts/{userservice,contacts}` (recommended after Fineract's layered complexity kept surfacing detection gaps rather than letting the architect exercise the rest of the workflow).
+**Observed:** Architect ran a fresh scan against a reference Java microservices banking sample's `repo/src/accounts/{userservice,contacts}` (recommended after the reference Java/JAX-RS banking platform's layered complexity kept surfacing detection gaps rather than letting the architect exercise the rest of the workflow).
 
 **Result — clean and correct:**
 ```
@@ -298,7 +298,7 @@ Both services connect directly to their own database class, no invisible layers,
 
 **Only 1 residual:** `S2-http-without-security-control` — expected, matches known auth-detection coverage limits.
 
-**Action item:** None new — this run is the clean baseline to compare Fineract's layered case against, and a good candidate for a short, low-friction residual-session walkthrough next.
+**Action item:** None new — this run is the clean baseline to compare the reference Java/JAX-RS banking platform's layered case against, and a good candidate for a short, low-friction residual-session walkthrough next.
 
 **Naming half fixed 2026-08-10, see `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-3.** Re-ran this exact scan post-fix: `userservice.py`/`contacts.py` now name `userservice`/`contacts` (basename fallback — Python has no class-level marker for these Flask app-factory files, a real, disclosed edge in `scope-limitations.yml`'s new `unit-name-derivation` entry, not a full fix to a "true" service name). `UserDb`/`ContactsDb` were already correct before this fix. Locked in `test/regression.test.js`'s existing reference-sample test.
 

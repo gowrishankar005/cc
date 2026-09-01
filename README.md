@@ -391,8 +391,9 @@ run without unsetting the environment variable, pass `--no-auto-codeql` —
 it overrides both the flag and the env var for that one invocation.
 
 **Gradle callers hand-writing the command: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
-failure mode, found running a live three-engine benchmark (Fineract +
-Spring Boot Admin, 2026-08-21): if a Gradle daemon from an earlier local
+failure mode, found running a live three-engine benchmark (a reference
+Java/JAX-RS banking platform + Spring Boot Admin, 2026-08-21): if a Gradle
+daemon from an earlier local
 build is already running, CodeQL's build tracer only instruments the
 process tree it directly launches — the already-running daemon does the
 real compilation *outside* that tree, so CodeQL sees zero source even

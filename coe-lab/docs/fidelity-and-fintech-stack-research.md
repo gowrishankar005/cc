@@ -3,10 +3,12 @@
 **Date:** 2026-08-07 (addendum 2026-08-08)  
 **Use:** Choose lab packages and gold expectations. Not a claim that the target customer runs this exact topology.
 
-**Superseding solutioning authority (2026-08-08):** full plane/construct/locus/mechanism/claim/sample matrix lives in  
-[`docs/solution/Fidelity_Yardstick_Closeout_Matrix.md`](../../docs/solution/Fidelity_Yardstick_Closeout_Matrix.md)  
-with implementation tasks in [`docs/solution/AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`](../../docs/solution/AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md).  
-Prefer those over this file when they disagree.
+**Superseding solutioning authority (2026-08-08):** this note originally pointed
+to a `Fidelity_Yardstick_Closeout_Matrix.md` / `AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`
+pair that no longer exists in the current doc structure (dead citation, found
+2026-09-01) — their content is superseded by `docs/solution/Architect_Residual_Review_Session.md`
+and the current `AGENT_TASKS_Ext_*.md` lane files for any topic still open.
+Prefer those, current, docs over this one when they disagree.
 
 ## 1. Target-customer-aligned signals (public hiring + project requirements)
 

@@ -19,7 +19,7 @@ zero code changes of any kind.
 ## Claim triple
 
 `{rootSet: a hand-authored real-syntax NestJS GraphQL resolver fixture +
-apache/fineract's fineract-charge module (spikes/), terminalGrain: N/A —
+a reference Java/JAX-RS banking platform's charge module (spikes/), terminalGrain: N/A —
 mechanism-level test, not an architecture-story claim, evalArtefact: direct
 run-slice output inspection + full pipeline/test regression suite}`.
 
@@ -63,7 +63,7 @@ Adding `nestjs-graphql-field-decorator` (`matchSignal: "Query|Mutation"`,
 `pipeline/test` regression suite (required — this is a shared file every
 package's classification depends on) surfaced **6 real regressions**, all
 tracing to one cause: Spring Data JPA's real `@Query(...)` annotation
-(`ChargeRepository.java`, `apache/fineract`, real source) bare-word-matches
+(`ChargeRepository.java`, a reference Java/JAX-RS banking platform, real source) bare-word-matches
 the new `"Query"` alternative. `findRule()`'s old fallback behavior —
 *"prefer a same-language candidate if one exists, otherwise fall back to
 `candidates[0]`"* — silently resolved this real Java `@Query` fact to the
@@ -75,7 +75,7 @@ cascading into 6 failing tests (R0/R2 grading, S1 silence metrics, HITL
 review, coverage percentage — every downstream consumer of that one node's
 kind).
 
-This is not scoped to GraphQL or to Fineract. It is the **third** real
+This is not scoped to GraphQL or to the reference banking platform. It is the **third** real
 instance of the same collision class this codebase's own code comments
 already document twice (Lombok's `@Getter` vs. JAX-RS's `GET` composed-route
 alternative; a JAX-RS composed route vs. NestJS's bare `Get` decorator) — the

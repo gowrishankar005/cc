@@ -8,7 +8,7 @@ architecture — `BACKLOG.md`'s "Graded fact admission (dual-unit gate)" row.
 **Result: implemented, evidenced against coe-lab (round 1) and real
 reference repos (rounds 2-3), SHIPPED in round 3 (2026-08-14).** Round 1
 (against coe-lab's sparse fixtures only) found 0 recall gain. Round 2
-(`spikes/apache-fineract`, `bank-of-anthos`, `ghostfolio`, `finos/waltz`,
+(a reference Java/JAX-RS banking platform, `bank-of-anthos`, `ghostfolio`, a reference Java governance platform,
 populated after round 1) reversed that conclusion — E2 recovers real signal
 against densely-linked real code — but surfaced three real architectural
 conflicts with this pipeline's other invariants and was reverted a second
@@ -83,7 +83,7 @@ synthetic worst-cases invented for the report.
 | Recall ↑ at L2, measured | **Not demonstrated.** coe-lab's core/trap fixtures produce **zero** raw Graphify edges each (too small/independent to exercise cross-references at all — confirmed via `--all-core` generation and a combined 7-root scan of every coe-lab core+trap package, both showing 0 relationships reconciled). No real densely-linked repo was present in `spikes/` at the time this was measured (see "What changed after" below). |
 | `lib-fintech-common` must-not-detect trap still passes | **Passes**, but untested by real load: the trap fixture itself produces 0 Graphify edges in this coe-lab fixture set, so the admission mechanism was never actually exercised against it. Passing here is a null result, not a demonstrated safe pass under stress. |
 | Core-package semantic gates stay green; R1 regression-lock holds | **Confirmed.** `npm test` 64/0/25 exact baseline match after both fixes; R1 lock test (real Bank-of-Anthos-shaped service→database `architecture`-graded edge) unaffected. |
-| `E-charge-single-L2` still fails for the right reason | **Not evaluated** — `spikes/fineract/repo` was absent for the entire duration this criterion needed checking (populated only after this report's numeric results were already captured; see below). |
+| `E-charge-single-L2` still fails for the right reason | **Not evaluated** — the reference Java/JAX-RS banking platform's own repo was absent for the entire duration this criterion needed checking (populated only after this report's numeric results were already captured; see below). |
 | False-positive cost stated as a number | **Before fixes:** 5 fabricated nodes on 1 fixture (5:1 ratio) + 1 real violation of the R2b ambiguity-refusal discipline. **After both fixes:** 0 admitted relationships (0 false positives) across all 20 checked-in `pipeline/test` fixtures and all 7 coe-lab core/trap packages — **but also 0 real facts recovered** in the same sweep. |
 
 ## Why this was reverted rather than shipped
@@ -103,18 +103,17 @@ re-attempt starts from evidenced code, not a blank page.
 
 ## What changed after this report's numbers were captured
 
-Real open-source reference repos (`apache/fineract`, `GoogleCloudPlatform/bank-of-anthos`,
-`ghostfolio/ghostfolio`, `finos/waltz` — the repos this codebase's own
-comments already anonymize as "a reference Java/JAX-RS banking platform" etc.,
-confirmed by directory-structure match against the exact paths
-`test/regression.test.js` already expects, e.g. `JAVA_SAMPLE_KAFKA_ROOT`'s
-`org/apache/fineract/...` path) were cloned into `spikes/` (gitignored, per
+Real open-source reference repos (a reference Java/JAX-RS banking platform, `GoogleCloudPlatform/bank-of-anthos`,
+`ghostfolio/ghostfolio`, a reference Java governance platform — genericized
+per this codebase's own convention, confirmed by directory-structure match
+against the exact paths `test/regression.test.js` already expects, e.g.
+`JAVA_SAMPLE_KAFKA_ROOT`'s expected package path) were cloned into `spikes/` (gitignored, per
 this repo's own convention) **after** the numbers above were recorded. This
 unblocked all 25 previously-skipped regression tests (88/89 pass with spikes/
 present) and surfaced one unrelated, pre-existing finding: a real-repo exact
 relationship-count assertion
 (`R0 grading: fineract-core direct-reconciler edges...`, expects 94, a fresh
-`apache/fineract` clone gives 60) has no commit/tag pinned anywhere in this
+reference-platform clone gives 60) has no commit/tag pinned anywhere in this
 codebase's docs or tests, so it silently drifts as the real upstream repo
 evolves — not an E2 regression (E2 was already fully reverted when this ran),
 a separate reproducibility gap worth its own fix.
@@ -127,17 +126,17 @@ larger reason.
 
 ## Round 2 — re-run against real `spikes/` repos (2026-08-13)
 
-With `apache/fineract`, `GoogleCloudPlatform/bank-of-anthos`,
-`ghostfolio/ghostfolio`, and `finos/waltz` populated, the round-1
+With a reference Java/JAX-RS banking platform, `GoogleCloudPlatform/bank-of-anthos`,
+`ghostfolio/ghostfolio`, and a reference Java governance platform populated, the round-1
 implementation (`git show 89b7bd3`) was reapplied and the full regression
 suite re-run: **80 pass, 9 fail** (vs. 89/0 on the reverted baseline with the
-same repos present — see the Fineract count-drift fix above, a prerequisite
+same repos present — see the reference platform's count-drift fix above, a prerequisite
 for this round to even give a stable baseline).
 
 **Recall ↑ at L2 — now demonstrated, reversing Round 1's finding.** Against
-`fineract-core` alone, admission recovers 371 additional low-confidence
+the reference platform's core module alone, admission recovers 371 additional low-confidence
 facts (`371 admitted via unresolved-endpoint placeholder`, vs. 0 in every
-coe-lab fixture). Against `fineract-charge` alone, 9 admitted relationships
+coe-lab fixture). Against the reference platform's charge module alone, 9 admitted relationships
 appear where 0 existed before. This is real, structurally-grounded signal —
 the mechanism works exactly as designed. But recovering it breaks 9 existing
 regression tests, which fall into three distinct, real problem classes (not
@@ -164,7 +163,7 @@ of every specialized detector, cannot know in advance which edges are
 Carve-outs discovered one regression at a time do not generalize safely.
 
 **2. Silences completeness/silence signals (S1) without the story actually
-being more complete.** `fineract-charge`'s `S1-zero-service-touching-relationships`
+being more complete.** The reference platform's charge module's `S1-zero-service-touching-relationships`
 flag exists specifically to stay loud when a service+database pair is
 present but genuinely disconnected (`Claim_Register.md`'s `S-silence` row;
 `E-charge-single-L2`'s whole reason for existing). E2's admitted
@@ -173,7 +172,7 @@ S1's own check only asks "does ≥1 relationship touch a service unit," not
 "does an architecture-grade relationship touch a service unit." A structural,
 low-confidence, unresolved-endpoint relationship still counts as
 "service-touching" by that definition, so **S1 silently stops firing** for
-`fineract-charge` even though nothing about the real, actionable-story
+the reference platform's charge module even though nothing about the real, actionable-story
 completeness changed (`silence metrics: ... flags S1`, `test/regression.test.js:643`).
 This cascades directly into the HITL review queue emptying out for the same
 package (`HITL review trigger: ... (S1) lists the actual units`,
@@ -208,7 +207,7 @@ is a latent E2 regression**, and there is no way to enumerate all of them
 short of exactly what this round did: run the full suite against real data.
 
 **One further compounding factor, not new but relevant:** the already-filed
-CodeGraph under-repeated-invocation degradation (see the Fineract
+CodeGraph under-repeated-invocation degradation (see the reference platform's
 count-drift fix above) interacts with E2 specifically — under degraded
 conditions a real database unit can fail to resolve, causing E2 to
 synthesize an `unresolved` placeholder for it, which then downgrades what
@@ -282,7 +281,7 @@ per-detector carve-out list:
 would silently stop firing because its "service-touching" check doesn't
 distinguish `structural` from `architecture` grade. After conflict 1's fix,
 this never materialized against real fixtures: E2's admitted relationships in
-`fineract-charge` land on `Charge.java`'s enum-type references and a
+the reference platform's charge module land on `Charge.java`'s enum-type references and a
 repository-wrapper call, not on the service unit the S1 check watches — S1
 still fires correctly, unchanged, no grade-awareness change needed. Left
 as-is; if a future real repo shows E2 admission actually landing squarely on
@@ -315,8 +314,8 @@ previously-orphaned node, exactly the kind of recall gain E2 was built to
 recover.
 
 **Result:** `npm test` — **93 pass, 0 fail, 0 skip** (every `spikes/` repo
-populated this session: `apache/fineract`, `bank-of-anthos`,
-`ghostfolio/ghostfolio`, `finos/waltz`). E2 ships live in
+populated this session: a reference Java/JAX-RS banking platform, `bank-of-anthos`,
+`ghostfolio/ghostfolio`, a reference Java governance platform). E2 ships live in
 `DEFAULT_PASSES` — no flag, no opt-in, same as every other core pass.
 
 ## What would reopen this
