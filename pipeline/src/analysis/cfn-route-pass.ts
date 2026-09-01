@@ -11,7 +11,7 @@ const ROUTE_WEIGHT = 40; // matches openApiPass's ROUTE_WEIGHT convention — a 
  * scanned units. Opt-in: only runs when --cfn-manifests <dir> was passed.
  * Runs AFTER mapSignalsPass (needs ctx.allUnits populated — this pass
  * never creates a new unit, only attaches evidence to one that already
- * exists from T-Y3-1's serverless-entry-point signal).
+ * exists from a serverless-entry-point signal).
  *
  * Join key: the Handler string's fully-qualified class name (e.g.
  * "lab.lambdaapigw.TierService" from "lab.lambdaapigw.TierService::getTiers")
@@ -74,14 +74,13 @@ export const cfnRoutePass: AnalysisPass = {
       boundCount++;
     }
 
-    // T-Y5-1 — real counts exposed for coverage-report.ts's S5 flag: a real
-    // CFN scan that finds real routes but binds NONE of them to a scanned
-    // unit is exactly the HT-ASB-006 class generalized (real infra evidence
-    // of an HTTP surface, invisible code-side) — still a real possibility
-    // even after Y3/Y4, e.g. the handler's code lives in a root not passed
-    // to this scan (the real 21/26-unresolved case found in T-Y4-2's own
-    // wild exam, where a reference AWS SaaS sample's other services' routes were correctly
-    // left unresolved).
+    // Real counts exposed for coverage-report.ts's S5 flag: a real CFN scan
+    // that finds real routes but binds NONE of them to a scanned unit is a
+    // real possibility (real infra evidence of an HTTP surface, invisible
+    // code-side) — e.g. the handler's code lives in a root not passed to
+    // this scan (a real 21/26-unresolved case found scanning a reference
+    // AWS SaaS sample, where the other services' routes were correctly left
+    // unresolved).
     ctx.cfnRouteBindingsFound = bindings.length;
     ctx.cfnRouteBindingsBound = boundCount;
 

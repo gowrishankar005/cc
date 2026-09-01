@@ -6,7 +6,7 @@ import { discoverSpringConfigFiles } from '../scanner/spring-config-provider';
 import { detectCrossRepoJoins, RootJoinInputs } from './cross_package/cross-repo-join-detector';
 
 /**
- * T-MR-2 — opt-in, same convention as `k8sManifestsDir`: a no-op when
+ * Opt-in, same convention as `k8sManifestsDir`: a no-op when
  * `ctx.repoManifestsDir` is unset. Re-discovers cdxgen/spring-config data
  * per root directly (same "call the provider per pass" convention
  * `cdxgen-corroboration-pass.ts` already uses — no existing ctx field
@@ -21,8 +21,8 @@ import { detectCrossRepoJoins, RootJoinInputs } from './cross_package/cross-repo
  * that raw string straight into `repoRootNodeId`. Two real problems: (1)
  * the exact same repo scanned from a different checkout location (a
  * different CI machine, a different local clone path) produces a
- * DIFFERENT `repo-root:` node/relationship id — breaking T-CL-1/T-CL-2's
- * whole "stable identity across reruns" guarantee for every cross-repo
+ * DIFFERENT `repo-root:` node/relationship id — breaking the whole
+ * "stable identity across reruns" guarantee for every cross-repo
  * relationship, the one fact class this pipeline's incremental-merge
  * mechanism exists to track correctly; (2) it leaks the scanning machine's
  * local filesystem layout into the architecture output's node id AND
