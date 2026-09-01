@@ -3,8 +3,8 @@ import * as path from 'path';
 import { FactHistoryEntry } from './incremental-merge';
 
 /**
- * T-CL-3 (BACKLOG.md "Fact identity, incremental merge, and review
- * history") — "who/when/on-what-evidence a status changed is retrievable,
+ * Fact identity, incremental merge, and review history (BACKLOG.md) —
+ * "who/when/on-what-evidence a status changed is retrievable,
  * not just current state". Two real sources of status-change events exist
  * in this pipeline and this file deliberately does not duplicate either:
  *  - HUMAN-driven changes (a fact promoted to 'reviewed') already carry a

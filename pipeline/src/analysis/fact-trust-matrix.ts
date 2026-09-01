@@ -1,7 +1,6 @@
 /**
- * T-LR-6 (`docs/solution/AGENT_TASKS_Ext_CodeQL_Engine.md`) — the
- * evidence-earned trust matrix `BACKLOG.md`'s "Per-(engine, fact-type) trust
- * tiers" row names. NOT the same axis as `scanner/engine-capability-matrix.yml`:
+ * The evidence-earned trust matrix `BACKLOG.md`'s "Per-(engine, fact-type)
+ * trust tiers" row names. NOT the same axis as `scanner/engine-capability-matrix.yml`:
  * that file routes which engine RUNS for a given (language, framework) —
  * declared upfront, before any measurement. This file is the opposite axis —
  * once multiple engines/mechanisms both produce a fact for the same
@@ -96,18 +95,18 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'admitted-unresolved', scope: 'same-root', confidence: 3, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
   { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'admitted-unresolved', scope: 'cross-root', confidence: 2, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
 
-  // CodeQL DI resolution (T-LR-5, codeql-di-pass.ts). Deliberately placed
+  // CodeQL DI resolution (codeql-di-pass.ts). Deliberately placed
   // strictly between r2b (8/5) and r2c (6/3) — real, verified accuracy
-  // (E1b: 2106 bindings, correct ambiguity refusal) but "never automatically
-  // primary" per the T-LR-6 acceptance criterion, so it does not get to
-  // outrank r2-phase1/r2-stereotype despite being a more direct fact.
+  // (2106 bindings, correct ambiguity refusal in real testing) but "never
+  // automatically primary" per its own acceptance criterion, so it does
+  // not get to outrank r2-phase1/r2-stereotype despite being a more direct fact.
   { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'same-root', confidence: 7, evidence: 'Claim_Register.md T-LR-5-codeql-di; a reference Java/JAX-RS banking platform charge+provider run, 2026-08-19, 2105 bindings' },
   { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'cross-root', confidence: 4, evidence: 'Claim_Register.md T-LR-5-codeql-di; a reference Java/JAX-RS banking platform charge+provider run, 2026-08-19, 2105 bindings' },
   { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-bean-factory', scope: 'same-root', confidence: 7, evidence: 'Claim_Register.md T-LR-5-codeql-di; LoanChargesApiResource -> LoanChargeReadPlatformServiceImpl, real @Bean-factory wiring' },
   { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-bean-factory', scope: 'cross-root', confidence: 4, evidence: 'Claim_Register.md T-LR-5-codeql-di; LoanChargesApiResource -> LoanChargeReadPlatformServiceImpl, real @Bean-factory wiring' },
 
-  // CodeQL-introduced units — T-FS-4-class introduction ("own tier, never
-  // promoted"; status-assignment.ts's SECONDARY_ONLY_SOURCES). Not a
+  // CodeQL-introduced units — own tier, never promoted
+  // (status-assignment.ts's SECONDARY_ONLY_SOURCES). Not a
   // relationship-edge fact type at all: this is CodeQL asserting a class
   // exists and is real, not resolving an edge between two already-known units.
   { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-di', scope: 'n/a', confidence: 10, evidence: 'Claim_Register.md T-LR-5-codeql-di; 56 new units introduced, a reference Java/JAX-RS banking platform charge+provider run, 2026-08-19' },
@@ -116,8 +115,9 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // Placed at the SAME tier as DI resolution's mechanisms (7/4) — comparably
   // real, whole-codebase-scale evidence, not a different number invented
   // without justification. Originally evaluated in E1-codeql-engine-evaluation.md
-  // (7 real edges, a reference Java/JAX-RS banking platform-only scope) but never shipped (T-LR-5 scoped DI
-  // resolution as the smaller safe first unit); re-verified and shipped
+  // (7 real edges, a reference Java/JAX-RS banking platform-only scope) but
+  // never shipped (DI resolution scoped as the smaller safe first unit);
+  // re-verified and shipped
   // 2026-08-22 after the original query was found never to have left
   // gitignored soln/ and had to be reconstructed from the memo's own
   // mechanism description.
@@ -145,7 +145,7 @@ export function unitIntroductionTrust(engine: TrustEngine, mechanism: string): n
 }
 
 /**
- * Structural check for the T-LR-6 acceptance criterion's own wording:
+ * Structural check for this matrix's own acceptance criterion:
  * "CodeQL is never automatically primary." `codegraph`'s real primary tier
  * never enters this matrix (see module doc, point 1) — this asserts the
  * weaker, matrix-internal version: no `engine: 'codeql'` row ever reaches or
