@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { CrossPackageGraphRun, CrossPackageEdge, parseSourceLocation } from '../../scanner/codegraph-crossroot-provider';
 import { TypedUnit, TypedRelationship, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
-import { findJavaImportForBareName, getJavaPackageDeclaration } from '../../rules/java-import-resolver';
+import { findJavaImportForBareName, getJavaPackageDeclaration, javaFileReferencesBareName } from '../../rules/java-import-resolver';
 import { relationshipTrust } from '../fact-trust-matrix';
 
 /**
@@ -97,13 +97,36 @@ export function buildNodeToUnitMap(run: CrossPackageGraphRun, unitsByRoot: Map<s
  * relationships on a real 918-relationship scan of a reference Java/JAX-RS
  * banking platform.
  *
- * Java-only (the only evidenced language) — rejects an edge only on a
- * POSITIVE, CONFIRMED disagreement: the source class has a real import for
- * this bare name, and that import's qualified package does not match the
- * destination unit's own real `package` declaration. No import found at all
- * (the legitimate same-package-reference case, which needs no Java import)
- * or an unreadable/unpackaged destination both degrade to "can't disprove
- * this edge, leave it" — never a false rejection from missing data.
+ * Java-only (the only evidenced language). Two independent, POSITIVE,
+ * CONFIRMED-disagreement checks, never a rejection from missing data:
+ *
+ * 1. **Explicit, disagreeing import** — the source class has a real import
+ *    for this bare name, and that import's qualified package does not match
+ *    the destination unit's own real `package` declaration.
+ * 2. **No import, same-package-reference case, package mismatch** — found
+ *    live, real, second instance (a reference Java microservices banking
+ *    sample, 2026-09-02): the ORIGINAL version of this function treated "no
+ *    import found" as always "can't disprove, leave it" — correct for the
+ *    case it was built for (an entirely un-packaged or unreadable
+ *    destination), but wrong for a very common real shape it didn't yet
+ *    have evidence for: several genuinely independent packages (e.g.
+ *    separate microservices in one repo) each defining their OWN,
+ *    unrelated, identically-named class. A bare reference with no import
+ *    can only correctly resolve to a class in the SOURCE's own package (or
+ *    `java.lang`, which is never a real `TypedUnit` here, so it can't cause
+ *    a false rejection) — so if the source's own real `package` declaration
+ *    disagrees with the destination's, that's a real, provable collision
+ *    too, previously undetectable. Real repro: `TransactionRepository
+ *    extends CrudRepository<Transaction, Long>` (a genuine, no-import,
+ *    same-package reference to ITS OWN `Transaction`) was being resolved
+ *    against two OTHER, unrelated services' own `Transaction` classes,
+ *    fabricating 10 cross-service relationships with zero basis in the real
+ *    source (see `docs/solution/BACKLOG.md`'s "Possible bare-identifier
+ *    collision..." row for the full evidence trail). Non-static wildcard
+ *    type imports (`import some.pkg.*;`) are a real, disclosed, narrower
+ *    residual this check doesn't handle — zero real instances found in
+ *    either of this project's two real Java evidence repos, not silently
+ *    assumed safe.
  *
  * `collisionCache` is keyed on (source file, bare name, destination unit) —
  * not just source+dest — since one file can bare-reference multiple
@@ -111,7 +134,38 @@ export function buildNodeToUnitMap(run: CrossPackageGraphRun, unitsByRoot: Map<s
  * edges (imports + references, in the evidenced repro) commonly land on the
  * exact same false-positive pair.
  */
-function isBareNameCollision(
+/**
+ * Shared core both public variants below call, once each has resolved its
+ * own "source absolute path" / "destination absolute path" from whatever
+ * data shape it has available (a resolved TypedUnit's root-relative
+ * `filePath`, or a raw graph node's own `source_file` — two genuinely
+ * different path conventions, not safely unifiable into one parameter, see
+ * `isBareNameCollisionForBridgeCandidate`'s own doc comment for why a
+ * second public entry point exists instead of generalizing this one
+ * function's parameter types).
+ */
+function _bareNameCollisionCore(srcAbsPath: string, destAbsPath: string, bareName: string, fileLineCache: Map<string, string[]>, collisionCache: Map<string, boolean>, cacheKey: string): boolean {
+  const cached = collisionCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const destPackage = getJavaPackageDeclaration(destAbsPath, fileLineCache);
+  const qualifiedImport = findJavaImportForBareName(srcAbsPath, bareName, fileLineCache);
+  let result = false;
+  if (qualifiedImport) {
+    result = destPackage !== undefined && qualifiedImport !== `${destPackage}.${bareName}`;
+  } else if (javaFileReferencesBareName(srcAbsPath, bareName, fileLineCache)) {
+    // Only trust the same-package-mismatch check when the destination's
+    // own bare name is literally written in the source file — see
+    // javaFileReferencesBareName's doc comment for the real false-positive
+    // (DI/interface-implementation resolution) this guards against.
+    const srcPackage = getJavaPackageDeclaration(srcAbsPath, fileLineCache);
+    result = srcPackage !== undefined && destPackage !== undefined && srcPackage !== destPackage;
+  }
+  collisionCache.set(cacheKey, result);
+  return result;
+}
+
+export function isBareNameCollision(
   edge: CrossPackageEdge,
   from: NodeUnitMatch,
   to: NodeUnitMatch,
@@ -127,20 +181,48 @@ function isBareNameCollision(
   const srcResolved = run.resolveRoot(edge.source_file);
   if (!srcResolved) return false;
   const srcAbsPath = path.join(srcResolved.root, srcResolved.relativeFilePath);
+  const destAbsPath = path.join(to.root, to.unit.filePath);
 
   const cacheKey = `${srcAbsPath}|${bareName}|${to.unit.id}`;
-  const cached = collisionCache.get(cacheKey);
-  if (cached !== undefined) return cached;
+  return _bareNameCollisionCore(srcAbsPath, destAbsPath, bareName, fileLineCache, collisionCache, cacheKey);
+}
 
-  const qualifiedImport = findJavaImportForBareName(srcAbsPath, bareName, fileLineCache);
-  let result = false;
-  if (qualifiedImport) {
-    const destAbsPath = path.join(to.root, to.unit.filePath);
-    const destPackage = getJavaPackageDeclaration(destAbsPath, fileLineCache);
-    result = destPackage !== undefined && qualifiedImport !== `${destPackage}.${bareName}`;
-  }
-  collisionCache.set(cacheKey, result);
-  return result;
+/**
+ * Same check, same root cause, for a BRIDGE CANDIDATE specifically — real,
+ * live, third instance found (a reference Java microservices banking
+ * sample, 2026-09-02): `isBareNameCollision` above requires an already-
+ * resolved `to: NodeUnitMatch`, which a bridge candidate structurally can
+ * never have (bridge candidacy, by `multi-hop-bridge-detector.ts`'s own
+ * definition, means the target has NO existing TypedUnit yet) — the same
+ * limitation `scope-limitations.yml`'s `bare-implementer-list-collision-not-reproduced`
+ * already named for the bridge-TARGET case, now genuinely reproduced and
+ * fixed for the shape it IS reachable for: `edge.target` (the bridge
+ * candidate) still has a real, raw graph node with its own `source_file` —
+ * resolved via `run.resolveRoot()`, the SAME convention `edge.source_file`
+ * already uses (unlike a TypedUnit's root-relative `filePath`, a raw node's
+ * `source_file` needs the same resolution the source side already gets).
+ * Real repro: `TransactionHistoryController`'s own bare reference to its
+ * own local helper class `LedgerReader` was resolved by CodeGraph to a
+ * DIFFERENT, unrelated service's own `LedgerReader.java` — one hop before
+ * `isBareNameCollision`'s existing check ever runs, so a second-hop
+ * same-package-legitimate reference from the WRONGLY-resolved bridge file
+ * passed cleanly (correctly, relative to the wrong file), while the overall
+ * result was still a fabricated cross-service relationship.
+ */
+export function isBareNameCollisionForBridgeCandidate(edge: CrossPackageEdge, nodeById: Map<string, { label: string; source_file: string }>, run: CrossPackageGraphRun, fileLineCache: Map<string, string[]>, collisionCache: Map<string, boolean>): boolean {
+  if (!edge.source_file.endsWith('.java')) return false;
+  const bridgeNode = nodeById.get(edge.target);
+  const bareName = bridgeNode?.label;
+  if (!bareName || !bridgeNode?.source_file) return false;
+
+  const srcResolved = run.resolveRoot(edge.source_file);
+  const destResolved = run.resolveRoot(bridgeNode.source_file);
+  if (!srcResolved || !destResolved) return false;
+  const srcAbsPath = path.join(srcResolved.root, srcResolved.relativeFilePath);
+  const destAbsPath = path.join(destResolved.root, destResolved.relativeFilePath);
+
+  const cacheKey = `bridge|${srcAbsPath}|${bareName}|${destAbsPath}`;
+  return _bareNameCollisionCore(srcAbsPath, destAbsPath, bareName, fileLineCache, collisionCache, cacheKey);
 }
 
 /**

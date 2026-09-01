@@ -1,6 +1,6 @@
-import { CrossPackageGraphRun } from '../../scanner/codegraph-crossroot-provider';
+import { CrossPackageGraphRun, CrossPackageEdge } from '../../scanner/codegraph-crossroot-provider';
 import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
-import { buildNodeToUnitMap, NodeUnitMatch } from './graphify-reconciler';
+import { buildNodeToUnitMap, NodeUnitMatch, isBareNameCollision, isBareNameCollisionForBridgeCandidate } from './graphify-reconciler';
 import { relationshipTrust } from '../fact-trust-matrix';
 
 /**
@@ -146,16 +146,30 @@ export function detectMultiHopBridgeRelationships(
   // the second-hop "does the implementer import a store" test is the exact
   // same relation vocabulary as the first-hop "does the service import a
   // bridge" test — one mechanism, two hops, not two mechanisms.
-  const importsBySource = new Map<string, string[]>();
+  //
+  // Stores the real CrossPackageEdge objects (not just target node ids) —
+  // real bug found live, second instance of the same root cause
+  // graphify-reconciler.ts's isBareNameCollision was built for (a reference
+  // Java microservices banking sample, 2026-09-02): this second hop used to
+  // trust `importsBySource`'s target ids blindly, with no collision check
+  // at all, fabricating an r2c 'calls' edge from a service straight to an
+  // unrelated OTHER service's own same-named store class whenever the real
+  // delegate was a no-import same-package reference. Needs the real edge
+  // object (not just the target id) so isBareNameCollision can be reused
+  // here exactly as graphify-reconciler.ts already uses it, not a second,
+  // drifting copy of the same check.
+  const importsBySource = new Map<string, CrossPackageEdge[]>();
   for (const edge of run.graph.edges) {
     if (edge.relation === 'implements') {
       if (!implementersByTarget.has(edge.target)) implementersByTarget.set(edge.target, []);
       implementersByTarget.get(edge.target)!.push(edge.source);
     } else if (edge.relation === 'imports' || edge.relation === 'references') {
       if (!importsBySource.has(edge.source)) importsBySource.set(edge.source, []);
-      importsBySource.get(edge.source)!.push(edge.target);
+      importsBySource.get(edge.source)!.push(edge);
     }
   }
+  const fileLineCache = new Map<string, string[]>();
+  const collisionCache = new Map<string, boolean>();
 
   for (const edge of run.graph.edges) {
     // Real finding while proving this against a synthetic fixture (a
@@ -178,6 +192,20 @@ export function detectMultiHopBridgeRelationships(
     const bridgeNodeId = edge.target;
     if (nodeToUnit.has(bridgeNodeId)) continue; // not a bridge — the imported thing already has its own evidence/unit (R1 handles this)
     if (!isRealBridgeCandidate(bridgeNodeId)) continue; // external/unresolved symbol (annotation type, out-of-root type) — not a real in-repo bridge, no ignored-item noise
+    // Real, live, third instance of the same bare-name-collision root cause
+    // isBareNameCollision was built for (a reference Java microservices
+    // banking sample, 2026-09-02): the service's own bare reference to what
+    // it thinks is ITS bridge candidate can itself resolve to a DIFFERENT
+    // service's own, unrelated same-named class — one hop before either of
+    // isBareNameCollision's two call sites below ever run, so their checks
+    // pass cleanly (correctly, relative to the WRONG file) while the overall
+    // chain still fabricates a cross-service relationship. Same "never guess
+    // when it's provably wrong, never reject from missing data" discipline —
+    // see isBareNameCollisionForBridgeCandidate's own doc comment for why
+    // this needs a separate entry point rather than reusing
+    // isBareNameCollision directly (a bridge candidate structurally has no
+    // resolved TypedUnit yet).
+    if (isBareNameCollisionForBridgeCandidate(edge, nodeById, run, fileLineCache, collisionCache)) continue;
 
     // From here on, this edge is this detector's own territory — recorded
     // regardless of what happens next (resolve or refuse).
@@ -219,9 +247,13 @@ export function detectMultiHopBridgeRelationships(
       // (genuine ambiguity between real candidates) is untouched — that's
       // a different, already-correctly-handled case, never routed here.
       if (implementers.length === 0) {
-        const delegateTargets = importsBySource.get(bridgeNodeId) ?? [];
-        const delegateStoreCandidates = delegateTargets
-          .map((targetId) => nodeToUnit.get(targetId))
+        const delegateEdges = importsBySource.get(bridgeNodeId) ?? [];
+        const delegateStoreCandidates = delegateEdges
+          .filter((edge) => {
+            const targetMatch = nodeToUnit.get(edge.target);
+            return !!targetMatch && !isBareNameCollision(edge, fromMatch, targetMatch, nodeById, run, fileLineCache, collisionCache);
+          })
+          .map((edge) => nodeToUnit.get(edge.target))
           .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
         const uniqueDelegateStores = dedupeByUnitId(delegateStoreCandidates);
         if (uniqueDelegateStores.length === 1) {
@@ -369,9 +401,13 @@ export function detectMultiHopBridgeRelationships(
     // §2.4.2 — this is a filter added at the existing second hop, not a new
     // third hop; an implementer's implementer is never chased.
     const implNodeId = implementers[0];
-    const implCandidateTargets = implNodeId ? importsBySource.get(implNodeId) ?? [] : [];
-    const storeCandidates = implCandidateTargets
-      .map((targetId) => nodeToUnit.get(targetId))
+    const implCandidateEdges = implNodeId ? importsBySource.get(implNodeId) ?? [] : [];
+    const storeCandidates = implCandidateEdges
+      .filter((edge) => {
+        const targetMatch = nodeToUnit.get(edge.target);
+        return !!targetMatch && !isBareNameCollision(edge, fromMatch, targetMatch, nodeById, run, fileLineCache, collisionCache);
+      })
+      .map((edge) => nodeToUnit.get(edge.target))
       .filter((m): m is NodeUnitMatch => !!m && (m.unit.kind === 'database' || m.unit.kind === 'topic'));
     // Dedupe by unit id — the same store can be imported via more than one edge.
     const uniqueStoreUnits = dedupeByUnitId(storeCandidates);

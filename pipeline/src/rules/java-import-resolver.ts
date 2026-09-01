@@ -76,6 +76,35 @@ export function findJavaImportForBareName(absoluteFilePath: string, bareName: st
   return undefined;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Real, second finding (a reference Java/JAX-RS banking platform's security
+ * module, `TwoFactorConfigurationApiResource.java` -> `SpringSecurityPlatformSecurityContext.java`):
+ * a resolved destination's bare name can differ from anything literally
+ * written in the source file when the edge came from a legitimate mechanism
+ * other than a direct same-name reference — e.g. dependency-injection /
+ * interface-implementation resolution, where the source only ever names the
+ * INTERFACE (`PlatformSecurityContext`) and CodeGraph correctly resolves it
+ * to its sole same-package implementation. The same-package-mismatch check
+ * (`_bareNameCollisionCore`'s no-import branch) must not fire in that case —
+ * it has no evidence of the specific bug it exists to catch (a bare
+ * identifier resolved to an unrelated same-named class), because the
+ * destination's own bare name never appears in the source text at all.
+ * Gate that branch on this: the destination bare name must be literally
+ * present as a whole word somewhere in the source file before treating a
+ * package mismatch as a real collision.
+ */
+export function javaFileReferencesBareName(absoluteFilePath: string, bareName: string, fileLineCache: Map<string, string[]>): boolean {
+  const lines = readLines(absoluteFilePath, fileLineCache);
+  if (!lines) return false;
+
+  const pattern = new RegExp(`\\b${escapeRegExp(bareName)}\\b`);
+  return lines.some((line) => pattern.test(line));
+}
+
 /** Reads a Java file's own `package X;` declaration (real ground truth for what package a class actually belongs to, independent of directory layout). Undefined for an unreadable file or the default/unnamed package. */
 export function getJavaPackageDeclaration(absoluteFilePath: string, fileLineCache: Map<string, string[]>): string | undefined {
   const lines = readLines(absoluteFilePath, fileLineCache);
