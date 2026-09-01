@@ -49,19 +49,19 @@ export function renderIntelligenceIR(
     `- k8sManifestsStatus: \`${coverage.k8sManifestsStatus}\``,
     `- relationships by kind: ${Object.entries(coverage.relationshipsByKind).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     `- relationships by source: ${Object.entries(coverage.relationshipsBySource).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
-    // T-L3-2 — resolved multi-hop edges by mechanism (r2-phase1/r2b, T-L2-1),
-    // the resolved-side counterpart to "unresolved by mechanism" below.
+    // Resolved multi-hop edges by mechanism (r2-phase1/r2b), the
+    // resolved-side counterpart to "unresolved by mechanism" below.
     `- relationships by mechanism (multi-hop): ${Object.entries(coverage.relationshipsByMechanism).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     `- unresolved by mechanism: ${Object.entries(coverage.unresolvedByMechanism).map(([k, c]) => `${k}=${c}`).join(', ') || '(none)'}`,
     ''
   );
 
-  h(`## Completeness (AREC S1/S2 — distinct from confidence; see S4)`);
+  h(`## Completeness (S1/S2 — distinct from confidence; see S4)`);
   lines.push(
     `- service units: ${coverage.completeness.serviceUnitCount}, database units: ${coverage.completeness.databaseUnitCount}, topic units: ${coverage.completeness.topicUnitCount}`,
     `- relationships touching a service unit: ${coverage.completeness.serviceTouchingRelationshipCount}`,
     `- HTTP-entry-point units without security-control evidence: ${coverage.completeness.httpUnitsWithoutSecurityControlCount}`,
-    // Robustness T-R0-2 — a RATE alongside S1's binary flag. "N/A" (not 0%)
+    // A RATE alongside S1's binary flag. "N/A" (not 0%)
     // when there are no store units to potentially connect to — same
     // honesty discipline as every other precondition-gated metric here.
     `- architecture coverage: ${coverage.completeness.servicesWithArchitectureOutbound}/${coverage.completeness.serviceUnitCount} service unit(s) have ≥1 architecture-grade outbound relationship${coverage.completeness.architectureOutboundCoverage !== undefined ? ` (${(coverage.completeness.architectureOutboundCoverage * 100).toFixed(0)}%)` : ' (N/A — no store units in this run)'}`,
@@ -103,7 +103,7 @@ export function renderIntelligenceIR(
   }
   lines.push('');
 
-  // B-scale-oom (T-SP1-1) — evidencePacks is capped (MAX_EVIDENCE_PACKS) by
+  // evidencePacks is capped (MAX_EVIDENCE_PACKS) by
   // buildEvidencePacks itself; report the real total honestly rather than
   // silently showing a partial count as if it were complete, same
   // truncated-but-disclosed convention as the unmapped-signals section below.

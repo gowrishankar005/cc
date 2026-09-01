@@ -3,7 +3,7 @@ import * as path from 'path';
 import { IgnoredItem } from '../../types/typed-facts';
 
 /**
- * T-X3-1 — HITL/LLM-advisory review of an IgnoredItem currently has only a
+ * HITL/LLM-advisory review of an IgnoredItem currently has only a
  * bare `ref` (file:line); an architect has to open their own IDE to see
  * anything. Attaches a small ±K-line source snippet for the two reasons
  * that actually benefit from review (AMBIGUOUS_BOUNDARY, INSUFFICIENT_EVIDENCE
