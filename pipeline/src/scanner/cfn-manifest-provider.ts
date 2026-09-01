@@ -112,7 +112,7 @@ function resolvePath(resourceLogicalId: string, pool: Map<string, RawResource>):
  * / discoverDeployments. 0 or 2+ resolution failures at any join step are
  * silently skipped (not guessed) — an unresolvable binding just doesn't
  * appear in the result, consistent with this project's "never fabricate"
- * discipline; T-Y4-2's wild exam checks how much real recall this leaves.
+ * discipline; a real-repo evaluation exam checks how much real recall this leaves.
  */
 export function discoverCfnRouteBindings(manifestsDir: string): CfnRouteBinding[] {
   const pool = loadResourcePool(manifestsDir);

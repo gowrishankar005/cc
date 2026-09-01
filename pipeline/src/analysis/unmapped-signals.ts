@@ -1,11 +1,11 @@
 import { IgnoredItem } from '../types/typed-facts';
 
 /**
- * T-X0-2 — unmatched raw signals currently vanish into a flat
+ * Unmatched raw signals currently vanish into a flat
  * INSUFFICIENT_EVIDENCE ignoredItems list (ignoreUnknownSignal, ignored-items.ts)
  * with no aggregate view, so the catalogue has no visible feedback loop.
- * Clustered and capped per the task's own explicit mitigation for "full AST
- * dumps unusable" — never fail or explode a run on volume.
+ * Clustered and capped so "full AST dumps unusable" never fails or
+ * explodes a run on volume.
  */
 const UNMAPPED_DETAIL_PATTERN = /No signal-catalogue\.yml rule matched raw signal "([^"]*)"/;
 

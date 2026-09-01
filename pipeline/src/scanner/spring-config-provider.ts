@@ -3,7 +3,7 @@ import * as path from 'path';
 import { parseAllDocuments } from 'yaml';
 
 /**
- * T-PC1-1/T-PC1-2 (B-spring-config) — deterministic `application.yml`/
+ * Deterministic `application.yml`/
  * `application-*.yml`/`application.properties` discovery + flat-key parse.
  * Real root cause this closes (`coe-lab/docs/reference/spring-config-blind-spot-root-cause-and-fix.md`):
  * CodeGraph never attempts YAML/properties at all (excluded from its
@@ -72,7 +72,7 @@ function flattenYaml(obj: unknown, prefix: string, out: Map<string, string>): vo
   }
 }
 
-/** ~20-line flat key=value reader (T-SC-2) — no new dependency, `.properties` has no nesting/anchors/multi-doc concerns YAML has. */
+/** ~20-line flat key=value reader — no new dependency, `.properties` has no nesting/anchors/multi-doc concerns YAML has. */
 function parsePropertiesFile(raw: string): Map<string, string> {
   const out = new Map<string, string>();
   for (const rawLine of raw.split('\n')) {
@@ -92,7 +92,7 @@ function parsePropertiesFile(raw: string): Map<string, string> {
  * packageRoot — "run without it ok", same convention as
  * discoverOpenApiDocuments/discoverDeployments.
  *
- * T-VM-2's decided profile-merge policy (spring-config-property-vocabulary.md
+ * The decided profile-merge policy (spring-config-property-vocabulary.md
  * §3): each file's properties are kept SEPARATE, never merged across files
  * here. A base `application.yml` and a sibling `application-prod.yml` both
  * setting `spring.datasource.url` are two distinct facts with two distinct

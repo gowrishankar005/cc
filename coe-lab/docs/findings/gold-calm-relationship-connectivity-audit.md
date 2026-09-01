@@ -85,7 +85,7 @@ Nothing in `package-catalog.md`, `FINERACT_GOLD.md`, or `wild-type-gold-policy.m
 
 ### 3.1 `java-rbac-datatable`
 
-`datatable-write-service` (a pure `@PreAuthorize`-annotated interface, no HTTP route) and `account-read-api` (an unrelated Spring controller) are two **independent** RBAC control-detection examples bundled into one fixture — not two components that call each other in real Fineract. Confirmed against the governing semantic gold: `"relationships": []` plus `"expectControls": true` / `"controlNotes": "At least one service node should carry CALM controls..."` — the fixture's entire purpose is control-evidence coverage, not architectural connectivity. Correctly disconnected.
+`datatable-write-service` (a pure `@PreAuthorize`-annotated interface, no HTTP route) and `account-read-api` (an unrelated Spring controller) are two **independent** RBAC control-detection examples bundled into one fixture — not two components that call each other in real a reference Java/JAX-RS banking platform. Confirmed against the governing semantic gold: `"relationships": []` plus `"expectControls": true` / `"controlNotes": "At least one service node should carry CALM controls..."` — the fixture's entire purpose is control-evidence coverage, not architectural connectivity. Correctly disconnected.
 
 ### 3.2 `lib-fintech-common`
 
@@ -100,7 +100,7 @@ Nothing in `package-catalog.md`, `FINERACT_GOLD.md`, or `wild-type-gold-policy.m
 {"key": "x-lab-out-of-scope", "value": "Remaining core @Entity classes; call-based auth via PlatformSecurityContext.validateHasReadPermission (not @PreAuthorize)"}
 ```
 
-`account-number-format-entity` and `client-entity` are "representative entities" included for entity-typing coverage, but their real owning API resources (`AccountNumberFormatApiResource`, `ClientApiResource`, etc.) were never added as nodes in this slice — so there is no legitimate node to connect them to without inventing one. `batch-api`, `cache-api`, `external-event-config-api`, `internal-external-events-api`, `currencies-api`, `datatable-write-service` are real Fineract API resources included for route/control coverage whose backing entities were likewise left out of this representative slice. This is a disclosed coverage-scope decision (`FINERACT_GOLD.md`: *"documents remaining entities as out-of-scope"*), not an omitted edge.
+`account-number-format-entity` and `client-entity` are "representative entities" included for entity-typing coverage, but their real owning API resources (`AccountNumberFormatApiResource`, `ClientApiResource`, etc.) were never added as nodes in this slice — so there is no legitimate node to connect them to without inventing one. `batch-api`, `cache-api`, `external-event-config-api`, `internal-external-events-api`, `currencies-api`, `datatable-write-service` are real a reference Java/JAX-RS banking platform API resources included for route/control coverage whose backing entities were likewise left out of this representative slice. This is a disclosed coverage-scope decision (`FINERACT_GOLD.md`: *"documents remaining entities as out-of-scope"*), not an omitted edge.
 
 ### 3.4 `fineract-system-map` and `maven-doxia-system-map`
 

@@ -5,13 +5,13 @@ import { loadWiringAnnotationCatalogue, wiringAnnotationNames } from '../../rule
 import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-import-strategy-detector';
 
 /**
- * T-X7-2 (G-L2-03) — the import-only strategy from
+ * The import-only strategy from
  * messaging-detection-catalogue.yml. Mirrors persistence-detector.ts's own
  * mechanism (both now call the same shared
  * graphify-import-strategy-detector.ts, post-MVP consolidation).
  *
- * Deliberately LOW, fixed confidence (weight 20) per this task's own
- * instruction ("import-only <= medium/low confidence... don't emit
+ * Deliberately LOW, fixed confidence (weight 20) — "import-only <=
+ * medium/low confidence... don't emit
  * high-confidence network nodes from import alone") — same flat value
  * persistence-detector.ts's own driver-import strategy already uses for
  * the identical reason (an import proves capability, not actual usage).
@@ -24,7 +24,7 @@ import { detectUnitsByImportStrategy, ImportStrategyResult } from './graphify-im
  * unverified` — no Node/TS messaging code has been run through this
  * pipeline yet), so this is a real but currently-unobserved risk, not
  * silently assumed safe — the existing unique-id-uniqueness regression
- * test (T-X2-1) would catch it the moment a real fixture triggers it.
+ * test would catch it the moment a real fixture triggers it.
  */
 export function detectMessagingUnits(
   run: CrossPackageGraphRun,

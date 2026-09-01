@@ -5,7 +5,7 @@ import { loadEnvRelationshipAllowlist } from '../rules/env-relationship-schema';
 import * as path from 'path';
 
 /**
- * T-X9-1 — OFF BY DEFAULT (ctx.enableEnvSoftGraph must be explicitly true,
+ * OFF BY DEFAULT (ctx.enableEnvSoftGraph must be explicitly true,
  * set by run-slice.ts's --enable-env-soft-graph flag) AND requires
  * --k8s-manifests, same opt-in convention as k8sTrustPass. MUST run after
  * reconcilePass (which overwrites ctx.relationships, not appends) — same

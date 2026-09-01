@@ -2,8 +2,8 @@ import * as path from 'path';
 import { TypedUnit } from '../../types/typed-facts';
 
 /**
- * Shared by k8s-trust-detector.ts (T-X5-1) and env-soft-graph-detector.ts
- * (T-X9-1) — both need to answer the same question, "which TypedUnit does
+ * Shared by k8s-trust-detector.ts and env-soft-graph-detector.ts — both need
+ * to answer the same question, "which TypedUnit does
  * this k8s Deployment name correspond to," and were previously two
  * independent implementations (env-soft-graph already imported this one,
  * but the function itself was exact-match-only, defined inside

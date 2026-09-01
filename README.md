@@ -89,7 +89,7 @@ Authoritative detail: [`docs/solution/Claim_Register.md`](./docs/solution/Claim_
 
 **Scanning & analysis** — hybrid dual-engine scanning (per-package native typing + a combined cross-package structural pass); JAX-RS/Spring MVC/Flask/NestJS route composition; JPA/import-based persistence detection; messaging consumer/producer detection; outbound-HTTP client detection; OpenAPI ingestion; Spring configuration file reading; dependency-manifest (SBOM) corroboration; multi-hop bridge resolution across layered access classes; Kubernetes shared-secret trust relationships, `deployed-in` runtime-placement relationships, and manifest-vs-config contradiction detection; CloudFormation/SAM API-Gateway-to-Lambda route binding; ranked cross-repo joins against another repo's own manifest. See [What runs by default vs. what needs a flag](#what-runs-by-default-vs-what-needs-a-flag) for which of these are always-on.
 
-**CodeQL DI-resolution (opt-in)** — a third structural engine, reserved for the two Spring wiring shapes neither CodeGraph nor Graphify's structural passes can see at all: a `@Bean`-factory method inside a `@Configuration` class, and 2+ real `implements` candidates disambiguated only by a stereotype annotation. Verified at real whole-codebase scale, not on a toy sample: **2105 real DI bindings, 731 new relationships, 56 new units introduced** on a real multi-module Java/Spring monorepo, `calm validate` clean. Its confidence is evidence-earned and centrally ranked against every other detection mechanism (`fact-trust-matrix.ts`) — structurally never the most-trusted source for a fact type another mechanism also produces. See the dedicated CodeQL section below for real cost/setup and the license constraint that keeps it opt-in-only.
+**CodeQL DI-resolution (opt-in)** — a second structural engine, reserved for the two Spring wiring shapes neither CodeGraph's per-root routing nor its cross-root structural pass can see at all: a `@Bean`-factory method inside a `@Configuration` class, and 2+ real `implements` candidates disambiguated only by a stereotype annotation. Verified at real whole-codebase scale, not on a toy sample: **2105 real DI bindings, 731 new relationships, 56 new units introduced** on a real multi-module Java/Spring monorepo, `calm validate` clean. Its confidence is evidence-earned and centrally ranked against every other detection mechanism (`fact-trust-matrix.ts`) — structurally never the most-trusted source for a fact type another mechanism also produces. See the dedicated CodeQL section below for real cost/setup and the license constraint that keeps it opt-in-only.
 
 **CALM generation** — catalogue-driven builders (nodes, interfaces, relationships, controls, system boundary, metadata); schema-correct relationship shapes; decorator- and call-site-based security controls with file:line evidence; a Decision Record/Override mechanism for human correction after a scan, including boundary-change overrides (reassigning a node's `composed-of` container membership); a human-readable intermediate representation rendered from the same facts as the CALM output; incremental merge against a prior run's `typed-facts.json` in the same `--out` directory, so a human-`reviewed` status is never silently lost on rerun.
 
@@ -170,17 +170,17 @@ node dist/orchestration/run-slice.js test/fixtures/nestjs-sample --out /tmp/weav
 Real output from this exact command:
 
 ```text
-[engine-capability-matrix] v0.2.0: 8 route(s), 4 proven, 2 with a Phase 2 augment engine (none fired yet), cross-package backbone: graphify
+[engine-capability-matrix] v0.2.0: 8 route(s), 4 proven, 2 with a Phase 2 augment engine (none fired yet), cross-package backbone: codegraph
 [run-slice] .../test/fixtures/nestjs-sample: 3 native route(s), 4 decorator fact(s), 1 unit(s)
-[run-slice] graphify: 0 relationship(s) reconciled (0 cross-package, 0 same-package)
-[platform-artefacts] coverage: 1 root(s), graphify ok; unmapped: 0 signal cluster(s), 0 occurrence(s)
+[run-slice] cross-package: 0 relationship(s) reconciled (0 cross-package, 0 same-package)
+[platform-artefacts] coverage: 1 root(s), cross-package ok; unmapped: 0 signal cluster(s), 0 occurrence(s)
 [run-slice] incremental merge: units 1 new / 0 disappeared / 0 unaffected / 0 flagged for re-review; relationships 0 new / 0 disappeared / 0 unaffected / 0 flagged for re-review
 [write-artefacts] emission coverage: 100.0% (0 gap(s) — see modules/calm-generator/emission-coverage-report.json)
 [threat-signals] 1 unit(s) flagged: http-entry-point evidence with no security-control evidence
 [run-slice] wrote artefacts to /tmp/weaver-demo
 ```
 
-`/tmp/weaver-demo/architecture.calm.json` now has a real `service` node for the one NestJS controller in that fixture, with its three routes as `path-interface` entries and `x-aac-confidence`/`x-aac-provenance` metadata pointing at the exact source lines that produced it. If `graphify` isn't on `PATH`, the same command still works — the `graphify:`/`coverage:` lines above just read `graphify failed`/`WARNING: graphify pass failed, continuing without cross-package relationships` instead, and cross-package relationships are skipped, same-file detection is unaffected.
+`/tmp/weaver-demo/architecture.calm.json` now has a real `service` node for the one NestJS controller in that fixture, with its three routes as `path-interface` entries and `x-aac-confidence`/`x-aac-provenance` metadata pointing at the exact source lines that produced it. If the cross-root CodeGraph pass fails for any reason, the same command still works — it's caught internally and logged as `[run-slice] WARNING: codegraph cross-root pass failed, continuing without cross-package relationships: <err>`, the `cross-package:`/`coverage:` lines above read `failed` instead of `ok`, and cross-package relationships are skipped; same-file detection is unaffected.
 
 ```bash
 # Schema-validate what you just generated
@@ -198,10 +198,10 @@ node dist/orchestration/run-slice.js test/fixtures/spring-config-sample --out /t
 Real output from this exact command:
 
 ```text
-[engine-capability-matrix] v0.2.0: 8 route(s), 4 proven, 2 with a Phase 2 augment engine (none fired yet), cross-package backbone: graphify
+[engine-capability-matrix] v0.2.0: 8 route(s), 4 proven, 2 with a Phase 2 augment engine (none fired yet), cross-package backbone: codegraph
 [run-slice] .../test/fixtures/spring-config-sample: 0 native route(s), 1 decorator fact(s), 1 unit(s)
-[run-slice] graphify: 0 relationship(s) reconciled (0 cross-package, 0 same-package)
-[platform-artefacts] coverage: 1 root(s), graphify ok; unmapped: 0 signal cluster(s), 0 occurrence(s)
+[run-slice] cross-package: 0 relationship(s) reconciled (0 cross-package, 0 same-package)
+[platform-artefacts] coverage: 1 root(s), cross-package ok; unmapped: 0 signal cluster(s), 0 occurrence(s)
 [write-artefacts] emission coverage: 100.0% (0 gap(s) — see modules/calm-generator/emission-coverage-report.json)
 [threat-signals] 1 unit(s) flagged: http-entry-point evidence with no security-control evidence
 [run-slice] wrote artefacts to /tmp/weaver-spring-demo
@@ -225,7 +225,7 @@ look at, versus what's diagnostic/advanced:
 | `architecture.calm.json` | **Yes — start here** | The generated CALM architecture graph — nodes, relationships, controls |
 | `typed-facts.json` | If you want the raw facts CALM was built from | The `TypedFacts` contract — every unit/relationship/evidence item before CALM construction |
 | `unmapped-signals-report.json` | Only if curious | Raw decorators/annotations this run saw but has no catalogue rule for — a **real, expected, nonzero count on most real repos**, not a sign something broke. A signal clustered 5+ times is a real catalogue-promotion candidate; a one-off is usually just app-specific code with no architectural signal to extract |
-| `coverage-report.json` | Only if curious | Analysis-time completeness — routes/files seen, whether Graphify ran, per-root counts |
+| `coverage-report.json` | Only if curious | Analysis-time completeness — routes/files seen, whether the cross-package backbone pass ran (`crossPackageStatus`), per-root counts |
 | `emission-coverage-report.json` | Only if curious | CALM-construction-time completeness — a real detected fact that couldn't be represented in CALM, and why (rare on a correct scan) |
 | `merge-report.json` / `fact-history.json` | Only on a rerun into the same `--out` dir | What changed since the last scan of this same output directory, and the full history of any status change |
 | `modules/<name>/*.json` | If you ran non-default modules | Each module's own findings — `modules/calm-generator/emission-coverage-report.json`, `modules/threat-signals/threat-signals-report.json`, etc. |
@@ -249,16 +249,16 @@ node dist/orchestration/run-slice.js rootA rootB --out /path/to/out
 npm run validate -- /path/to/out/architecture.calm.json -f pretty
 ```
 
-**Before your first real scan:** if `graphify` is on `PATH`, a scan writes
-`.graphify-cache/` **inside your `--out` directory** (a real, deliberate
-incremental-caching benefit — a second scan into the *same* `--out`
-directory is dramatically faster). `codegraph-provider.ts`'s `.codegraph/`
-**does** still get written inside the scanned package root, as a sibling of
-your source — this one is a permanent constraint of the third-party
-CodeGraph SDK itself (it decides where its own index lives, with no
-location override in its public API), not something Weaver's own code
-controls. Add `.codegraph/` to that repo's `.gitignore` before your first
-run, or you'll see it as untracked noise in `git status` afterward.
+**Before your first real scan:** CodeGraph writes a `.codegraph/` index
+directory — for a single package root, at that root itself; for a
+multi-root scan, at the common ancestor of every given root (the same
+directory the cross-root pass indexes as one combined structural backbone).
+This is a permanent constraint of the third-party CodeGraph SDK itself (it
+decides where its own index lives, with no location override in its public
+API), not something Weaver's own code controls, and there is no
+`--out`-relative cache — `.codegraph/` is always beside your source, not
+inside `--out`. Add `.codegraph/` to that repo's `.gitignore` before your
+first run, or you'll see it as untracked noise in `git status` afterward.
 
 ### What runs by default vs. what needs a flag
 
@@ -312,6 +312,7 @@ anyone deciding what the product can do.
 | `--auto-codeql` | No | off | Derives `--codeql-source-root`/`--codeql-build-command` from a detected `build.gradle`/`build.gradle.kts` (with a `gradlew` wrapper) or `pom.xml` (preferring a checked-in `mvnw` wrapper) at the common ancestor of every package root, instead of hand-writing both. **Still requires this explicit flag** — it only removes the friction of deriving the two values, it does not make CodeQL reachable without a conscious opt-in (same license reason `--codeql-source-root`/`--codeql-build-command` are opt-in below). Explicit `--codeql-source-root`/`--codeql-build-command` always take precedence and are never overridden if both are also passed. Refuses to guess a Gradle build with no `gradlew` wrapper checked in (a system-wide `gradle` install could be any version) rather than silently picking one — logs a message and continues without CodeQL evidence instead. The `WEAVER_CODEQL_LICENSE_CONFIRMED=1` environment variable triggers the identical behavior without needing this flag on every invocation — see the CodeQL section below |
 | `--no-auto-codeql` | No | off | Suppresses `--auto-codeql`/`WEAVER_CODEQL_LICENSE_CONFIRMED` for a single run — skip CodeQL for one invocation without unsetting the environment variable |
 | `--repo-manifests <dir>` | Yes | — (off) | T-MR-2: a directory of OTHER repos' `*.weaver-manifest.yml` files (T-MR-1, `scanner/repo-manifest-provider.ts`) to join this run's own evidence against — never this run's own manifest, and the pipeline never writes to any target repo. Resolves in strict order (shared API-spec identity → published artifact coordinates → service-catalogue/DNS), stopping at the first match per candidate; unmatched entries are never guessed at |
+| `--strict-isolated-nodes` | No | off | Exit non-zero when any unit has zero relationships touching it in either direction (S6, `coverage-report.json`'s `completeness.silenceFlags`) — same "silent by default, loud on request" posture as `--strict-detect`. A lone node is sometimes honestly correct (a newly-detected unit whose relationships haven't been recovered yet), so this stays off by default |
 
 **When to reach for which flag:**
 
@@ -390,8 +391,9 @@ run without unsetting the environment variable, pass `--no-auto-codeql` —
 it overrides both the flag and the env var for that one invocation.
 
 **Gradle callers hand-writing the command: always pass `--no-daemon`, not just `--rerun-tasks`.** Real
-failure mode, found running a live three-engine benchmark (Fineract +
-Spring Boot Admin, 2026-08-21): if a Gradle daemon from an earlier local
+failure mode, found running a live three-engine benchmark (a reference
+Java/JAX-RS banking platform + Spring Boot Admin, 2026-08-21): if a Gradle
+daemon from an earlier local
 build is already running, CodeQL's build tracer only instruments the
 process tree it directly launches — the already-running daemon does the
 real compilation *outside* that tree, so CodeQL sees zero source even
@@ -415,7 +417,7 @@ a real multi-module Java/Spring monorepo (`Claim_Register.md`'s
 introduced relationship's confidence is looked up from
 `analysis/fact-trust-matrix.ts` (T-LR-6) — the single, evidence-cited
 ranking every detection mechanism's confidence now reads from — placed
-deliberately between two of Graphify's own multi-hop tiers, never the
+deliberately between two of the cross-package backbone's own multi-hop tiers, never the
 strongest source for a fact type another mechanism also produces
 ("CodeQL is never automatically primary," enforced structurally, not just
 by convention).
@@ -471,7 +473,7 @@ python3 apply.py --session-dir ../../review-sessions/my-run --out /tmp/my-run-re
 |---|---|
 | `python3 bulk_apply.py --session-dir ... --anchor R-014 --i-confirm-bulk-apply` | Replicates one already-answered residual's decision across every other open residual in the same (tier, class) group — still writes one real Decision Record per residual, never a blanket batch record |
 | `python3 queue_rank.py --session-dir ... [--history <prior-session-dir>]` | Ranks the open backlog highest-consequence-first (PII-touching, external-system-identity, trust-boundary signals — named proxies over real detected facts, not a PII/data-classification engine) and reports real residual age across reruns |
-| `python3 advisory.py --session-dir ...` | **Optional LLM-advisory layer** (`ANTHROPIC_API_KEY` required; reports what it would attempt and writes nothing without one) — explains evidence and proposes hypotheses for open residuals, and optionally one catalogue-rule candidate per residual. **Never writes a fact**: any response shaped like a decision/override is rejected outright, and accepting a hypothesis via a card is still one human judgement, never treated as independent corroboration |
+| `python3 advisory.py --session-dir ...` | **Optional LLM-advisory layer** (needs the `claude` CLI already authenticated on `PATH` — deliberately never a raw `ANTHROPIC_API_KEY`; reports what it would attempt and writes nothing without one) — explains evidence and proposes hypotheses for open residuals, and optionally one catalogue-rule candidate per residual. **Never writes a fact**: any response shaped like a decision/override is rejected outright, and accepting a hypothesis via a card is still one human judgement, never treated as independent corroboration |
 | `python3 pack.py --out-dir ... --session-dir ... --baseline <prior-session-dir>` | A later rescan carries forward already-decided residuals instead of re-asking, and flags real drift (the same unit's trigger/class changed since it was decided) as `reconfirm` rather than silently overwriting or silently re-asking |
 
 **Hard boundary:** nothing under `tools/review-session/` is ever imported by

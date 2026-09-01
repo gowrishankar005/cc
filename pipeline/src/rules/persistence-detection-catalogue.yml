@@ -66,14 +66,14 @@ strategies:
       # DynamoDB genuinely IS a database, so it's correct to type via this
       # strategy (unlike SQS/SNS below, which are messaging, not persistence
       # — see the cloud-messaging strategy entry for why those are NOT here).
-      # AREC Wave 3 T-E3 (2026-08-08) — verified via lab fixture
+      # Verified (2026-08-08) via lab fixture
       # ts-orders-dynamo (real @aws-sdk/client-dynamodb import): correctly
       # detected as a real database unit. Also surfaced and fixed a real,
       # generic bug this same round — a file importing BOTH a persistence
       # AND a messaging library produced duplicate unique-ids (see
       # existingUnitFilePaths, pass-registry.ts).
       #
-      # T-MR-4 ownerFieldType — DynamoDB clients are never subclassed (no
+      # ownerFieldType — DynamoDB clients are never subclassed (no
       # `extends` idiom exists for them the way PrismaClient has one), so
       # Q13's ownerBaseClass check can't apply here; the real ownership
       # idiom is composition — a store class holds one as a field. Real,
@@ -94,7 +94,7 @@ strategies:
       # addition, not yet dispatched (Graphify's actual edge-target naming
       # for these hasn't been verified against real Java source).
       - { name: com.mongodb, language: java, evidenceLevel: unverified }
-      # T-MR-4 ownerFieldType — same composition-ownership ambiguity as the
+      # ownerFieldType — same composition-ownership ambiguity as the
       # Node v3 SDK row above, verified via a second, different instance of
       # the same mechanism class (different language, different SDK
       # generation — AWS SDK v1 for Java's AmazonDynamoDB interface, not
@@ -103,14 +103,14 @@ strategies:
       # synthetic per Catalogue_Intake.md.
       - { name: com.amazonaws.services.dynamodbv2, language: java, evidenceLevel: unverified, ownerFieldType: AmazonDynamoDB }
       # AWS SDK v2 for Java, distinct package from the v1 entry above.
-      # T-MR-4 ownerFieldType — re-verified against the existing real
+      # ownerFieldType — re-verified against the existing real
       # java-lambda-apigw/java-lambda-orphan-store lab fixtures (TierStore,
       # LegacyTierHandler, OrderStore all genuinely declare
       # `private final DynamoDbClient dynamoDbClient` fields) — all three
       # still resolve as real database units with the new check applied,
       # not just the new synthetic negative case.
       - { name: software.amazon.awssdk.services.dynamodb, language: java, evidenceLevel: verified, ownerFieldType: DynamoDbClient }
-      # T-X7-4 — org.postgresql IS the PostgreSQL JDBC driver package,
+      # org.postgresql IS the PostgreSQL JDBC driver package,
       # unambiguously (not a guess: this is what the package name means).
       # protocol: JDBC is a real value in core.json#/defs/protocol
       # (verified against the installed calm-cli schema before adding this,
@@ -119,31 +119,32 @@ strategies:
       # (same caveat every other Java entry in this list already carries);
       # the protocol mechanism itself is proven with a synthetic test
       # (test/regression.test.js), honestly not a real-fixture one.
-      # T-R1-3 — the Java symbol-vs-package Graphify gap that kept this row
+      # The Java symbol-vs-package Graphify gap that kept this row
       # unreachable is fixed (java-import-resolver.ts: reads the real import
       # line back from source at the edge's own source_location, matches the
       # qualified package against this name — see that file for the full
-      # real-evidence writeup). Verified against real a reference Java/JAX-RS banking platform source:
+      # real-evidence writeup). Verified against real reference Java/JAX-RS banking platform source:
       # the reference platform's security module/.../SqlInjectionPreventerServiceImpl.java (imports
       # org.postgresql.core.Utils) now correctly becomes a real `database`
       # unit, evidence.signal = "org.postgresql.core.Utils" (the real
       # resolved import, not a guess), calm validate 0 errors.
       - { name: org.postgresql, language: java, evidenceLevel: verified, protocol: JDBC }
-      # T-R1-3 — added now that the shared Java resolution fix makes this
+      # Added now that the shared Java resolution fix makes this
       # reachable; see the `jooq` strategy entry below for why this couldn't
       # be added before the fix existed, and real-fixture verification.
       - { name: org.jooq, language: java, evidenceLevel: verified }
-      # T-R1-3 follow-up (B-charge-jdbc-driver) — Spring's raw JDBC helper
+      # B-charge-jdbc-driver — Spring's raw JDBC helper
       # package (JdbcTemplate/RowMapper/NamedParameterJdbcTemplate). REAL,
-      # VERIFIED CLOSURE of the flagship a reference Java/JAX-RS banking platform-charge residual named since
-      # requirements v0.9: ChargeReadPlatformServiceImpl (the real bridge
+      # VERIFIED CLOSURE of the flagship a reference Java/JAX-RS banking platform-charge residual:
+      # ChargeReadPlatformServiceImpl (the real bridge
       # implementer for ChargesApiResource's read path, previously "imports 0
       # candidate store units") imports THIS package directly — with this row
       # added, it becomes its own real `database` unit (a Phase 1 "implementer
       # IS the store" case, R2b's extra hop not even needed), and
       # ChargesApiResource -> ChargeReadPlatformServiceImpl is a real,
       # calm-validated (0 errors), confidence-10 cross-root relationship in a
-      # real fineract-charge+fineract-provider multi-root run. Not a synthetic
+      # real multi-root run against a reference Java/JAX-RS banking platform's
+      # charge+provider modules. Not a synthetic
       # proof — the actual case this whole R2/R2b program was scoped around.
       - { name: org.springframework.jdbc.core, language: java, evidenceLevel: verified }
 
@@ -160,7 +161,7 @@ strategies:
 
   - id: spring-data-repository
     description: >
-      AREC Wave 3 T-E3 (2026-08-08) — BUILT. An interface extending
+      Built (2026-08-08). An interface extending
       CrudRepository/JpaRepository/PagingAndSortingRepository/JpaSpecificationExecutor,
       from CodeGraph's extractFromSource() `referenceKind: 'extends'` entries
       (signal-catalogue.yml's spring-data-repository-extends row, matchSource:
@@ -176,24 +177,24 @@ strategies:
 
   - id: jooq
     description: >
-      T-R1-3 (2026-08-08) — FIXED and BUILT. The root-cause Java
+      Fixed and built (2026-08-08). The root-cause Java
       symbol-vs-package Graphify gap named below is now resolved generically
       (`java-import-resolver.ts`, shared by every Java driver-import row, not
       a jOOQ-specific patch) — org.jooq is now a real `driver-import` library
       row (no separate mechanism needed; plain import detection was always
       sufficient, "typed-field usage" was never actually required). Real
-      re-verification against real a reference Java governance platform source (spikes/waltz/repo,
-      waltz-data module, 241 files): 229 real `database` units detected,
+      re-verification against real reference Java governance platform source
+      (its own data module, 241 files): 229 real `database` units detected,
       evidence.signal correctly shows the real resolved import (e.g.
       "org.jooq.Record1", "org.jooq.impl.DSL", "org.jooq.DSLContext"),
       including the exact GenericSelector.java case this row was originally
       evidenced against. `calm validate` 0 errors, 0 warnings.
     status: dispatched
-    mechanism: driver-import strategy (see the org.jooq row above), Java qualified-import resolved via java-import-resolver.ts (T-R1-3)
+    mechanism: driver-import strategy (see the org.jooq row above), Java qualified-import resolved via java-import-resolver.ts
 
   - id: spring-config-datasource
     description: >
-      T-PC1-7 (B-spring-config, 2026-08-09) — BUILT, but via a structurally
+      B-spring-config, built 2026-08-09, but via a structurally
       different mechanism than every other row in this file: a real
       spring.datasource.url key read directly from a deterministically
       parsed application.yml/.properties file (scanner/spring-config-provider.ts

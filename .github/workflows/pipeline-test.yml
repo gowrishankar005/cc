@@ -26,6 +26,8 @@ jobs:
         working-directory: pipeline
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed so origin/main is a real, comparable ref for check-generalization.js below
 
       - uses: actions/setup-node@v4
         with:
@@ -33,19 +35,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: pipeline/package-lock.json
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      # Graphify (scanner/graphify-provider.ts) — installed so the
-      # cross-package pass actually exercises the real subprocess path in CI
-      # instead of silently degrading (run-slice.ts catches a missing
-      # binary and continues without relationships, so this isn't required
-      # for tests to pass, but it's cheap and gives a stronger real signal).
-      - run: pip install graphifyy
-
       - run: npm ci
       - run: npm test
+
+      # BACKLOG.md "Mechanical bug-fix generalization check" — mechanical
+      # guard against the exact T-LR-1 class of bug (a hardcoded sample-repo
+      # literal, or detection logic changed with no matching regression
+      # test) that passive review already missed once. Same "surface it,
+      # don't silently pass" posture as --strict-detect and the S-flags.
+      - run: node scripts/check-generalization.js origin/main
 
   # Separate job (not a step in `test` above): a real Dockerfile problem
   # should be visible on its own, not block or get masked by the primary

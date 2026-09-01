@@ -3,14 +3,14 @@ import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELA
 import { findUnitForDeployment } from './deployment-correlation';
 
 /**
- * T-X5-1 (requirements v0.7 §3.1) — groups Deployments by shared Secret
+ * Groups Deployments by shared Secret
  * name, infers issuer/verifier role ONLY from the manifest's own
  * `items[].key` naming (a real, grep-verified pattern in a reference Python microservices banking app:
  * `userservice` mounts BOTH `jwtRS256.key` (private) and `jwtRS256.key.pub`
  * (public) under `secretName: jwt-key`; `contacts`/`frontend`/
  * `balance-reader`/`ledger-writer`/`transaction-history` mount ONLY the
  * `.pub` key under the same secret name) — never guesses a direction when
- * that signal is absent, matching v0.7 §3.1's explicit rule.
+ * that signal is absent.
  *
  * Deployment<->TypedUnit correlation is `deployment-correlation.ts`'s
  * `findUnitForDeployment()` — shared with env-soft-graph-detector.ts, fixed
@@ -36,7 +36,7 @@ export function detectK8sTrustRelationships(
 ): { relationships: TypedRelationship[]; ignoredItems: IgnoredItem[] } {
   const relationships: TypedRelationship[] = [];
   const ignoredItems: IgnoredItem[] = [];
-  // T-CL-1 review fix — two deployments can legitimately share MORE THAN
+  // Review fix — two deployments can legitimately share MORE THAN
   // ONE Secret (e.g. a JWT signing secret and a DB credential, both mounted
   // by the same issuer/verifier pair). Without this, each secret pushed its
   // own `shares-secret` relationship, which is fine at the raw array level

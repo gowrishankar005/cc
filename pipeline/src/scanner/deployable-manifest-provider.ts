@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * T-X8-1 (G-L1-10) — fintech monorepos already encode "what is a
+ * Fintech monorepos already encode "what is a
  * deployable" in build files; this pipeline previously ignored them
  * entirely. Deliberately narrow: checks for the four real, unambiguous
  * deployable markers directly AT a package root (not a recursive search —

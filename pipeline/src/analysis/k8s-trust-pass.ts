@@ -4,7 +4,7 @@ import { detectK8sTrustRelationships } from './cross_package/k8s-trust-detector'
 import { detectK8sDeployedInRelationships } from './cross_package/k8s-deployment-detector';
 
 /**
- * T-X5-1 (trust) / T-MR-3 (placement) — opt-in: only runs when
+ * Trust (shared secrets) and placement (namespace) — opt-in: only runs when
  * --k8s-manifests <dir> was passed (ctx.k8sManifestsDir set by
  * run-slice.ts's CLI parsing). Runs AFTER mapSignalsPass/openApiPass so
  * ctx.allUnits is populated to correlate deployment names against. Both
@@ -13,8 +13,7 @@ import { detectK8sDeployedInRelationships } from './cross_package/k8s-deployment
  * placement via namespace), same reasoning env-soft-graph-detector.ts's own
  * reuse of findUnitForDeployment already established: shared input, separate
  * mechanisms, not a merged detector. Deliberately NOT emitting
- * image/build-metadata decorators this round — out of scope for both named
- * gaps (G-L1-03 trust, T-MR-3 placement).
+ * image/build-metadata decorators this round — out of scope for both.
  */
 export const k8sTrustPass: AnalysisPass = {
   name: 'k8sTrust',

@@ -6,8 +6,8 @@ import { jdbcScheme } from '../../analysis/jdbc-url';
 const DATASOURCE_SIGNAL_PREFIXES = ['spring.datasource.url=', 'spring.datasource.hikari.jdbcUrl='];
 
 /**
- * T-PC1-6/T-SC-6 (B-formal-interface-port) — server.port -> a real
- * `port-interface` CalmInterface (types/calm.ts's own already-verified-against-
+ * server.port -> a real `port-interface` CalmInterface
+ * (types/calm.ts's own already-verified-against-
  * calm.finos.org enum — NOT the informal "tcp-host-port" name the original
  * gap-closure research doc used; that name isn't a real member of this
  * project's own verified CalmInterfaceType union, so using it would have
@@ -44,7 +44,7 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
     // is stable regardless of directory-walk order.
     const distinctPorts = [...new Map(portFacts.map((p) => [p.port, p])).values()].sort((a, b) => a.ref.localeCompare(b.ref));
 
-    // T-CL-1 review fix — the id was `iface-port-${i}`, a positional index
+    // Review fix — the id was `iface-port-${i}`, a positional index
     // into this sorted-and-deduped list: deterministic given identical
     // inputs, but not content-derived — adding a THIRD port fact for the
     // same unit could shift an unrelated, unchanged port's ordinal and
@@ -63,10 +63,9 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
 }
 
 /**
- * T-SC-3/T-PC1-3 (B-protocol-populate) — spring.datasource.url's own JDBC
- * scheme -> a real relationship `protocol` value, via the SAME
- * `protocolBySignal` mechanism T-X7-4 already wired for
- * persistence-detection-catalogue.yml's driver-import rows
+ * spring.datasource.url's own JDBC scheme -> a real relationship
+ * `protocol` value, via the SAME `protocolBySignal` mechanism already
+ * wired for persistence-detection-catalogue.yml's driver-import rows
  * (relationship-builder.ts's `inferredProtocol` looks up EITHER endpoint
  * unit's `evidence.signal` against this map). Reads only `Evidence.signal`
  * (TypedFacts' own public contract) — never reaches into scanner/analysis
@@ -103,10 +102,10 @@ export function springConfigProtocolBySignal(units: TypedUnit[]): Map<string, st
       // unwrap Spring's `${VAR:jdbc:...}` colon-default placeholder syntax
       // in this same change: a signal like
       // "spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://...}"
-      // (apache/fineract's own real shape) never starts with "...=jdbc:"
+      // (a reference Java/JAX-RS banking platform's own real shape) never starts with "...=jdbc:"
       // literally, so this check silently stopped populating `protocol`
       // for exactly the real case the placeholder fix targeted — verified
-      // live against the real Fineract fixture. Now reuses the SAME shared
+      // live against a real a reference Java/JAX-RS banking platform fixture. Now reuses the SAME shared
       // resolver every other JDBC-scheme consumer uses, instead of its own
       // independent prefix check.
       const rawValue = e.signal.slice(prefix.length);

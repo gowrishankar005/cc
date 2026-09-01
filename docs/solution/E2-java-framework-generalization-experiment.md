@@ -1,10 +1,11 @@
 # CodeQL DI-resolution framework-generalization experiment (2026-08-21)
 
-**Task:** `T-LR-5-codeql-di`'s only real-world verification is Fineract
-(one repo, one JAX-RS/Spring shape). `fact-trust-matrix.ts`'s confidence
-tier for `codeql-di-stereotype`/`codeql-di-bean-factory` was set from that
-single data point. Before treating that number as generalized fact rather
-than a Fineract-specific measurement, this experiment asks: does the same
+**Task:** `T-LR-5-codeql-di`'s only real-world verification is the reference
+Java/JAX-RS banking platform (one repo, one JAX-RS/Spring shape).
+`fact-trust-matrix.ts`'s confidence tier for `codeql-di-stereotype`/
+`codeql-di-bean-factory` was set from that single data point. Before
+treating that number as generalized fact rather than a reference-platform-
+specific measurement, this experiment asks: does the same
 mechanism, run unmodified against real, different Spring applications,
 behave the same way?
 
@@ -26,7 +27,7 @@ discipline, applied here to engine evaluation, not just catalogue rows):
 | Repo | Real signal (grep-verified before use) |
 |---|---|
 | `spring-projects/spring-petclinic` | 4 files with `@Service`/`@Repository`/`@Bean`, thin — included as a fast/cheap sanity check, not primary evidence |
-| `finos/spring-bot` | 22 stereotype-carrying files, **135 `@Bean` occurrences**, 67 files with real interfaces — the primary evidence source, real production Spring app (Symphony chat-bot platform), structurally unrelated domain to Fineract |
+| `finos/spring-bot` | 22 stereotype-carrying files, **135 `@Bean` occurrences**, 67 files with real interfaces — the primary evidence source, real production Spring app (Symphony chat-bot platform), structurally unrelated domain to the reference banking platform |
 
 Ruled out from the original candidate list before cloning: `openrewrite/rewrite-recipe-bom`
 (no source, a version-alignment BOM only — `primaryLanguage: null` confirmed
@@ -36,7 +37,7 @@ Spring — a different mechanism-class question, scoped separately, see
 `finos/messageml-utils` (plain libraries, no real stereotype/DI-wiring
 shape); `spring-projects/spring-data-commons` (a framework defining
 abstractions, not an application consuming them — wrong shape for this
-question); `awslabs/aws-saas-boost` (mixed-language, heavier setup for
+question); a reference AWS SaaS sample (mixed-language, heavier setup for
 uncertain payoff).
 
 ## Method
@@ -83,7 +84,7 @@ turned it into a unit — nothing to anchor a relationship to." Confirmed
 directly against `typed-facts.json`, not assumed from the gate's own
 comment.
 
-**This is the real finding:** Fineract has 30,778 decorator facts feeding
+**This is the real finding:** The reference banking platform has 30,778 decorator facts feeding
 6,741 units — a codebase saturated with the specific "ambiguous interface,
 resolved via `@Bean`-factory/stereotype" shape this query targets.
 `spring-bot` has 1,071 decorator facts feeding only 22 units, and the one
@@ -115,16 +116,16 @@ fixed here (see `BACKLOG.md`).
 - The mechanism's *yield* does not generalize by framework identity — it's
   gated by how much of a specific architecture shape (ambiguous interface +
   bean-factory/stereotype resolution) a given codebase actually contains.
-  Fineract is unusually rich in this shape; that richness is not a property
-  of "being a Spring app," it's a property of Fineract's own specific
-  layering convention.
+  The reference banking platform is unusually rich in this shape; that
+  richness is not a property of "being a Spring app," it's a property of
+  the reference platform's own specific layering convention.
 - A real pipeline observability gap: a genuine zero-bindings run and a
   silent tool failure currently look identical in `run-slice`'s own output.
 
 **Does not establish:**
 - Whether the shape generalizes to *other* Spring apps with heavier
   interface-abstraction layering than `spring-bot`/`spring-petclinic` — only
-  two data points beyond Fineract, both on the low end of that spectrum.
+  two data points beyond the reference banking platform, both on the low end of that spectrum.
 - Anything about non-Spring Java DI (JSR-330/Sisu, e.g. `maven-doxia`) —
   a structurally different mechanism-class question, scoped as its own
   follow-up (`BACKLOG.md` Tier 2 row), not answered here.
@@ -150,6 +151,6 @@ fixed here (see `BACKLOG.md`).
    Gradle+Maven support), not a hypothetical edge case.
 4. Before generalizing the confidence tier itself to "any Java/Spring repo,"
    the more valuable next experiment is a repo *known* to be
-   interface-abstraction-heavy (closer to Fineract's own shape) rather than
+   interface-abstraction-heavy (closer to the reference platform's own shape) rather than
    another arbitrary Spring app — yield is the variable that matters here,
    not framework name.

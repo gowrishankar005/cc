@@ -23,23 +23,23 @@ export interface RootCoverage {
   filesByExt: Record<string, number>;
   nativeRouteCount: number;
   decoratorFactCount: number;
-  graphifyNodeCount: number;
-  graphifyEdgeCount: number;
+  crossPackageNodeCount: number;
+  crossPackageEdgeCount: number;
   unitsByKind: Record<string, number>;
-  /** T-X4-1's own mitigation: "Absent file -> coverage openapi: absent" — never silently omit the status. */
+  /** "Absent file -> coverage openapi: absent" — never silently omit the status. */
   openapiStatus: 'present' | 'absent';
-  /** T-X8-1 — real, previously-invisible coverage: a root can ship a deployable manifest and still produce 0 architectural units (e.g. a shared library with no HTTP route) — this makes that visible instead of silently indistinguishable from "nothing here." */
+  /** Real, previously-invisible coverage: a root can ship a deployable manifest and still produce 0 architectural units (e.g. a shared library with no HTTP route) — this makes that visible instead of silently indistinguishable from "nothing here." */
   deployableManifests: string[]; // manifest type names found at this root, e.g. ["package.json", "Dockerfile"]
 }
 
 export interface CoverageReport {
   generatedAt: string;
-  graphifyStatus: 'ok' | 'failed' | 'skipped';
-  graphifyError?: string;
+  crossPackageStatus: 'ok' | 'failed' | 'skipped';
+  crossPackageError?: string;
   roots: RootCoverage[];
   ignoredByReason: Record<string, number>;
   unmappedSignalCount: number;
-  /** T-X5-1 — top-level (not per-root) since --k8s-manifests is one shared directory, not scoped to a package root. */
+  /** Top-level (not per-root) since --k8s-manifests is one shared directory, not scoped to a package root. */
   k8sManifestsStatus: 'provided' | 'not-provided';
   /**
    * Cross-cutting (not per-root) breakdown of every relationship this run
@@ -71,8 +71,7 @@ export interface CoverageReport {
    */
   unresolvedByMechanism: Record<string, number>;
   /**
-   * AREC Wave 3 T-A1 (S1/S2, validation-approach-vnext.md §L3) — completeness
-   * signals, distinct from confidence. A package can have high-confidence
+   * S1/S2 completeness signals, distinct from confidence. A package can have high-confidence
    * units and still be an architecturally silent/incomplete run (a reference Java/JAX-RS banking platform
    * charge/core: 64 relationships, 0 touching a service unit). These fields
    * make that visible without a hand audit, using dimensions every
@@ -98,9 +97,9 @@ export interface CoverageReport {
      */
     silenceFlags: string[];
     /**
-     * Robustness Wave T-R0-2 — beyond S1's binary "zero vs non-zero", a
+     * Beyond S1's binary "zero vs non-zero", a
      * RATE: of the run's service units, how many have at least one real
-     * OUTBOUND architecture-grade relationship (T-A2's `grade === 'architecture'`
+     * OUTBOUND architecture-grade relationship (`grade === 'architecture'`
      * — R1 one-hop or R2 bridge-resolved, never `structural`/`trust`).
      * Same precondition spirit as S1 (only meaningful when the run also has
      * store units to potentially connect to) — `undefined` when there are 0
@@ -109,6 +108,21 @@ export interface CoverageReport {
     topicUnitCount: number;
     servicesWithArchitectureOutbound: number;
     architectureOutboundCoverage?: number;
+    /**
+     * S6 — BACKLOG.md "Isolated-node completeness flag". A node with zero
+     * real relationships touching it (neither `from` nor `to` references
+     * its id). Deliberately never counts the synthetic `system`-node
+     * `composed-of` edge (`system-node-builder.ts`) as a relationship —
+     * that edge is built directly from `TypedUnit[]` at CALM-generation
+     * time, strictly AFTER this function runs on `typed-facts.json`'s own
+     * `relationships`, so it structurally cannot appear here; no explicit
+     * exclusion code was needed. Soft flag by default, same posture as
+     * S1/S2/S5 — a lone node is sometimes honestly correct (a newly
+     * detected unit whose relationships haven't been recovered yet), so
+     * this never fails a run on its own; `--strict-isolated-nodes`
+     * (run-slice.ts) is the opt-in gate.
+     */
+    isolatedNodeCount: number;
   };
 }
 
@@ -132,12 +146,12 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
   const silenceFlags: string[] = [];
   if (serviceUnitIds.size >= 1 && databaseUnitCount >= 1 && serviceTouchingRelationshipCount === 0) {
     silenceFlags.push(
-      `S1-zero-service-touching-relationships: ${serviceUnitIds.size} service unit(s) and ${databaseUnitCount} database unit(s) present, but 0 relationships touch a service unit — likely a multi-hop/layered architecture story not yet recovered (see AREC R2), not "no architecture here"`
+      `S1-zero-service-touching-relationships: ${serviceUnitIds.size} service unit(s) and ${databaseUnitCount} database unit(s) present, but 0 relationships touch a service unit — likely a multi-hop/layered architecture story not yet recovered, not "no architecture here"`
     );
   }
   if (httpUnitsWithoutSecurityControlCount > 0) {
     silenceFlags.push(
-      `S2-http-without-security-control: ${httpUnitsWithoutSecurityControlCount} HTTP-entry-point unit(s) have no security-control evidence — may reflect a missing detection mechanism (see AREC C-call), not necessarily "no auth in source"`
+      `S2-http-without-security-control: ${httpUnitsWithoutSecurityControlCount} HTTP-entry-point unit(s) have no security-control evidence — may reflect a missing detection mechanism, not necessarily "no auth in source"`
     );
   }
   // The original, still-real gap S1 structurally cannot catch: S1 requires
@@ -158,7 +172,26 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     );
   }
 
-  // Robustness T-R0-2 — architecture coverage RATE, same precondition
+  // S6 — a node with zero real relationships touching it, in either
+  // direction. `relationships` here is exactly typed-facts.json's own
+  // TypedRelationship[], computed strictly BEFORE calm-generator's
+  // system-node-builder.ts ever runs (see run-slice.ts's pass ordering) —
+  // the synthetic system `composed-of` edge doesn't exist yet at this point
+  // in the pipeline, so it structurally cannot inflate this count; no
+  // explicit filtering was needed to exclude it.
+  const touchedUnitIds = new Set<string>();
+  for (const rel of relationships) {
+    touchedUnitIds.add(rel.from);
+    touchedUnitIds.add(rel.to);
+  }
+  const isolatedNodeCount = units.filter((u) => !touchedUnitIds.has(u.id)).length;
+  if (isolatedNodeCount > 0) {
+    silenceFlags.push(
+      `S6-isolated-nodes: ${isolatedNodeCount} unit(s) exist but have zero relationships touching them — may be a newly-detected unit whose relationships haven't been recovered yet, not necessarily a dead/unused component; see --strict-isolated-nodes to gate on this`
+    );
+  }
+
+  // Architecture coverage RATE, same precondition
   // spirit as S1 (only meaningful when a store unit exists to potentially
   // connect to). Outbound only (rel.from), architecture-grade only (never
   // structural/trust) — a service "has architecture coverage" when it has
@@ -180,17 +213,12 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     topicUnitCount,
     servicesWithArchitectureOutbound,
     architectureOutboundCoverage,
+    isolatedNodeCount,
   };
 }
 
 export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
-  // Field names on CoverageReport (graphifyStatus/graphifyNodeCount/graphifyEdgeCount/
-  // graphifyError) are kept as-is — external JSON contract, now sourced from
-  // the codegraph cross-root pass (ctx.crossPackageRun), not Graphify. Not
-  // renamed: no functional reason to churn a serialized field name, and
-  // downstream consumers (intelligence-ir.ts, platform-artefacts.ts,
-  // external tooling reading coverage-report.json) key off these names.
-  const graphifyStatus: CoverageReport['graphifyStatus'] = ctx.crossPackageRun ? 'ok' : ctx.crossPackageError ? 'failed' : 'skipped';
+  const crossPackageStatus: CoverageReport['crossPackageStatus'] = ctx.crossPackageRun ? 'ok' : ctx.crossPackageError ? 'failed' : 'skipped';
 
   const roots: RootCoverage[] = ctx.packageRoots.map((root) => {
     const raw = ctx.rawByRoot.get(root);
@@ -198,12 +226,12 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
     const unitsByKind: Record<string, number> = {};
     for (const u of units) unitsByKind[u.kind] = (unitsByKind[u.kind] ?? 0) + 1;
 
-    let graphifyNodeCount = 0;
-    let graphifyEdgeCount = 0;
+    let crossPackageNodeCount = 0;
+    let crossPackageEdgeCount = 0;
     if (ctx.crossPackageRun) {
       const { graph, resolveRoot } = ctx.crossPackageRun;
-      graphifyNodeCount = graph.nodes.filter((n) => resolveRoot(n.source_file)?.root === root).length;
-      graphifyEdgeCount = graph.edges.filter((e) => resolveRoot(e.source_file)?.root === root).length;
+      crossPackageNodeCount = graph.nodes.filter((n) => resolveRoot(n.source_file)?.root === root).length;
+      crossPackageEdgeCount = graph.edges.filter((e) => resolveRoot(e.source_file)?.root === root).length;
     }
 
     const openApiDocs = ctx.openApiDocumentsByRoot?.get(root) ?? [];
@@ -213,8 +241,8 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
       filesByExt: raw?.filesByExt ?? {},
       nativeRouteCount: raw?.nativeRoutes.length ?? 0,
       decoratorFactCount: raw?.decoratorFacts.length ?? 0,
-      graphifyNodeCount,
-      graphifyEdgeCount,
+      crossPackageNodeCount,
+      crossPackageEdgeCount,
       unitsByKind,
       openapiStatus: openApiDocs.length > 0 ? 'present' : 'absent',
       deployableManifests: (raw?.deployableManifests ?? []).map((m) => m.type),
@@ -246,26 +274,26 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   }
 
   const completeness = computeCompleteness(ctx.allUnits, ctx.relationships);
-  // Robustness T-R0-5 — graphifyStatus was already surfaced prominently in
+  // crossPackageStatus was already surfaced prominently in
   // intelligence-ir.md's own header, but living in a DIFFERENT field than
-  // silenceFlags meant a reviewer (or the T-E5 hitl-review-trigger.js CLI,
+  // silenceFlags meant a reviewer (or the hitl-review-trigger.js CLI,
   // which reads exactly this array) could miss that a degraded/failed
-  // Graphify pass is the REAL reason a run looks architecturally empty —
-  // every cross-package edge, persistence-detector unit, and R2 bridge
-  // resolution depends on Graphify; a failure here silently starves S1's
+  // cross-package backbone pass is the REAL reason a run looks architecturally
+  // empty — every cross-package edge, persistence-detector unit, and R2
+  // bridge resolution depends on it; a failure here silently starves S1's
   // own precondition (fewer database units even exist to trigger it).
   // Folding this into the SAME reviewer-facing list closes that gap.
-  if (graphifyStatus !== 'ok') {
+  if (crossPackageStatus !== 'ok') {
     completeness.silenceFlags.push(
-      `S0-cross-package-backbone-incomplete: graphifyStatus is "${graphifyStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
+      `S0-cross-package-backbone-incomplete: crossPackageStatus is "${crossPackageStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to detection maturity`
     );
   }
-  // T-Y5-1 — the second, CFN-specific half of the HT-ASB-006 class: real
+  // The CFN-specific half: real
   // infra evidence of an HTTP surface (actual API Gateway Method/Resource
   // bindings in the passed --cfn-manifests dir) exists, but NONE of it
   // bound to any unit this scan found — e.g. the handler's Java source
-  // lives in a package root not passed to this scan (the real, honest
-  // 21-of-26-unresolved case found in T-Y4-2's own wild exam against
+  // lives in a package root not passed to this scan (a real, honest
+  // 21-of-26-unresolved case found against
   // a reference AWS SaaS sample's shared resources/ directory). Only meaningful when
   // --cfn-manifests was actually passed (undefined, not 0, when it wasn't
   // — same "don't fake a 0" precondition discipline as every other rate
@@ -278,8 +306,8 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
 
   return {
     generatedAt: new Date().toISOString(),
-    graphifyStatus,
-    graphifyError: ctx.crossPackageError ? String(ctx.crossPackageError) : undefined,
+    crossPackageStatus,
+    crossPackageError: ctx.crossPackageError ? String(ctx.crossPackageError) : undefined,
     roots,
     ignoredByReason,
     unmappedSignalCount,

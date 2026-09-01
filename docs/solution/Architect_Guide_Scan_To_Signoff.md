@@ -62,10 +62,23 @@ This produces the raw materials in `<out-dir>`: `typed-facts.json`, `coverage-re
 
 **What to look at before moving on:** `<out-dir>/coverage-report.json`'s `silenceFlags`. If it includes `S1`, the scan genuinely didn't recover part of the architecture's shape for this repo — that's real information you'll want in hand before promising a stakeholder "this is the architecture," not something the next steps quietly paper over.
 
+**Optional, only if `S1` shows up on a real Java/Spring repo: CodeQL DI-resolution.** CodeGraph (the default scanner) can miss a real dependency wired through a Spring `@Bean`-factory method or disambiguated by a stereotype annotation — CodeQL can see both, at real cost (a full compile + database build, minutes not seconds). Simplest way in:
+
+```bash
+node pipeline/dist/orchestration/run-slice.js <package-root> --out <out-dir> --auto-codeql
+```
+
+This detects your `build.gradle`/`pom.xml` and derives the right build command itself (including the two known Gradle gotchas — a stale daemon, a missing `--no-daemon` — that would otherwise silently produce zero bindings). **Before you use this, read the license note**: the free CodeQL CLI license only permits automated use against an Open Source Codebase, or under a paid GitHub Advanced Security license — this pipeline can't verify which applies to you, so `--auto-codeql` is a conscious opt-in, never on by default. If you're running this repeatedly, set `WEAVER_CODEQL_LICENSE_CONFIRMED=1` once in your shell profile instead of typing the flag every time — same effect, same license attestation. Full detail (hand-writing `--codeql-source-root`/`--codeql-build-command` yourself, the Gradle-daemon failure mode, what "silently zero bindings" looks like) is in `README.md`'s own CodeQL section — this is the fast path, that's the reference.
+
 ## Step 2 — Build your Session Pack
 
 ```bash
 python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir review-sessions/<run-id>
+
+# optional: attach a real, evidence-grounded LLM explanation to every open
+# residual before you start (any tier) — see Step 3 for what this needs
+# and what it costs
+python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir review-sessions/<run-id> --with-dossier
 ```
 
 This reads the scan output and writes a self-contained workspace: `review-sessions/<run-id>/SESSION.md` (open this first), `residuals.json` (everything still open, sorted into three tiers — see below), `evidence/` (redacted source snippets backing each item), and an empty `drafts/` waiting to be filled.
@@ -77,19 +90,42 @@ If a pack for this run already exists with unapplied drafts, this refuses to ove
 - **Tier B — the assistant may draft, you approve.** Only when the evidence bar is fully met; otherwise it correctly says "cannot decide" rather than guessing.
 - **Tier C — nobody invents.** Things like an unresolvable external call or a dynamic dispatch pattern get documented as out-of-scope, not fabricated into a relationship that doesn't exist.
 
+**Set your expectations before you open the pack:** most real residuals today will be Tier A. Only one real detector currently produces Tier B (a specific multi-hop-bridge shape — one clear candidate among several syntactic implementers, below the auto-include confidence bar); everything else routes to Tier A or C. Seeing an all-Tier-A pack on your first run is normal, not a sign the tool skipped something.
+
 ## Step 3 — Work the pack
 
-The chat mode lives at `.github/chatmodes/residual-review.chatmode.md` — it's a real file checked into this repo, not something to fetch separately. It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
+The custom agent lives at `.github/agents/residual-review.agent.md` — it's a real file checked into this repo, not something to fetch separately. (If you're on an older Copilot Chat that still expects `.github/chatmodes/*.chatmode.md`, this file won't be picked up from its current location — see your Copilot Chat version, or ask about migrating back, if the agent picker comes up empty.) It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
 
-**Recommended, strongest safety guarantee: VS Code + GitHub Copilot Chat.**
+**VS Code + GitHub Copilot Chat (the primary, intended path).**
 1. Open this repo as a workspace in VS Code (the desktop app, not the terminal).
-2. Open the Copilot Chat panel and find its chat-mode picker (usually a dropdown near the chat input).
-3. Select the mode matching this file's `description` frontmatter ("Weaver residual review session...").
+2. Open the Copilot Chat panel and find its agent picker — a dropdown near the chat input (or type `/agents` in the chat box to open it directly).
+3. Select **"CALM File reviewer"** (this file's own `name:` frontmatter).
 4. Point it at your pack, e.g.: `Read review-sessions/<run-id>/SESSION.md and start the residual review.`
+5. No `ANTHROPIC_API_KEY` or any other secret to set up — Copilot Chat uses whatever model your own Copilot subscription already provides.
 
-**Confirmed real** (not just designed): in an actual VS Code Copilot Chat session, the chat wrote a Decision Record and then genuinely stopped — it has no terminal tool available at all, so you run `validate_drafts.py`/`apply.py` yourself in Step 4/5. This is a structural guarantee in this host, not a convention.
+**How to actually decide a Tier A card — a real question, not a formality.** A pack with 20+ Tier A cards is normal on a real multi-service repo, and "you decide" isn't much help on its own. What actually works:
+- **Read the evidence blockquote, and only the evidence blockquote.** That's the whole point of a choice card — the answer is either supported by what's shown, or it isn't. Don't reach for "what a Spring Boot app like this usually does," even if you're confident — if the evidence doesn't show it, it doesn't count, no matter how experienced you are with the framework.
+- **Evidence too short to be sure? Ask for more before deciding**, don't fill the gap from memory. The chat prints a `pack.py fetch-span` command for exactly this (see below) — run it, then keep reading.
+- **`--with-dossier`'s explanation (if you built the pack with it) is a second opinion, not a second vote.** It's a legitimate aid for reading the evidence faster, not a replacement for you actually deciding — and it's never treated as independent corroboration of anything.
+- **"Leave open" is a complete, correct answer, not a cop-out.** This system is built so you never have to force a confident answer you don't actually have — it was the single most common real answer across two prior pilot sessions. If the evidence genuinely doesn't tell you, say so and move on.
+- **For a big batch, don't decide every card independently from scratch.** Once you've answered one for real and its card's "Similar residuals this session" note lists others, replicate that exact decision across them — still one real Decision Record per residual, never a blanket record:
+  ```bash
+  python3 tools/review-session/bulk_apply.py --session-dir review-sessions/<run-id> --anchor <the-residual-id-you-just-answered> --i-confirm-bulk-apply
+  ```
+  Want to work highest-impact-first instead of top-to-bottom through 20+ cards? Rank the backlog by real consequence signals first:
+  ```bash
+  python3 tools/review-session/queue_rank.py --session-dir review-sessions/<run-id>
+  ```
 
-**Also works, weaker safety guarantee: Claude Code chat.** The same chat-mode file works when opened directly in Claude Code — same choice cards, same evidence-first behavior. **But confirmed differently here**: Claude Code chat *does* have terminal (`Bash`) access despite the identical file, so nothing structurally stops it from running `apply.py` itself. In practice it stayed within its stated rules (wrote only to `drafts/`, asked before writing) — but the only thing actually enforcing that is the model's own compliance plus this host's per-action permission prompt. **If you use this path: always approve each file write individually, and never choose a blanket "allow all edits this session" option** — that's the one thing standing between you and an unreviewed apply.
+**The real safety guarantee, wherever you run the chat mode (VS Code, Claude Code, or any other host) — read this, not folklore about what a given host "can't" do:** Copilot Chat can propose invoking any tool available to it in any host, including a terminal command — that's normal agentic behavior, not a bug, and it is *not* something this chat-mode file's declared `tools:` list can categorically prevent (a host is free to ignore that list, and even where it's honored, the per-action confirmation prompt that would gate a run is itself a configurable IDE setting someone could turn off). **The one thing that actually holds, in every host, no exceptions**: `apply.py` — the only code path that ever writes to `architecture.calm.json` — is this repo's own code, not an IDE preference, and it refuses to run without its own separate, explicit confirmation (Step 5), regardless of what the chat client did upstream. A drafted file under `drafts/` is inert until you run Step 5 yourself. Treat that as the guarantee — not "this host can't run scripts."
+
+**Practical guidance while you're in the chat, any host:** always approve file writes individually, and never grant a blanket "allow all edits this session" permission — that's needless exposure, not a required convenience, given Step 5 is the real gate either way.
+
+**Optional, before you even open the chat: `pack.py --with-dossier`.** Re-run Step 2 with this flag added and every open residual (any tier) gets a real, evidence-grounded explanation attached before you start — Copilot Chat (or you, reading `SESSION.md` by hand) sees the reasoning up front instead of a bare choice card. Needs the `claude` CLI already authenticated on your `PATH` (same convenience as Copilot Chat itself — no separate key to manage); real cost/latency measured at $0.08–$0.32 and 40–132 seconds per residual, so it's opt-in, not the default, and worth skipping on a pack with a lot of open items unless you want the extra explanation for all of them.
+
+**Known gap, real, not yet fixed:** if your repo's residual comes from a Spring config file (`application.yml`-derived database/queue units), `--with-dossier` will currently come back saying no evidence was provided for it — a real coverage hole in how evidence snippets get built for that unit shape (tracked in `BACKLOG.md`), not a sign the dossier pass is broken. Source-code-derived units (the common case) aren't affected.
+
+**If a card's evidence snippet is too short to decide from:** the chat prints one `pack.py fetch-span` command instead of guessing — it never runs this itself. Copy it into your terminal, run it, and the extra source lines land in the pack for you to keep reviewing. Two forms: an exact `--start-line`/`--end-line` range, or `--anchor <file:line> --context-lines <n>` for "N lines either side of this line" without hand-computing the range yourself. Capped per session (10 extra reads / 400 lines) so this can't quietly balloon into reading the whole repo.
 
 **A small cosmetic quirk you may see, host-dependent, not a bug:** every choice card already includes its own "Other…" option (by design). Some hosts' own chat UI adds a second, independent "Other" on top of it — two overlapping ways to say the same thing, harmless.
 

@@ -90,7 +90,7 @@ export function detectEnvSoftGraphRelationships(
           kind: 'connects',
           crossPackage: referencerUnit.filePath !== targetUnit.filePath,
           source: 'k8s',
-          confidence: 20, // low, fixed — a name-correlation guess, never promoted (T-X9-1's own explicit instruction)
+          confidence: 20, // low, fixed — a name-correlation guess, never promoted
           status: PENDING_STATUS,
           id: PENDING_RELATIONSHIP_ID,
         });

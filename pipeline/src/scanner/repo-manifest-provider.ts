@@ -3,13 +3,14 @@ import * as path from 'path';
 import { parse as parseYaml } from 'yaml';
 
 /**
- * T-MR-1 (`AGENT_TASKS_Ext_MultiRepo_Deployment.md`, BACKLOG.md "Cross-repo
- * relationship resolution") — a small, human-authored, checked-in file a
+ * A small, human-authored, checked-in file a
  * target repo's own maintainers declare at their repo's root, naming what
- * that repo publishes for another repo's pipeline run to join against.
+ * that repo publishes for another repo's pipeline run to join against
+ * (`AGENT_TASKS_Ext_MultiRepo_Deployment.md`, BACKLOG.md "Cross-repo
+ * relationship resolution").
  * **The pipeline never writes this file** — only reads it, and only ever
  * from a local directory a human has placed copies/symlinks of OTHER repos'
- * manifests into (`discoverRepoManifests`) for THIS run's own T-MR-2 join
+ * manifests into (`discoverRepoManifests`) for this run's own cross-repo join
  * pass to consume. Same "structured non-code file provider" mechanism class
  * as `k8s-manifest-provider.ts`/`openapi-provider.ts`/
  * `spring-config-provider.ts` — file discovery + structural parse only, no

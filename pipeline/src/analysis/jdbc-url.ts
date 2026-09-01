@@ -1,14 +1,15 @@
 /**
  * Single shared JDBC-URL literal resolution + scheme extraction.
  *
- * Real bug found on independent code review (2026-08-16) of T-FS-3: this
- * logic previously existed as THREE independent hand-copied pieces —
- * spring-config-pass.ts's own jdbcScheme(), contradiction-detector.ts's
+ * Real bug found on independent code review (2026-08-16) of contradiction
+ * detection: this logic previously existed as THREE independent hand-copied
+ * pieces — spring-config-pass.ts's own jdbcScheme(), contradiction-detector.ts's
  * jdbcSchemeEngine() (a deliberate re-derivation, per its own "keep this
  * detector's only dependency on OUTPUT, not internals" comment), and
  * port-interface-builder.ts's isJdbcSignal prefix check. When
  * jdbcScheme() was taught to unwrap Spring's `${VAR:default}` placeholder
- * syntax (T-FS-3 real-instance verification against apache/fineract),
+ * syntax (real-instance verification against a reference Java/JAX-RS
+ * banking platform),
  * contradiction-detector.ts's copy was updated in the same commit but
  * port-interface-builder.ts's WASN'T — proving that "must stay in sync"
  * comments are not a real guardrail. Fixed properly: one function, three
@@ -18,8 +19,10 @@
 /**
  * Unwraps Spring's `${ENV_VAR:default}` placeholder syntax when its
  * literal default is itself a `jdbc:` URL already sitting in checked-in
- * source text (e.g. apache/fineract's real
- * `spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}`)
+ * source text (e.g. a reference Java/JAX-RS banking platform's real
+ * `spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}` —
+ * property KEY/VALUE quoted verbatim from the real source file as evidence,
+ * not genericized)
  * — narrow on purpose: only unwraps a `${...:jdbc:...}` shape, never
  * general placeholder resolution. A placeholder with no default at all
  * (`${SOME_VAR}`) or a non-jdbc default is left as raw text, matching

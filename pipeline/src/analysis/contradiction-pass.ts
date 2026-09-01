@@ -3,7 +3,7 @@ import { discoverDeployments } from '../scanner/k8s-manifest-provider';
 import { detectValueContradictions } from './cross_package/contradiction-detector';
 
 /**
- * T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources").
+ * Contradiction detection between evidence sources (BACKLOG.md).
  * Opt-in, same convention as k8sTrustPass/envSoftGraphPass: only runs when
  * --k8s-manifests <dir> was passed. Runs after springConfigPass (needs its
  * spring.datasource.url-derived database units already in ctx.allUnits) —

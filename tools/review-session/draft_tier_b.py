@@ -9,43 +9,38 @@ trigger map now has one real Tier B producer —
 `multi-hop-single-candidate-below-threshold`, sourced from
 `multi-hop-bridge-detector.ts`'s own `tier-b-single-candidate` ignored-item
 (exactly one real database/topic candidate found among a bridge
-interface's several syntactic implementers). This file's own drafting
-logic and guardrails are unchanged by that — a real Tier B residual now
-reaches this tool, but end-to-end proof still needs a real
-ANTHROPIC_API_KEY run (see the second honest limit below, also still
-true). Still built and tested primarily against the design's own trap
-fixtures (§5.1); a Tier B residual card from a real multi-hop scan is
-exercised via `pipeline`'s own regression test
-(`multi-hop-bridge-detector.ts`'s new fixture) and `tools/review-session`'s
-own `test_triage.py`/`test_cards.py`, not (yet) an end-to-end
-`draft_tier_b.py` run against a live model.
+interface's several syntactic implementers).
 
-SECOND HONEST LIMIT: no ANTHROPIC_API_KEY is set in the environment this
-was built in, and no live-model call has ever been exercised here — same
-"specified, not proven live" disclosure already used for the chat-mode
-file and the CI workflow. The network boundary (_call_llm) is a single,
-thin, isolated function specifically so the surrounding logic (prompt
-assembly, response parsing, and — critically — the guardrails that decide
-whether to trust and write what a model returns) can be fully tested
-without ever calling a real API: see draft_for_residual's own separation
-and test_draft_tier_b.py's synthetic-response fixtures.
-
-No key set -> for every Tier B residual found, prints what would be
-attempted and writes nothing (matches suggest-rules.ts's own established
-convention in this codebase for "LLM backend optional").
+T-1 (AGENT_TASKS_Residual_Assist_Redesign.md, 2026-08-23): the first
+real live-model run of this file, closing the "never exercised" gap that
+used to be documented here. **Backend is the `claude` CLI only — deliberately,
+not a raw `ANTHROPIC_API_KEY` from the environment.** This project's own
+target-customer profile (fintechs) doesn't leave API keys in environment
+variables for an LLM to pick up; the realistic path is an already-
+authenticated coding-assistant CLI (`claude`, or the in-chat Copilot path
+this same drafting logic is bound to via `.github/agents/`), never a
+bare secret. No `claude` CLI on `PATH` -> for every Tier B residual found,
+prints what would be attempted and writes nothing (matches
+suggest-rules.ts's own established convention in this codebase for "LLM
+backend optional"). The network/subprocess boundary (_call_llm) is a
+single, thin, isolated function specifically so the surrounding logic
+(prompt assembly, response parsing, and — critically — the guardrails that
+decide whether to trust and write what a model returns) can be fully
+tested without ever calling a real backend: see draft_for_residual's own
+separation and test_draft_tier_b.py's synthetic-response fixtures.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import llm_common  # noqa: E402
+from llm_common import _call_llm, _llm_backend_available, _strip_markdown_json_fence  # noqa: E402
 from validate_drafts import validate as validate_drafts  # noqa: E402
 
 SYSTEM_PROMPT = """You are the Tier B drafting assistant for a Weaver residual review session.
@@ -89,33 +84,11 @@ residuals outside your assigned batch."""
 
 
 def build_user_prompt(residual: dict, unit_index: dict, packs: dict) -> str:
-    """Assembles ONLY the inputs §5.1 permits — pure, testable, no I/O."""
-    relevant_units = {uid: info for uid, info in unit_index.items() if uid in residual.get("unitIds", [])}
-    relevant_evidence = {ref: snippet for uid in relevant_units.values() for ref in uid.get("evidenceRefs", []) for r, snippet in packs.items() if r == ref}
-    return json.dumps({"residual": residual, "unit_index": relevant_units, "evidence_snippets": relevant_evidence}, indent=2)
-
-
-def _call_llm(system_prompt: str, user_prompt: str, api_key: str, model: str = "claude-sonnet-4-5-20250929") -> str:
-    """The ONLY network boundary in this whole tool suite. Real, but never
-    exercised in this session (no API key present) — kept as one small,
-    isolated function specifically so it can be swapped/mocked without
-    touching any of the actually-testable logic around it."""
-    body = json.dumps(
-        {
-            "model": model,
-            "max_tokens": 2048,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": user_prompt}],
-        }
-    ).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=body,
-        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        payload = json.loads(resp.read())
-    return "".join(block.get("text", "") for block in payload.get("content", []))
+    """Assembles ONLY the inputs §5.1 permits — pure, testable, no I/O.
+    Delegates to llm_common.build_evidence_prompt -- the shared
+    implementation both this file and advisory.py (and dossier.py) now
+    call."""
+    return llm_common.build_evidence_prompt(residual, unit_index, packs)
 
 
 REQUIRED_DECISION_KEYS = {"decision_id", "module", "target_type", "target_ref", "final_decision", "rationale", "reviewer", "reviewed_at", "status"}
@@ -135,7 +108,7 @@ def parse_and_validate_response(raw_text: str, residual: dict, calm_node_ids: se
     REJECTION, never silently treated as drafted, no matter how
     plausible-looking the response is (S6: non-fabricate)."""
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(_strip_markdown_json_fence(raw_text))
     except (json.JSONDecodeError, TypeError):
         return {"outcome": "invalid_response", "reason": "response was not valid JSON — rejected, not guessed at"}
 
@@ -188,11 +161,11 @@ def parse_and_validate_response(raw_text: str, residual: dict, calm_node_ids: se
     return {"outcome": "drafted", "decision": decision, "override": override}
 
 
-def draft_for_residual(residual: dict, unit_index: dict, packs: dict, calm_node_ids: set[str] | None, calm_relationship_ids: set[str] | None, api_key: str | None) -> dict:
-    if not api_key:
-        return {"outcome": "no_key", "reason": "no ANTHROPIC_API_KEY set — nothing drafted"}
+def draft_for_residual(residual: dict, unit_index: dict, packs: dict, calm_node_ids: set[str] | None, calm_relationship_ids: set[str] | None) -> dict:
+    if not _llm_backend_available():
+        return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) — nothing drafted"}
     user_prompt = build_user_prompt(residual, unit_index, packs)
-    raw = _call_llm(SYSTEM_PROMPT, user_prompt, api_key)
+    raw = _call_llm(SYSTEM_PROMPT, user_prompt)
     return parse_and_validate_response(raw, residual, calm_node_ids, calm_relationship_ids)
 
 
@@ -206,7 +179,8 @@ def main() -> int:
     if not residuals_path.exists():
         print(f"[draft_tier_b] {residuals_path} not found — is this a real Session Pack?", file=sys.stderr)
         return 1
-    residuals = json.loads(residuals_path.read_text()).get("items", [])
+    residuals_doc = json.loads(residuals_path.read_text())
+    residuals = residuals_doc.get("items", [])
     tier_b = [r for r in residuals if r.get("tier") == "B" and r.get("status") == "open"]
 
     if not tier_b:
@@ -227,14 +201,14 @@ def main() -> int:
             calm_node_ids = {n["unique-id"] for n in calm.get("nodes", [])}
             calm_relationship_ids = {r["unique-id"] for r in calm.get("relationships", [])}
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        print(f"[draft_tier_b] no ANTHROPIC_API_KEY set — would attempt to draft {len(tier_b)} residual(s), writing nothing: {[r['id'] for r in tier_b]}")
+    if not _llm_backend_available():
+        print(f"[draft_tier_b] no LLM backend available (`claude` CLI not found on PATH) — would attempt to draft {len(tier_b)} residual(s), writing nothing: {[r['id'] for r in tier_b]}")
         return 0
+    print("[draft_tier_b] backend: claude CLI")
 
     decisions_dir = session_dir / "drafts" / "decisions"
     overrides_dir = session_dir / "drafts" / "overrides"
-    results = process_tier_b_batch(tier_b, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key, decisions_dir, overrides_dir)
+    results = process_tier_b_batch(tier_b, unit_index, packs, calm_node_ids, calm_relationship_ids, decisions_dir, overrides_dir)
     for residual_id, outcome, detail in results:
         if outcome == "drafted":
             print(f"[draft_tier_b] {residual_id}: drafted {detail}")
@@ -243,7 +217,28 @@ def main() -> int:
         else:
             print(f"[draft_tier_b] {residual_id}: {outcome} — {detail}")
 
+    tier_b_by_id = {r["id"]: r for r in tier_b}
+    if _apply_bar_not_met_outcomes(results, tier_b_by_id):
+        residuals_path.write_text(json.dumps(residuals_doc, indent=2))
+
     return 0
+
+
+def _apply_bar_not_met_outcomes(results: list[tuple[str, str, str]], tier_b_by_id: dict[str, dict]) -> bool:
+    """§3's redesign: a Tier B residual whose evidence bar wasn't met
+    (draft_for_residual's own "cannot_decide" outcome) must gain
+    draftOutcome: "bar-not-met" in residuals.json -- otherwise it reads
+    identically to a residual that was never Tier-B-eligible at all.
+    Mutates the residual dicts in tier_b_by_id in place (they're the same
+    objects held in residuals_doc's own items list); returns True if
+    anything changed, so the caller knows whether residuals.json needs
+    rewriting."""
+    changed = False
+    for residual_id, outcome, _detail in results:
+        if outcome == "cannot_decide" and residual_id in tier_b_by_id:
+            tier_b_by_id[residual_id]["draftOutcome"] = "bar-not-met"
+            changed = True
+    return changed
 
 
 def process_tier_b_batch(
@@ -252,7 +247,6 @@ def process_tier_b_batch(
     packs: dict,
     calm_node_ids: set[str] | None,
     calm_relationship_ids: set[str] | None,
-    api_key: str,
     decisions_dir: Path,
     overrides_dir: Path,
     draft_fn=draft_for_residual,
@@ -276,7 +270,7 @@ def process_tier_b_batch(
     written_override_ids: dict[str, str] = {}
     results: list[tuple[str, str, str]] = []
     for residual in tier_b:
-        result = draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids, api_key)
+        result = draft_fn(residual, unit_index, packs, calm_node_ids, calm_relationship_ids)
         if result["outcome"] != "drafted":
             results.append((residual["id"], result["outcome"], result["reason"]))
             continue

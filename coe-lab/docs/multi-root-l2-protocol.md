@@ -59,7 +59,7 @@ Use this shape whenever recording a multi-root result (STATUS.md, Claim Register
 **Residual:** honest, evidenced (see AREC_R2_MultiHop_Strategy.md §1 and STATUS.md §D T-C1) — not closed by this scan
 ```
 
-This is a real, already-run example (T-C1's own remeasure) — included to show the template applied, not as a repeatable product claim about Fineract specifically.
+This is a real, already-run example (T-C1's own remeasure) — included to show the template applied, not as a repeatable product claim about a reference Java/JAX-RS banking platform specifically.
 
 ---
 

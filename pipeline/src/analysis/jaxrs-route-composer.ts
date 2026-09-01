@@ -39,8 +39,7 @@ export function composeJaxRsRoutes(fileDecoratorFacts: DecoratorFact[]): JaxRsCo
 
   const consumed = new Set<DecoratorFact>();
 
-  // T-TC2-1 (B-jaxrs-composer-class-scoping) — real, confirmed bug, fixed.
-  // Previously took the FIRST class-level @Path found anywhere in the file
+  // Real, confirmed bug, fixed. Previously took the FIRST class-level @Path found anywhere in the file
   // and applied it, unconditionally, to every method in the file — correct
   // only for the real, common "one resource class per file" production
   // shape this was originally proven against (19/19 real routes from a

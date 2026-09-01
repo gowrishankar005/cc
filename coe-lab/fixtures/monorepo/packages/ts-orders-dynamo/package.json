@@ -2,5 +2,5 @@
   "name": "ts-orders-dynamo",
   "version": "0.1.0",
   "private": true,
-  "description": "Lab fixture — orders API with DynamoDB + SQS SDK patterns (Fidelity-aligned)"
+  "description": "Lab fixture — orders API with DynamoDB + SQS SDK patterns (target-customer-aligned)"
 }

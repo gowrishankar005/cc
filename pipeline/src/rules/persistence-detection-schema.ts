@@ -7,7 +7,7 @@ export interface PersistenceLibraryEntry {
   name: string;
   language: string;
   evidenceLevel: 'verified' | 'unverified';
-  /** T-X7-4 — a real CALM protocol enum value (core.json#/defs/protocol), set ONLY when the library name unambiguously implies it (e.g. org.postgresql IS the Postgres JDBC driver -> "JDBC"). Absent, not guessed, for anything that doesn't map to a real enum value (Mongo/DynamoDB have no CALM protocol entry at all). */
+  /** A real CALM protocol enum value (core.json#/defs/protocol), set ONLY when the library name unambiguously implies it (e.g. org.postgresql IS the Postgres JDBC driver -> "JDBC"). Absent, not guessed, for anything that doesn't map to a real enum value (Mongo/DynamoDB have no CALM protocol entry at all). */
   protocol?: string;
   /**
    * Q13 ontology fix — set ONLY for libraries where "imports the driver" and
@@ -24,7 +24,7 @@ export interface PersistenceLibraryEntry {
    */
   ownerBaseClass?: string;
   /**
-   * T-MR-4 — the composition-style counterpart to ownerBaseClass, for
+   * The composition-style counterpart to ownerBaseClass, for
    * libraries where real ownership is a FIELD holding the client, never an
    * `extends` relationship (the AWS SDK's Dynamo clients are never
    * subclassed; a store class holds one as a field/constructor-injected
@@ -78,7 +78,7 @@ export function driverImportLibraries(catalogue: PersistenceDetectionCatalogue):
   return expandWithGraphifyRefTargets(new Set((strategy?.libraries ?? []).map((lib) => lib.name)));
 }
 
-/** T-X7-4 — library name -> real CALM protocol enum value, for the subset of driver-import libraries where that mapping is unambiguous (verified against core.json#/defs/protocol, not guessed). */
+/** Library name -> real CALM protocol enum value, for the subset of driver-import libraries where that mapping is unambiguous (verified against core.json#/defs/protocol, not guessed). */
 export function driverImportProtocols(catalogue: PersistenceDetectionCatalogue): Map<string, string> {
   const strategy = catalogue.strategies.find((s) => s.id === 'driver-import');
   const map = new Map<string, string>();
@@ -108,7 +108,7 @@ export function driverImportOwnerBaseClasses(catalogue: PersistenceDetectionCata
 }
 
 /**
- * T-MR-4 — library name -> required owner field type (see
+ * Library name -> required owner field type (see
  * PersistenceLibraryEntry.ownerFieldType). Same lookup shape as
  * driverImportOwnerBaseClasses (keyed by both the literal catalogue name
  * and its Graphify ref_-transformed form), for the composition-ownership

@@ -15,7 +15,7 @@
 6. **L5** — residual HITL budget accepted only for non-systematic leftovers.  
 
 **Lab core “semantic PASS” today is roughly L0+L1 (soft L2).**  
-**Fineract hand gold L2 currently FAILS** (by design of current platform).  
+**a reference Java/JAX-RS banking platform hand gold L2 currently FAILS** (by design of current platform).  
 Saying “all pass” without a layer is **forbidden**.
 
 ---
@@ -26,7 +26,7 @@ Saying “all pass” without a layer is **forbidden**.
 |---|---|---|---|
 | **L0** | Schema | `hasErrors: false` under calm validate (+ `-u` if controls) | `calm validate`, generate-calm |
 | **L1** | Unit recall | Gold architectural nodes/types/paths/control **presence** matched (ids may differ) | `score-calm`, semantic half of `validate-calm-pair` |
-| **L2** | Story recall | Gold **connects topology** (and required controls content level per claim) | Stricter validate-calm-pair; Fineract gold |
+| **L2** | Story recall | Gold **connects topology** (and required controls content level per claim) | Stricter validate-calm-pair; a reference Java/JAX-RS banking platform gold |
 | **L3** | Silence probes | Invariants hold (see below) | Metrics on typed-facts/CALM (Wave 3-S may automate) |
 | **L4** | Scope honesty | Every known gap has claim cell and/or scope-limitation id | Claim_Register, scope-limitations.yml |
 | **L5** | HITL residual | Overrides only for residual after systematic strategies | DR/Override, review-flow map |
@@ -39,9 +39,9 @@ Saying “all pass” without a layer is **forbidden**.
 |---|---|---|
 | Lab **core** (py-accounts, nestjs, jaxrs, spring, rbac, lib trap, ledger) | L0 + L1; L2 soft (extras OK) | Good unit coverage today |
 | Lab **stretch** (kafka, dynamo, jwt, k8s) | L0 + L1 report; L2 per gold expected gaps | May expected-fail L2 |
-| **Wild Fineract** charge/core | L0 + L1 + **L2** for story gold | L2 fail until AREC R2/C-call or gold OOS |
-| **Wild Fineract** system-map | L0 only vs class-level gen | Incomparable grain without aggregation |
-| Ghostfolio / BoA full | L0 + L1; L2 per claim cell | Use as disconfirming samples |
+| **Wild a reference Java/JAX-RS banking platform** charge/core | L0 + L1 + **L2** for story gold | L2 fail until AREC R2/C-call or gold OOS |
+| **Wild a reference Java/JAX-RS banking platform** system-map | L0 only vs class-level gen | Incomparable grain without aggregation |
+| Ghostfolio / reference-sample full | L0 + L1; L2 per claim cell | Use as disconfirming samples |
 
 ---
 
@@ -58,7 +58,7 @@ Implement later (Wave 3-S); **policy now**:
 | **S4** | High `x-aac-confidence` on units does not imply L2 pass | confidence-not-completeness |
 | **S5** | T-Y5-1, HT-ASB-006 class: (a) 0 service units present but ≥1 database/topic unit exists — real persistence code with no discovered entry-point surface at all; (b) `--cfn-manifests` found real API Gateway route bindings but bound none of them to a scanned unit | The degenerate, loudest-should-be case S1 structurally cannot catch (S1 requires ≥1 service unit to even fire) — real, pre-Y3 `aws-saas-boost-tier-service`/`tenant-service` baseline (0 services, N Dynamo units, `silenceFlags: []`) named this gap; still fires post-Y4 for Node/Python handlers (no sample yet) or CFN routes whose handler code lives outside the scanned roots |
 
-**Fineract charge/core today:** S1 fails under architecture claim; S2 fails for HTTP APIs under full control claim.
+**a reference Java/JAX-RS banking platform charge/core today:** S1 fails under architecture claim; S2 fails for HTTP APIs under full control claim.
 
 ---
 
@@ -74,7 +74,7 @@ Implement later (Wave 3-S); **policy now**:
 
 ### `validate-calm-pair.mjs` L0/L1/L2 (T-A3, 2026-08-07)
 
-Each package result now prints separate `L0 schema`, `L1 unit recall`, `L2 story` lines instead of one bundled `semantic: PASS/FAIL` — the previous shape made it impossible to tell an L1-only pass from an L2 story pass by output alone, which is exactly the false-comfort the Fineract finding named.
+Each package result now prints separate `L0 schema`, `L1 unit recall`, `L2 story` lines instead of one bundled `semantic: PASS/FAIL` — the previous shape made it impossible to tell an L1-only pass from an L2 story pass by output alone, which is exactly the false-comfort the reference Java/JAX-RS banking platform's finding named.
 
 - **L2 = N/A** (not PASS, not FAIL) when: gold has zero `connects`-shaped relationships (most lab-core packages — they assert unit/interface recall, not architecture links), OR gold carries an `x-lab-grain` metadata key (module-grain gold, e.g. `fineract-system-map`, is not comparable to a class/file-grain generated CALM at all — both L1 and L2 are N/A for those).
 - **Exit code default = L0 + L1 only.** An L2-only failure does not fail the run. Pass `--require-l2` to also gate on L2 — deliberately off by default while R2 (multi-hop architecture links) is Claim-Register `specified-unbuilt`; turning default exit code red for an honestly-documented, not-yet-built capability would just train operators to ignore red, the opposite of this file's purpose.
@@ -93,7 +93,7 @@ Each package result now prints separate `L0 schema`, `L1 unit recall`, `L2 story
 
 Lab core may **L1 pass** while wild L2 fails — that is consistent, not a contradiction.
 
-**R2 mechanism status (T-C1, 2026-08-07)**: built and verified NON-FABRICATING on two real scan shapes — never invents an edge when a bridge is ambiguous or its implementer lacks persistence evidence, always reports an honest `unresolved-multi-hop` ignored-item instead. Proven POSITIVE on a synthetic fixture (`pipeline/test/fixtures/r2-bridge-sample`) where the full chain (service → bridge → persistence-evidenced implementer) is resolvable within scanned roots. Fineract-charge's own L2 failure is now a genuinely evidenced residual (the real implementer lacks its own persistence evidence), not an "unbuilt mechanism" gap — worth re-testing once C-call (Session D) or a broader persistence catalogue closes that specific evidence gap.
+**R2 mechanism status (T-C1, 2026-08-07)**: built and verified NON-FABRICATING on two real scan shapes — never invents an edge when a bridge is ambiguous or its implementer lacks persistence evidence, always reports an honest `unresolved-multi-hop` ignored-item instead. Proven POSITIVE on a synthetic fixture (`pipeline/test/fixtures/r2-bridge-sample`) where the full chain (service → bridge → persistence-evidenced implementer) is resolvable within scanned roots. a reference Java/JAX-RS banking platform-charge's own L2 failure is now a genuinely evidenced residual (the real implementer lacks its own persistence evidence), not an "unbuilt mechanism" gap — worth re-testing once C-call (Session D) or a broader persistence catalogue closes that specific evidence gap.
 
 ---
 

@@ -6,7 +6,7 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 /**
- * Lab fixture — JPA Charge entity (Fineract-shaped).
+ * Lab fixture — JPA Charge entity (a reference Java/JAX-RS banking platform-shaped).
  */
 @Entity
 @Table(name = "m_charge")

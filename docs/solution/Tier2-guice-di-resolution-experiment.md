@@ -130,7 +130,7 @@ re-checked, 2026-08-22: no contamination in any of them.**
 in `apps/api/src` production code, matching the ambiguity already
 disclosed in `E2a-typescript-nestjs-codeql-evaluation.md` exactly, nothing
 additional. For `E1b`/`E2`: verified directly against a real, generic
-"list every indexed file under `src/test/`" query run against Fineract's,
+"list every indexed file under `src/test/`" query run against the reference Java/JAX-RS banking platform's,
 `spring-bot`'s, and `spring-petclinic`'s own CodeQL databases (the latter
 two rebuilt with the identical `mvn -q -DskipTests clean compile` command
 `E2` used, to confirm reproducibility, not just re-derive from theory) —

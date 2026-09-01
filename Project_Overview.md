@@ -2,7 +2,7 @@
 
 **Weaver** is a deterministic Architecture-as-Code pipeline. It reads a real Java / Python / Node-TypeScript monorepo and emits schema-valid [FINOS CALM 1.2](https://calm.finos.org) JSON — services, stores, topics, routes, persistence, security controls, and the relationships between them — with file:line evidence on every claim.
 
-It is **not** an LLM architecture generator, not a CALM governance product, and not a detector tuned to any one sample repo. Public repos (Fineract-shaped banking, Waltz-shaped governance, etc.) are evidence samples used to prove or falsify a generic mechanism.
+It is **not** an LLM architecture generator, not a CALM governance product, and not a detector tuned to any one sample repo. Public repos (a reference Java/JAX-RS banking platform, a reference Java governance platform, etc.) are evidence samples used to prove or falsify a generic mechanism.
 
 ---
 
@@ -23,18 +23,18 @@ A second module (`threat-signals`) already consumes only that contract. A green-
 
 ```
 package roots
-    → Scanner (CodeGraph per root + one combined Graphify pass + structured-file providers)
+    → Scanner (CodeGraph per root + one combined CodeGraph cross-root pass + structured-file providers)
     → Analysis passes (ordered registry, shared context)
-    → typed-facts.json   ← versioned contract (currently 11.0.0)
+    → typed-facts.json   ← versioned contract (currently 17.0.0)
     → Module registry (calm-generator, threat-signals, …)
     → architecture.calm.json + IR + coverage + unmapped + provenance
 ```
 
-**Scanner is dual-engine on purpose.** CodeGraph is good at per-package native routes and `extractFromSource()` decorator/annotation/call/extends facts. Graphify is the cross-package structural backbone — it must run **once** across all given roots, not once per root, or cross-package edges are impossible by construction. That was a real, load-bearing bug that was found and fixed.
+**Scanner uses CodeGraph two ways.** Per-root, it's good at native routes and `extractFromSource()` decorator/annotation/call/extends facts. One combined cross-root pass (`codegraph-crossroot-provider.ts`) is the cross-package structural backbone — it must run **once** across all given roots, not once per root, or cross-package edges are impossible by construction. That was a real, load-bearing bug that was found and fixed (originally against a since-removed second engine, Graphify — see `docs/solution/E6-cross-package-backbone-evaluation.md`).
 
-Structured-file providers cover what neither engine can see: Kubernetes manifests (Secret **names** only — never values), OpenAPI/Swagger, Spring `application.yml`/`.properties`, CloudFormation/SAM path joins, CycloneDX SBOMs (corroboration only, never primary detection).
+Structured-file providers cover what neither pass can see: Kubernetes manifests (Secret **names** only — never values), OpenAPI/Swagger, Spring `application.yml`/`.properties`, CloudFormation/SAM path joins, CycloneDX SBOMs (corroboration only, never primary detection).
 
-**Analysis is a pass list**, not a hardcoded call chain: compose routes → map signals through the catalogue → detect persistence / messaging / outbound HTTP → reconcile Graphify edges → multi-hop bridges → k8s trust → Spring config → SBOM corroboration → grade relationships. New analysis is a named pass, not an edit to `run-slice.ts`.
+**Analysis is a pass list**, not a hardcoded call chain: compose routes → map signals through the catalogue → detect persistence / messaging / outbound HTTP → reconcile cross-package edges → multi-hop bridges → k8s trust → Spring config → SBOM corroboration → grade relationships. New analysis is a named pass, not an edit to `run-slice.ts`.
 
 **CALM construction is catalogue-driven.** `node-type-mapping.yml`, `relationship-type-mapping.yml`, and `control-requirement-catalogue.yml` decide CALM shape. Isolated builders (`node`, `interface`, `relationship`, `control`, `metadata`, `port-interface`) stay independent. New coverage is supposed to be a catalogue row plus one of four proven mechanisms:
 
@@ -61,7 +61,7 @@ If a new signal needs a fifth mechanism, that is a design conversation, not a si
 
 | Grade | What it is |
 |---|---|
-| **R0 structural** | Graphify edge only if **both** ends are TypedUnits. Code-level, not “the architecture story.” |
+| **R0 structural** | Cross-package edge only if **both** ends are TypedUnits. Code-level, not “the architecture story.” |
 | **R1 architecture** | One-hop service → database/topic. Regression-locked. |
 | **R2 multi-hop** | Service → access-layer implementer → store, bounded at **2 hops**. Three branches: implementer-is-store, implementer-imports-one-store, direct-delegate (no interface). Refuses 0 or 2+ candidates rather than guessing. |
 

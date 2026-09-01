@@ -5,10 +5,11 @@ import * as os from 'os';
 import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
 
 /**
- * #18 (BACKLOG.md "CodeQL command-bus dispatch") — the second real CodeQL
- * capability this pipeline evaluated (`E1-codeql-engine-evaluation.md`,
- * 7 real edges on Fineract) but never shipped, because T-LR-5 scoped DI
- * resolution as the smaller safe first unit. Architecturally identical to
+ * The second real CodeQL capability this pipeline evaluated
+ * (`E1-codeql-engine-evaluation.md`, 7 real edges on a reference
+ * Java/JAX-RS banking platform) but didn't ship at the same time as the DI
+ * resolution engine, which was scoped as the smaller safe first unit.
+ * Architecturally identical to
  * `codeql-di-provider.ts` — a real, whole-codebase CodeQL query, not a
  * per-file `StructuralEngine` — deliberately duplicated in shape rather
  * than abstracted, since the two mechanisms' binding shapes (interface
@@ -19,7 +20,7 @@ import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
  * Query: `src/rules/codeql-queries/command-dispatch/command_dispatch.ql` —
  * generic, no sample-repo class/annotation names, re-verified real at
  * whole-codebase scale 2026-08-22 (408 real bindings on the whole
- * `fineract-provider` tree, including a genuine second real dispatch
+ * its own provider-module tree, including a genuine second real dispatch
  * convention, `InteropWrapperBuilder`, found unprompted — see the query's
  * own doc comment and `docs/solution/E1-codeql-engine-evaluation.md`).
  *
@@ -46,13 +47,13 @@ export interface CodeQLDispatchBinding {
  * rather than building its own — see `codeql-database-cache.ts`'s doc
  * comment for the real silent-empty-extraction bug this fixes.
  */
-export function runCodeQLCommandDispatchResolution(sourceRoot: string, buildCommand: string): CodeQLDispatchBinding[] {
+export function runCodeQLCommandDispatchResolution(sourceRoot: string, buildCommand: string, fallbackBuildCommand?: string): CodeQLDispatchBinding[] {
   if (!fs.existsSync(COMMAND_DISPATCH_QUERY)) {
     console.warn(`[codeql-command-dispatch] WARNING: query file missing at ${COMMAND_DISPATCH_QUERY}, continuing without CodeQL command-dispatch evidence`);
     return [];
   }
 
-  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand);
+  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand, fallbackBuildCommand);
   if (!dbPath) return []; // binary/build failure already warned by the shared cache
 
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-dispatch-out-'));
@@ -70,6 +71,9 @@ export function runCodeQLCommandDispatchResolution(sourceRoot: string, buildComm
 
   const bindings = parseCommandDispatchCsv(fs.readFileSync(csvPath, 'utf8'));
   fs.rmSync(workDir, { recursive: true, force: true });
+  if (bindings.length === 0) {
+    console.log('[codeql-command-dispatch] query ran cleanly, 0 real dispatch bindings found (not a failure — see WARNING above if the database/query itself failed)');
+  }
   return bindings;
 }
 

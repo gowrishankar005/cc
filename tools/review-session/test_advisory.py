@@ -1,8 +1,9 @@
 """Tests for advisory.py (T-RT-4). Tests parse_and_validate_response and
 process_advisory_batch -- the actual guardrails -- against SYNTHETIC raw-
-response text, never a live model call (no ANTHROPIC_API_KEY in this
-environment; see advisory.py's own module docstring for the honest
-disclosure this shares with draft_tier_b.py)."""
+response text, never a live model call in this suite itself (T-1,
+AGENT_TASKS_Residual_Assist_Redesign.md, already exercised the real
+`claude` CLI backend live and separately; see advisory.py's own module
+docstring for the full disclosure)."""
 
 import json
 import os
@@ -110,6 +111,26 @@ class TestParseAndValidateResponse(unittest.TestCase):
         result = parse_and_validate_response(raw, RESIDUAL)
         self.assertEqual(result["outcome"], "advised", result.get("reason"))
 
+    # Regression test (found live during T-2's dossier.py work, 2026-08-23,
+    # BACKLOG.md): residual.evidenceRefs is genuinely EMPTY for whole-unit
+    # trigger classes (e.g. S2-http-without-security-control) -- the real
+    # evidence lives on the unit's own evidenceRefs in unit_index instead.
+    # A response citing that unit-level evidence must not be spuriously
+    # rejected as "not in the pack".
+    def test_ref_only_on_unit_index_not_residual_evidence_refs_is_accepted(self):
+        residual_with_empty_refs = dict(RESIDUAL, evidenceRefs=[])
+        unit_index = {"svc.py": {"kind": "service", "confidence": 100, "evidenceRefs": ["svc.py:10"]}}
+        raw = json.dumps({"explanation": "svc.py:10 shows the route with no auth control.", "hypotheses": [], "catalogue_rule_candidate": None})
+        result = parse_and_validate_response(raw, residual_with_empty_refs, unit_index)
+        self.assertEqual(result["outcome"], "advised", result.get("reason"))
+
+    def test_ref_on_neither_residual_nor_unit_index_still_rejected(self):
+        residual_with_empty_refs = dict(RESIDUAL, evidenceRefs=[])
+        unit_index = {"svc.py": {"kind": "service", "confidence": 100, "evidenceRefs": ["svc.py:10"]}}
+        raw = json.dumps({"explanation": "ghost.py:1 shows a route.", "hypotheses": [], "catalogue_rule_candidate": None})
+        result = parse_and_validate_response(raw, residual_with_empty_refs, unit_index)
+        self.assertEqual(result["outcome"], "invalid_response")
+
     # --- catalogue_rule_candidate shape validation ---
     def test_candidate_missing_field_rejected(self):
         bad = dict(GOOD_CANDIDATE)
@@ -169,10 +190,10 @@ class TestBuildAdvisoryPrompt(unittest.TestCase):
 
 class TestProcessAdvisoryBatch(unittest.TestCase):
     def test_advisory_attached_never_mutates_input_dict(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "advised", "explanation": "e", "hypotheses": ["h"], "catalogue_rule_candidate": None}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertNotIn("advisory", RESIDUAL, "the input residual dict must never be mutated in place")
         self.assertIn("advisory", updated[0])
         self.assertEqual(updated[0]["advisory"]["explanation"], "e")
@@ -182,10 +203,10 @@ class TestProcessAdvisoryBatch(unittest.TestCase):
         self.assertEqual(candidates, [])
 
     def test_candidate_appended_with_episode_metadata(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "advised", "explanation": "e", "hypotheses": [], "catalogue_rule_candidate": GOOD_CANDIDATE}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertEqual(len(candidates), 1)
         self.assertEqual(candidates[0]["status"], "proposed")
         self.assertEqual(candidates[0]["sourceResidualId"], "R-001")
@@ -195,29 +216,29 @@ class TestProcessAdvisoryBatch(unittest.TestCase):
     def test_duplicate_candidate_id_within_batch_refused_not_overwritten(self):
         residual2 = dict(RESIDUAL, id="R-002")
 
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "advised", "explanation": "e", "hypotheses": [], "catalogue_rule_candidate": GOOD_CANDIDATE}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL, residual2], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL, residual2], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertEqual(len(candidates), 1, "only the FIRST residual's candidate should be written -- the second must be refused, not silently overwrite it")
         outcomes = {e["residualId"]: e["outcome"] for e in episodes}
         self.assertEqual(outcomes["R-001"], "advised")
         self.assertEqual(outcomes["R-002"], "candidate_id_collision")
 
     def test_no_key_outcome_logged_not_treated_as_advised(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "no_key", "reason": "no ANTHROPIC_API_KEY set -- nothing advised"}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, None, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertNotIn("advisory", updated[0])
         self.assertEqual(episodes[0]["outcome"], "no_key")
         self.assertEqual(candidates, [])
 
     def test_invalid_response_outcome_never_attaches_advisory(self):
-        def fake_advise_fn(residual, unit_index, packs, api_key):
+        def fake_advise_fn(residual, unit_index, packs):
             return {"outcome": "invalid_response", "reason": "malformed"}
 
-        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, "fake-key", advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
+        updated, episodes, candidates = process_advisory_batch([RESIDUAL], {}, {}, advise_fn=fake_advise_fn, now_fn=lambda: "2026-08-20T00:00:00Z", id_fn=lambda: "AE-1")
         self.assertNotIn("advisory", updated[0])
         self.assertEqual(episodes[0]["outcome"], "invalid_response")
 
@@ -276,9 +297,14 @@ class TestNoKeyCliPath(unittest.TestCase):
     def test_no_key_writes_nothing_and_exits_zero(self):
         env = dict(os.environ)
         env.pop("ANTHROPIC_API_KEY", None)
+        # T-1 (AGENT_TASKS_Residual_Assist_Redesign.md): neutralize PATH so
+        # this proves "no backend at all," not "no API key, but `claude`
+        # happens to be on this machine's PATH" -- deterministic regardless
+        # of the environment this test runs in.
+        env["PATH"] = ""
         run = subprocess.run([sys.executable, str(TOOLS_DIR / "advisory.py"), "--session-dir", str(self.session_dir)], capture_output=True, text=True, env=env)
         self.assertEqual(run.returncode, 0, run.stderr)
-        self.assertIn("no ANTHROPIC_API_KEY set", run.stdout)
+        self.assertIn("no LLM backend available", run.stdout)
         self.assertIn("R-999-synthetic", run.stdout)
         residuals_after = json.loads((self.session_dir / "residuals.json").read_text())
         self.assertNotIn("advisory", residuals_after["items"][0], "no-key path must never attach advisory")
@@ -297,6 +323,12 @@ class TestNoKeyCliPath(unittest.TestCase):
         (self.session_dir / "residuals.json").write_text(json.dumps({"generatedAt": "x", "items": [dict(RESIDUAL, id="R-999-synthetic"), residual2]}))
         env = dict(os.environ)
         env.pop("ANTHROPIC_API_KEY", None)
+        # This test is about --residual filtering reaching the no-key path
+        # for the right id, not about exercising a live backend -- strip
+        # PATH so it stays deterministic regardless of what's installed
+        # on the machine running it (T-1, same reasoning as the no-key test
+        # above).
+        env["PATH"] = ""
         run = subprocess.run([sys.executable, str(TOOLS_DIR / "advisory.py"), "--session-dir", str(self.session_dir), "--residual", "R-999-synthetic"], capture_output=True, text=True, env=env)
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertIn("R-999-synthetic", run.stdout)

@@ -118,7 +118,7 @@ export function extractDecoratorFacts(cg: any, packageRoot: string, relativeFile
 }
 
 /**
- * AREC Wave 3 T-D1 — the call-site sibling of extractDecoratorFacts(),
+ * The call-site sibling of extractDecoratorFacts(),
  * filtering the SAME extractFromSource() result for `referenceKind ===
  * 'calls'` instead of 'decorates'. Verified real (not assumed) against two
  * fixtures before building the catalogue rows: a reference Java/JAX-RS banking platform's
@@ -185,7 +185,7 @@ export function extractCallFacts(cg: any, packageRoot: string, relativeFilePath:
 }
 
 /**
- * AREC Wave 3 T-E1 — closes messaging-detection-catalogue.yml's
+ * Closes messaging-detection-catalogue.yml's
  * "typed-field-producer" gap (previously `status: not-implemented`,
  * honestly named as needing "call-based typed-field usage detection, a
  * mechanism this pipeline has never built"). Real evidence, verified via a
@@ -229,7 +229,7 @@ export function extractTypeReferenceFacts(cg: any, packageRoot: string, relative
 }
 
 /**
- * AREC Wave 3 T-E3 — closes persistence-detection-catalogue.yml's
+ * Closes persistence-detection-catalogue.yml's
  * `spring-data-repository` gap. Real evidence, verified via a direct probe
  * before writing the catalogue row: a reference Java/JAX-RS banking platform's `ChargeRepository.java`
  * (`interface ChargeRepository extends JpaRepository<Charge, Long>,

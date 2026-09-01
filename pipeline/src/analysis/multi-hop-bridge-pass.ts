@@ -3,11 +3,11 @@ import { detectMultiHopBridgeRelationships } from './cross_package/multi-hop-bri
 import { bridgeStereotypeSignals } from '../rules/rule-schema';
 
 /**
- * AREC Wave 3 T-C1 (R2). Reuses the SAME ctx.crossPackageRun detectPersistencePass
+ * R2 multi-hop bridge resolution. Reuses the SAME ctx.crossPackageRun detectPersistencePass
  * already produced (no re-run) — a no-op when that pass didn't run/failed,
  * same graceful-degradation convention as reconcilePass/k8sTrustPass.
  *
- * T-P0-1 (E2) round 3 — now runs BEFORE reconcilePass (both append to
+ * Now runs BEFORE reconcilePass (both append to
  * ctx.relationships, which is safe in either order on its own), so that
  * ctx.multiHopExaminedPairs is populated before reconcilePass's graded-fact
  * admission logic runs. Without this, admission raced this detector for the

@@ -6,7 +6,7 @@ Sources: `01-business-challenge.md` §7 / §13, `02-solution-architecture.md`.
 
 **T-CL-1 is treated as complete.** Implementation lives on
 `feature/contract-lifecycle` (worktree
-`/Users/gowri/Innovation/arch_weaver-contract-lifecycle`, uncommitted as of
+`<repo-parent>/arch_weaver-contract-lifecycle`, uncommitted as of
 this audit; claim row `T-CL-1-fact-identity`). This checkout
 (`feature/semantic-model-extension` @ `ed41720`) does **not** yet contain
 that code. **Merge that worktree before starting T-CL-2 here.**

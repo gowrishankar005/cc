@@ -15,7 +15,7 @@ Use this to pick the next session.
 |---|---|---|
 | **A** Lens | `T-LM-2` resilience lens (scored). `T-LM-0` already done. `T-LM-5` fitness declaration done (2026-08-18, own commit) | `T-LM-1` no CVE feed; `T-LM-3` no data-classification facts; `T-LM-4` no cost feed — all three correctly stay gated |
 | **B** Fact Semantics | `T-FS-1` Tier-B residuals; `T-FS-3` contradiction detection; `T-FS-6` status vocabulary; `T-FS-4` secondary-source introduction — all done, 2026-08-18, own commits (not part of the original A/B/C merge). `T-FS-2` was already done; `T-FS-5` skipped | **B's entire task list is now closed** |
-| **C** Layered Recovery | `T-LR-3` stereotype-disambiguated bridges (+ Waltz second instance) | `T-LR-4` **confirmed blocked on T-LR-5** (neither engine sees `@Bean` `new X(...)`) |
+| **C** Layered Recovery | `T-LR-3` stereotype-disambiguated bridges (+ reference-governance-platform second instance) | `T-LR-4` **confirmed blocked on T-LR-5** (neither engine sees `@Bean` `new X(...)`) |
 
 ---
 

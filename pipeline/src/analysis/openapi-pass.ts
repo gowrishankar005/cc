@@ -9,7 +9,7 @@ const ROUTE_WEIGHT = 40; // matches nativeRouteWeight's convention in signal-map
 const SECURITY_SCHEME_WEIGHT = 20; // corroboration tier, matches jpa-table's weight — a securityScheme names an auth mechanism but isn't itself proof it's enforced on a given operation
 
 /**
- * AREC Wave 3 T-E4 (C-contract expand) — derives a generic, spec-vocabulary
+ * Derives a generic, spec-vocabulary
  * signal from a securityScheme's real `type`/`scheme` fields, e.g.
  * "http-bearer" for `{type: http, scheme: bearer}`, "apiKey" for
  * `{type: apiKey}`. Falls back to the scheme's own type string (or
@@ -23,7 +23,7 @@ function openApiSecuritySchemeSignal(scheme: OpenApiSecurityScheme): string {
 }
 
 /**
- * AREC Wave 3 T-E4 (trap card T8, coe-lab/docs/trap-gold-backlog.md) —
+ * Trap card T8 (coe-lab/docs/trap-gold-backlog.md) —
  * normalizes a route path so a code-derived signal ("GET /users/:id",
  * NestJS/Express-style) and an OpenAPI signal ("GET /users/{id}") can be
  * compared for real overlap without caring whether the param NAME matches
@@ -40,12 +40,11 @@ function normalizeRouteSignal(signal: string): string {
 }
 
 /**
- * T-X4-1 — turns discoverOpenApiDocuments()'s raw parse into TypedUnits +
- * Evidence, the "Scanner provider -> TypedFacts" flow this task requires
- * (not a calm-only parse — CALM Generator never touches openapi-provider.ts
- * directly).
+ * Turns discoverOpenApiDocuments()'s raw parse into TypedUnits +
+ * Evidence (not a calm-only parse — CALM Generator never touches
+ * openapi-provider.ts directly).
  *
- * AREC Wave 3 T-E4 — closes the "path-to-unit correlation is real future
+ * Closes the "path-to-unit correlation is real future
  * work" gap this pass's own header comment used to name (trap card T8: a
  * package with both openapi.yaml AND a real NestJS controller implementing
  * the same routes produced TWO standalone `service` nodes for one real

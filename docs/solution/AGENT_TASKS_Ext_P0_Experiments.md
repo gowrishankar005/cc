@@ -31,7 +31,7 @@ not blocked on E3/E4/E5.
 | Task | Status | Depends on | Parallel? | Acceptance |
 |---|---|---|---|---|
 | **T-P0-0 Baseline** | **Done** — `baseline-2026-08-13.md` | — | — | `npm test` 64/0/25 + scoreboard committed as `baseline-<date>.md`. Nothing else starts first |
-| **T-P0-1 E2 fact admission** | **Done, shipped 2026-08-14 (round 3)** — `E2-graded-fact-admission-experiment.md` | T-P0-0 | Yes (with T-P0-2) | Recall ↑ at L2 measured (yes — real facts recovered against Fineract/Ghostfolio); **must-not-detect trap holds**; R1 lock intact; `E-charge-single-L2` still fails *for the right reason* (no fabricated edge); false-positive cost stated as a number (0, full suite green) |
+| **T-P0-1 E2 fact admission** | **Done, shipped 2026-08-14 (round 3)** — `E2-graded-fact-admission-experiment.md` | T-P0-0 | Yes (with T-P0-2) | Recall ↑ at L2 measured (yes — real facts recovered against the reference banking platform/Ghostfolio); **must-not-detect trap holds**; R1 lock intact; `E-charge-single-L2` still fails *for the right reason* (no fabricated edge); false-positive cost stated as a number (0, full suite green) |
 | **T-P0-2a Engine licensing check** `CON-20` | **Done** — resolved for OSS eval + confirmed enterprise procurement path. Full memo at `soln/codeql-licensing-check-memo.md` (gitignored local scratch — see the durable summary immediately below this table, kept in sync with the memo since `soln/` cannot travel with the repo) | — | Yes | **Do this before T-P0-2 spends effort.** Confirm the engine's licence permits use against private/commercial source at the target's scale. Free for public/OSS repos does not imply free for an enterprise monorepo. A licence blocker here invalidates the whole E1 lane — cheapest possible thing to check first |
 | **T-P0-2 E1 prerequisites** | **Done** — CodeQL 2.26.3, `spikes/` populated, CON-10 resolved | T-P0-2a | Yes | CodeQL CLI installed and verified; sample cloned to `spikes/` (never committed); `graphifyy` on PATH; **Java build of the sample succeeds** (`CON-10` — the step that blocked prior attempts) |
 | **T-P0-3 E1 engine evaluation** | **Done, positive** — `E1-codeql-engine-evaluation.md`, 7/7 real edges, 0 false positives, fully generic | T-P0-2 | No | Reproduces the hand-verified dispatch join on a real database **and** the detector is generic — no sample-repo class/package names (`OOS-sample-repo-detectors`). This fires `OOS-command-bus`'s revisit trigger; report in its terms |
@@ -51,8 +51,8 @@ private enterprise monorepo, so CodeQL cannot be adopted as a live
 
 **Why the E1/E1b evaluation work (`E1-codeql-engine-evaluation.md`,
 `E1b-codeql-di-resolution-experiment.md`) was still in scope:** all four
-`spikes/` repos used for evaluation (`apache/fineract`,
-`GoogleCloudPlatform/bank-of-anthos`, `ghostfolio/ghostfolio`, `finos/waltz`)
+`spikes/` repos used for evaluation (a reference Java/JAX-RS banking platform,
+`GoogleCloudPlatform/bank-of-anthos`, `ghostfolio/ghostfolio`, a reference Java governance platform)
 are real, public, OSS-licensed — exactly the case the free tier permits
 without restriction. Evaluation needed no GHAS license; production adoption
 against an enterprise repo does.

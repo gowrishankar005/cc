@@ -3,7 +3,7 @@
 | # | Requirement | Delivered in |
 |---|---|---|
 | R1 | Isolated from platform implementation bias | `ISOLATION.md`, `gold/README.md`, root ignores |
-| R2 | Research-backed package portfolio (fintech + Fidelity menu) | `docs/fidelity-and-fintech-stack-research.md` |
+| R2 | Research-backed package portfolio (fintech + target-customer menu) | `docs/fidelity-and-fintech-stack-research.md` |
 | R3 | Authored architecture as gold | `gold/packages/*.gold.json` + schema |
 | R4 | Minimal honest fixtures | `fixtures/monorepo/packages/*` |
 | R5 | Multi-language (Java, Python, TS) | package catalog |
@@ -27,7 +27,7 @@ Lab results are **trustworthy as gates** only when:
 2. `lib-fintech-common` has zero must-not-detect violations  
 3. Multi-root Python score exists  
 4. Stretch failures map to `expectedPlatformGaps` or a new gap class  
-5. Wild-type regression (BoA/Fineract) still passes  
+5. Wild-type regression (a reference Java microservices banking sample / a reference Java/JAX-RS banking platform) still passes  
 
 ## Future (lab v0.2+)
 

@@ -3,13 +3,12 @@ import * as path from 'path';
 import { parse as parseYaml } from 'yaml';
 
 /**
- * T-X4-1 — static OpenAPI/Swagger discovery + parse. Deliberately NOT
+ * Static OpenAPI/Swagger discovery + parse. Deliberately NOT
  * annotation-driven (springdoc-style generated-at-build-time specs are a
- * named, honest gap
- * §8.4 — not silently claimed covered). Scanner provider only: file
- * discovery + structural parse, no TypedFacts construction here (that's
- * analysis/openapi-pass.ts, per the task's own "Scanner provider ->
- * TypedFacts, not calm-only parse" integrity home).
+ * named, honest gap, not silently claimed covered). Scanner provider only:
+ * file discovery + structural parse, no TypedFacts construction here
+ * (that's analysis/openapi-pass.ts — scanner produces facts, analysis
+ * builds TypedFacts, not a calm-only parse shortcut).
  */
 const OPENAPI_FILENAMES = ['openapi.yaml', 'openapi.yml', 'openapi.json', 'swagger.yaml', 'swagger.yml', 'swagger.json'];
 const SKIP_DIRS = new Set(['node_modules', '.git', '.codegraph', '.graphify-cache', 'graphify-out']);
@@ -20,7 +19,7 @@ export interface OpenApiOperation {
 }
 
 /**
- * AREC Wave 3 T-E4 (C-contract expand) — real structural fields, not just
+ * Real structural fields, not just
  * the scheme's user-chosen NAME (`bearerAuth`, `myAuth`, `jwt`, ... — the
  * author picks this string freely, so matching on it can never generalize
  * across real specs). `type`/`scheme` are the actual OpenAPI/Swagger
@@ -75,7 +74,7 @@ function parseOpenApiFile(absPath: string): { title?: string; paths?: Record<str
   return { title, paths, securitySchemes };
 }
 
-/** Discovers and parses every OpenAPI/Swagger file under packageRoot. Empty array (not an error) when none exist — "run without file ok" per T-X4-1's own acceptance. */
+/** Discovers and parses every OpenAPI/Swagger file under packageRoot. Empty array (not an error) when none exist — "run without file ok" is the expected, correct behavior. */
 export function discoverOpenApiDocuments(packageRoot: string): OpenApiDocument[] {
   return findOpenApiFiles(packageRoot).map((absPath) => {
     const relativeFilePath = path.relative(packageRoot, absPath);

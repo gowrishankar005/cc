@@ -3,7 +3,7 @@ import { bandFor } from './confidence-scorer';
 import { CONTRADICTION_PREFIX } from './cross_package/contradiction-detector';
 
 /**
- * T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — assigns FactStatus to
+ * Status vocabulary (BACKLOG.md) — assigns FactStatus to
  * every unit and relationship from signals this run has already computed
  * (kind, confidence band, evidence source, relationship mechanism/source) —
  * no new extraction mechanism, same "derive from existing facts" class as
@@ -31,8 +31,8 @@ function statusForUnit(unit: TypedUnit, contradictedUnitIds: Set<string>): FactS
   // unclassified counterpart carries no Evidence at all by construction —
   // never 'observed'/'externally-verified' from code alone.
   if (unit.kind === 'unresolved') return 'requires-review';
-  // T-FS-4 (BACKLOG.md "Secondary sources may introduce facts, not only
-  // corroborate") / T-LR-5 — a unit a secondary/tertiary source introduced
+  // Secondary sources may introduce facts, not only
+  // corroborate (BACKLOG.md) — a unit a secondary/tertiary source introduced
   // with NO primary/code evidence at all (its entire evidence array comes
   // from a source that only ever CORROBORATES or INTRODUCES, never a
   // primary detection mechanism: cdxgen's SBOM reading, or CodeQL's
@@ -46,7 +46,7 @@ function statusForUnit(unit: TypedUnit, contradictedUnitIds: Set<string>): FactS
   // reader, not because the two conditions can both fire.
   const SECONDARY_ONLY_SOURCES = ['dependency-manifest', 'codeql-di'];
   if (unit.evidence.every((e) => SECONDARY_ONLY_SOURCES.includes(e.source))) return 'requires-review';
-  // T-FS-3 — a real, unresolved disagreement between two evidence sources
+  // A real, unresolved disagreement between two evidence sources
   // about the same fact overrides the confidence band: the band measures
   // HOW MUCH evidence exists, not whether it agrees with itself.
   if (contradictedUnitIds.has(unit.id)) return 'requires-review';
@@ -61,7 +61,7 @@ function statusForRelationship(rel: TypedRelationship, statusById: Map<string, F
   // k8s-manifest-sourced (shares-secret) — confirmed against a real deployed
   // manifest, not inferred from static code reading.
   if (rel.source === 'k8s') return 'externally-verified';
-  // T-MR-2 — a cross-repo join is never confirmed by this run's own code
+  // A cross-repo join is never confirmed by this run's own code
   // reading of BOTH sides (only the local root was actually scanned; the
   // other side is a manifest declaration this run trusts but cannot
   // verify). "Review status at best" (this task's own acceptance text) is
@@ -69,7 +69,7 @@ function statusForRelationship(rel: TypedRelationship, statusById: Map<string, F
   // checked here, before any tier-specific signal, so even a Tier-1
   // shared-API-spec-identity match never reads 'externally-verified'.
   if (rel.source === 'repo-manifest') return 'requires-review';
-  // T-P0-1 (E2) — admitted with a synthesized unresolved-endpoint placeholder
+  // Admitted with a synthesized unresolved-endpoint placeholder
   // on one side; the same hard rule as an unresolved unit applies to the
   // edge that anchors to one.
   if (rel.mechanism === 'admitted-unresolved') return 'requires-review';

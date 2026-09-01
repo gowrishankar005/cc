@@ -2,7 +2,7 @@
   "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
   "unique-id": "coe-lab-deploy-k8s-trust",
   "name": "CoE Lab \u2014 K8s JWT Trust",
-  "description": "Hand-authored gold for Bank of Anthos\u2013class shared jwt-key Secret: accounts_api (issuer, private key mount) and ledger_api (verifier, public key mount) trust via shared secret material.",
+  "description": "Hand-authored gold for a reference Java microservices banking sample's class of shared jwt-key Secret: accounts_api (issuer, private key mount) and ledger_api (verifier, public key mount) trust via shared secret material.",
   "metadata": [
     {
       "key": "x-lab-gold-source",

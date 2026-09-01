@@ -12,7 +12,7 @@ Update **Status** as packages move: `queued` → `gold-wip` → `gold-done` → 
 
 | Sample | Path | Approx scale | Languages | Notes |
 |---|---|---|---|---|
-| **boa** | `spikes/boa/repo` | ~35 Java, ~20 Python | Java, Python, k8s | Bank of Anthos; good R1 / k8s trust |
+| **refbank** | `spikes/refbank/repo` | ~35 Java, ~20 Python | Java, Python, k8s | a reference Java microservices banking sample; good R1 / k8s trust |
 | **calm-hub** | `spikes/calm-hub/repo` | ~434 Java | Java (Quarkus-class) | FINOS CALM Hub; distinct stack |
 | **fineract** | `spikes/fineract/repo` | ~6600+ Java | Java | Large; use **module slices**, not whole tree |
 | **ghostfolio** | `spikes/ghostfolio/repo` | ~820 TS/TSX | TypeScript/Nest | Prisma / Node; ontology evidence |
@@ -31,9 +31,9 @@ One clone → one or more **package-ids** (scoped roots). Prefer deep slices.
 | `fineract-charge` | `spikes/fineract/repo/fineract-charge` | single | yes | compared (prior) | re-baseline only if claims change |
 | `fineract-charge-provider` | charge + provider | multi | yes (access-layer) | layered-story track | coordinate with L-story; don’t duplicate |
 | `fineract-core` | `…/fineract-core` | single | yes | compared (prior) | optional recheck |
-| `boa-userservice` | TBD (accounts userservice path) | single | no | **queued** | high (R1 / Python) |
-| `boa-contacts` | TBD | single | no | **queued** | high |
-| `boa-multi` | userservice + contacts | multi | no | **queued** | high (cross-package) |
+| `refbank-userservice` | TBD (accounts userservice path) | single | no | **queued** | high (R1 / Python) |
+| `refbank-contacts` | TBD | single | no | **queued** | high |
+| `refbank-multi` | userservice + contacts | multi | no | **queued** | high (cross-package) |
 | `waltz-data` | TBD waltz-data module | single | no | **queued** | high (jOOQ) |
 | `waltz-web` | TBD waltz-web | single | no | **queued** | medium (C-call / RBAC) |
 | `ghostfolio-api` | TBD apps/api slice | single | no | **queued** | high (Nest/Prisma) |
@@ -61,4 +61,4 @@ One clone → one or more **package-ids** (scoped roots). Prefer deep slices.
 | Date | Note |
 |---|---|
 | 2026-08-08 | Hard-test #3 **aws-saas-boost-tenant-service** compared — generalizes WDL-1; HT-ASB-002 not reproduced (handler has no Dynamo import) |
-| 2026-08-08 | Initial registry from local spikes inventory; Fineract gold already present |
+| 2026-08-08 | Initial registry from local spikes inventory; a reference Java/JAX-RS banking platform's gold already present |

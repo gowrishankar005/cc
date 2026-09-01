@@ -2,7 +2,7 @@
   "packageId": "deploy-k8s-trust",
   "goldVersion": "0.1.0",
   "tier": "stretch",
-  "description": "Two deployments share jwt-key secret — trust relationship (Bank of Anthos class).",
+  "description": "Two deployments share jwt-key secret — trust relationship (a reference Java microservices banking sample class).",
   "platformMinContract": "1.0.0",
   "fixturePath": "fixtures/monorepo/deploy/k8s",
   "changelog": "v0.1.0 initial",

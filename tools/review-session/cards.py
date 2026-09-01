@@ -13,6 +13,8 @@ run's own facts — never an invented/fabricated node name.
 
 from __future__ import annotations
 
+import re
+
 OTHER_OPTION = {"key": "other", "label": "Other…", "detail": "free text — requires a 1-line rationale, captured verbatim into the Decision Record"}
 LEAVE_OPEN_OPTION = {"key": "leave-open", "label": "Leave open", "detail": "insufficient confidence to decide now — stays flagged for a future session"}
 
@@ -81,6 +83,35 @@ def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) 
     ]
 
 
+def _catalogue_candidate_options(residual: dict, unit_index: dict) -> list[dict]:
+    """Unmapped-signal cluster: catalogue lane first (S11), optional
+    one-off construct only if a packed sample already names a real unit —
+    never auto-merge signal-catalogue.yml."""
+    return [
+        {"key": "1", "label": "Catalogue-rule candidate", "detail": "propose a signal-catalogue.yml row (suggest-rules lane) — not a one-off CALM node"},
+        {"key": "2", "label": "One-off construct from a packed sample", "detail": "only if a sample ref in this pack already names a real unit — HITL still applies"},
+        {"key": "3", "label": "Ignore this cluster for this run", "detail": "document as not-in-scope / noise for this scan"},
+    ]
+
+
+def _insufficient_evidence_options(residual: dict, unit_index: dict) -> list[dict]:
+    """Ignored INSUFFICIENT_EVIDENCE leftover (not an unmapped catalogue miss)."""
+    return [
+        {"key": "1", "label": "Promote — the snippet is enough to type/connect this unit", "detail": "draft a CALM construct only from packed evidence; otherwise cannot_decide"},
+        {"key": "2", "label": "Confirmed insufficient — leave as a known gap", "detail": "scope-limitation, not a fabricated node"},
+        {"key": "3", "label": "Need a bounded extra-read", "detail": "architect runs pack.py fetch-span for this residual — Copilot does not read the repo"},
+    ]
+
+
+def _ambiguous_boundary_options(residual: dict, unit_index: dict) -> list[dict]:
+    """Ignored AMBIGUOUS_BOUNDARY leftover (not a T-FS-3 contradiction)."""
+    return [
+        {"key": "1", "label": "Pick the boundary named in the packed evidence", "detail": "only if exactly one candidate is named in this residual's snippet"},
+        {"key": "2", "label": "Leave ambiguous — do not pick", "detail": "0 or 2+ candidates → cannot_decide, same as R2"},
+        {"key": "3", "label": "Need a bounded extra-read", "detail": "architect runs pack.py fetch-span for this residual — Copilot does not read the repo"},
+    ]
+
+
 def _contradicting_evidence_options(residual: dict, unit_index: dict) -> list[dict]:
     """T-FS-3: two real evidence sources assert DIFFERENT values for the
     same fact (e.g. a k8s deployment manifest names one datastore engine,
@@ -102,6 +133,9 @@ _CLASS_TEMPLATES = {
     "missing-intermediates-not-in-scan": _missing_intermediates_options,
     "single-candidate-below-threshold": _single_candidate_below_threshold_options,
     "contradicting-evidence": _contradicting_evidence_options,
+    "catalogue-candidate": _catalogue_candidate_options,
+    "insufficient-evidence": _insufficient_evidence_options,
+    "ambiguous-boundary": _ambiguous_boundary_options,
 }
 
 
@@ -117,9 +151,36 @@ def build_options(residual: dict, unit_index: dict) -> list[dict]:
     return options
 
 
-def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict, similar_ids: list[str]) -> str:
+def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict, similar_ids: list[str], context_lines: int = 15, evidence_paths: dict | None = None) -> str:
     """§4.4: renders as ordinary Copilot Chat markdown — numbered options,
-    an evidence blockquote, a follow-up reply of a key or 'other: ...'."""
+    an evidence blockquote, a follow-up reply of a key or 'other: ...'.
+    context_lines must match whatever pack.py actually used to build
+    evidence_packs's snippets (default 15 = pack.py's own
+    DEFAULT_CONTEXT_LINES) -- see _anchor_line_preview's own docstring for
+    why this has to agree with the real build-time value.
+
+    evidence_paths (Architect_Pilot_Feedback_Notes.md Entry 20): optional
+    ref -> REPO_ROOT-relative "path:line" map from pack.py's
+    _build_evidence_packs. When present for a ref, the evidence line shows
+    that real, VS-Code-workspace-openable path instead of the raw scan ref
+    (which is only relative to whichever package root produced it, not to
+    the workspace root an architect has open). Optional and defaulted so
+    every existing caller/test that only ever passed a bare ref->snippet
+    dict keeps working unchanged.
+
+    Architect_Pilot_Feedback_Notes.md Entry 23: the "My read (not a
+    decision):" recommendation paragraph is rendered HERE, deterministically,
+    from residual["dossier"] (dossier.py's own validated {explanation,
+    hypotheses, evidenceRefsUsed} shape, attached by pack.py's
+    _run_dossier_pass BEFORE cards are built when --with-dossier is set) --
+    it is never left to the live chat model to author on demand. Two real,
+    live-reproduced attempts (Entries 21/22) showed that asking the ambient
+    chat model to freshly generate a grounded paragraph on every card is
+    unreliable, the same class of problem dossier.py's own structured-
+    response validation exists to avoid for exactly this reason. When no
+    dossier is present (no --with-dossier, or no LLM backend at pack-build
+    time), the card says so plainly instead of asking the chat model to
+    invent one."""
     options = build_options(residual, unit_index)
     lines = [
         f"### {residual['id']} (Tier {residual['tier']}: {residual['class']})",
@@ -131,13 +192,16 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
         lines.append(f"- **[{opt['key']}]** {opt['label']} — {opt['detail']}")
     lines.append("")
 
-    evidence_lines = _evidence_lines(residual, unit_index, evidence_packs)
+    evidence_lines = _evidence_lines(residual, unit_index, evidence_packs, context_lines, evidence_paths)
     if evidence_lines:
         lines.append("**Evidence:**")
         for e in evidence_lines:
             lines.append(f"> {e}")
     else:
         lines.append("**Evidence:** none captured for this residual's unit(s) in this pack.")
+    lines.append("")
+
+    lines.append(_dossier_block(residual.get("dossier")))
     lines.append("")
 
     if similar_ids:
@@ -148,9 +212,77 @@ def render_card_markdown(residual: dict, unit_index: dict, evidence_packs: dict,
     return "\n".join(lines)
 
 
-def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> list[str]:
+def _dossier_block(dossier: dict | None) -> str:
+    """Renders dossier.py's own validated {explanation, hypotheses,
+    evidenceRefsUsed} shape as the card's "My read (not a decision):"
+    paragraph (Entry 23) -- deterministic reproduction of an already-
+    validated LLM response, never live authoring by whatever chat model is
+    reading this card. No dossier -> say so plainly; never a blank gap that
+    invites the reading model to fill it in on its own."""
+    if not dossier or not dossier.get("explanation"):
+        return "**My read (not a decision):** no evidence dossier available for this residual (run `pack.py --with-dossier` to generate one) — this is not a recommendation, decide from the evidence above."
+    lines = [f"**My read (not a decision):** {dossier['explanation']}"]
+    for h in dossier.get("hypotheses") or []:
+        lines.append(f"- {h}")
+    used = dossier.get("evidenceRefsUsed") or []
+    if used:
+        lines.append(f"  _(based on: {', '.join(used)})_")
+    return "\n".join(lines)
+
+
+_REF_RE = re.compile(r"^(.*):(\d+)$")
+
+
+def _anchor_line_preview(ref: str, snippet: str, context_lines: int) -> str:
+    """Real bug found live (Architect_Pilot_Feedback_Notes.md Entry 19):
+    evidence_packs[ref] is a multi-line CONTEXT WINDOW built by pack.py's
+    _read_snippet/_window_for_line -- context_lines before AND after the
+    ref's own claimed line, not starting at that line. The old code just
+    took the snippet's first non-blank line as "the evidence at this
+    ref," which is almost always context padding, not the actual match
+    (confirmed: a real "Column" cluster ref showed an unrelated import
+    line instead of the real @Column(...) annotation 15 lines later).
+
+    Recomputes the SAME window-start math pack.py's own _window_for_line
+    uses (start = max(0, line - 1 - context_lines)) to find the anchor
+    line's own position within the snippet, without needing pack.py's
+    n_lines (this repo's default context_lines=15 never triggers
+    _window_for_line's own MAX_SNIPPET_WINDOW re-centering, since
+    15+15+1=31 <= 40 -- only a much larger custom --context-lines would).
+    Falls back to the old first-non-blank-line heuristic whenever the
+    computed index doesn't land inside the actual snippet -- e.g. a
+    custom context_lines that DID trigger re-centering, or a
+    synthetic/test snippet that isn't a real windowed capture -- rather
+    than indexing out of bounds or guessing."""
+    lines = snippet.splitlines()
+    m = _REF_RE.match(ref)
+    if m:
+        line_1indexed = int(m.group(2))
+        window_start = max(0, line_1indexed - 1 - context_lines)
+        anchor_idx = (line_1indexed - 1) - window_start
+        if 0 <= anchor_idx < len(lines) and lines[anchor_idx].strip():
+            return lines[anchor_idx]
+    return next((line for line in lines if line.strip()), "")
+
+
+def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict, context_lines: int = 15, evidence_paths: dict | None = None) -> list[str]:
     seen_refs = set()
     out = []
+    evidence_paths = evidence_paths or {}
+
+    def _add(ref: str) -> None:
+        if not ref or ref in seen_refs:
+            return
+        seen_refs.add(ref)
+        snippet = evidence_packs.get(ref)
+        if not snippet:
+            return
+        preview = _anchor_line_preview(ref, snippet, context_lines)
+        label = evidence_paths.get(ref, ref)
+        out.append(f"`{label}`: {preview}")
+
+    for ref in residual.get("evidenceRefs") or []:
+        _add(ref)
     for unit_id in residual.get("unitIds", []):
         unit = unit_index.get(unit_id)
         if not unit:
@@ -160,14 +292,7 @@ def _evidence_lines(residual: dict, unit_index: dict, evidence_packs: dict) -> l
         # the same line) — real, not a bug in the underlying data, but the
         # card must show each ref once, not once per evidence entry.
         for ref in unit.get("evidenceRefs", []):
-            if ref in seen_refs:
-                continue
-            seen_refs.add(ref)
-            snippet = evidence_packs.get(ref)
-            if not snippet:
-                continue
-            preview = next((line for line in snippet.splitlines() if line.strip()), "")
-            out.append(f"`{ref}`: {preview}")
+            _add(ref)
     return out
 
 
@@ -182,14 +307,17 @@ def group_by_class(residuals: list[dict]) -> dict[tuple, list[str]]:
     return groups
 
 
-def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict) -> dict:
+def build_all_cards(residuals: list[dict], unit_index: dict, evidence_packs: dict, context_lines: int = 15, evidence_paths: dict | None = None) -> dict:
     """Returns {residual_id: markdown_card}. Also computes the real
     'similar residuals' grouping (same tier+class), shared across all cards
-    in the group — not per-card in isolation."""
+    in the group — not per-card in isolation. context_lines must match
+    whatever pack.py actually used to build evidence_packs (see
+    render_card_markdown's own docstring). evidence_paths is optional (see
+    render_card_markdown's own docstring, Entry 20)."""
     groups = group_by_class(residuals)
 
     cards = {}
     for r in residuals:
         siblings = [rid for rid in groups[(r["tier"], r["class"])] if rid != r["id"]]
-        cards[r["id"]] = render_card_markdown(r, unit_index, evidence_packs, siblings)
+        cards[r["id"]] = render_card_markdown(r, unit_index, evidence_packs, siblings, context_lines, evidence_paths)
     return cards

@@ -7,29 +7,23 @@ import { UNRESOLVED_MULTI_HOP_PREFIX, TIER_B_SINGLE_CANDIDATE_PREFIX } from '../
 import { CONTRADICTION_PREFIX } from '../cross_package/contradiction-detector';
 
 /**
- * AREC Wave 3 T-E5 (review-flow-capability-map.md's own "Decision: empty-
- * neighborhood review trigger" — recommended AFTER Wave 3-S metrics exist,
- * i.e. after T-A1 shipped `coverage-report.json`'s `completeness.silenceFlags`).
- *
- * OFFLINE ONLY, deterministic, no LLM call anywhere in this file — the
- * "no core-path LLM" acceptance bar for this task, and stricter than
- * suggest-rules.ts (which at least offers an LLM backend behind an env var).
- * Never imported by orchestration/run-slice.ts or anything in its call
- * graph. A human (or, per the review-flow doc's own "LLM proposes, never
- * writes TypedFacts" rule of thumb, a FUTURE separate LLM step reading this
- * file's OUTPUT) runs this deliberately, after a scan, over that scan's own
- * artifacts. Read-only over typed-facts.json/coverage-report.json — never
- * writes to either; only ever writes a NEW file (review-queue.json).
+ * OFFLINE ONLY, deterministic, no LLM call anywhere in this file — stricter
+ * than suggest-rules.ts (which at least offers an LLM backend behind an env
+ * var). Never imported by orchestration/run-slice.ts or anything in its
+ * call graph. A human (or a future separate LLM step reading this file's
+ * OUTPUT, never writing TypedFacts directly) runs this deliberately, after
+ * a scan, over that scan's own artifacts. Read-only over
+ * typed-facts.json/coverage-report.json — never writes to either; only
+ * ever writes a NEW file (review-queue.json).
  *
  * Turns "S1/S2 fired" (a boolean-ish flag buried in coverage-report.json,
  * easy to miss) into a concrete, actionable list: WHICH units triggered it,
  * so a human reviewing a run doesn't have to re-derive that from
- * typed-facts.json by hand — exactly the "a reference Java/JAX-RS banking platform miss was exactly false
- * confidence without a flag" rationale review-flow-capability-map.md names.
+ * typed-facts.json by hand.
  *
- * Robustness T-R4-1 added a THIRD trigger, `low-architecture-coverage`
- * (see the threshold constant below for why): the original T-E5 scope only
- * ever wired in S1/S2, but T-R4-1's own goal always named "S1 fires OR arch
+ * A later pass added a THIRD trigger, `low-architecture-coverage`
+ * (see the threshold constant below for why): the original scope only
+ * ever wired in S1/S2, but the stated goal always named "S1 fires OR arch
  * coverage below threshold" — the second half was a real, unclosed gap
  * until this trigger was added, not a hypothetical extension.
  *
@@ -51,15 +45,14 @@ export interface ReviewQueueItem {
     | 'low-architecture-coverage'
     | 'S5-zero-service-units-with-store-present'
     | 'S5-cfn-routes-found-but-unbound'
-    // T-FS-1 (BACKLOG.md "Tier-B residual detection") — multi-hop-bridge-detector.ts's
-    // own 'tier-b-single-candidate' ignored-item class: exactly one real
+    // multi-hop-bridge-detector.ts's own 'tier-b-single-candidate'
+    // ignored-item class: exactly one real
     // database/topic candidate found among a bridge's several syntactic
     // implementers, distinct from genuine multi-candidate ambiguity (which
     // still routes through S1/low-architecture-coverage above, unchanged).
     | 'multi-hop-single-candidate-below-threshold'
-    // T-FS-3 (BACKLOG.md "Contradiction detection between evidence
-    // sources") — contradiction-detector.ts's own 'contradiction:'
-    // ignored-item class: two evidence sources assert DIFFERENT values for
+    // contradiction-detector.ts's own 'contradiction:' ignored-item
+    // class: two evidence sources assert DIFFERENT values for
     // the same real-world fact (e.g. a k8s deployment manifest naming one
     // datastore engine, the live spring-config naming another). Forces a
     // review decision; the conflicting unit's own confidence is never
@@ -73,10 +66,10 @@ export interface ReviewQueueItem {
 }
 
 /**
- * T-R4-1 (Robustness Phase R4) — the task's own original goal named TWO
- * triggers ("when S1 fires OR arch coverage below threshold"), but only S1
- * was ever wired in (T-E5 shipped before T-R0-2's architectureOutboundCoverage
- * metric existed at all). Real gap, not just a doc-sync item: S1 only fires
+ * The original goal named TWO triggers ("when S1 fires OR arch coverage
+ * below threshold"), but only S1 was ever wired in (this trigger shipped
+ * before coverage-report.ts's architectureOutboundCoverage metric existed
+ * at all). Real gap, not just a doc-sync item: S1 only fires
  * on ZERO service-touching relationships — a run with SOME but SPARSE
  * architecture coverage (say 20%) never trips S1 at all, yet is exactly the
  * "residual human completion" case this task exists for. Closed here by
@@ -117,9 +110,9 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
   // A real S1 unit often already has a SPECIFIC, named reason on file: the multi-hop
   // detector's own honest `unresolved-multi-hop` ignored-item (bridge id,
   // candidate count). Surfacing that specific detail instead of a generic
-  // "see AREC R2" pointer is what makes a review-queue item actually
-  // actionable without a human re-deriving it from typed-facts.json by
-  // hand — no new detection, just reading a fact this run already produced.
+  // pointer is what makes a review-queue item actually actionable without a
+  // human re-deriving it from typed-facts.json by hand — no new detection,
+  // just reading a fact this run already produced.
   const unresolvedMultiHopByUnitId = new Map<string, string>();
   for (const item of facts.ignoredItems) {
     if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith(UNRESOLVED_MULTI_HOP_PREFIX)) continue;
@@ -140,7 +133,7 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
         confidence: unit.confidence,
         rationale: specific
           ? `Run has service+database units but 0 relationships touch a service unit. "${unit.id}" has a specific, named residual: ${specific}`
-          : `Run has service+database units but 0 relationships touch a service unit. Review whether "${unit.id}" should connect to another unit in this run (see AREC R2 for why an automatic edge wasn't produced).`,
+          : `Run has service+database units but 0 relationships touch a service unit. Review whether "${unit.id}" should connect to another unit in this run — the multi-hop bridge mechanism did not find enough evidence to produce an edge automatically.`,
       });
     }
   }
@@ -210,20 +203,19 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
         unitId: unit.id,
         unitKind: unit.kind,
         confidence: unit.confidence,
-        rationale: `"${unit.id}" has HTTP-entry-point evidence but no security-control evidence found by this pipeline's catalogue (see AREC C-call for what is/isn't detected). Review whether real auth exists in source that this run's mechanisms don't cover.`,
+        rationale: `"${unit.id}" has HTTP-entry-point evidence but no security-control evidence found by this pipeline's catalogue. Review whether real auth exists in source that this run's mechanisms don't cover.`,
       });
     }
   }
 
-  // T-FS-1 (BACKLOG.md "Tier-B residual detection") — always surfaced when
-  // present, unlike S1/S2/S5 above: this is a real fact about ONE specific
-  // edge (multi-hop-bridge-detector.ts found exactly one real store
-  // candidate among several syntactic implementers), not a run-wide
-  // completeness gap that only matters when a silence flag also fired. The
-  // detail text is the review tooling's own actionable class distinction —
-  // "one high-confidence candidate obscured by noise" vs. "genuinely many
-  // candidates" (the latter stays under S1/low-architecture-coverage,
-  // unchanged) — the exact separation the backlog row asked for.
+  // Always surfaced when present, unlike S1/S2/S5 above: this is a real
+  // fact about ONE specific edge (multi-hop-bridge-detector.ts found
+  // exactly one real store candidate among several syntactic implementers),
+  // not a run-wide completeness gap that only matters when a silence flag
+  // also fired. The detail text is the review tooling's own actionable
+  // class distinction — "one high-confidence candidate obscured by noise"
+  // vs. "genuinely many candidates" (the latter stays under
+  // S1/low-architecture-coverage, unchanged).
   for (const item of facts.ignoredItems) {
     if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED' || !item.detail?.startsWith(TIER_B_SINGLE_CANDIDATE_PREFIX)) continue;
     const sourceUnitId = item.detail.slice(TIER_B_SINGLE_CANDIDATE_PREFIX.length).split('"')[0];
@@ -237,8 +229,7 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
     });
   }
 
-  // T-FS-3 (BACKLOG.md "Contradiction detection between evidence sources")
-  // — same always-on convention as the tier-b block above: a real
+  // Same always-on convention as the tier-b block above: a real
   // contradiction about one specific unit matters regardless of this run's
   // overall silence-flag state. item.ref IS the contradicted unit's own id
   // (contradiction-detector.ts sets it that way), so no text-parsing is

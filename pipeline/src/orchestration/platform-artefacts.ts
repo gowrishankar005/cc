@@ -5,7 +5,7 @@ import { buildCoverageReport, CoverageReport } from '../analysis/coverage-report
 import { buildUnmappedSignalsReport, UnmappedSignalsReport } from '../analysis/unmapped-signals';
 
 /**
- * T-X0-1/T-X0-2 — coverage-report.json and unmapped-signals-report.json are
+ * coverage-report.json and unmapped-signals-report.json are
  * PLATFORM artefacts (every module reads the same typed-facts.json; these
  * describe the RUN, not one module's output), so they're written from
  * orchestration alongside typed-facts.json — not from inside
@@ -23,7 +23,7 @@ export function writePlatformArtefacts(ctx: AnalysisContext, outDir: string): { 
   fs.writeFileSync(path.join(outDir, 'unmapped-signals-report.json'), JSON.stringify(unmapped, null, 2));
 
   console.log(
-    `[platform-artefacts] coverage: ${coverage.roots.length} root(s), graphify ${coverage.graphifyStatus}; unmapped: ${unmapped.clusterCount} signal cluster(s), ${unmapped.totalUnmappedOccurrences} occurrence(s)`
+    `[platform-artefacts] coverage: ${coverage.roots.length} root(s), cross-package ${coverage.crossPackageStatus}; unmapped: ${unmapped.clusterCount} signal cluster(s), ${unmapped.totalUnmappedOccurrences} occurrence(s)`
   );
 
   return { coverage, unmapped };

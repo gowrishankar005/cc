@@ -5,15 +5,15 @@ import { Module, ModuleContext } from '../registry';
 import { loadModuleFitness } from '../fitness';
 
 /**
- * T-LM-2 (AGENT_TASKS_Ext_Lens_Modules.md, Lens Modules lane) — the second
- * module proving the module boundary generalizes past threat-signals
- * (written without touching Scanner, Rules, Analysis, or the CALM
- * generator; consumes typed-facts.json only, per Module_Authoring_Guide.md).
+ * The second module proving the module boundary generalizes past
+ * threat-signals (written without touching Scanner, Rules, Analysis, or the
+ * CALM generator; consumes typed-facts.json only, per
+ * Module_Authoring_Guide.md).
  *
- * Deliberately narrow, per the lane file's own gate: retry-annotation and
- * timeout-config detection specifically, not "resilience" scoped whole.
- * Circuit-breaker/bulkhead/rate-limiter annotations and non-Spring timeout
- * shapes are real, named residuals — not silently claimed as covered.
+ * Deliberately narrow: retry-annotation and timeout-config detection
+ * specifically, not "resilience" scoped whole. Circuit-breaker/bulkhead/
+ * rate-limiter annotations and non-Spring timeout shapes are real, named
+ * residuals — not silently claimed as covered.
  *
  * Signal source: Evidence.category === 'resilience' (CONTRACT_VERSION
  * 12.0.0) — a retry annotation (Spring Retry `@Retryable`, Resilience4j
@@ -21,18 +21,16 @@ import { loadModuleFitness } from '../fitness';
  * `timelimiter.instances.*.timeout-duration` config value
  * (structured-config-sourced, spring-config-pass.ts's attachResilienceTimeout).
  *
- * Per BR-110 (AGENT_TASKS_Ext_Lens_Modules.md's pre-flight finding): this
- * module's findings are descriptive facts for a human to read, not a
+ * This module's findings are descriptive facts for a human to read, not a
  * verdict — a unit with retry evidence and no timeout evidence is not
  * automatically "misconfigured"; a unit with neither is not automatically
  * "fragile." This module DOES have a gold-scored fitness declaration
  * (`coe-lab/gold/modules/resilience-lens/*.gold.json` +
- * `coe-lab/scripts/score-module-resilience-lens.mjs`, built alongside this
- * module per T-LM-0's own "do this before/with the first new lens"
- * instruction) — surfaced machine-readably in this module's own report
- * (`fitness.json`/`fitness.ts`, T-LM-5), not only as Claim_Register.md
- * prose. See `docs/solution/Claim_Register.md`'s Module fitness section for
- * the full narrative.
+ * `coe-lab/scripts/score-module-resilience-lens.mjs`) — surfaced
+ * machine-readably in this module's own report (`fitness.json`/
+ * `fitness.ts`), not only as Claim_Register.md prose. See
+ * `docs/solution/Claim_Register.md`'s Module fitness section for the full
+ * narrative.
  */
 function run(facts: TypedFacts, ctx: ModuleContext): void {
   // Review fix (2026-08-16) — restructured to this file's sibling module's
@@ -56,8 +54,8 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
   // same convention threat-signals already established.
   const moduleDir = path.join(ctx.outDir, 'modules', 'resilience-lens');
   fs.mkdirSync(moduleDir, { recursive: true });
-  // T-LM-5 (BR-110) — same machine-readable fitness declaration mechanism
-  // as threat-signals; the second module proving it isn't module-specific.
+  // Same machine-readable fitness declaration mechanism as threat-signals;
+  // the second module proving it isn't module-specific.
   const fitness = loadModuleFitness('resilience-lens');
   fs.writeFileSync(path.join(moduleDir, 'resilience-lens-report.json'), JSON.stringify({ findings, fitness }, null, 2));
   if (findings.length > 0) {
@@ -67,6 +65,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const resilienceLensModule: Module = {
   name: 'resilience-lens',
-  supportedMajorVersion: '16', // bumped for CONTRACT_VERSION 16.0.0 (T-MR-2) — TypedRelationship.source gained 'repo-manifest'; this module never reads TypedRelationship.kind/source at all, filters on Evidence.category === 'resilience' only — reviewed, unaffected
+  supportedMajorVersion: '17', // bumped for CONTRACT_VERSION 17.0.0 (JPA entity->table CodeQL candidate) — Evidence.source gained 'codeql-jpa-table'; this module filters on Evidence.category === 'resilience' only, never reads Evidence.source — reviewed, unaffected
   run,
 };

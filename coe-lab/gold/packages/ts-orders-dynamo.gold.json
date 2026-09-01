@@ -2,7 +2,7 @@
   "packageId": "ts-orders-dynamo",
   "goldVersion": "0.1.0",
   "tier": "stretch",
-  "description": "Node order service using DynamoDB + SQS SDK imports (Fidelity cloud-native pattern).",
+  "description": "Node order service using DynamoDB + SQS SDK imports (a large financial-services organization's cloud-native pattern).",
   "platformMinContract": "1.0.0",
   "fixturePath": "fixtures/monorepo/packages/ts-orders-dynamo",
   "changelog": "v0.1.0 initial",

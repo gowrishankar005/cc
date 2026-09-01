@@ -17,8 +17,8 @@ function readLines(absoluteFilePath: string, fileLineCache: Map<string, string[]
 }
 
 /**
- * T-R1-3 (Robustness Phase R1) — real finding, re-confirmed against real
- * a reference Java/JAX-RS banking platform source before writing this (`the reference platform's security module/.../
+ * Real finding, re-confirmed against real reference Java/JAX-RS banking
+ * platform source before writing this (`the reference platform's security module/.../
  * SqlInjectionPreventerServiceImpl.java:26`, `import org.postgresql.core.Utils;`):
  * unlike Node/TS (deterministic `ref_<name>` transform, `graphify-import-target.ts`),
  * there is NO string transform that recovers a Java import's qualified

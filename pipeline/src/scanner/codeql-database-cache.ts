@@ -10,7 +10,7 @@ import * as os from 'os';
  * (sourceRoot, buildCommand), running BOTH in one `run-slice` invocation
  * silently produced an EMPTY second extraction — not a crash, not a
  * warning, just zero bindings. Root cause, confirmed against a real run
- * (Fineract, `gradle.properties` has `org.gradle.caching=true`):
+ * (a reference Java/JAX-RS banking platform, `gradle.properties` has `org.gradle.caching=true`):
  * `--rerun-tasks` only disables Gradle's up-to-date CHECK, not the
  * separate build CACHE — the second build's tasks could still restore
  * outputs from the cache (matching the first build's just-computed input
@@ -54,14 +54,65 @@ function codeqlBinaryAvailable(): boolean {
   }
 }
 
+function tryBuildDatabase(sourceRoot: string, buildCommand: string): string | undefined {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-db-'));
+  workDirs.push(workDir);
+  const dbPath = path.join(workDir, 'db');
+
+  try {
+    execFileSync('codeql', ['database', 'create', dbPath, '--language=java', `--source-root=${sourceRoot}`, `--command=${buildCommand}`], {
+      stdio: 'pipe',
+      timeout: 10 * 60 * 1000,
+    });
+    return dbPath;
+  } catch (err) {
+    // BACKLOG.md "CodeQL + Gradle: pre-existing daemon silently empties the
+    // database" residual — a pre-existing Gradle daemon executes the real
+    // compile OUTSIDE the process tree CodeQL's tracer instruments, so the
+    // build itself reports success but CodeQL's own database-finalization
+    // step then fails with this exact, distinct phrase (confirmed via a
+    // real three-engine benchmark, 2026-08-21) — different from a genuinely
+    // broken build, which fails earlier/differently. `execFileSync` surfaces
+    // captured output on `err.stderr`/`err.stdout` (Buffers) when
+    // `stdio: 'pipe'`; `err.message` is checked too since Node's own error
+    // formatting sometimes folds the buffer text in there instead.
+    const capturedOutput = [
+      (err as { stderr?: Buffer }).stderr?.toString(),
+      (err as { stdout?: Buffer }).stdout?.toString(),
+      err instanceof Error ? err.message : String(err),
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const isDaemonReuseEmptyDb = /could not process any of it/i.test(capturedOutput);
+    if (isDaemonReuseEmptyDb) {
+      console.warn(
+        `[codeql] WARNING: CodeQL database creation for "${buildCommand}" finalized empty — this is CodeQL's own "detected code but could not process any of it" signature, the known symptom of a PRE-EXISTING build daemon (Gradle) executing the real compile outside CodeQL's tracer, not a broken build. Pass --no-daemon (or kill any running daemon) and retry: ${err}`
+      );
+    } else {
+      console.warn(`[codeql] WARNING: CodeQL database creation failed for build command "${buildCommand}" (build likely broke, or produced no source-backed database): ${err}`);
+    }
+    return undefined;
+  }
+}
+
 /**
  * Returns a real CodeQL Java database path for (sourceRoot, buildCommand),
  * building it at most once per key per process. Returns `undefined` on any
  * real failure (missing binary, broken build) — same graceful-degradation
  * contract every CodeQL-based provider already has; callers treat
  * `undefined` exactly like the old per-provider "return []" path.
+ *
+ * `fallbackBuildCommand` (real gap found 2026-08-21, `codeql-auto-detect.ts`
+ * — `spring-petclinic` checks in both a Gradle and a Maven build; Gradle's
+ * toolchain resolution failed there while Maven, against the identical
+ * source with the identical JDK, compiled cleanly): tried, at the SAME
+ * sourceRoot, only after the primary command's build genuinely fails — never
+ * consulted on a cache hit, and cached under the ORIGINAL (sourceRoot,
+ * buildCommand) key either way, so a second CodeQL-based pass calling with
+ * the identical primary/fallback pair reuses whichever one actually
+ * succeeded without re-attempting the primary.
  */
-export function getOrBuildCodeqlDatabase(sourceRoot: string, buildCommand: string): string | undefined {
+export function getOrBuildCodeqlDatabase(sourceRoot: string, buildCommand: string, fallbackBuildCommand?: string): string | undefined {
   const key = cacheKey(sourceRoot, buildCommand);
   const cached = cache.get(key);
   if (cached) return cached.dbPath;
@@ -72,19 +123,10 @@ export function getOrBuildCodeqlDatabase(sourceRoot: string, buildCommand: strin
     return undefined;
   }
 
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-db-'));
-  workDirs.push(workDir);
-  const dbPath = path.join(workDir, 'db');
-
-  try {
-    execFileSync('codeql', ['database', 'create', dbPath, '--language=java', `--source-root=${sourceRoot}`, `--command=${buildCommand}`], {
-      stdio: 'pipe',
-      timeout: 10 * 60 * 1000,
-    });
-  } catch (err) {
-    console.warn(`[codeql] WARNING: CodeQL database creation failed (build likely broke, or produced no source-backed database), continuing without any CodeQL evidence: ${err}`);
-    cache.set(key, { dbPath: undefined });
-    return undefined;
+  let dbPath = tryBuildDatabase(sourceRoot, buildCommand);
+  if (!dbPath && fallbackBuildCommand) {
+    console.warn(`[codeql] retrying with fallback build command: ${fallbackBuildCommand}`);
+    dbPath = tryBuildDatabase(sourceRoot, fallbackBuildCommand);
   }
 
   cache.set(key, { dbPath });

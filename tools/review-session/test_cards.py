@@ -96,6 +96,9 @@ class TestCardDeterminism(unittest.TestCase):
             "missing-intermediates-not-in-scan",
             "single-candidate-below-threshold",
             "contradicting-evidence",
+            "catalogue-candidate",
+            "insufficient-evidence",
+            "ambiguous-boundary",
             "unclassified",
         ):
             residual = {"id": "R-001", "tier": "A", "class": cls, "unitIds": [], "rationale": "r"}
@@ -138,6 +141,76 @@ class TestCardDeterminism(unittest.TestCase):
         packs = {"svc.ts:5": "\n\n@Get()\nfindAll() {}"}  # first 2 lines blank, matches a real +/- window landing on blank source lines
         card = render_card_markdown(residual, unit_index, packs, [])
         self.assertIn("@Get()", card)
+
+    def test_evidence_preview_shows_the_real_anchor_line_not_the_windows_first_line(self):
+        """Real bug, found live against Bank of Anthos (Architect_Pilot_
+        Feedback_Notes.md Entry 19): evidence_packs[ref] is a multi-line
+        context WINDOW (context_lines before AND after the ref's own
+        claimed line), not text starting at that line. The old code took
+        the snippet's first non-blank line as "the evidence," which was
+        almost always unrelated padding. Real reproduction: a "Column"
+        unmapped-signal cluster's ref Transaction.java:42 had a snippet
+        whose real content at line 42 was `@Column(name = "TRANSACTION_ID"...)`,
+        but the card showed `import jakarta.persistence.Transient;` (the
+        window's first line, really file line 27) instead.
+
+        This test constructs the same shape directly: a ref at line 42,
+        context_lines=15 (pack.py's own default), so the window starts at
+        file line 27 (42-1-15=26, 0-indexed) -- the anchor line is the
+        16th line of a synthetic 20-line snippet (index 15)."""
+        residual = {"id": "R-001", "tier": "A", "class": "catalogue-candidate", "unitIds": [], "rationale": "r", "evidenceRefs": ["Transaction.java:42"]}
+        snippet_lines = [f"padding line {i}" for i in range(15)] + ['@Column(name = "TRANSACTION_ID")'] + [f"padding line {i}" for i in range(4)]
+        packs = {"Transaction.java:42": "\n".join(snippet_lines)}
+        card = render_card_markdown(residual, {}, packs, [], context_lines=15)
+        self.assertIn('@Column(name = "TRANSACTION_ID")', card, "must show the real anchor line, not the window's first line")
+        self.assertNotIn("`Transaction.java:42`: padding line 0", card)
+
+    def test_evidence_preview_second_instance_different_line_and_context(self):
+        """Second, independent instance (different ref line, different
+        context_lines) per this repo's own 'verify against a second
+        instance' rule -- not just a coincidental match for the first
+        test's exact numbers."""
+        residual = {"id": "R-002", "tier": "A", "class": "catalogue-candidate", "unitIds": [], "rationale": "r", "evidenceRefs": ["Foo.java:100"]}
+        # context_lines=5, ref line 100 -> window starts at file line 94 (100-1-5=94, 0-indexed),
+        # so the anchor is the 6th line (index 5) of the snippet.
+        snippet_lines = [f"other line {i}" for i in range(5)] + ["REAL_MATCH_HERE"] + [f"other line {i}" for i in range(5)]
+        packs = {"Foo.java:100": "\n".join(snippet_lines)}
+        card = render_card_markdown(residual, {}, packs, [], context_lines=5)
+        self.assertIn("REAL_MATCH_HERE", card)
+
+    def test_dossier_paragraph_rendered_verbatim_from_residual_when_present(self):
+        """Entry 23, Architect_Pilot_Feedback_Notes.md: the "My read (not a
+        decision):" paragraph must come from residual["dossier"] (dossier.py's
+        own validated {explanation, hypotheses, evidenceRefsUsed} shape),
+        deterministically -- never generated live by whatever chat model
+        later reads the card."""
+        residual = {
+            "id": "R-001",
+            "tier": "A",
+            "class": "security-authority-policy",
+            "unitIds": [],
+            "rationale": "r",
+            "dossier": {
+                "explanation": "This controller has HTTP entry points but no visible auth annotation in the shown evidence.",
+                "hypotheses": ["Auth may be enforced upstream (gateway/mesh), not in this class."],
+                "evidenceRefsUsed": ["Foo.java:10"],
+            },
+        }
+        card = render_card_markdown(residual, {}, {}, [])
+        self.assertIn("**My read (not a decision):** This controller has HTTP entry points", card)
+        self.assertIn("Auth may be enforced upstream", card)
+        self.assertIn("Foo.java:10", card)
+
+    def test_dossier_paragraph_states_none_available_when_absent_not_a_blank_gap(self):
+        """No dossier field (no --with-dossier, or no LLM backend at
+        pack-build time) must render an explicit "none available" line --
+        never a blank gap that invites the reading chat model to fill it in
+        with its own live-authored recommendation (the exact failure mode
+        Entries 21/22 found live)."""
+        residual = {"id": "R-001", "tier": "A", "class": "security-authority-policy", "unitIds": [], "rationale": "r"}
+        card = render_card_markdown(residual, {}, {}, [])
+        self.assertIn("**My read (not a decision):** no evidence dossier available", card)
+        self.assertIn("--with-dossier", card)
 
     def test_bulk_apply_note_says_one_dr_per_residual(self):
         residuals = [

@@ -8,7 +8,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
 /**
- * Lab fixture — JAX-RS charges API (Fineract-shaped).
+ * Lab fixture — JAX-RS charges API (a reference Java/JAX-RS banking platform-shaped).
  */
 @Path("/v1/charges")
 @Produces(MediaType.APPLICATION_JSON)

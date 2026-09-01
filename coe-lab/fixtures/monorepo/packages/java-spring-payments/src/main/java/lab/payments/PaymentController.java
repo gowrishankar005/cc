@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Lab fixture — Spring MVC-style payments API (Fidelity Java REST pattern).
+ * Lab fixture — Spring MVC-style payments API (target-customer Java REST pattern).
  */
 @RestController
 @RequestMapping("/payments")

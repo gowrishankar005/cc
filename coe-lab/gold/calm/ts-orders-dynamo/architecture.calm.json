@@ -2,7 +2,7 @@
   "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
   "unique-id": "coe-lab-ts-orders-dynamo",
   "name": "CoE Lab \u2014 Orders Dynamo/SQS",
-  "description": "Hand-authored gold for cloud-native orders store: HTTP surface, DynamoDB client, and SQS queue (Fidelity-aligned AWS patterns).",
+  "description": "Hand-authored gold for cloud-native orders store: HTTP surface, DynamoDB client, and SQS queue (target-customer-aligned AWS patterns).",
   "metadata": [
     {
       "key": "x-lab-gold-source",

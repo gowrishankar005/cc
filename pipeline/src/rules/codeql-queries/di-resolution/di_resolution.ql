@@ -50,7 +50,7 @@ predicate beanFactoryResolution(Interface iface, RefType impl) {
 }
 
 /**
- * Real finding running this against Fineract: LockingService has TWO real
+ * Real finding running this against a reference Java/JAX-RS banking platform: LockingService has TWO real
  * @Bean factory methods in different @Configuration classes
  * (retrieveLoanLockingService() -> LoanLockingServiceImpl,
  * workingCapitalLoanLockingService() -> WorkingCapitalLoanLockingServiceImpl),

@@ -2,7 +2,7 @@ import { AnalysisContext, AnalysisPass, existingServiceFilePaths, overridableSer
 import { detectMessagingUnits } from './cross_package/messaging-detector';
 
 /**
- * T-X7-2 — a separate pass from detectPersistencePass (passes.ts), even
+ * A separate pass from detectPersistencePass (passes.ts), even
  * though both read the SAME ctx.crossPackageRun, to keep each pass's name
  * matching its actual scope (one is genuinely "persistence," this is
  * genuinely "messaging") rather than quietly widening detectPersistencePass
@@ -11,7 +11,7 @@ import { detectMessagingUnits } from './cross_package/messaging-detector';
  * when that pass didn't run or failed (ctx.crossPackageRun undefined), same
  * graceful-degradation convention as reconcilePass.
  *
- * B-msg-prod-sqs (Robustness, real re-check) — AREC Wave 3 T-E3's original
+ * B-msg-prod-sqs (Robustness, real re-check) — an earlier
  * fix (exclude any file already claimed by an earlier pass) prevented the
  * real duplicate-unique-id bug it targeted, but it did so by SILENTLY
  * DROPPING real messaging evidence whenever the SAME class is genuinely
@@ -29,7 +29,7 @@ import { detectMessagingUnits } from './cross_package/messaging-detector';
  * lost. Genuinely new messaging-only units (no prior-pass collision) are
  * still added exactly as before.
  *
- * T-LR-3 follow-up (weak-service / messaging duplicate-node): same
+ * Weak-service / messaging duplicate-node fix: same
  * replace-not-duplicate mechanism detectPersistencePass already uses.
  * Decorator-created service units use id `filePath`; import-strategy
  * messaging units use `filePath::ClassName`, so the same-id merge above
@@ -49,7 +49,7 @@ export const detectMessagingPass: AnalysisPass = {
       existingServiceFilePaths(ctx),
       overridable
     );
-    // T-TC1-3 (B-test-code-exclusion) — real, visible record, never a silent skip.
+    // B-test-code-exclusion — real, visible record, never a silent skip.
     for (const filePath of excludedTestFiles) {
       ctx.allIgnoredItems.push({ ref: `${filePath}:0`, reason: 'TEST_CODE', detail: 'Excluded from messaging detection — matched a real test-path/filename convention (isTestPath()), despite importing a catalogued messaging-client library' });
     }

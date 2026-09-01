@@ -17,7 +17,8 @@ nothing happened.
 
 ## Claim triple
 
-`{rootSet: fresh run-slice output for fineract-core, waltz-data (spikes/,
+`{rootSet: fresh run-slice output for the reference banking platform's core
+module, the reference governance platform's data module (spikes/,
 real repos) + all 7 coe-lab core/trap packages, terminalGrain: unit
 confidence band (low <40 / medium 40-69 / high >=70, the live bandFor()
 thresholds), evalArtefact: an offline replay script scored against real,
@@ -54,8 +55,8 @@ under either formula). **22 band changes**, all `high -> medium` (80 -> 64),
 all the same real shape: a Spring Data repository interface with exactly two
 `extends` clauses from one declaration (`extends JpaRepository<X, Long>,
 JpaSpecificationExecutor<X>`), each independently weighted 40. Every single
-instance is `apache/fineract` real source (`spikes/fineract/repo`); the
-coe-lab fixtures and `waltz-data` contributed 0 changes (too few 2+-evidence
+instance is the reference Java/JAX-RS banking platform's real source; the
+coe-lab fixtures and the reference governance platform's data module contributed 0 changes (too few 2+-evidence
 units, or existing evidence already summed past the point where the two
 formulas' outputs land in different bands).
 
@@ -97,7 +98,8 @@ to weigh against the 22 negative-direction ones either.
 
 - A different real evidence shape where 2+ items genuinely are independent
   (not two facets of one declaration) surfaces a band change that improves
-  correctness — this replay's dataset (`fineract-core`, `waltz-data`, 7
+  correctness — this replay's dataset (the reference banking platform's core
+  module, the reference governance platform's data module, 7
   coe-lab packages) happened to only exercise the correlated-evidence shape;
   a different repo could exercise a genuinely independent-evidence case this
   replay never saw.

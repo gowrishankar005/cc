@@ -25,23 +25,23 @@ import { logMem } from '../util/debug-mem';
 export interface RawRootFacts {
   nativeRoutes: NativeRouteFact[];
   decoratorFacts: DecoratorFact[];
-  /** AREC Wave 3 T-D1 — call-site facts (referenceKind: 'calls'), same shape/scoping as decoratorFacts. */
+  /** Call-site facts (referenceKind: 'calls'), same shape/scoping as decoratorFacts. */
   callFacts: DecoratorFact[];
-  /** AREC Wave 3 T-E1 — field/variable type-reference facts (referenceKind: 'references'), same shape/scoping. */
+  /** Field/variable type-reference facts (referenceKind: 'references'), same shape/scoping. */
   typeReferenceFacts: DecoratorFact[];
-  /** AREC Wave 3 T-E3 — extends/implements supertype facts (referenceKind: 'extends'), same shape/scoping. */
+  /** Extends/implements supertype facts (referenceKind: 'extends'), same shape/scoping. */
   extendsFacts: DecoratorFact[];
-  /** T-X0-1 coverage report input — indexed source files by extension, captured at scan time since only run-slice.ts's scan loop calls listIndexedFiles(). */
+  /** Coverage report input — indexed source files by extension, captured at scan time since only run-slice.ts's scan loop calls listIndexedFiles(). */
   filesByExt: Record<string, number>;
-  /** T-X8-1 — deployable-unit manifests (package.json/pom.xml/build.gradle/Dockerfile) found directly at this root. */
+  /** Deployable-unit manifests (package.json/pom.xml/build.gradle/Dockerfile) found directly at this root. */
   deployableManifests: DeployableManifest[];
-  /** T-TC1-2 (B-test-code-exclusion) — real files excluded from all CodeGraph-derived extraction because isTestPath() matched them; mapSignalsPass turns each into a real, visible IgnoredItem (reason TEST_CODE), never a silent skip. */
+  /** B-test-code-exclusion — real files excluded from all CodeGraph-derived extraction because isTestPath() matched them; mapSignalsPass turns each into a real, visible IgnoredItem (reason TEST_CODE), never a silent skip. */
   excludedTestFiles: string[];
 }
 
 export interface AnalysisContext {
   packageRoots: string[];
-  /** T-onboarding-2 — this run's --out directory. Set once at context construction (run-slice.ts), used by detectPersistencePass so Graphify's own persistent cache (runGraphifyPass) writes under --out instead of beside the scanned source. */
+  /** This run's --out directory. Set once at context construction (run-slice.ts), used by detectPersistencePass so Graphify's own persistent cache (runGraphifyPass) writes under --out instead of beside the scanned source. */
   outDir: string;
   catalogue: SignalCatalogue;
   rawByRoot: Map<string, RawRootFacts>;
@@ -52,24 +52,26 @@ export interface AnalysisContext {
   /** Populated by detectPersistencePass; consumed by reconcilePass. Absent if the cross-package pass failed (graceful degradation, unchanged from before this refactor). */
   crossPackageRun?: CrossPackageGraphRun;
   crossPackageError?: unknown;
-  /** Populated by openApiPass (T-X4-1); undefined for a root openApiPass hasn't run for yet. Empty array (not absent) means "ran, found none" — coverage-report.ts distinguishes the two. */
+  /** Populated by openApiPass; undefined for a root openApiPass hasn't run for yet. Empty array (not absent) means "ran, found none" — coverage-report.ts distinguishes the two. */
   openApiDocumentsByRoot?: Map<string, OpenApiDocument[]>;
-  /** Set by run-slice.ts from --k8s-manifests <dir>; k8sTrustPass (T-X5-1) is a no-op when absent — opt-in, same convention as overridesDir. */
+  /** Set by run-slice.ts from --k8s-manifests <dir>; k8sTrustPass is a no-op when absent — opt-in, same convention as overridesDir. */
   k8sManifestsDir?: string;
-  /** T-X9-1 — set by run-slice.ts from --enable-env-soft-graph; envSoftGraphPass is a no-op unless this AND k8sManifestsDir are both set. Default false/off. */
+  /** Set by run-slice.ts from --enable-env-soft-graph; envSoftGraphPass is a no-op unless this AND k8sManifestsDir are both set. Default false/off. */
   enableEnvSoftGraph?: boolean;
-  /** T-Y4-1 — set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
+  /** Set by run-slice.ts from --cfn-manifests <dir>; cfnRoutePass is a no-op when absent, same opt-in convention as k8sManifestsDir. */
   cfnManifestsDir?: string;
-  /** T-LR-5 — set by run-slice.ts from --codeql-source-root / --codeql-build-command; codeqlDiPass is registered in DEFAULT_PASSES but a no-op unless both fields are set — never a default-on path. Real, non-trivial cost (a real compile + CodeQL database build) and a real license constraint (free-tier CodeQL CLI cannot run in this pipeline's own CI against a non-Open-Source codebase) are why this is never a default-on path. */
+  /** Set by run-slice.ts from --codeql-source-root / --codeql-build-command; codeqlDiPass is registered in DEFAULT_PASSES but a no-op unless both fields are set — never a default-on path. Real, non-trivial cost (a real compile + CodeQL database build) and a real license constraint (free-tier CodeQL CLI cannot run in this pipeline's own CI against a non-Open-Source codebase) are why this is never a default-on path. */
   codeqlSourceRoot?: string;
   codeqlBuildCommand?: string;
-  /** T-MR-2 — set by run-slice.ts from --repo-manifests <dir>; crossRepoJoinPass (cross-repo-join-pass.ts) is a no-op when absent, same opt-in convention as k8sManifestsDir/cfnManifestsDir. */
+  /** Set by run-slice.ts's --auto-codeql detection when a Maven build also exists alongside the primary Gradle command; getOrBuildCodeqlDatabase tries this only if the primary command's build genuinely fails. Never set when --codeql-build-command was hand-written (no fallback to infer). */
+  codeqlFallbackBuildCommand?: string;
+  /** Set by run-slice.ts from --repo-manifests <dir>; crossRepoJoinPass (cross-repo-join-pass.ts) is a no-op when absent, same opt-in convention as k8sManifestsDir/cfnManifestsDir. */
   repoManifestsDir?: string;
-  /** T-Y5-1 — set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
+  /** Set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
   cfnRouteBindingsFound?: number;
   cfnRouteBindingsBound?: number;
   /**
-   * T-P0-1 (E2) round 3 — `${source}|${target}` raw-edge pairs
+   * `${source}|${target}` raw-edge pairs
    * multiHopBridgePass's detector already examined (resolved or honestly
    * refused). Populated by multiHopBridgePass, which now runs BEFORE
    * reconcilePass specifically so reconcilePass's graded-fact admission can
@@ -78,10 +80,10 @@ export interface AnalysisContext {
    * defaults to an empty set when not passed.
    */
   multiHopExaminedPairs?: Set<string>;
-  /** T-P0-1 (E2) round 3 continued — see multiHopExaminedPairs; file-level companion (multi-hop-bridge-detector.ts's examinedBridgeFiles) covering edges into a bridge candidate's non-class-level nodes (e.g. its methods) that examinedPairs alone misses. */
+  /** See multiHopExaminedPairs; file-level companion (multi-hop-bridge-detector.ts's examinedBridgeFiles) covering edges into a bridge candidate's non-class-level nodes (e.g. its methods) that examinedPairs alone misses. */
   multiHopExaminedFiles?: Set<string>;
   /**
-   * T-LR-3 follow-up bugfix — units mapSignalsPass rejected as sub-`CONFIDENCE_FLOOR`
+   * Follow-up bugfix — units mapSignalsPass rejected as sub-`CONFIDENCE_FLOOR`
    * (never added to `allUnits`/`unitsByRoot`, only recorded as an `IgnoredItem`
    * with just a ref string, no evidence) but which are still a bare `service`
    * stereotype (framework-bootstrap-only evidence) eligible for the same
@@ -130,12 +132,12 @@ export function existingServiceFilePaths(ctx: AnalysisContext): Set<string> {
 }
 
 /**
- * T-LR-3 real-data finding (2026-08-16): a SUBSET of `existingServiceFilePaths`
+ * Real-data finding (2026-08-16): a SUBSET of `existingServiceFilePaths`
  * — files whose `service` unit's ENTIRE evidence set is `framework-bootstrap`
  * category only (a bare class-level stereotype like `@Service`, no real
  * route or security-control evidence of its own). Real regression surfaced
  * against a reference Java/JAX-RS banking platform: `spring-service-stereotype`
- * (signal-catalogue.yml, T-LR-3) correctly makes a bare-`@Service` class a
+ * (signal-catalogue.yml) correctly makes a bare-`@Service` class a
  * `service` unit, but `existingServiceFilePaths`'s original, unconditional
  * exclusion then used that fact to suppress persistence detection entirely
  * for the same file — silently flipping a real, previously-verified

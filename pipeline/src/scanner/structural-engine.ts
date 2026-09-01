@@ -32,12 +32,12 @@ export interface DecoratorFact {
   line: number;
   argument?: string; // decorator's own quoted string literal, e.g. "{chargeId}" for @Path("{chargeId}")
   fromNodeKind?: 'class' | 'method' | 'other';
-  fromNodeName?: string; // AP-3 — the real class/method name (CodeGraph's own Node.name), used to derive a human-readable TypedUnit.name instead of the raw file path
+  fromNodeName?: string; // the real class/method name (CodeGraph's own Node.name), used to derive a human-readable TypedUnit.name instead of the raw file path
   language?: string;
 }
 
 /**
- * AREC Wave 3 T-D1 — a call-SITE fact (e.g. Java's
+ * A call-SITE fact (e.g. Java's
  * `context.authenticatedUser().validateHasReadPermission(RESOURCE)`,
  * Python's `jwt.decode(token, ...)`), same shape as DecoratorFact
  * deliberately reused rather than duplicated: both come from the same
@@ -53,7 +53,7 @@ export interface DecoratorFact {
 export type CallFact = DecoratorFact;
 
 /**
- * AREC Wave 3 T-E1 — a field/variable TYPE reference (e.g. `private
+ * A field/variable TYPE reference (e.g. `private
  * KafkaTemplate<Long, byte[]> externalEventsKafkaTemplate;`), from the same
  * extractFromSource() API, filtered on referenceKind: 'references' instead
  * of 'decorates'/'calls'. Real evidence this was built for: a reference Java/JAX-RS banking platform's
@@ -66,7 +66,7 @@ export type CallFact = DecoratorFact;
 export type TypeReferenceFact = DecoratorFact;
 
 /**
- * AREC Wave 3 T-E3 — an `extends`/`implements` supertype reference (e.g.
+ * An `extends`/`implements` supertype reference (e.g.
  * `interface ChargeRepository extends JpaRepository<Charge, Long>`), from
  * the same extractFromSource() API, filtered on referenceKind: 'extends'
  * instead of 'references'/'calls'/'decorates'. Closes
@@ -88,11 +88,11 @@ export type ExtendsFact = DecoratorFact;
 export interface StructuralEngine {
   indexPackage(packageRoot: string): Promise<{ handle: unknown; nativeRoutes: NativeRouteFact[] }>;
   extractDecoratorFacts(handle: unknown, packageRoot: string, relativeFilePath: string): DecoratorFact[];
-  /** AREC Wave 3 T-D1 — call-site facts (referenceKind: 'calls'), same handle/scoping contract as extractDecoratorFacts. */
+  /** Call-site facts (referenceKind: 'calls'), same handle/scoping contract as extractDecoratorFacts. */
   extractCallFacts(handle: unknown, packageRoot: string, relativeFilePath: string): CallFact[];
-  /** AREC Wave 3 T-E1 — field/variable type-reference facts (referenceKind: 'references'), same handle/scoping contract. */
+  /** Field/variable type-reference facts (referenceKind: 'references'), same handle/scoping contract. */
   extractTypeReferenceFacts(handle: unknown, packageRoot: string, relativeFilePath: string): TypeReferenceFact[];
-  /** AREC Wave 3 T-E3 — extends/implements supertype facts (referenceKind: 'extends'), same handle/scoping contract. */
+  /** Extends/implements supertype facts (referenceKind: 'extends'), same handle/scoping contract. */
   extractExtendsFacts(handle: unknown, packageRoot: string, relativeFilePath: string): ExtendsFact[];
   listIndexedFiles(handle: unknown, extensions: string[]): string[];
 }

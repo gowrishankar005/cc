@@ -8,7 +8,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import java.util.Map;
 
 /**
- * WDL-1 clean positive case (mirrors real aws-saas-boost-tenant-service):
+ * WDL-1 clean positive case (mirrors a reference AWS SaaS sample's tenant-service):
  * a Lambda handler with NO Dynamo import of its own — delegates entirely
  * to TierStore. Should become a real `service` unit via http-entry-point
  * evidence (implements RequestHandler), never `database`.

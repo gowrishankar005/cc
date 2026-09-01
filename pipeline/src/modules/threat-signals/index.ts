@@ -29,29 +29,28 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
     .map((u) => ({
       unitId: u.id,
       stride: 'spoofing' as const,
-      // AREC Wave 3 T-D3 (S3, narrative honesty) — the original wording
-      // ("no security-control evidence found") reads as "no auth exists in
-      // source," which is a different, stronger, unverified claim. Even
-      // with C-call built (T-D1), this pipeline's detection is bounded by
-      // its own catalogue — absence here means "this pipeline's category
-      // coverage found nothing," not "an auditor confirmed there is no
-      // auth." Softened per S3 and pointed at the concrete pipeline
-      // capability (Claim Register C-dec/C-call cells) rather than implying
-      // a completeness guarantee this module was never built to make.
+      // The original wording ("no security-control evidence found") reads
+      // as "no auth exists in source," which is a different, stronger,
+      // unverified claim. This pipeline's detection is bounded by its own
+      // catalogue — absence here means "this pipeline's category coverage
+      // found nothing," not "an auditor confirmed there is no auth."
+      // Softened and pointed at the concrete pipeline capability (Claim
+      // Register C-dec/C-call cells) rather than implying a completeness
+      // guarantee this module was never built to make.
       rationale:
         'HTTP-entry-point evidence present; this pipeline found no security-control evidence (decorator or call-site) for this unit. This reflects the DETECTION CATALOGUE\'s coverage, not a confirmed absence of authorization in source — see docs/solution/Claim_Register.md (C-dec/C-call) for what is and is not detected today.',
       evidenceRefs: u.evidence.map((e) => e.ref),
     }));
 
-  // Namespaced (Wave M T-M2) — no top-level back-compat copy needed, unlike
+  // Namespaced — no top-level back-compat copy needed, unlike
   // calm-generator's architecture.calm.json, since nothing outside this
   // module has ever depended on this file's location.
   const moduleDir = path.join(ctx.outDir, 'modules', 'threat-signals');
   fs.mkdirSync(moduleDir, { recursive: true });
-  // T-LM-5 (BR-110) — a machine-readable fitness declaration alongside the
-  // findings, not just Claim_Register.md prose a human has to go read
-  // separately. See fitness.ts's own doc comment for why this is checked-in
-  // data, never computed live against gold at run time.
+  // A machine-readable fitness declaration alongside the findings, not just
+  // Claim_Register.md prose a human has to go read separately. See
+  // fitness.ts's own doc comment for why this is checked-in data, never
+  // computed live against gold at run time.
   const fitness = loadModuleFitness('threat-signals');
   fs.writeFileSync(path.join(moduleDir, 'threat-signals-report.json'), JSON.stringify({ findings, fitness }, null, 2));
   if (findings.length > 0) {
@@ -61,6 +60,6 @@ function run(facts: TypedFacts, ctx: ModuleContext): void {
 
 export const threatSignalsModule: Module = {
   name: 'threat-signals',
-  supportedMajorVersion: '16', // bumped for CONTRACT_VERSION 16.0.0 (T-MR-2) — TypedRelationship.source gained 'repo-manifest'; this module never reads TypedRelationship at all, filters on Evidence.category only — reviewed, unaffected
+  supportedMajorVersion: '17', // bumped for CONTRACT_VERSION 17.0.0 (JPA entity->table CodeQL candidate) — Evidence.source gained 'codeql-jpa-table'; this module never reads TypedRelationship at all, filters on Evidence.category only — reviewed, unaffected
   run,
 };

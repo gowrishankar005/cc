@@ -1,4 +1,4 @@
-# Catalogue for messaging-detector.ts (T-X7-2, G-L2-03). Mirrors
+# Catalogue for messaging-detector.ts. Mirrors
 # persistence-detection-catalogue.yml's own pattern deliberately — messaging
 # has the same "different code shapes need different strategies" problem
 # persistence did: a decorator-marked consumer (@KafkaListener/@JmsListener,
@@ -57,7 +57,7 @@ strategies:
 
   - id: typed-field-producer
     description: >
-      AREC Wave 3 T-E1 (2026-08-08) — BUILT. A field/variable's declared
+      Built (2026-08-08). A field/variable's declared
       TYPE (KafkaTemplate), from CodeGraph's extractFromSource()
       `referenceKind: 'references'` entries (signal-catalogue.yml's
       kafka-template-field row, matchSource: field-type). Deliberately
@@ -75,7 +75,7 @@ strategies:
 
   - id: spring-config-broker
     description: >
-      T-PC1-7 (B-spring-config, 2026-08-09) — BUILT, same structured-config-file
+      B-spring-config, built 2026-08-09, same structured-config-file
       mechanism as persistence-detection-catalogue.yml's spring-config-datasource
       row: spring.kafka.bootstrap-servers / spring.rabbitmq.host+port|addresses /
       spring.activemq.broker-url read directly from application.yml/.properties

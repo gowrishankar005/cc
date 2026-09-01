@@ -20,7 +20,7 @@ const SKIP_DIRS = new Set(['node_modules', '.git']);
 
 export interface SecretMount {
   secretName: string;
-  itemKeys: string[]; // the `items[].key` names actually mounted — the only signal T-X5-0 allows for issuer/verifier inference
+  itemKeys: string[]; // the `items[].key` names actually mounted — the only signal allowed for issuer/verifier inference
 }
 
 export interface DeploymentManifest {
@@ -33,7 +33,7 @@ export interface DeploymentManifest {
 }
 
 /**
- * T-X9-0/1 — a ConfigMap's `data` KEY NAMES only, never `data`'s values.
+ * A ConfigMap's `data` KEY NAMES only, never `data`'s values.
  * Extending the existing "names only" boundary this file already holds for
  * Deployments (never reads Secret data) to ConfigMap objects too — reading
  * `Object.keys(data)` and discarding the values immediately, not "reading
@@ -116,7 +116,7 @@ export function discoverDeployments(manifestsDir: string): DeploymentManifest[] 
   return deployments;
 }
 
-/** T-X9-0/1 — same discovery walk as discoverDeployments, filtered to `kind: ConfigMap` and key names only. */
+/** Same discovery walk as discoverDeployments, filtered to `kind: ConfigMap` and key names only. */
 export function discoverConfigMapKeys(manifestsDir: string): ConfigMapKeys[] {
   const configMaps: ConfigMapKeys[] = [];
   for (const filePath of findManifestFiles(manifestsDir)) {

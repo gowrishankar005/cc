@@ -24,7 +24,7 @@ import { buildEmissionCoverageReport, EmissionCoverageGap } from './emission-cov
  *   private copy, per the new convention).
  * - `overrides-applied-report.json` is genuinely calm-generator-private (no
  *   other module applies overrides) — namespaced only, no top-level copy.
- * - `emission-coverage-report.json` (T-CL-5) is also calm-generator-private
+ * - `emission-coverage-report.json` is also calm-generator-private
  *   — only this module's own builders decide CALM representability, unlike
  *   `coverage-report.json`/`unmapped-signals-report.json` (analysis-time,
  *   pre-CALM completeness, written as top-level platform artefacts by
@@ -39,7 +39,7 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
   let calm: CalmDocument = buildCalm(facts, includeSystemNode, emissionGaps);
   logMem('write-artefacts after buildCalm');
 
-  // T-CL-5 — "what the representation could not carry, and why" as a
+  // "What the representation could not carry, and why" as a
   // required emission output, computed from the same gaps the builders
   // recorded inline above (never re-derived independently). Written before
   // overrides are applied: overrides patch already-emitted CALM output and
@@ -98,6 +98,6 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
 /** CALM Generator as a real registry Module — the first, proving the boundary against its own real implementation above. */
 export const calmGeneratorModule: Module = {
   name: 'calm-generator',
-  supportedMajorVersion: '16', // bumped for CONTRACT_VERSION 16.0.0 (T-MR-2) — TypedRelationship.source gained 'repo-manifest'; reviewed, real code change already shipped in the SAME commit (relationship-type-mapping.yml's new row, external-repo-node-builder.ts wired into build-calm.ts before relationship-builder.ts runs) — this module now understands the new value, not just tolerates it
+  supportedMajorVersion: '17', // bumped for CONTRACT_VERSION 17.0.0 (JPA entity->table CodeQL candidate) — Evidence.source gained 'codeql-jpa-table'; reviewed, real code change already shipped in the SAME commit (interface-builder.ts's SOURCE_PRECEDENCE table gained the new key, ordered last — never contributes an interface, matching 'dependency-manifest'/'codeql-di''s existing corroboration-only precedent)
   run: (facts, ctx) => writeArtefacts(facts, ctx.outDir, ctx.overridesDir, ctx.includeSystemNode ?? true),
 };

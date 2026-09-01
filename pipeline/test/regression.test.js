@@ -1285,7 +1285,7 @@ test(
   }
 );
 
-test('Robustness T-R0-5 — Graphify partial/failed visibility: S0 fires in completeness.silenceFlags when graphifyStatus is not ok, absent when ok', () => {
+test('Robustness T-R0-5 — cross-package backbone partial/failed visibility: S0 fires in completeness.silenceFlags when crossPackageStatus is not ok, absent when ok', () => {
   const { buildCoverageReport } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
   const baseCtx = {
     packageRoots: ['fake-root'],
@@ -1298,17 +1298,17 @@ test('Robustness T-R0-5 — Graphify partial/failed visibility: S0 fires in comp
   };
 
   const failedReport = buildCoverageReport({ ...baseCtx, crossPackageError: new Error('codegraph cross-root pass failed') });
-  assert.equal(failedReport.graphifyStatus, 'failed');
+  assert.equal(failedReport.crossPackageStatus, 'failed');
   assert.ok(
     failedReport.completeness.silenceFlags.some((f) => f.startsWith('S0-cross-package-backbone-incomplete')),
-    'expected S0 to fire when graphifyStatus is failed'
+    'expected S0 to fire when crossPackageStatus is failed'
   );
 
   const okReport = buildCoverageReport({ ...baseCtx, crossPackageRun: { graph: { nodes: [], edges: [] }, resolveRoot: () => undefined } });
-  assert.equal(okReport.graphifyStatus, 'ok');
+  assert.equal(okReport.crossPackageStatus, 'ok');
   assert.ok(
     !okReport.completeness.silenceFlags.some((f) => f.startsWith('S0-cross-package-backbone-incomplete')),
-    'S0 must not fire when graphifyStatus is ok'
+    'S0 must not fire when crossPackageStatus is ok'
   );
 });
 
@@ -1755,6 +1755,86 @@ test('T-MR-3 — a service unit whose ONLY relationship is deployed-in must stil
   const completeness = computeCompleteness(units, relationships);
   assert.equal(completeness.servicesWithArchitectureOutbound, 1, 'only covered.py has a real architecture-grade outbound edge — lonely.py\'s deployed-in relationship must not count');
   assert.equal(completeness.architectureOutboundCoverage, 0.5, '1/2 services covered, not 2/2 — a deployed-in-only service must not be silently exempted from low-architecture-coverage review');
+});
+
+test('S6 (BACKLOG.md "Isolated-node completeness flag") — a unit with zero relationships touching it (either direction) is counted and flagged', () => {
+  const { computeCompleteness } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
+
+  const isolated = { id: 'orphan.py', kind: 'service', name: 'orphan.py', filePath: 'orphan.py', startLine: 1, endLine: 1, evidence: [], confidence: 80, status: 'observed' };
+  const sourceUnit = { id: 'a.py', kind: 'service', name: 'a.py', filePath: 'a.py', startLine: 1, endLine: 1, evidence: [], confidence: 80, status: 'observed' };
+  const targetUnit = { id: 'b.py', kind: 'database', name: 'b.py', filePath: 'b.py', startLine: 1, endLine: 1, evidence: [], confidence: 80, status: 'observed' };
+  const units = [isolated, sourceUnit, targetUnit];
+  const relationships = [{ from: 'a.py', to: 'b.py', kind: 'calls', crossPackage: false, source: 'graphify', grade: 'architecture', status: 'observed', id: 'r1' }];
+
+  const completeness = computeCompleteness(units, relationships);
+  assert.equal(completeness.isolatedNodeCount, 1, 'only orphan.py has zero relationships touching it — a.py and b.py are both real endpoints of r1');
+  assert.ok(
+    completeness.silenceFlags.some((f) => f.startsWith('S6-isolated-nodes')),
+    `expected an S6-isolated-nodes silenceFlag, got: ${completeness.silenceFlags}`
+  );
+
+  // Negative: no isolated units -> S6 must not fire, isolatedNodeCount 0.
+  const healthyCompleteness = computeCompleteness([sourceUnit, targetUnit], relationships);
+  assert.equal(healthyCompleteness.isolatedNodeCount, 0);
+  assert.ok(!healthyCompleteness.silenceFlags.some((f) => f.startsWith('S6')), 'no isolated units — S6 must stay silent');
+
+  // A unit referenced only as `to` (never `from`) still counts as touched —
+  // isolation means "zero relationships in EITHER direction," not "zero
+  // outbound."
+  const onlyTargetCompleteness = computeCompleteness([sourceUnit, targetUnit, isolated], [{ from: 'a.py', to: 'orphan.py', kind: 'calls', crossPackage: false, source: 'graphify', grade: 'architecture', status: 'observed', id: 'r2' }]);
+  assert.equal(onlyTargetCompleteness.isolatedNodeCount, 1, 'b.py now has zero relationships (r1 removed) so it — not orphan.py, which is now a real `to` endpoint — is the isolated one');
+});
+
+test('--strict-isolated-nodes: a run with an isolated unit fails loudly when the flag is passed, succeeds without it (BACKLOG row 16, S6)', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  const outDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const outDir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  try {
+    // The real spring-mvc-sample fixture has no relationships at all
+    // between its units (single-file, no cross-unit edges) — every unit it
+    // produces is structurally isolated, a real (not synthetic) S6 case.
+    const withoutFlag = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir1], { encoding: 'utf8' });
+    assert.doesNotMatch(withoutFlag, /FAILED \(--strict-isolated-nodes\)/, 'soft by default — must not fail without the flag');
+
+    assert.throws(
+      () => execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir2, '--strict-isolated-nodes'], { encoding: 'utf8', stdio: 'pipe' }),
+      /FAILED \(--strict-isolated-nodes\)/,
+      '--strict-isolated-nodes must turn a real isolated-unit run into a hard failure (process.exit(1)), same posture as --strict-detect'
+    );
+  } finally {
+    fs.rmSync(outDir1, { recursive: true, force: true });
+    fs.rmSync(outDir2, { recursive: true, force: true });
+  }
+});
+
+test('--strict-isolated-nodes also gates --from-facts reconstruction, not just a live scan (review-caught gap: isolatedNodeCount is honestly recomputed there per S1/S2\'s own "not a placeholder" comment, so the gate must apply too)', () => {
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
+  const scanOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const reconstructOutDirClean = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const reconstructOutDirStrict = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  try {
+    execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', scanOutDir], { encoding: 'utf8' });
+    const factsPath = path.join(scanOutDir, 'typed-facts.json');
+
+    // Without the flag: --from-facts must still succeed even though the
+    // reconstructed facts contain the same isolated units the live scan had.
+    const withoutFlag = execFileSync('node', [RUN_SLICE, '--from-facts', factsPath, '--out', reconstructOutDirClean], { encoding: 'utf8' });
+    assert.doesNotMatch(withoutFlag, /FAILED \(--strict-isolated-nodes\)/);
+
+    // With the flag: must fail loudly here too — this is the exact TDZ/
+    // wiring bug a review caught (strictIsolatedNodes was referenced in
+    // runFromFacts's call site before its own `const` declaration, which
+    // would have thrown "Cannot access 'strictIsolatedNodes' before
+    // initialization" on EVERY --from-facts invocation, not just this one).
+    assert.throws(
+      () => execFileSync('node', [RUN_SLICE, '--from-facts', factsPath, '--out', reconstructOutDirStrict, '--strict-isolated-nodes'], { encoding: 'utf8', stdio: 'pipe' }),
+      /FAILED \(--strict-isolated-nodes\)/
+    );
+  } finally {
+    fs.rmSync(scanOutDir, { recursive: true, force: true });
+    fs.rmSync(reconstructOutDirClean, { recursive: true, force: true });
+    fs.rmSync(reconstructOutDirStrict, { recursive: true, force: true });
+  }
 });
 
 test('Robustness T-R3-3 (trap-gold T3 promoted) — pure-helper classes (no HTTP/persistence/messaging/control evidence) must NOT become CALM nodes: lab lib-fintech-common produces ZERO nodes, calm validate 0 errors', () => {
@@ -3024,7 +3104,7 @@ test('Platform artefacts — coverage-report.json and unmapped-signals-report.js
     assert.equal(coverage.roots.length, 1);
     assert.equal(coverage.roots[0].nativeRouteCount, 3, 'NestJS fixture has 3 native routes');
     assert.equal(coverage.roots[0].filesByExt['.ts'], 1);
-    assert.ok(['ok', 'failed', 'skipped'].includes(coverage.graphifyStatus));
+    assert.ok(['ok', 'failed', 'skipped'].includes(coverage.crossPackageStatus));
 
     const unmapped = JSON.parse(fs.readFileSync(path.join(outDir, 'unmapped-signals-report.json'), 'utf8'));
     assert.equal(unmapped.clusterCount, 0, 'NestJS fixture has no unmapped signals — every decorator matches a catalogue rule');
@@ -5575,6 +5655,65 @@ test('--auto-codeql detection: Maven root derives a clean-compile build command,
   }
 });
 
+test('--auto-codeql detection: Gradle root with a pom.xml also present derives a Maven fallbackBuildCommand (BACKLOG row 26)', () => {
+  const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
+  const rootBoth = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  const rootGradleOnly = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
+  try {
+    fs.writeFileSync(path.join(rootBoth, 'build.gradle'), '// real gradle build file\n');
+    fs.writeFileSync(path.join(rootBoth, 'gradlew'), '#!/bin/sh\necho gradlew\n', { mode: 0o755 });
+    fs.writeFileSync(path.join(rootBoth, 'pom.xml'), '<project></project>\n');
+    const bothResult = detectCodeqlBuildConfig([rootBoth]);
+    assert.equal(bothResult.buildTool, 'gradle', 'Gradle stays primary when both build files exist — this only adds a fallback, never changes the preference order');
+    assert.ok(bothResult.fallbackBuildCommand, 'a real spring-petclinic-shaped repo (both build.gradle+gradlew and pom.xml) must get a Maven fallback — found 2026-08-21, Gradle toolchain resolution failed there while Maven compiled cleanly against the identical source');
+    assert.match(bothResult.fallbackBuildCommand, /^mvn /, 'no mvnw wrapper in this fixture, falls back to plain mvn');
+    assert.match(bothResult.fallbackBuildCommand, /clean compile/);
+
+    fs.writeFileSync(path.join(rootGradleOnly, 'build.gradle'), '// real gradle build file\n');
+    fs.writeFileSync(path.join(rootGradleOnly, 'gradlew'), '#!/bin/sh\necho gradlew\n', { mode: 0o755 });
+    const gradleOnlyResult = detectCodeqlBuildConfig([rootGradleOnly]);
+    assert.equal(gradleOnlyResult.fallbackBuildCommand, undefined, 'no pom.xml present — no fallback to infer, must stay undefined rather than guessing');
+  } finally {
+    fs.rmSync(rootBoth, { recursive: true, force: true });
+    fs.rmSync(rootGradleOnly, { recursive: true, force: true });
+  }
+});
+
+test('getOrBuildCodeqlDatabase: retries with fallbackBuildCommand only after the primary build genuinely fails (BACKLOG row 26)', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  const attemptedCommands = [];
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args[0] === 'version') return '';
+    if (Array.isArray(args) && args[0] === 'database' && args[1] === 'create') {
+      const commandArg = args.find((a) => a.startsWith('--command='));
+      attemptedCommands.push(commandArg);
+      if (commandArg.includes('gradlew')) throw new Error('simulated Gradle toolchain failure'); // the real spring-petclinic shape
+      return '';
+    }
+    throw new Error(`unexpected execFileSync call in this test: ${cmd} ${JSON.stringify(args)}`);
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+  const { getOrBuildCodeqlDatabase, resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    const dbPath = getOrBuildCodeqlDatabase('/fake/root', './gradlew compileJava', 'mvn clean compile');
+    assert.equal(attemptedCommands.length, 2, 'must try the primary Gradle command first, then the Maven fallback only after it fails');
+    assert.ok(attemptedCommands[0].includes('gradlew'));
+    assert.ok(attemptedCommands[1].includes('mvn'));
+    assert.ok(dbPath, 'the fallback build succeeding must still produce a real database path, not a silent undefined');
+
+    attemptedCommands.length = 0;
+    const dbPathAgain = getOrBuildCodeqlDatabase('/fake/root', './gradlew compileJava', 'mvn clean compile');
+    assert.equal(attemptedCommands.length, 0, 'identical (sourceRoot, primaryBuildCommand) must hit the cache, never re-attempt either build');
+    assert.equal(dbPathAgain, dbPath);
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
 test('--auto-codeql detection: no build.gradle/pom.xml at all returns undefined (never guesses a build)', () => {
   const { detectCodeqlBuildConfig } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-auto-detect'));
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-auto-codeql-'));
@@ -5718,6 +5857,73 @@ test('T-onboarding-18b — getOrBuildCodeqlDatabase builds at most once per (sou
     assert.notEqual(db3, db1);
   } finally {
     cp.execFileSync = originalExecFileSync;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
+test('getOrBuildCodeqlDatabase: daemon-reuse empty-database failure gets a distinct WARNING from a genuinely broken build (BACKLOG row 20 residual)', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (msg) => warnings.push(msg);
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args[0] === 'version') return '';
+    if (Array.isArray(args) && args[0] === 'database' && args[1] === 'create') {
+      // Real phrasing CodeQL's own CLI prints when a pre-existing Gradle
+      // daemon executes the real compile outside the tracer's process tree
+      // (found running a real 3-engine benchmark, 2026-08-21) — surfaced on
+      // execFileSync's thrown error the same way a genuine build failure is.
+      const err = new Error('codeql database create failed');
+      err.stderr = Buffer.from('CodeQL detected code written in Java/Kotlin but could not process any of it');
+      throw err;
+    }
+    throw new Error(`unexpected execFileSync call in this test: ${cmd} ${JSON.stringify(args)}`);
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+  const { getOrBuildCodeqlDatabase, resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    const dbPath = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile');
+    assert.equal(dbPath, undefined, 'still degrades to undefined — this only changes the WARNING text, never the graceful-degradation contract');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /daemon/i, 'a daemon-reuse empty database must name the real cause (a pre-existing build daemon), not just "build likely broke"');
+    assert.match(warnings[0], /--no-daemon/, 'must tell the caller the real, already-documented fix');
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    console.warn = originalWarn;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+    resetCodeqlDatabaseCacheForTests();
+  }
+});
+
+test('getOrBuildCodeqlDatabase: a genuinely broken build still gets the generic WARNING, not the daemon-reuse one', () => {
+  const cp = require('child_process');
+  const originalExecFileSync = cp.execFileSync;
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (msg) => warnings.push(msg);
+  cp.execFileSync = (cmd, args) => {
+    if (Array.isArray(args) && args[0] === 'version') return '';
+    if (Array.isArray(args) && args[0] === 'database' && args[1] === 'create') {
+      const err = new Error('codeql database create failed');
+      err.stderr = Buffer.from('BUILD FAILED: a real compile error, unrelated to any daemon');
+      throw err;
+    }
+    throw new Error(`unexpected execFileSync call in this test: ${cmd} ${JSON.stringify(args)}`);
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
+  const { getOrBuildCodeqlDatabase, resetCodeqlDatabaseCacheForTests } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'));
+  resetCodeqlDatabaseCacheForTests();
+  try {
+    getOrBuildCodeqlDatabase('/fake/root', 'mvn compile');
+    assert.equal(warnings.length, 1);
+    assert.doesNotMatch(warnings[0], /daemon/i, 'a genuinely broken build must not be misattributed to the daemon-reuse case just because a build failed');
+    assert.match(warnings[0], /build likely broke/);
+  } finally {
+    cp.execFileSync = originalExecFileSync;
+    console.warn = originalWarn;
     delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-database-cache'))];
     resetCodeqlDatabaseCacheForTests();
   }
@@ -5883,4 +6089,161 @@ test('engine-capability-matrix.yml: java/codeql-command-dispatch is marked prove
   const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
   const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
   assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-command-dispatch'), 'the shipped command-dispatch mechanism (408 real Fineract bindings, 2026-08-22) must be recorded as proven');
+});
+
+test('JPA entity->table CodeQL candidate — parseJpaTableCsv parses jpa_entity_table.ql\'s real 3-column output shape (real rows copied from a live run against Fineract, 2026-08-22)', () => {
+  const { parseJpaTableCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'));
+  const realCsv = [
+    '"entityClass","tableName","file"',
+    '"Charge","m_charge","fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/domain/Charge.java"',
+    '"Client","m_client","fineract-core/src/main/java/org/apache/fineract/portfolio/client/domain/Client.java"',
+  ].join('\n');
+  const bindings = parseJpaTableCsv(realCsv);
+  assert.equal(bindings.length, 2);
+  assert.equal(bindings[0].entityClass, 'Charge');
+  assert.equal(bindings[0].tableName, 'm_charge');
+  assert.equal(bindings[0].file, 'fineract-charge/src/main/java/org/apache/fineract/portfolio/charge/domain/Charge.java');
+
+  // Header-only / empty CSV -> 0 real bindings, not an error.
+  assert.deepEqual(parseJpaTableCsv('"entityClass","tableName","file"'), []);
+  assert.deepEqual(parseJpaTableCsv(''), []);
+
+  // A row with an empty table name is skipped, never a fact with a blank string.
+  assert.deepEqual(parseJpaTableCsv('"entityClass","tableName","file"\n"X","","x/X.java"'), []);
+});
+
+test('JPA entity->table CodeQL candidate — codeqlJpaTablePass enriches an ALREADY-detected persistence unit\'s evidence, never introduces a unit, never crosses an unscanned root boundary', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'));
+  const originalRun = provider.runCodeQLJpaTableResolution;
+
+  const chargeUnit = {
+    id: 'src/main/java/example/Charge.java',
+    kind: 'database',
+    name: 'Charge',
+    filePath: 'src/main/java/example/Charge.java',
+    startLine: 1,
+    endLine: 1,
+    evidence: [
+      { signal: 'Entity', source: 'decorator', category: 'persistence', weight: 40, ref: 'x:1' },
+      { signal: 'Table', source: 'decorator', category: 'persistence', weight: 10, ref: 'x:2' },
+    ],
+    confidence: 50,
+  };
+
+  provider.runCodeQLJpaTableResolution = () => [
+    { entityClass: 'Charge', tableName: 'm_charge', file: 'root/src/main/java/example/Charge.java' },
+    // A real class OUTSIDE the scanned root entirely — must be skipped, never guessed at.
+    { entityClass: 'Client', tableName: 'm_client', file: 'unscanned-root/src/main/java/example/Client.java' },
+  ];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+  const { codeqlJpaTablePass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'));
+
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [chargeUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [chargeUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlJpaTablePass.run(ctx);
+
+    assert.equal(ctx.allUnits.length, 1, 'corroboration-only — must never introduce a new unit, even for the real out-of-root Client binding');
+    assert.equal(chargeUnit.kind, 'database', 'must never change an already-correct classification');
+    assert.equal(chargeUnit.evidence.length, 3, 'expected exactly one new evidence entry added (the out-of-root Client binding produced none)');
+    const tableEvidence = chargeUnit.evidence.find((e) => e.source === 'codeql-jpa-table');
+    assert.ok(tableEvidence, 'expected a codeql-jpa-table evidence entry');
+    assert.equal(tableEvidence.signal, 'm_charge');
+    assert.equal(tableEvidence.category, 'persistence');
+    assert.equal(tableEvidence.weight, 10);
+    assert.equal(chargeUnit.confidence, 60, 'confidence must be recomputed via scoreConfidence after the new evidence is added (50 + 10)');
+
+    // Idempotency: running the SAME pass again must never push a duplicate.
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+    const { codeqlJpaTablePass: pass2 } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'));
+    pass2.run(ctx);
+    assert.equal(chargeUnit.evidence.length, 3, 'must never duplicate the identical table-name fact on a second run');
+  } finally {
+    provider.runCodeQLJpaTableResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+  }
+});
+
+test('JPA entity->table CodeQL candidate — codeqlJpaTablePass skips a binding whose file matches no existing unit (corroboration-only, never introduces one)', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'));
+  const originalRun = provider.runCodeQLJpaTableResolution;
+  provider.runCodeQLJpaTableResolution = () => [{ entityClass: 'Ghost', tableName: 'm_ghost', file: 'root/src/main/java/example/Ghost.java' }];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+  const { codeqlJpaTablePass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'));
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [],
+      allIgnoredItems: [],
+      unitsByRoot: new Map(),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlJpaTablePass.run(ctx);
+    assert.equal(ctx.allUnits.length, 0, 'no matching unit exists — must stay silent, never introduce one');
+  } finally {
+    provider.runCodeQLJpaTableResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+  }
+});
+
+test('JPA entity->table CodeQL candidate — codeqlJpaTablePass never attaches persistence evidence to a unit signal-mapper.ts classified as something other than database (review-caught gap, same precondition cdxgen-corroboration-pass.ts already enforces)', () => {
+  const provider = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'));
+  const originalRun = provider.runCodeQLJpaTableResolution;
+  // A real, if unusual, shape: a class carrying BOTH @Entity/@Table AND
+  // decisive HTTP-entry-point evidence — signal-mapper.ts's own
+  // decisive-category logic can classify this 'service', not 'database'.
+  const serviceUnit = {
+    id: 'src/main/java/example/HybridResource.java',
+    kind: 'service',
+    name: 'HybridResource',
+    filePath: 'src/main/java/example/HybridResource.java',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: 'Path', source: 'decorator', category: 'http-entry-point', weight: 40, ref: 'x:1' }],
+    confidence: 40,
+  };
+  provider.runCodeQLJpaTableResolution = () => [{ entityClass: 'HybridResource', tableName: 'm_hybrid', file: 'root/src/main/java/example/HybridResource.java' }];
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+  const { codeqlJpaTablePass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'));
+  try {
+    const ctx = {
+      packageRoots: ['/fake/root'],
+      allUnits: [serviceUnit],
+      allIgnoredItems: [],
+      unitsByRoot: new Map([['/fake/root', [serviceUnit]]]),
+      relationships: [],
+      codeqlSourceRoot: '/fake',
+      codeqlBuildCommand: './gradlew compileJava',
+    };
+    codeqlJpaTablePass.run(ctx);
+    assert.equal(serviceUnit.evidence.length, 1, 'a non-database unit must never receive persistence-category corroboration evidence, even when CodeQL genuinely resolved a real @Table binding for it');
+    assert.equal(serviceUnit.kind, 'service', 'kind must stay untouched either way — this pass never reclassifies');
+  } finally {
+    provider.runCodeQLJpaTableResolution = originalRun;
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'))];
+    delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'))];
+  }
+});
+
+test('JPA entity->table CodeQL candidate — codeqlJpaTablePass is a no-op unless BOTH codeqlSourceRoot and codeqlBuildCommand are set (opt-in only, never a default-on path)', () => {
+  const { codeqlJpaTablePass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/codeql-jpa-table-pass'));
+  const unit = { id: 'x', kind: 'database', name: 'x', filePath: 'x', startLine: 1, endLine: 1, evidence: [], confidence: 40 };
+  const ctx1 = { packageRoots: ['/fake'], allUnits: [unit], allIgnoredItems: [], unitsByRoot: new Map([['/fake', [unit]]]), relationships: [] };
+  codeqlJpaTablePass.run(ctx1);
+  assert.equal(unit.evidence.length, 0);
+
+  const ctx2 = { packageRoots: ['/fake'], allUnits: [unit], allIgnoredItems: [], unitsByRoot: new Map([['/fake', [unit]]]), relationships: [], codeqlSourceRoot: '/fake' };
+  codeqlJpaTablePass.run(ctx2); // build command missing -> still a no-op
+  assert.equal(unit.evidence.length, 0);
 });

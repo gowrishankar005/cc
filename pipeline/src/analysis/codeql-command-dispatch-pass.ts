@@ -50,7 +50,7 @@ export const codeqlCommandDispatchPass: AnalysisPass = {
 
     let bindings: CodeQLDispatchBinding[];
     try {
-      bindings = runCodeQLCommandDispatchResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand);
+      bindings = runCodeQLCommandDispatchResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand, ctx.codeqlFallbackBuildCommand);
     } catch (err) {
       console.warn(`[codeql-command-dispatch] WARNING: unexpected failure running CodeQL command-dispatch resolution, continuing without it: ${err}`);
       return;
@@ -78,7 +78,7 @@ export const codeqlCommandDispatchPass: AnalysisPass = {
 
       let handlerUnit = findUnitByFile(ctx.unitsByRoot, handlerLoc.root, handlerLoc.relativeFilePath);
       if (!handlerUnit) {
-        // T-FS-4-class introduction — CodeQL is the ONLY mechanism that
+        // CodeQL is the ONLY mechanism that
         // knows this class exists and is real (a string-keyed command
         // handler this pipeline's own catalogue-driven detection never
         // independently reached). Same conservative 'service' default and

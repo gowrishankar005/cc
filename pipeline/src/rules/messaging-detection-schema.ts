@@ -22,7 +22,7 @@ export interface MessagingDetectionCatalogue {
   strategies: MessagingStrategy[];
 }
 
-/** Mirrors persistence-detection-schema.ts's loader exactly (T-X7-2). */
+/** Mirrors persistence-detection-schema.ts's loader exactly. */
 export function loadMessagingDetectionCatalogue(catalogueDir: string = __dirname): MessagingDetectionCatalogue {
   const filePath = path.join(catalogueDir, 'messaging-detection-catalogue.yml');
   const raw = fs.readFileSync(filePath, 'utf8');

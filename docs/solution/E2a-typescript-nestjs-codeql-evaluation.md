@@ -48,7 +48,7 @@ Confirmed against the run's own baseline output (`out/ghostfolio-baseline`,
 CodeGraph + Graphify, no CodeQL): **zero relationships touch
 `data-provider.service.ts` at all** — this wiring is completely invisible
 to this pipeline's own import-tracing, the identical shape of gap `E1b`
-found for Fineract's `@Bean`-factory wiring.
+found for the reference Java/JAX-RS banking platform's `@Bean`-factory wiring.
 
 ## The query — generic, no hardcoded class/token names
 
@@ -90,7 +90,7 @@ Confirmed via `diff` on the two real `inject` arrays, not assumed. The
 exploratory query's `select` silently unions both registrations' results
 rather than flagging the token as ambiguously-registered — the identical
 class of gap `E1b` had to build explicit `ambiguousBeanFactory`/
-`ambiguousStereotype` refusal predicates for (Fineract's
+`ambiguousStereotype` refusal predicates for (the reference platform's
 `@ConditionalOnMissingBean`-guarded duplicate `@Bean` methods). **Not
 fixed here** — this exploratory query does not yet refuse, so its output
 should not be trusted as a finished mechanism, only as evidence the

@@ -1,10 +1,10 @@
 # Architect residual review session (VS Code agent + session pack)
 
-**Status:** **RS-0…RS-5 CLOSED, 2026-08-09** — real, tested, working code in `tools/review-session/` + `.github/chatmodes/residual-review.chatmode.md` (83 tests). `T-RS5-2`/`T-RS5-3` explicitly deferred (owner decision, reasons stated — see AGENT TASKS Residual Review Session's Program DoD). Two real, named open gaps remain: **`B-tier-b-detector`** (no detector currently classifies a residual Tier B, so LLM drafting has no real production input yet) and the live-model API path has never been exercised against a real key in this dev environment.  
+**Status:** **RS-0…RS-5 CLOSED, 2026-08-09; §3 redesigned 2026-08-23; recommendation/turn-taking hardened 2026-08-26** — real, tested, working code in `tools/review-session/` + `.github/agents/residual-review.agent.md` (83 tests; migrated from `.github/chatmodes/*.chatmode.md` 2026-08-25, see Changelog — current VS Code Copilot Chat no longer discovers the old location/format). `T-RS5-2`/`T-RS5-3` explicitly deferred (owner decision, reasons stated — see AGENT TASKS Residual Review Session's Program DoD). **`B-tier-b-detector` is partially closed, not open** — T-FS-1 (see `draft_tier_b.py`'s own docstring and §8's RS-4 row for the date and detail) gave `triage.py` one real Tier B producer (`multi-hop-single-candidate-below-threshold`); this line previously said the opposite and was corrected on review, see Changelog. **Corrected 2026-08-26 (previously contradicted this doc's own 2026-08-23 changelog row below it):** `draft_tier_b.py`/`advisory.py` **were** already exercised against a real key by T-1 (2026-08-23) — that part of the "never exercised" claim was stale. What's still real and current: `draft_tier_b.py` has not been re-verified since today's dossier work, and `dossier.py` itself got its **first-ever live `claude` CLI run today** (2026-08-26, commit `21b966c`, real success against a reference Java microservices banking sample's pack — see Changelog and `Architect_Pilot_Feedback_Notes.md` Entry 23).  
 **Product:** Weaver  
 **Related:** design v2 §7.1 (LLM advisory), §5.4 (overrides), intelligence IR (`intelligence-ir.md`); `coe-lab/docs/review-flow-capability-map.md`; `BACKLOG.md` **B-review-session** + **B-calm-portable-ir** + **B-tier-b-detector**; layered recovery **AGENT TASKS Layered Architecture Story** (**B-layered-story**); **implementation tasks:** AGENT TASKS Residual Review Session.  
 **Owner:** **Gowri**  
-**RS-0 sign-off:** **2026-08-08** — go-ahead granted; **do not skip safety** (no autonomous chat apply of `apply.py` / `run-slice` / override-applier — verified: the chat-mode's `tools:` allowlist has no terminal tool, S4 mechanically tested).
+**RS-0 sign-off:** **2026-08-08** — go-ahead granted; **do not skip safety** (no autonomous chat apply of `apply.py` / `run-slice` / override-applier — the real guarantee is `apply.py`'s own explicit confirmation gate, not any chat host's `tools:` allowlist; see Changelog 2026-08-23 and §4.4).
 
 **Phase IDs in this document are `RS-*` (Residual Session), not `L*`.**  
 `L0–L4` in this repo mean the **layered-architecture-story** agent program only. Do not conflate them.
@@ -105,12 +105,32 @@ The single biggest adoption risk in the original design is that Tier A "architec
 │  [4] Other…            — free text (requires 1-line rationale)          │
 │                                                                          │
 │  Evidence: class-ownership-resolver match (PrismaClient, source L1-L4) │
+│                                                                          │
+│  My read (not a decision): [only present if an evidence dossier was    │
+│  built for this residual — pack.py --with-dossier, see §3.0] ...       │
+│                                                                          │
 │  Similar decisions this session: none yet                              │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
 Rules for building a choice card, not just its look:
 
+- **A dossiered card's "My read" line is rendered into the card at
+  pack-build time, from `dossier.py`'s validated response — never authored
+  live by the chat model reading the card.** Found live (`Architect_Pilot_
+  Feedback_Notes.md` Entries 21/22): asking the chat model to freshly write
+  an evidence-grounded recommendation on top of an already-presented card,
+  in two different instruction phrasings, failed both times in real
+  reproduction. `cards.py`'s `_dossier_block` closes this by making the
+  recommendation part of the card itself, so the model's job stays
+  "reproduce verbatim" — the one thing it already does reliably. No dossier
+  built (no `--with-dossier`, or no backend at pack-build time) → the card
+  says so plainly; the chat model must never supply its own recommendation
+  to fill the gap.
+- **Evidence citations show a clickable, workspace-relative path**
+  (`file:line` relative to the repo root, not the bare package-root-relative
+  scan ref) whenever the cited source file resolves inside the repo — see
+  `evidence/paths.json`, §4.1.
 - **Options come from a fixed generator per residual class** (§3's Tier A table maps 1:1 to a card template — ontology judgment always offers `{typeA, typeB, leave-open, other}`; multi-candidate bridge always offers `{each candidate, none-of-these, leave-open, other}`), never from the LLM inventing plausible-sounding categories on the fly. This keeps Tier A answerable in seconds and keeps the option set auditable — the same card template produces the same options given the same evidence, independent of model variance.
 - **"Other…" always requires one line of rationale**, captured verbatim into the Decision Record's `rationale` field — never silently defaulted.
 - **Every card must show its evidence inline** (the file:line / class-ownership / import match that produced the options) so the architect is deciding from what the tool found, not trusting a summary.
@@ -121,9 +141,58 @@ Rules for building a choice card, not just its look:
 
 ## 3. Residual taxonomy
 
-### Tier A — Architect must decide
+**Redesigned 2026-08-23** (see Changelog) — this section is now the single
+authoritative source of truth for every residual a Session Pack can ever
+show an architect, and is meant to be kept mechanically in sync with the
+code that produces residuals (see `CLAUDE.md`'s "Working in this repo"
+rule and the `check-residual-taxonomy-sync.js` follow-on task in
+`AGENT_TASKS_Residual_Assist_Redesign.md`). **A change to a producer listed
+in the table below is not done until this section is updated in the same
+diff.**
 
-LLM may **prepare context**, not finalise alone.
+### 3.0 Two independent axes, not one conflated question
+
+Earlier versions of this taxonomy conflated "how much evidence-grounded
+reasoning does the architect get for this residual" with "is the LLM
+allowed to write an Override for it." They're different questions, answered
+separately:
+
+- **Tier (A/B/C)** — a **write-permission ceiling**. It answers only:
+  may the LLM ever propose a Decision Record + Override for this residual,
+  and under what evidence bar. It says nothing about how much the LLM is
+  allowed to *explain*.
+- **Evidence Dossier** — an **explanation**, applicable to **every**
+  residual regardless of tier, when an LLM backend is available (in-chat
+  Copilot, or a headless run — see below for what "headless" means here).
+  It is never a second, independent corroborating signal for a fact — a
+  human accepting a dossier's hypothesis via a card is one human judgment,
+  not two — and it never counts toward Tier B's own evidence bar on its
+  own. This is what makes "informed decision" real instead of aspirational:
+  a Tier A card isn't just a bare menu, a Tier C card explains *why*
+  nothing can be invented instead of silently refusing. **Decided
+  2026-08-23, with real evidence, not asserted**: the headless dossier pass
+  is **opt-in behind an explicit flag**, not automatic whenever a backend
+  is available — `AGENT_TASKS_Residual_Assist_Redesign.md`'s T-1 (real
+  live runs, the first ever in this project) measured $0.08–$0.32 and
+  40–132 seconds per residual, which rules out running it unprompted on
+  every `pack.py` build, matching the `--auto-codeql` precedent this
+  section anticipated before T-1 ran. T-1 also found the "headless backend"
+  in practice can be the `claude` CLI itself (already authenticated,
+  no `ANTHROPIC_API_KEY` needed) — the same secret-free convenience
+  in-chat Copilot already has, not a separate managed-secret requirement.
+  See that document's own T-1 row for the full real-run evidence.
+  **Corrected 2026-08-26 (`Architect_Pilot_Feedback_Notes.md` Entry 23):**
+  when a dossier is built, its `{explanation, hypotheses, evidenceRefsUsed}`
+  is not just "available for the chat model to narrate" — `cards.py`
+  renders it directly into the residual's own `card` markdown (a `**My
+  read (not a decision):**` section, §2.1) before the chat model ever sees
+  it. This was a real gap, not a design choice stated here and simply
+  unbuilt: `cards.py` never read `residual["dossier"]` until this date,
+  which is why two earlier attempts to get the recommendation to appear by
+  instructing the chat model to author it live both failed in real,
+  reproduced sessions.
+
+### Tier A — Architect must decide, LLM may only explain
 
 | Class | Examples | Choice-card options (generator-fixed; not LLM-invented) |
 |---|---|---|
@@ -131,13 +200,14 @@ LLM may **prepare context**, not finalise alone.
 | Ontology judgment | Prisma / ORM service-vs-database | `{typeA, typeB, leave-open, other}` (e.g. database vs service) |
 | Multi-candidate / zero-candidate bridges | R2 ambiguous skip | `{each in-scope candidate unit, none-of-these, leave-open, other}` — **not** free invention of missing modules |
 | Security authority / policy | What *should* be required | Policy options + leave-open + other (does not invent controls without override support — see H4) |
-| Promote large clusters to product claim | “Claim SQS for this pilot?” | Promote / defer / leave-open / other |
+| Promote large clusters to product claim | "Claim SQS for this pilot?" | Promote / defer / leave-open / other |
+| Contradicting evidence (T-FS-3) | Two evidence sources disagree on a value | `{source A's value, source B's value, leave-open, other}` — deliberately never Tier B even with exactly two candidates, since picking between two *equally* evidenced sources is exactly what Tier B's own bar refuses |
 
-**Command-bus / dynamic dispatch** is **not** Tier A “pick an edge.” It is **Tier C / permanent OOS** for inventing relationships: choice card if shown at all is only `{document as OOS, leave open, (optional) multi-root rescan if roots incomplete}` — never `relationship_add` without both endpoints already in TypedFacts.
+**Command-bus / dynamic dispatch** is **not** Tier A "pick an edge." It is **Tier C / permanent OOS** for inventing relationships: choice card if shown at all is only `{document as OOS, leave open, (optional) multi-root rescan if roots incomplete}` — never `relationship_add` without both endpoints already in TypedFacts.
 
-**AP-4 (Architect_Pilot_Feedback_Notes.md Entry 8) — the `leave-open` card option maps to `final_decision.action: "accepted"`, by design, not by inference.** `DecisionRecord`'s `action` enum has no dedicated `leave-open` value; `"accepted"` is the designated one for this outcome — it means "the scan's finding (nothing real to connect/change here) is confirmed correct," not "a proposed edit was accepted." No Override is written alongside it (nothing in CALM changes) — the Decision Record alone is the audit trail. Stated explicitly here after this was found to be the single most common real Tier A outcome across two pilot sessions (3/3 residuals in both the reference Java/JAX-RS banking platform and the reference Python microservices banking app runs), and had to be inferred rather than looked up.
+**AP-4 (Architect_Pilot_Feedback_Notes.md Entry 8) — the `leave-open` card option maps to `final_decision.action: "accepted"`, by design, not by inference.** `DecisionRecord`'s `action` enum has no dedicated `leave-open` value; `"accepted"` is the designated one for this outcome — it means "the scan's finding (nothing real to connect/change here) is confirmed correct," not "a proposed edit was accepted." No Override is written alongside it (nothing in CALM changes) — the Decision Record alone is the audit trail. Stated explicitly here after this was found to be the single most common real Tier A outcome across two pilot sessions (3/3 residuals in both the reference Java/JAX-RS banking platform and the reference Python microservices banking app runs), and had to be inferred rather than looked up. **This is also this design's stated completion bar going forward: an architect "completes" a Session Pack by *reviewing* every residual to a real decision — including `leave-open`/document-as-OOS — not by driving open-residual count to zero.**
 
-### Tier B — LLM may draft if evidence bar met
+### Tier B — LLM may draft if evidence bar met, else falls through to Tier A
 
 | Class | Minimum evidence | Allowed draft |
 |---|---|---|
@@ -147,7 +217,7 @@ LLM may **prepare context**, not finalise alone.
 | Promote ignored item with clear signal | Snippet maps to known category | `node_add` (+ optional connects) |
 | Auth present but not matched | Prefer **catalogue proposal** if recurring | Catalogue lane first (`suggest-rules` / proposed-updates) |
 
-If bar fails → **do not decide** → Tier A or leave open.
+**If the bar fails, this is a real, named state transition, not a silent reclassification**: the residual stays `tier: "B"` in `residuals.json` (its class doesn't change — it's still the same evidence shape), but gains `draftOutcome: "bar-not-met"` and is presented to the architect exactly like a Tier A card (fixed-option menu, no draft attached). A future reader of `residuals.json` should be able to tell "this was eligible for LLM drafting and the bar wasn't met" apart from "this was never eligible at all" — that distinction is real information (it tells the architect the evidence was close, not absent).
 
 #### H4 — v1 residual closes nodes/relationships better than controls
 
@@ -162,7 +232,7 @@ First-class Override types today emphasize **nodes** and **connects** (`node_add
 
 **Effective IR §4** still **lists** control evidence (and HTTP-without-control silence) from post-override CALM — honesty about controls does not require v1 residual to *write* controls. When control override exists later, add a Tier B class; until then this is a named v1 limitation, not a silent gap.
 
-### Tier C — Do not invent
+### Tier C — Never drafts, but still gets a dossier explaining why
 
 | Class | Action |
 |---|---|
@@ -171,6 +241,56 @@ First-class Override types today emphasize **nodes** and **connects** (`node_add
 | Unresolvable external HTTP | Leave unresolved / ignored |
 | Entity–entity structural noise | Grade/filter policy — not free-form LLM cleanup |
 | Unmapped ≥5 occurrences | Catalogue session (`suggest-rules` or equivalent proposal file) |
+
+### 3.1 Producer registry — every real source of a residual, checked against current code (2026-08-23)
+
+This table is the mechanically-enforced link between "a residual exists in
+the code" and "an architect can find out about it here." Populated by
+grepping the actual producers, not carried forward from an earlier draft
+of this doc. **The enforcement is real, not aspirational**: `pipeline/scripts/check-residual-taxonomy-sync.js`
+(CI-wired via `.github/workflows/residual-taxonomy-sync.yml`) fails a diff
+that changes `coverage-report.ts`'s `silenceFlags`, `typed-facts.ts`'s
+`IgnoredItem.reason` union, or `triage.py`'s `_TRIGGER_MAP` without this
+section also changing in the same diff.
+
+**`coverage-report.ts`'s `silenceFlags`** (surfaced via `review-queue.json`, `hitl-review-trigger.ts`):
+
+| Flag | Producer | Tier | Class |
+|---|---|---|---|
+| `S1-zero-service-touching-relationships` | `coverage-report.ts` `computeCompleteness` | A | multi-candidate-bridge |
+| `S2-http-without-security-control` | `coverage-report.ts` `computeCompleteness` | A | security-authority-policy |
+| `S5-zero-service-units-with-store-present` | `coverage-report.ts` `computeCompleteness` | A | ontology-judgment |
+| `S5-cfn-routes-found-but-unbound` | `coverage-report.ts` `computeCompleteness` | C | missing-intermediates-not-in-scan |
+| `S6-isolated-nodes` | `coverage-report.ts` `computeCompleteness` | — (soft flag, informational; not a `review-queue.json` residual trigger today — `--strict-isolated-nodes` is the hard-gate opt-in, not a pack input) | — |
+| `S0-cross-package-backbone-incomplete` | `coverage-report.ts` `computeCompleteness` | — (soft flag, informational; not a `review-queue.json` residual trigger today — same pattern as `S6` above) | — |
+| `low-architecture-coverage` | `hitl-review-trigger.ts` | A | multi-candidate-bridge |
+
+**`typed-facts.ts`'s `IgnoredItem.reason` union** — only two of the eight declared reasons are actually pulled into a Session Pack today (`triage.py`'s `_IGNORED_REASONS` frozenset); the rest are either filtered as noise or currently unused by any producer, checked directly, not assumed:
+
+| Reason | Producer(s) | Reaches a pack? |
+|---|---|---|
+| `INSUFFICIENT_EVIDENCE` | `ignored-items.ts` (`ignoreUnknownSignal`) | Yes — ambiguous residual |
+| `AMBIGUOUS_BOUNDARY` | `cdxgen-corroboration-pass.ts` | Yes — ambiguous residual |
+| `TEST_CODE` | `passes.ts`, `messaging-pass.ts`, `cross_package/outbound-http-detector.ts` | No — deliberately filtered as noise (real, expected exclusions, not review candidates) |
+| `CROSS_DOMAIN_UNRESOLVED` | `cfn-route-pass.ts`, `cross_package/outbound-http-detector.ts`, `cross_package/k8s-deployment-detector.ts`, `cross_package/k8s-trust-detector.ts`, `cross_package/env-soft-graph-detector.ts`, `cross_package/multi-hop-bridge-detector.ts` | No — filtered as noise today; a real, disclosed gap if any of these turn out to be architect-relevant rather than genuine noise (not yet evaluated) |
+| `GENERATED_CODE` | None — declared in the type, never produced by any pass | N/A |
+| `PURE_UTILITY` | None — declared in the type, never produced by any pass | N/A |
+| `EXCLUDED_BY_CONFIG` | None — declared in the type, never produced by any pass | N/A |
+| `OTHER` | None — declared in the type, never produced by any pass | N/A |
+
+**`triage.py`'s `_TRIGGER_MAP`** (the actual tier/class dispatch table — this is the literal source `residuals.json` is built from, so this row of the table is the one most likely to drift and the one the mechanical sync check watches most closely):
+
+| Trigger | Tier | Class |
+|---|---|---|
+| `S1-zero-service-touching-relationships` | A | multi-candidate-bridge |
+| `low-architecture-coverage` | A | multi-candidate-bridge |
+| `S2-http-without-security-control` | A | security-authority-policy |
+| `S5-zero-service-units-with-store-present` | A | ontology-judgment |
+| `S5-cfn-routes-found-but-unbound` | C | missing-intermediates-not-in-scan |
+| `multi-hop-single-candidate-below-threshold` | B | single-candidate-below-threshold |
+| `contradicting-evidence-force-review` | A | contradicting-evidence |
+
+Plus two producers not routed through `_TRIGGER_MAP` at all: **unmapped-signal clusters** (`unmapped-signals-report.json`, ≥5 occurrences → catalogue lane, <5 → Tier C noise) and **multi-hop bridge zero/2+-candidate refusals** (`multi-hop-bridge-detector.ts`'s own ignored items, folded into the `S1`/`low-architecture-coverage` Tier A class above rather than a separate trigger).
 
 ---
 
@@ -211,6 +331,9 @@ review-sessions/<run-id>/
   residuals.json             # unified A/B/C queue + status
   evidence/
     packs.json               # redacted snippets where available
+    paths.json                # ref -> REPO_ROOT-relative "path:line" map
+                               # (source resolves inside the repo only,
+                               # added 2026-08-26, Entry 20)
     unit-index.json          # thin unitId → kind, confidence, refs
   drafts/
     decisions/               # DecisionRecord JSON
@@ -253,7 +376,7 @@ Do **not** dump full Graphify graphs into the pack (tokens + privacy).
 
 Confirmed direction: architects interact via **GitHub Copilot Chat inside VS Code**, not a custom-built VS Code extension. That changes the implementation shape of "the agent" — it isn't a new UI, it's a **bound Copilot Chat configuration** pointed at the Session Pack:
 
-- **Decided: chat-mode/instructions file only, no MCP server.** `.github/chatmodes/residual-review.chatmode.md` (or a repo `.github/prompts/residual-review.prompt.md`) is `AGENTS.md` (§4.1) expressed in Copilot Chat's own instructions format — scopes a chat session to the playbook rules in §5: "read `SESSION.md` + `residuals.json` first, never scan the whole repo, never edit `typed-facts.json`, write only under `drafts/`."
+- **Decided: chat-mode/instructions file only, no MCP server.** `.github/agents/residual-review.agent.md` (or a repo `.github/prompts/residual-review.prompt.md`) is `AGENTS.md` (§4.1) expressed in Copilot Chat's own instructions format — scopes a chat session to the playbook rules in §5: "read `SESSION.md` + `residuals.json` first, never scan the whole repo, never edit `typed-facts.json`, write only under `drafts/`."
 - **Correction (found on review, was wrong as originally written): "drafts/ is inert until a human runs apply.py" is not true by default in Copilot Chat's agent mode.** Agent mode can execute terminal commands and edit arbitrary workspace files when the user has granted tool/terminal permissions — which is precisely the mode a chat-mode/instructions file is built to enable. Without an explicit restriction, nothing stops the chat agent from invoking `apply.py`/`run-slice`/`override-applier` itself, mid-conversation, which collapses the separation this design's integrity story depends on. This is now a **hard requirement of the chat-mode configuration, not an assumption**:
   1. The chat-mode file's declared tool/permission set **must not** include unrestricted terminal execution. Either deny terminal tools entirely for this mode, or require VS Code's per-command confirmation prompt (never "auto-approve") for any command touching `run-slice`, `apply.py`, or `override-applier`.
   2. `apply.py` (§8 **RS-3**) itself is the actual backstop, and it re-validates every draft against the Decision Record/Override JSON schema and the integrity rules already in `override-applier.ts` (active-decision-only, no dangling refs) before calling anything real — so even a permitted invocation still gets rejected there if a draft is malformed. But rule 1 is what keeps that invocation an explicit, confirmed architect action rather than something the model did on its own initiative.
@@ -283,12 +406,21 @@ Bound playbook (not free-form monorepo chat):
 7. `reviewer`: `architect:<id>` or `llm-advisory:<model>` (and whether architect pre-authorized Tier B).
 8. Weak multi-hop → `cannot_decide`, leave S1 honest.
 9. Prefer catalogue when same unknown signal ≥5 times.
+10. **Present exactly one residual's card at a time, then stop** — do not
+    draft, decide, or move to the next residual until the architect replies
+    to that specific one (a reply of `1`/`2`/`leave-open`/`other: ...`, or an
+    explicit bulk-apply request per §2.1). Added 2026-08-26 after a real,
+    live failure (`Architect_Pilot_Feedback_Notes.md` Entry 24): asked to
+    "start the review," the chat agent decided all 23 residuals in one reply
+    without ever presenting a card. An open-ended request to "start" or
+    "review everything" means show the first card — it is never permission
+    to decide on the architect's behalf.
 
 ### Interaction modes
 
 | Mode | v1? | Behaviour |
 |---|---|---|
-| **Guided** | **Yes (default)** | Ask all Tier A; draft Tier B; architect approves apply |
+| **Guided** | **Yes (default)** | Ask each Tier A item **one at a time** — present its card, architect replies, then the next is shown (§5 item 10); draft Tier B; architect approves apply |
 | Semi-auto | Later | Tier B auto-draft; one “approve all B” |
 | Auto-B | Later opt-in | Auto-apply only allowlisted, high-evidence relationship_add |
 
@@ -698,6 +830,12 @@ So: **yes, a queryable model is realistic and mostly already present as CALM; fu
 
 | Date | Note |
 |---|---|
+| 2026-08-26 | **Real pilot findings against a reference Java microservices banking sample's pack closed five real gaps in one session** (`Architect_Pilot_Feedback_Notes.md` Entries 20–24; commits `037e572`..`4a9abca`). (1) **Entry 20** — evidence citations were relative to whichever scanned package root produced them, not the VS Code workspace root the architect has open, so they weren't clickable; `pack.py` now writes a companion `evidence/paths.json` (§4.1) and `cards.py` shows the resolved, REPO_ROOT-relative path when it resolves inside the repo. (2) **Entries 21/22** — architect asked for the agent to recommend an answer, not just present a bare menu, since they often don't own the code under review; Hard Rule 4 was widened to require a `**My read (not a decision):**` paragraph, then a real live-reproduced rule conflict (the "present verbatim" instruction from Entry 18 read as forbidding any addition) was found and patched — **superseded by (3) below**, kept for the record since it documents a real, reproduced failure mode. (3) **Entry 23** — the widened-instruction approach still failed live a second time (the model never produced the paragraph, even in a fresh session); per this repo's own "two failed fix attempts is a stop signal" convention, the mechanism was re-derived instead of the prose patched a third time: `cards.py`'s new `_dossier_block` renders the recommendation deterministically from `dossier.py`'s already-validated `{explanation, hypotheses, evidenceRefsUsed}` response (§3.0), attached before cards are built when `--with-dossier` is set — the chat model's job shrinks back to verbatim reproduction. Verified against a real, first-ever live `claude` CLI dossier run for this project. (4) **Entry 24** — with the recommendation now working, a more serious live failure surfaced: asked to "start the review," the agent silently decided all 23 residuals itself in one reply, never presenting a single card. New hard rule (§5 item 10) requires presenting exactly one residual at a time and stopping until the architect replies to that specific one; "Guided" mode's table cell (§5) tightened to state this explicitly, since the previous "Ask all Tier A" wording didn't rule out the failure that occurred. Status line and §2.1/§3.0/§4.1 corrected in the same pass to reflect all of the above and to fix a separate, pre-existing contradiction between the status line and this doc's own 2026-08-23 row (the "never exercised against a real key" claim was stale for `draft_tier_b.py`/`advisory.py`, which T-1 had already run live). |
+| 2026-08-25 | **Migrated `.github/chatmodes/residual-review.chatmode.md` → `.github/agents/residual-review.agent.md`.** Found by the architect trying the guide hands-on in real VS Code (per Changelog's own 2026-08-23 correction, which flagged the chat-mode `tools:` allowlist claim as host/version-fragile but didn't yet know the file's whole location/format had itself gone stale): the screenshot showed the mode picker not offering this agent at all — confirmed via direct fetch of current VS Code docs (not secondhand search) that `.chatmode.md`/`.github/chatmodes/` is no longer a documented discovery location; current Copilot Chat only reads `.agent.md` files under `.github/agents/`, with an explicit migration note in VS Code's own docs. `description`/`tools` frontmatter fields map directly (confirmed against VS Code's own field reference before assuming) — same content, same S4 safety framing, same §5.1 hard rules, only the file's name/location/extension changed, plus an added `name:` field for a clean picker label. All cross-references updated (`apply.py`, `draft_tier_b.py`, `pack.py`, `test_chatmode_safety.py`'s `CHATMODE_PATH`, `tools/review-session/README.md`, `Architect_Guide_Scan_To_Signoff.md`, this doc's §4.4/status line) — dated historical records (`Architect_Pilot_Feedback_Notes.md` Entries 9/16, this doc's own pre-2026-08-25 changelog rows, `AGENT_TASKS_Architect_Pilot_Fixes.md`) deliberately left referencing the old path, since they're accurately describing what was true when each was written, not the current state. |
+| 2026-08-23 | **T-1 (`AGENT_TASKS_Residual_Assist_Redesign.md`) closed — the first real live-model run of `draft_tier_b.py`/`advisory.py` in this project's history.** Backend used: the `claude` CLI itself (already authenticated in this environment) — deliberately the ONLY backend, no raw-`ANTHROPIC_API_KEY`-from-environment fallback at all (owner directive, 2026-08-23: this project's fintech target-customer profile doesn't leave API keys in environment variables for an LLM to pick up). Three real bugs found and fixed from real responses, not hypothesized: a bare markdown JSON fence around the model's answer; a second case where the model prefixed a paragraph of prose BEFORE the fence, which the first fix didn't catch (fixed by searching for a fenced block anywhere in the text, both files); and a 120s subprocess timeout that was too short for a real Tier B drafting call (one real call measured 131.75s) — raised to 240s with the real number as justification. Real costs/latencies captured: `advisory.py` (dossier-shaped, explanation only) ≈ $0.08/40–49s per residual; `draft_tier_b.py` (Tier B drafting) up to $0.32/47–132s per residual — both non-trivial, and the same synthetic Tier B residual run twice produced two different real outcomes (a full draft, then `cannot_decide`), a genuine reliability finding, not a bug. §3.0 corrected from "left open" to a real decision: **the dossier pass is opt-in behind an explicit flag, not automatic** — T-1's numbers are why. Full evidence in `AGENT_TASKS_Residual_Assist_Redesign.md`'s T-1 row; T-2 (shared evidence-assembly module, dossier wiring) is now unblocked. Test suite hygiene fix in the same pass: `test_draft_tier_b.py`/`test_advisory.py`'s own "no key" tests were unintentionally exercising the real `claude` CLI on any machine that has it on `PATH` (this one included) once the CLI-preferring change landed — fixed by neutralizing `PATH` in those specific subprocess tests so they stay deterministic regardless of what's installed on the machine running them. |
+| 2026-08-23 | **`AGENT_TASKS_Residual_Assist_Redesign.md` resequenced before any task started, and §3.0's dossier description corrected to match.** Caught on review, same day as the redesign below: the original task order built the shared evidence-assembly module and wired a dossier pass into every `pack.py` run *before* the live-key verification — designing a mechanism, and asserting it runs "by default," ahead of the one real data point (an actual model run) that should inform both. Reordered so the live-key smoke test (unmodified `draft_tier_b.py`/`advisory.py`, no refactor) runs first and its captured latency/cost/quality data feeds the shared-module design and the default-on-vs-opt-in decision, instead of the reverse. §3.0 corrected from "attempted for every residual... when an LLM backend is available" (asserted default-on) to naming that as an open, cost-sensitive decision this repo already has precedent for treating cautiously (`--auto-codeql`'s own reasoning) — to be closed with real evidence, not asserted in this doc first. |
+| 2026-08-23 | **§3 (Residual taxonomy) redesigned — two independent axes instead of one conflated question, plus a fully code-verified producer registry.** Prompted by two real findings: (1) this doc's own top status line said "no detector produces Tier B" while §8's RS-4 row and `draft_tier_b.py`'s own docstring said T-FS-1 already closed that gap — a real, caught drift between this doc and the code, now fixed at the source (line 3 corrected) and structurally guarded going forward (see below). (2) Tier A/B/C was conflating "how much LLM-explained evidence does the architect get" with "may the LLM write an Override" — only the second was actually designed; the first (an evidence-grounded explanation for every residual, not just the ones someone remembers to run `advisory.py` against) is now a named, orthogonal **Evidence Dossier** concept (§3.0), decoupled from tier. Tier B's "if the bar fails" path is now a named state (`draftOutcome: "bar-not-met"`), not a silent reclassification to Tier A. **New §3.1 producer registry** enumerates every real `silenceFlags` push (`coverage-report.ts`), every `IgnoredItem` reason (`typed-facts.ts` — checked directly: `GENERATED_CODE`/`PURE_UTILITY`/`EXCLUDED_BY_CONFIG`/`OTHER` are declared but never produced by any pass today, `TEST_CODE`/`CROSS_DOMAIN_UNRESOLVED` are produced but deliberately filtered out of every pack as noise), and every `triage.py` `_TRIGGER_MAP` row — checked against real code, not carried forward from the prior draft of this table. **Governance, not just a one-time fix**: new CLAUDE.md rule requires this section to be updated in the same diff as any change to a residual producer; `AGENT_TASKS_Residual_Assist_Redesign.md` (new) breaks the follow-on build (a mechanical CI sync check modeled on `check-generalization.js`, a `fetch-span --anchor/--context-lines` extension, merging `advisory.py`'s evidence-assembly logic into a shared step the dossier and Tier-B-draft paths both call, and — the one exit condition that can't be faked — actually running `draft_tier_b.py`/the new dossier step against a real `ANTHROPIC_API_KEY` for the first time) into session-sized tasks, not attempted in this same pass. |
+| 2026-08-23 | **The 2026-08-10 row below is superseded, not deleted — its "structurally true in VS Code" conclusion was itself an overclaim, caught on review.** That row correctly moved off one universal "genuinely can't" claim to a per-host one, but "the model genuinely had no terminal tool available" (VS Code) and "the chat mode's `tools:` allowlist is the enforcement mechanism" both still treated a chat host's declared-tool restriction as a safety guarantee. It isn't, in either host: Copilot Chat can propose invoking any tool made available to it (including a terminal/run-command tool) in any host — normal behavior, not a bug — and even where a per-action confirmation prompt gates that by default, VS Code documents settings that turn the prompt off entirely (`chat.tools.autoApprove` / `chat.tools.terminal.autoApprove` allow/deny lists, and a sandboxed-terminal mode that auto-approves with no prompt at all — `code.visualstudio.com/docs/agents/run/approvals`). None of that is this repo's to control or verify per architect. **The one guarantee this design actually gets to make**: `apply.py` — the only code path that ever writes to `architecture.calm.json` from a Session Pack — is this repo's own code, not an IDE preference, and refuses to run without its own separate, explicit confirmation (a typed prompt, or `--i-confirm-apply`) regardless of what any chat client, host, or auto-approve setting did upstream. `.github/chatmodes/residual-review.chatmode.md`'s header comment, `tools/review-session/README.md` rule 4, `pack.py`'s embedded `SESSION.md`/`AGENTS.md` text, and `test_chatmode_safety.py`'s docstring all corrected to state this once, consistently — the chat-mode `tools:` allowlist is now described as defense-in-depth friction, never as proof anything is impossible. **`B-chatmode-host-enforcement-gap` removed as a "gap to close"** (there's no gap once the guarantee is correctly placed on `apply.py`) — see `BACKLOG.md` for the reframed, lower-priority follow-on question this leaves open. |
 | 2026-08-10 | **§4.4's safety claim tested live in a second real host — confirmed host-scoped, not universal.** A real architect pilot (`Architect_Pilot_Feedback_Notes.md` Entries 9, 16) ran the chat mode in both VS Code + GitHub Copilot Chat (safety claim held — the model genuinely had no terminal tool available, architect ran `apply.py` manually) and Claude Code chat (safety claim did NOT hold — the model had live `Bash` access despite the identical `tools:` frontmatter). `.github/chatmodes/residual-review.chatmode.md`'s header comment corrected to state this explicitly per-host rather than as one universal "genuinely can't" claim (**B-chatmode-host-enforcement-gap**, `AGENT_TASKS_Architect_Pilot_Fixes.md` Phase AP-2). Structurally closing the gap for non-VS-Code hosts (e.g. a pre-flight check in `apply.py`/`override-applier.ts`) is a separate, not-yet-decided follow-on, not part of this correction. |
 | 2026-08-09 | **Program CLOSED — RS-0 through RS-5, this document's own header/§8/§10 updated to stop saying "not yet code."** Real, tested implementation now exists (`tools/review-session/`, `.github/chatmodes/residual-review.chatmode.md`, 83 tests) — see this program's Program DoD for the closure evidence. Two real, named gaps remain, tracked as their own backlog items: **B-tier-b-detector** (no detector currently produces a Tier B residual) and the live-model API path (never exercised against a real key in this dev environment — works normally for a pilot operator with their own Copilot/API access). Two items explicitly deferred, owner decision, reasons stated at their own task rows. |
 | 2026-08-09 | **Finding (2) from the post-sign-off review closed**: §3 Tier B taxonomy now lists `relationship_remove` as a real class ("wrong/duplicate connects between existing units") — `override-applier.ts` already fully implements it, it was just never named in the taxonomy a future choice-card generator would read from. Finding (3) (pack.py scale risk) closed separately instead, since it's an implementation-exit-criteria change, not a design-taxonomy one. |

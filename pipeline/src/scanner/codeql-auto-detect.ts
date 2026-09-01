@@ -10,7 +10,7 @@ import { computeCommonAncestor } from './codegraph-crossroot-provider';
  * explicit, conscious opt-in (the free CodeQL CLI license permits
  * automated/CI use only against an Open Source Codebase or under GHAS — see
  * `codeql-di-provider.ts`'s own doc comment and `Claim_Register.md`'s
- * `T-LR-5-codeql-di` row). `--auto-codeql` only removes the friction of
+ * CodeQL DI-resolution row). `--auto-codeql` only removes the friction of
  * hand-deriving the two flag values; it does not change what "opt-in" means.
  *
  * Gradle root only auto-detected when a `gradlew` wrapper is present — a
@@ -32,11 +32,29 @@ export interface CodeqlAutoDetectResult {
   sourceRoot: string;
   buildCommand: string;
   buildTool: 'gradle' | 'maven';
+  /**
+   * Set only when Gradle is the primary `buildTool` AND a `pom.xml` also
+   * exists at the same `sourceRoot` — real gap found 2026-08-21 running
+   * `spring-petclinic` (checks in both build files): Gradle's toolchain
+   * resolution failed there (`languageVersion=17` unmatched) while Maven,
+   * against the identical source with the identical JDK, compiled cleanly.
+   * `getOrBuildCodeqlDatabase` (`codeql-database-cache.ts`) only tries this
+   * after the primary Gradle build genuinely fails, never speculatively.
+   */
+  fallbackBuildCommand?: string;
+}
+
+function mavenBuildCommand(sourceRoot: string): string {
+  const mvnwName = process.platform === 'win32' ? 'mvnw.cmd' : 'mvnw';
+  const mvnwPath = path.join(sourceRoot, mvnwName);
+  const mvnInvocation = fs.existsSync(mvnwPath) ? (process.platform === 'win32' ? mvnwName : `./${mvnwName}`) : 'mvn';
+  return `${mvnInvocation} -q -DskipTests clean compile`;
 }
 
 export function detectCodeqlBuildConfig(packageRoots: string[]): CodeqlAutoDetectResult | undefined {
   const sourceRoot = packageRoots.length === 1 ? path.resolve(packageRoots[0]) : computeCommonAncestor(packageRoots);
 
+  const hasMavenBuild = fs.existsSync(path.join(sourceRoot, 'pom.xml'));
   const hasGradleBuild = fs.existsSync(path.join(sourceRoot, 'build.gradle')) || fs.existsSync(path.join(sourceRoot, 'build.gradle.kts'));
   if (hasGradleBuild) {
     const gradlewName = process.platform === 'win32' ? 'gradlew.bat' : 'gradlew';
@@ -50,18 +68,15 @@ export function detectCodeqlBuildConfig(packageRoots: string[]): CodeqlAutoDetec
       sourceRoot,
       buildTool: 'gradle',
       buildCommand: `${gradlewInvocation} --no-daemon compileJava --rerun-tasks`,
+      fallbackBuildCommand: hasMavenBuild ? mavenBuildCommand(sourceRoot) : undefined,
     };
   }
 
-  const hasMavenBuild = fs.existsSync(path.join(sourceRoot, 'pom.xml'));
   if (hasMavenBuild) {
-    const mvnwName = process.platform === 'win32' ? 'mvnw.cmd' : 'mvnw';
-    const mvnwPath = path.join(sourceRoot, mvnwName);
-    const mvnInvocation = fs.existsSync(mvnwPath) ? (process.platform === 'win32' ? mvnwName : `./${mvnwName}`) : 'mvn';
     return {
       sourceRoot,
       buildTool: 'maven',
-      buildCommand: `${mvnInvocation} -q -DskipTests clean compile`,
+      buildCommand: mavenBuildCommand(sourceRoot),
     };
   }
 

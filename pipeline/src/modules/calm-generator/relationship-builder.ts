@@ -14,7 +14,7 @@ import { EmissionCoverageGap } from './emission-coverage';
  * raw kind (e.g. both an 'imports' edge and a 'references'/'calls' edge —
  * the exact real shape B-stereotype-name-collision's own repro produced)
  * survives that earlier dedup as 2+ separate CalmRelationship objects.
- * Confirmed on a real 918-relationship Fineract scan: 162 real,
+ * Confirmed on a real 918-relationship scan of a reference Java/JAX-RS banking platform: 162 real,
  * otherwise-correct source/destination pairs produced 182 redundant objects.
  * Only `connects` is reachable today (see this file's own header comment);
  * the other three branches are written defensively so a future
@@ -84,7 +84,7 @@ function mergeDuplicateRelationships(group: Array<{ calmRel: CalmRelationship; k
  * exists yet) — adding actor detection later is a catalogue row, not a code
  * change to this file.
  *
- * T-X7-4 — protocol comes from the catalogue row first (rule.protocol,
+ * Protocol comes from the catalogue row first (rule.protocol,
  * always null today — no row sets one); when that's absent, falls back to
  * `protocolBySignal` (built from persistence-detection-catalogue.yml's
  * per-library `protocol` field, e.g. org.postgresql -> JDBC) by checking
@@ -115,7 +115,7 @@ export function buildRelationships(
     return undefined;
   };
 
-  // T-CL-5 — a dangling endpoint (usually cascading from node-builder.ts
+  // A dangling endpoint (usually cascading from node-builder.ts
   // dropping the endpoint unit for lacking a node-type-mapping row, but
   // recorded independently of that cause) is a real emission-coverage gap,
   // not just a silent filter.
@@ -162,12 +162,12 @@ export function buildRelationships(
       }
 
       const calmRel: CalmRelationship = {
-        // T-CL-1 — content-derived from the relationship's own semantic
+        // Content-derived from the relationship's own semantic
         // coordinates (analysis/fact-identity.ts), not a positional index:
         // the old `rel-${i}` counter changed on rerun even when the
-        // relationship set itself was unchanged, the exact "never a
-        // run-scoped counter" anti-pattern this task exists to close.
-        // Falls back to computing it fresh only for a typed-facts.json
+        // relationship set itself was unchanged — a run-scoped counter
+        // is never stable identity. Falls back to computing it fresh only
+        // for a typed-facts.json
         // predating rel.id (e.g. an older --from-facts input).
         'unique-id': rel.id ?? computeRelationshipId(rel),
         description: `${rel.kind} relationship (${rel.crossPackage ? 'cross-package' : 'same-package'}, source: ${rel.source})`,
@@ -175,21 +175,21 @@ export function buildRelationships(
         metadata: [
           { key: 'x-aac-provenance', value: rel.source },
           { key: 'x-aac-cross-package', value: rel.crossPackage },
-          // T-X9-1 — only present for relationships a producer explicitly
+          // Only present for relationships a producer explicitly
           // scored (today: the env soft-graph detector's name-correlation
           // edges); every other producer leaves rel.confidence unset, so no
           // x-aac-confidence entry is added for them — absence, not a fake 0.
           ...(rel.confidence !== undefined ? [{ key: 'x-aac-confidence', value: rel.confidence }] : []),
-          // AREC T-A2 — 'structural' | 'architecture' | 'trust', set by
+          // 'structural' | 'architecture' | 'trust', set by
           // gradeRelationshipsPass for every relationship a real run
           // produces. Exists so a dual-unit Graphify entity<->entity edge
           // (structural) is never visually indistinguishable in the
           // generated CALM from a real service->database architecture link.
           ...(rel.grade !== undefined ? [{ key: 'x-aac-relationship-grade', value: rel.grade }] : []),
-          // T-L2-1 — only present on multi-hop-bridge-detector.ts output
+          // Only present on multi-hop-bridge-detector.ts output
           // ('r2-phase1' | 'r2b'); every other producer leaves it unset.
           ...(rel.mechanism !== undefined ? [{ key: 'x-aac-mechanism', value: rel.mechanism }] : []),
-          // T-FS-6 — set by assignStatusPass (the true last Analysis pass)
+          // Set by assignStatusPass (the true last Analysis pass)
           // for every relationship a real run produces; absent only for a
           // typed-facts.json predating this field.
           ...(rel.status !== undefined ? [{ key: 'x-aac-status', value: rel.status }] : []),

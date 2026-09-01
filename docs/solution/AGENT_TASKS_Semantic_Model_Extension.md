@@ -73,9 +73,9 @@ violated by a naive reading of the extension goal.
 
 | Prerequisite | State (original) | State (update, later same day) | Needed for |
 |---|---|---|---|
-| `spikes/` sample repos | Absent | **Present** — `apache/fineract`, `bank-of-anthos`, `ghostfolio`, `finos/waltz` cloned, unshallowed | E1, E2 round 2 |
+| `spikes/` sample repos | Absent | **Present** — a reference Java/JAX-RS banking platform, `bank-of-anthos`, `ghostfolio`, a reference Java governance platform cloned, unshallowed | E1, E2 round 2 |
 | CodeQL CLI | Not installed | **Installed** — 2.26.3 via `brew install --cask codeql` | E1 |
-| Working Java build of the sample | Unverified | **Confirmed working** (`CON-10` resolved) — the real blocker hit was a shallow clone missing git tags for Fineract's Gradle version-derivation plugin, not a network/dependency problem; fixed by unshallowing | E1 |
+| Working Java build of the sample | Unverified | **Confirmed working** (`CON-10` resolved) — the real blocker hit was a shallow clone missing git tags for the reference platform's Gradle version-derivation plugin, not a network/dependency problem; fixed by unshallowing | E1 |
 | `graphifyy` on PATH | Not present | **Correction: this was always wrong** — `graphifyy` (0.9.34) was genuinely installed the whole time; the original `pip show` check ran against the wrong Python on this machine. See `baseline-2026-08-13.md`'s correction note | Cross-package pass |
 | coe-lab fixtures + scripts | Present | Present, but found to produce **zero raw Graphify edges** even in a combined 7-root scan — too sparse to exercise cross-reference detection at all (a separate finding from the `graphifyy` question above) | E2 stage 1 |
 
@@ -285,8 +285,8 @@ each was *reviewed*, not merely bumped.
     suspicious and had to explicitly task a review before it was refactored
     into a catalogue row. **Don't treat a task's own "Done" status or a
     status-note phrase like "flagged on review" as proof this rule was
-    followed — read the diff.** T-LR-2's second-repo verification (Waltz,
-    beyond the original Fineract sample) is a genuine example of the rule's
+    followed — read the diff.** T-LR-2's second-repo verification (the reference governance platform,
+    beyond the original reference banking platform sample) is a genuine example of the rule's
     *outcome* done right, in `Claim_Register.md`'s `R2-mechanism` row — but
     it doesn't establish that the *process* catches violations on its own.
     So far, only a human reading a diff has.

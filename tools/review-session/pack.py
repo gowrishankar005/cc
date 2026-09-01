@@ -30,20 +30,42 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 from redact import redact  # noqa: E402
 from triage import build_residuals, apply_baseline  # noqa: E402
 from cards import build_all_cards  # noqa: E402
 from consequence import annotate_residuals  # noqa: E402
+import dossier  # noqa: E402
+from llm_common import _llm_backend_available  # noqa: E402
 
-SNIPPET_CONTEXT_LINES = 3  # +/- lines around a referenced line, bounded window per design §6
+# Wider than the original +/- 3: most "need 20 more lines" cases stay in
+# the pack. Hard cap on the window so one residual cannot dump a file.
+DEFAULT_CONTEXT_LINES = 15
+MAX_SNIPPET_WINDOW = 40
+FETCH_SPAN_DEFAULT_MAX_LINES = 40
+FETCH_SPAN_HARD_CAP_LINES = 80
+FETCH_SPAN_SESSION_MAX_CALLS = 10
+FETCH_SPAN_SESSION_MAX_LINES = 400
+
+_REF_RE = re.compile(r"^(.*):(\d+)$")
 
 
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "fetch-span":
+        return fetch_span_main(sys.argv[2:])
+    return pack_main()
+
+
+def pack_main() -> int:
     parser = argparse.ArgumentParser(description="Build a Weaver residual review Session Pack from a run-slice out-dir.")
     parser.add_argument("--out-dir", required=True, help="run-slice output directory (must contain typed-facts.json + coverage-report.json)")
     parser.add_argument("--session-dir", required=True, help="where to write the Session Pack (typically review-sessions/<run-id>)")
     parser.add_argument("--roots", nargs="*", default=None, help="override package roots for source snippet reads (defaults to typed-facts.json's own packageRoots)")
     parser.add_argument("--baseline", help="a prior Session Pack dir — residuals already decided there are carried forward, not re-asked; residuals whose evidence shape changed since are flagged re-confirm")
+    parser.add_argument("--max-residuals", type=int, default=None, help="keep the N highest-consequence askable residuals (carried_forward always kept). Token cap, not a correctness cap.")
+    parser.add_argument("--context-lines", type=int, default=DEFAULT_CONTEXT_LINES, help=f"lines either side of an Evidence.ref (default {DEFAULT_CONTEXT_LINES}; window capped at {MAX_SNIPPET_WINDOW})")
+    parser.add_argument("--with-dossier", action="store_true", help="opt-in Evidence Dossier pass (T-2): calls the `claude` CLI to attach an additive `dossier` field to every open residual (any tier). Off by default -- needs the `claude` CLI on PATH; no backend -> reports what would have been attempted, writes a normal dossier-less pack.")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir).resolve()
@@ -89,7 +111,7 @@ def main() -> int:
     (session_dir / "drafts" / "overrides").mkdir(parents=True, exist_ok=True)
     (session_dir / "evidence").mkdir(parents=True, exist_ok=True)
 
-    residuals = build_residuals(review_queue)
+    residuals = build_residuals(review_queue, unmapped=unmapped, ignored=ignored if isinstance(ignored, list) else None)
 
     if args.baseline:
         baseline_dir = Path(args.baseline).resolve()
@@ -115,9 +137,18 @@ def main() -> int:
     # for and why), so queue_rank.py can rank the backlog highest-
     # consequence-first without re-deriving these facts itself.
     residuals = annotate_residuals(residuals, unit_index, facts.get("relationships", []))
+    residuals = _rank_and_cap(residuals, args.max_residuals)
 
-    packs = _build_evidence_packs(residuals, unit_index, package_roots)
+    context_lines = max(0, args.context_lines)
+    packs, evidence_paths = _build_evidence_packs(residuals, unit_index, package_roots, context_lines)
     (session_dir / "evidence" / "packs.json").write_text(json.dumps(packs, indent=2))
+    (session_dir / "evidence" / "paths.json").write_text(json.dumps(evidence_paths, indent=2))
+
+    # T-2 (AGENT_TASKS_Residual_Dossier_Module.md): opt-in only -- with no
+    # --with-dossier flag, pack.py behaves exactly as it did before this
+    # pass existed (doesn't even check for a `claude` CLI backend).
+    if args.with_dossier:
+        residuals = _run_dossier_pass(residuals, unit_index, packs)
 
     # Deterministic choice cards, generated from the fixed
     # per-class templates in cards.py (never LLM-invented), attached
@@ -126,7 +157,7 @@ def main() -> int:
     # residuals never get a full choice card — they're not being
     # asked again — just a short note.
     askable = [r for r in residuals if r.get("status") != "carried_forward"]
-    card_markdown = build_all_cards(askable, unit_index, packs)
+    card_markdown = build_all_cards(askable, unit_index, packs, context_lines, evidence_paths)
     for r in residuals:
         r["card"] = card_markdown.get(r["id"], f"### {r['id']} (carried forward)\n\n{r['rationale']}\n")
     (session_dir / "residuals.json").write_text(json.dumps({"generatedAt": _now(), "items": residuals}, indent=2))
@@ -140,6 +171,11 @@ def main() -> int:
         "hasCalm": has_calm,
         "hasUnmapped": unmapped is not None,
         "residualCount": len(residuals),
+        "crossPackageBackbone": "codegraph",
+        "extraReadCount": 0,
+        "extraReadLines": 0,
+        "extraReadMaxCalls": FETCH_SPAN_SESSION_MAX_CALLS,
+        "extraReadMaxLines": FETCH_SPAN_SESSION_MAX_LINES,
     }
     (session_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
@@ -176,7 +212,7 @@ def _generate_review_queue(out_dir: Path) -> None:
 
 def _build_unit_index(facts: dict) -> dict:
     """Thin unitId -> {kind, confidence, refs} — never the full TypedUnit
-    (no full Graphify graph dump, per design §4.1)."""
+    (no full CodeGraph dump, per design §4.1)."""
     index = {}
     for unit in facts.get("units", []):
         index[unit["id"]] = {
@@ -188,30 +224,108 @@ def _build_unit_index(facts: dict) -> dict:
     return index
 
 
-_REF_RE = re.compile(r"^(.*):(\d+)$")
+def _rank_and_cap(residuals: list[dict], max_residuals: int | None) -> list[dict]:
+    """--max-residuals keeps the N highest-consequence *askable* residuals
+    (T-RT-2 scores already annotated). Uncapped path keeps build order
+    (review-queue first, then unmapped, then ignored). carried_forward
+    always kept. Original residual ids are preserved."""
+    if max_residuals is None:
+        return residuals
+    carried = [r for r in residuals if r.get("status") == "carried_forward"]
+    askable = [r for r in residuals if r.get("status") != "carried_forward"]
+    askable.sort(key=lambda r: int((r.get("consequence") or {}).get("score") or 0), reverse=True)
+    return carried + askable[: max(0, max_residuals)]
 
 
-def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots: list[str]) -> dict:
-    """Redacted source snippets for every residual's referenced units, bounded
-    window (+/- SNIPPET_CONTEXT_LINES), only ever read from within a scanned
-    package root — never an arbitrary path (S8, path-traversal-safe)."""
+def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots: list[str], context_lines: int = DEFAULT_CONTEXT_LINES) -> tuple[dict, dict]:
+    """Redacted source snippets for every residual's referenced units and
+    residual.evidenceRefs, bounded window, only ever read from within a
+    scanned package root — never an arbitrary path (S8, path-traversal-safe).
+
+    Also returns a companion ref -> clickable-path map (Architect_Pilot_
+    Feedback_Notes.md Entry 20): the stored `ref` itself is only relative to
+    whichever scanned package root produced it, not to the VS Code workspace
+    root an architect actually has open, so it isn't directly openable. Where
+    the resolved absolute file lives inside REPO_ROOT (the normal case for
+    this repo's own fixtures/spikes and any workspace opened at REPO_ROOT),
+    we can compute a real REPO_ROOT-relative "path:line" that VS Code's own
+    file-link auto-detection resolves. Falls back to omitting the entry
+    (never a wrong/guessed path) when the file lives outside REPO_ROOT."""
     resolved_roots = [Path(r).resolve() for r in package_roots]
-    packs = {}
+    packs: dict[str, str] = {}
+    paths: dict[str, str] = {}
+    refs: list[str] = []
     for residual in residuals:
+        refs.extend(residual.get("evidenceRefs") or [])
         for unit_id in residual.get("unitIds", []):
             unit = unit_index.get(unit_id)
             if not unit:
                 continue
-            for ref in unit.get("evidenceRefs", []):
-                if ref in packs:
-                    continue
-                snippet = _read_snippet(ref, resolved_roots)
-                if snippet is not None:
-                    packs[ref] = redact(snippet)
-    return packs
+            refs.extend(unit.get("evidenceRefs") or [])
+    for ref in refs:
+        if ref in packs:
+            continue
+        result = _read_snippet(ref, resolved_roots, context_lines)
+        if result is None:
+            continue
+        snippet, resolved_path = result
+        packs[ref] = redact(snippet)
+        try:
+            rel = resolved_path.relative_to(REPO_ROOT)
+        except ValueError:
+            continue
+        m = _REF_RE.match(ref)
+        if m:
+            paths[ref] = f"{rel.as_posix()}:{m.group(2)}"
+    return packs, paths
 
 
-def _read_snippet(ref: str, resolved_roots: list[Path]) -> str | None:
+def _run_dossier_pass(residuals: list[dict], unit_index: dict, packs: dict) -> list[dict]:
+    """T-2's opt-in Evidence Dossier pass, over every OPEN residual
+    regardless of tier. No `claude` CLI on PATH (even with --with-dossier
+    set) -> log what would have been attempted, return residuals
+    unchanged so the rest of pack.py writes a normal dossier-less pack."""
+    targets = [r for r in residuals if r.get("status") == "open"]
+    if not targets:
+        print("[pack] --with-dossier set but no open residual(s) to build a dossier for -- nothing to do")
+        return residuals
+    if not _llm_backend_available():
+        print(f"[pack] --with-dossier set but no LLM backend available (`claude` CLI not found on PATH) -- would attempt a dossier for {len(targets)} residual(s), writing a dossier-less pack: {[r['id'] for r in targets]}")
+        return residuals
+    print("[pack] --with-dossier: backend claude CLI")
+
+    updated_targets, episodes = dossier.process_dossier_batch(targets, unit_index, packs)
+    updated_by_id = {r["id"]: r for r in updated_targets}
+    for episode in episodes:
+        if episode["outcome"] == "dossiered":
+            print(f"[pack] dossier {episode['residualId']}: dossiered")
+        else:
+            print(f"[pack] dossier {episode['residualId']}: {episode['outcome']} -- {episode.get('reason', '')}")
+    return [updated_by_id.get(r["id"], r) for r in residuals]
+
+
+def _window_for_line(line_1indexed: int, n_lines: int, context_lines: int) -> tuple[int, int]:
+    start = max(0, line_1indexed - 1 - context_lines)
+    end = min(n_lines, line_1indexed + context_lines)
+    if end - start > MAX_SNIPPET_WINDOW:
+        # Keep the referenced line inside a MAX_SNIPPET_WINDOW slice.
+        center = line_1indexed - 1
+        half = MAX_SNIPPET_WINDOW // 2
+        start = max(0, center - half)
+        end = min(n_lines, start + MAX_SNIPPET_WINDOW)
+        if end - start < MAX_SNIPPET_WINDOW:
+            start = max(0, end - MAX_SNIPPET_WINDOW)
+    return start, end
+
+
+def _read_snippet(ref: str, resolved_roots: list[Path], context_lines: int = DEFAULT_CONTEXT_LINES) -> tuple[str, Path] | None:
+    """Returns (snippet, resolved_absolute_path) so callers can also build
+    a real, clickable evidence link — the stored `ref` itself is only
+    relative to whichever scanned package root it came from (e.g.
+    src/main/java/.../Foo.java), not to the VS Code workspace root an
+    architect actually has open, so it's not directly openable on its
+    own (found live: an architect asked for clickable evidence links,
+    Architect_Pilot_Feedback_Notes.md Entry 20)."""
     m = _REF_RE.match(ref)
     if not m:
         return None
@@ -230,9 +344,8 @@ def _read_snippet(ref: str, resolved_roots: list[Path]) -> str | None:
             lines = candidate.read_text(errors="replace").splitlines()
         except OSError:
             continue
-        start = max(0, line_str - 1 - SNIPPET_CONTEXT_LINES)
-        end = min(len(lines), line_str + SNIPPET_CONTEXT_LINES)
-        return "\n".join(lines[start:end])
+        start, end = _window_for_line(line_str, len(lines), context_lines)
+        return "\n".join(lines[start:end]), candidate
     return None
 
 
@@ -247,10 +360,11 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "",
         "## How this session works",
         "",
-        "1. You already ran a Weaver scan → `architecture.calm.json` (unchanged, upstream of this pack).",
+        "1. You already ran a Weaver scan → `architecture.calm.json` (unchanged, upstream of this pack). "
+        "Cross-package backbone on this run is **CodeGraph** (not Graphify).",
         "2. `pack.py` built this Session Pack from that scan's out-dir — the step you just did.",
         "3. Open this pack in VS Code and start a chat using the `residual-review` chat mode "
-        "(`.github/chatmodes/residual-review.chatmode.md`) — or, if that chat mode's tools are disabled by "
+        "(`.github/agents/residual-review.agent.md`) — or, if that chat mode's tools are disabled by "
         "your org's Copilot policy, just read this file and `residuals.json` directly (the degraded path — see below).",
         "4. The agenda below is already split into Tier A (you decide), Tier B (the chat agent may draft "
         "in-conversation, per its own bound rules), and Tier C (never invented, document or leave open).",
@@ -274,6 +388,11 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
         "- Applying is a **human step** — `apply.py` re-validates everything and requires explicit confirmation "
         "(a real terminal prompt, or `--i-confirm-apply`). Nothing here is auto-applied, ever.",
         "- Reply to a card with its option key (e.g. `1`) or `other: <rationale>`.",
+        "- If a card says evidence is short, Copilot prints a `pack.py fetch-span` command. "
+        "**You** run it — the chat mode is instructed never to run it itself. Then continue the chat. "
+        f"Session cap: {FETCH_SPAN_SESSION_MAX_CALLS} extra-reads / {FETCH_SPAN_SESSION_MAX_LINES} extra lines.",
+        "- Ranked backlog: `python3 tools/review-session/queue_rank.py --session-dir <this pack>` (T-RT-2). "
+        "Similar residuals can be bulk-applied with `bulk_apply.py` (T-RT-1) — still one Decision Record each.",
         "",
     ]
 
@@ -314,27 +433,198 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
 def _render_agents_md() -> str:
     return (
         "# Bound agent playbook for this Session Pack\n\n"
-        "This is the per-pack copy of the rules already enforced repo-wide by "
-        "`.github/chatmodes/residual-review.chatmode.md` — read that file's "
-        "`tools:` frontmatter for how autonomous apply is structurally prevented, not just instructed against.\n\n"
+        "This is the per-pack copy of the rules already stated repo-wide by "
+        "`.github/agents/residual-review.agent.md` — read that file's header comment for the real "
+        "safety guarantee: apply.py's own explicit confirmation gate, not this file's tools: list.\n\n"
         "**Mode: Guided (v1's only mode — design §5)** — ask all Tier A items as choice cards; "
         "Tier B may be drafted in-chat (editFiles, per the chat-mode's own §5.1 hard rules) and is always shown as "
         "Accept / Reject / Edit rationale, never auto-accepted; the architect approves every apply.\n\n"
-        "1. Read SESSION.md + residuals.json first — do not scan the whole repo.\n"
-        "2. For each open item: use listed evidence; if needed open only the file:line already in evidence/packs.json.\n"
+        "1. Read SESSION.md + residuals.json first — do not scan the whole repo. "
+        "Do not use workspace search. If a pack file is not in context, ask the architect to open it.\n"
+        "2. For each open item: use listed evidence; if needed, cite only file:line already in evidence/packs.json.\n"
         "3. Never edit typed-facts.json.\n"
         "4. Write proposals only under drafts/.\n"
         "5. Every override must reference an active Decision Record with rationale.\n"
         "6. Tier A is the architect's decision — offer choices, never decide alone.\n"
         "7. Tier B may be drafted directly in this chat — see the chat-mode file's own §5.1 hard rules "
-        "for the exact evidence bar and required fields (llm-advisory: reviewer, cited evidence, no invented ids). "
-        "`draft_tier_b.py` is a separate, optional headless alternative for scripted runs, not the primary path. "
-        "Whichever path drafted it, present it as Accept / Reject / Edit rationale — a draft existing is not the "
-        "same as it being approved. No trigger currently classifies any residual as Tier B, so in practice this "
-        "won't happen yet, but the rule holds the moment one does.\n"
-        "8. Weak/ambiguous evidence -> cannot_decide / leave open, never fabricate.\n"
-        "9. Never run apply.py / run-slice / override-applier from this chat — applying is a human step.\n"
+        "(llm-advisory: reviewer, cited evidence). Present as Accept / Reject / Edit rationale.\n"
+        "8. 0 or 2+ candidates after pack + extra-read → cannot_decide, never fabricate. "
+        "No folklore (\"typical Spring\").\n"
+        "9. Never run apply.py / run-slice / override-applier / pack.py fetch-span from this chat — "
+        "applying and extra-reads are human steps. If evidence is short, PRINT one fetch-span command and stop.\n"
     )
+
+
+def fetch_span_main(argv: list[str]) -> int:
+    """Architect-run extra-read. The chat mode is instructed to print the command, not run it.
+
+    Two mutually-exclusive ways to specify the same bounded/redacted/capped read:
+      --path <file> --start-line <n> --end-line <n>   (exact range)
+      --anchor <file:line> [--context-lines <n>]      (windowed around a line, via _window_for_line)
+    """
+    parser = argparse.ArgumentParser(
+        prog="pack.py fetch-span",
+        description="Append a bounded, redacted source span to an existing Session Pack (HITL extra-read). Copilot must not run this.",
+    )
+    parser.add_argument("--session-dir", required=True)
+    parser.add_argument("--residual-id", required=True, help="must match an id in this pack's residuals.json")
+    parser.add_argument("--path", help="source path under a packageRoot (or an existing evidence path prefix) — exact-range mode only")
+    parser.add_argument("--start-line", type=int, default=None, help="exact-range mode only")
+    parser.add_argument("--end-line", type=int, default=None, help="exact-range mode only")
+    parser.add_argument("--anchor", help="<file:line> — alternate to --path/--start-line/--end-line, windowed by --context-lines via _window_for_line")
+    parser.add_argument("--context-lines", type=int, default=DEFAULT_CONTEXT_LINES, help=f"--anchor mode only (default {DEFAULT_CONTEXT_LINES}, window capped at {MAX_SNIPPET_WINDOW})")
+    parser.add_argument("--max-lines", type=int, default=FETCH_SPAN_DEFAULT_MAX_LINES)
+    args = parser.parse_args(argv)
+
+    anchor_mode = args.anchor is not None
+    exact_given = args.path is not None or args.start_line is not None or args.end_line is not None
+    if anchor_mode and exact_given:
+        parser.error("--anchor cannot be combined with --path/--start-line/--end-line")
+    if not anchor_mode and (args.path is None or args.start_line is None or args.end_line is None):
+        parser.error("exact-range mode requires --path, --start-line, and --end-line (or use --anchor instead)")
+
+    session_dir = Path(args.session_dir).resolve()
+    residual_id = args.residual_id
+    if not residual_id:
+        print("[fetch-span] residual-id is required", file=sys.stderr)
+        return 1
+
+    manifest_path = session_dir / "manifest.json"
+    residuals_path = session_dir / "residuals.json"
+    packs_path = session_dir / "evidence" / "packs.json"
+    extra_path = session_dir / "evidence" / "extra-reads.json"
+    if not manifest_path.exists() or not residuals_path.exists():
+        print(f"[fetch-span] not a Session Pack: {session_dir}", file=sys.stderr)
+        return 1
+
+    manifest = json.loads(manifest_path.read_text())
+    residuals_doc = json.loads(residuals_path.read_text())
+    residuals = residuals_doc.get("items") or []
+    target = next((r for r in residuals if r.get("id") == residual_id), None)
+    if target is None:
+        print(f"[fetch-span] residual {residual_id} not in this pack", file=sys.stderr)
+        return 1
+
+    extra_doc = json.loads(extra_path.read_text()) if extra_path.exists() else {"calls": [], "totalLines": 0}
+    if len(extra_doc["calls"]) >= FETCH_SPAN_SESSION_MAX_CALLS:
+        print(f"[fetch-span] session cap {FETCH_SPAN_SESSION_MAX_CALLS} extra-reads reached — remaining items stay cannot_decide", file=sys.stderr)
+        return 1
+
+    roots = [Path(r).resolve() for r in (manifest.get("packageRoots") or [])]
+    if not roots:
+        print("[fetch-span] pack has no packageRoots", file=sys.stderr)
+        return 1
+
+    if anchor_mode:
+        m = _REF_RE.match(args.anchor)
+        if not m:
+            print(f"[fetch-span] --anchor must be <file:line>: {args.anchor}", file=sys.stderr)
+            return 1
+        anchor_path_str, anchor_line_str = m.group(1), m.group(2)
+        anchor_line = int(anchor_line_str)
+        if anchor_line < 1:
+            print("[fetch-span] --anchor line must be >= 1", file=sys.stderr)
+            return 1
+        candidate = _resolve_under_roots(anchor_path_str, roots)
+        if candidate is None:
+            print(f"[fetch-span] path is outside packageRoots / evidence prefix: {anchor_path_str}", file=sys.stderr)
+            return 1
+        try:
+            file_lines = candidate.read_text(errors="replace").splitlines()
+        except OSError as err:
+            print(f"[fetch-span] cannot read {candidate}: {err}", file=sys.stderr)
+            return 1
+        if anchor_line > len(file_lines):
+            print(f"[fetch-span] anchor line {anchor_line} past end of file ({len(file_lines)} lines)", file=sys.stderr)
+            return 1
+        context_lines = max(0, args.context_lines)
+        window_start, window_end = _window_for_line(anchor_line, len(file_lines), context_lines)
+        start, end = window_start + 1, window_end
+    else:
+        start = args.start_line
+        end = args.end_line
+        if start < 1 or end < start:
+            print("[fetch-span] start-line must be >= 1 and end-line >= start-line", file=sys.stderr)
+            return 1
+        candidate = _resolve_under_roots(args.path, roots)
+        if candidate is None:
+            print(f"[fetch-span] path is outside packageRoots / evidence prefix: {args.path}", file=sys.stderr)
+            return 1
+        try:
+            file_lines = candidate.read_text(errors="replace").splitlines()
+        except OSError as err:
+            print(f"[fetch-span] cannot read {candidate}: {err}", file=sys.stderr)
+            return 1
+        if start > len(file_lines):
+            print(f"[fetch-span] start-line {start} past end of file ({len(file_lines)} lines)", file=sys.stderr)
+            return 1
+
+    max_lines = min(max(1, args.max_lines), FETCH_SPAN_HARD_CAP_LINES)
+    span_len = end - start + 1
+    if span_len > max_lines:
+        print(f"[fetch-span] requested {span_len} lines > --max-lines {max_lines} (hard cap {FETCH_SPAN_HARD_CAP_LINES})", file=sys.stderr)
+        return 1
+    if extra_doc["totalLines"] + span_len > FETCH_SPAN_SESSION_MAX_LINES:
+        print(f"[fetch-span] session line cap {FETCH_SPAN_SESSION_MAX_LINES} would be exceeded", file=sys.stderr)
+        return 1
+
+    slice_end = min(end, len(file_lines))
+    snippet = redact("\n".join(file_lines[start - 1 : slice_end]))
+    actual_lines = slice_end - start + 1
+
+    rel = _rel_to_roots(candidate, roots)
+    ref = f"{rel}:{start}"
+    packs = json.loads(packs_path.read_text()) if packs_path.exists() else {}
+    packs[ref] = snippet
+    packs_path.parent.mkdir(parents=True, exist_ok=True)
+    packs_path.write_text(json.dumps(packs, indent=2))
+
+    refs = list(target.get("evidenceRefs") or [])
+    if ref not in refs:
+        refs.append(ref)
+    target["evidenceRefs"] = refs
+    residuals_path.write_text(json.dumps(residuals_doc, indent=2))
+
+    extra_doc["calls"].append({"residualId": residual_id, "ref": ref, "lines": actual_lines})
+    extra_doc["totalLines"] += actual_lines
+    extra_path.write_text(json.dumps(extra_doc, indent=2))
+
+    manifest["extraReadCount"] = len(extra_doc["calls"])
+    manifest["extraReadLines"] = extra_doc["totalLines"]
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+
+    print(f"[fetch-span] appended {ref} ({actual_lines} line(s)) to {packs_path} for {residual_id}")
+    return 0
+
+
+def _resolve_under_roots(path_str: str, roots: list[Path]) -> Path | None:
+    raw = Path(path_str)
+    candidates: list[Path] = []
+    if raw.is_absolute():
+        candidates.append(raw.resolve())
+    else:
+        candidates.append(Path.cwd().joinpath(raw).resolve())
+        for root in roots:
+            candidates.append((root / raw).resolve())
+    for cand in candidates:
+        if not cand.exists() or not cand.is_file():
+            continue
+        for root in roots:
+            try:
+                cand.relative_to(root)
+                return cand
+            except ValueError:
+                continue
+    return None
+
+
+def _rel_to_roots(path: Path, roots: list[Path]) -> str:
+    for root in roots:
+        try:
+            return str(path.relative_to(root))
+        except ValueError:
+            continue
+    return str(path)
 
 
 if __name__ == "__main__":

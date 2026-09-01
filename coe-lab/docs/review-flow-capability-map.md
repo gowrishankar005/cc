@@ -25,7 +25,7 @@
 
 | Decision | **Yes — recommend** adding “high-confidence service (+ optional db present) with zero service-touching relationships” as a **review trigger** for IR/advisory **after Wave 3-S metrics exist**. |
 |---|---|
-| Rationale | Fineract miss was exactly false confidence without a flag. |
+| Rationale | a reference Java/JAX-RS banking platform miss was exactly false confidence without a flag. |
 | Until Wave 3-S | Use wild L2 gold fail + finding doc; do not pretend advisory already covers it. |
 
 ---

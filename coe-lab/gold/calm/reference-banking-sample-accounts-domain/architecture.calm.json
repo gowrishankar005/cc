@@ -1,8 +1,8 @@
 {
   "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
-  "unique-id": "boa-accounts-domain",
-  "name": "Bank of Anthos — Accounts Domain (frontend + userservice + contacts + accounts-db)",
-  "description": "Hand-authored gold CALM for the real, wild-type Bank of Anthos accounts bounded context (google/bank-of-anthos, local clone at spikes/boa/repo). Deliberately well-connected — authored specifically to give Weaver a real, non-trivial multi-service architecture to test against, after an earlier review found several hand-authored lab-fixture gold packages had disconnected nodes. Every node, route, relationship, and control below is grep-verified against real source and real k8s manifests, cited at file:line — none inferred from README/docs/diagrams (this repo's own gold-authoring rule, gold/calm/README.md).",
+  "unique-id": "reference-banking-sample-accounts-domain",
+  "name": "A Reference Java Microservices Banking Sample — Accounts Domain (frontend + userservice + contacts + accounts-db)",
+  "description": "Hand-authored gold CALM for a real, wild-type reference Java microservices banking sample's accounts bounded context (a real public multi-service reference repo, local clone at spikes/refbank/repo). Deliberately well-connected — authored specifically to give Weaver a real, non-trivial multi-service architecture to test against, after an earlier review found several hand-authored lab-fixture gold packages had disconnected nodes. Every node, route, relationship, and control below is grep-verified against real source and real k8s manifests, cited at file:line — none inferred from README/docs/diagrams (this repo's own gold-authoring rule, gold/calm/README.md).",
   "nodes": [
     {
       "unique-id": "end-user",
@@ -144,13 +144,13 @@
     {
       "unique-id": "platform-system",
       "node-type": "system",
-      "name": "Bank of Anthos — Accounts Domain",
+      "name": "A Reference Java Microservices Banking Sample — Accounts Domain",
       "description": "Logical domain composition — the accounts bounded context, composed-of below."
     },
     {
       "unique-id": "k8s-cluster",
       "node-type": "system",
-      "name": "Bank of Anthos Kubernetes Cluster (accounts domain)",
+      "name": "Reference Sample Kubernetes Cluster (accounts domain)",
       "description": "Runtime placement boundary. In this real repo composed-of and deployed-in happen to name the same four nodes (all genuinely run in the same real cluster, per kubernetes-manifests/*.yaml) — a real case where the two questions have the same answer, not a modeling shortcut; see coe-lab/docs/reference/how-to-capture-architecture-in-calm.md Step 4 for when they diverge instead."
     }
   ],
@@ -215,7 +215,7 @@
   ],
   "metadata": [
     { "key": "x-lab-gold-source", "value": "hand-authored" },
-    { "key": "x-lab-wild-repo", "value": "google/bank-of-anthos (local clone: spikes/boa/repo)" },
+    { "key": "x-lab-wild-repo", "value": "a real public multi-service reference repo (local clone: spikes/refbank/repo)" },
     { "key": "x-lab-purpose", "value": "Solid, well-connected reference gold to test the Weaver pipeline against — authored after a review found several existing lab-fixture gold packages had disconnected nodes (missing same-package connects edges); see coe-lab/docs/findings/gold-calm-relationship-connectivity-audit.md for that finding." },
     {
       "key": "x-lab-real-finding-jwt-trust",

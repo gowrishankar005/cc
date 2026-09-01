@@ -18,7 +18,7 @@
       "unique-id": "datatable-write-service",
       "node-type": "service",
       "name": "DatatableWriteService",
-      "description": "Authorization-enforcing service interface with @PreAuthorize on every method and no HTTP surface (Fineract-shaped).",
+      "description": "Authorization-enforcing service interface with @PreAuthorize on every method and no HTTP surface (a reference Java/JAX-RS banking platform-shaped).",
       "controls": {
         "security-rbac-001": {
           "description": "Role-Based Access Control via Spring @PreAuthorize on create/update/delete datatable operations.",

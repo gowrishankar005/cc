@@ -22,14 +22,14 @@ Volatile generator fields (`x-aac-generated-at`, file-based unique-ids like `acc
 gold/calm/
   py-accounts-api/architecture.calm.json
   java-rbac-datatable/architecture.calm.json
-  fineract-charge/architecture.calm.json      # wild-type Apache Fineract (deep)
+  fineract-charge/architecture.calm.json      # wild-type a reference Java/JAX-RS banking platform (deep)
   fineract-core/architecture.calm.json        # wild-type core slice
   fineract-system-map/architecture.calm.json  # wild-type module map
   FINERACT_GOLD.md
   ...
 ```
 
-**Wild-type Fineract gold lives only under `coe-lab/gold/`** — never under `spikes/` (experiments are not eval contract). See `FINERACT_GOLD.md`.
+**Wild-type a reference Java/JAX-RS banking platform gold lives only under `coe-lab/gold/`** — never under `spikes/` (experiments are not eval contract). See `FINERACT_GOLD.md`.
 
 ## Validate gold alone
 

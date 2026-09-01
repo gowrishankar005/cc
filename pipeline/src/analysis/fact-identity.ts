@@ -1,8 +1,8 @@
 import { TypedRelationship } from '../types/typed-facts';
 
 /**
- * T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review
- * history") — a TypedRelationship's stable identity: fact type (kind) +
+ * Fact identity, incremental merge, and review history (BACKLOG.md) — a
+ * TypedRelationship's stable identity: fact type (kind) +
  * endpoint identities (from/to, already-stable TypedUnit.id values) +
  * discriminator (mechanism when a specialized detector set one, otherwise
  * source). Never file:line — no line number is even in scope for a
@@ -21,7 +21,7 @@ export function computeRelationshipId(rel: Pick<TypedRelationship, 'kind' | 'fro
 }
 
 /**
- * T-CL-1 — the single place every relationship a run produces gets its
+ * The single place every relationship a run produces gets its
  * stable id, run once after every relationship producer (see
  * analysis/passes.ts's factIdentityPass ordering note). Mutates in place,
  * same convention as status-assignment.ts's assignStatuses.

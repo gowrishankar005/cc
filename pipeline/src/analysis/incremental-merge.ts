@@ -1,11 +1,11 @@
 import { Evidence, FactStatus, TypedFacts, TypedRelationship, TypedUnit } from '../types/typed-facts';
 
 /**
- * T-CL-2 (BACKLOG.md "Fact identity, incremental merge, and review
- * history", `AGENT_TASKS_Ext_Contract_Lifecycle.md`) — merges this run's
+ * Fact identity, incremental merge, and review history (BACKLOG.md,
+ * `AGENT_TASKS_Ext_Contract_Lifecycle.md`) — merges this run's
  * freshly-computed units/relationships against the PRIOR run's
  * `typed-facts.json` (same `--out` directory), keyed on the stable,
- * content-derived ids T-CL-1 already guarantees (`TypedUnit.id` /
+ * content-derived ids already guaranteed elsewhere (`TypedUnit.id` /
  * `TypedRelationship.id`).
  *
  * The lane's own hard constraint: "No `reviewed` fact is ever silently
@@ -27,8 +27,8 @@ import { Evidence, FactStatus, TypedFacts, TypedRelationship, TypedUnit } from '
  *
  * A fact present in the prior run but absent from this one (a rename,
  * deletion, or a mechanism no longer firing) is never resurrected here —
- * T-CL-1's own doc comment on `TypedUnit.id` already names that as "a
- * disappeared fact plus a new one, not a bug to work around." It's only
+ * `TypedUnit.id`'s own doc comment already names that as "a disappeared
+ * fact plus a new one, not a bug to work around." It's only
  * recorded in the returned history/report so it's visible, not silently
  * dropped from the audit trail.
  */

@@ -1,8 +1,8 @@
-# Engine capability research — CodeGraph vs. Graphify vs. CodeQL, Java Spring/JAX-RS (Fineract)
+# Engine capability research — CodeGraph vs. Graphify vs. CodeQL, Java Spring/JAX-RS (reference banking platform)
 
 **Purpose:** a systematic, evidence-first comparison of the three structural/semantic
 extraction engines this project has real experience with, scoped to Java
-Spring/JAX-RS — Apache Fineract specifically, now that it's a real, buildable
+Spring/JAX-RS — a reference Java/JAX-RS banking platform specifically, now that it's a real, buildable
 `spikes/` repo — for the purpose of semantic architecture-model building. Written
 to be read on its own by someone deciding engine strategy later, without
 re-deriving what this session already found the hard way.
@@ -55,7 +55,7 @@ mechanism to even represent, let alone resolve.
 
 | Capability | CodeGraph | Graphify | CodeQL | Notes |
 |---|---|---|---|---|
-| HTTP route detection (native framework typing) | **Yes**, where its resolver covers the framework | No (no semantic typing at all) | **Yes**, via framework-aware query (proven for TS/NestJS this session — `permission_controls.ql` — not yet run for Java routes) | For Fineract specifically: JAX-RS is Phase-1 `extractFromSource()`-fallback (`engine-capability-matrix.yml`'s `jax-rs` row), not native — CodeQL is already named as that row's `augmentEngine`, trigger not yet fired |
+| HTTP route detection (native framework typing) | **Yes**, where its resolver covers the framework | No (no semantic typing at all) | **Yes**, via framework-aware query (proven for TS/NestJS this session — `permission_controls.ql` — not yet run for Java routes) | For the reference platform specifically: JAX-RS is Phase-1 `extractFromSource()`-fallback (`engine-capability-matrix.yml`'s `jax-rs` row), not native — CodeQL is already named as that row's `augmentEngine`, trigger not yet fired |
 | Annotation/decorator extraction generally | **Yes** — `extractFromSource()`, gate-free, file-scoped | No | **Yes**, and more expressively (real AST match on `Annotation`/`getValue()`, not text/regex) | CodeQL's annotation matching is semantic (resolves the annotation's *type*, not its textual name) — relevant to the bare-name-collision problem below |
 | Cross-file/cross-package structural edges | Only within `extractFromSource()`'s file-local reference kinds | **Yes — the only source in this pipeline.** One combined pass, 265 real cross-module edges evidenced (`java.md`) | **Yes**, in principle (full program model) — not evaluated for this at scale this session | Graphify's uniqueness here is architectural, not incidental: this pipeline's entire R0/R1/R2/R2b relationship story runs off Graphify's raw graph |
 | Symbol/type resolution fidelity | High within a file/package | **Low** — bare-label resolution, no real type binding | **High** — real compiled-AST symbol binding | See §4.1 — this is Graphify's most consequential real weakness |
@@ -82,7 +82,7 @@ node actually means*:
 1. **Bare-name collision.** Graphify resolves a bare identifier (e.g. an
    `@Component` annotation's simple class name) against *any* same-named node
    anywhere in the whole combined-extraction graph — not against the file's
-   real import statement. Quantified on a real 918-relationship Fineract scan:
+   real import statement. Quantified on a real 918-relationship reference-platform scan:
    **32.4% of relationships** were this exact false-positive shape
    (`graphify-reconciler.ts`'s own code comment, `B-stereotype-name-collision`).
    A real mitigation exists in this pipeline (`isBareNameCollision`, a
@@ -170,7 +170,7 @@ edge point at the right thing), stable across repeated runs. CodeGraph's
 problem, found this session, is about *completeness under operating
 conditions* (does repeated same-process invocation silently return fewer
 units) — a fresh, isolated process is fully deterministic (94/94/94 across
-three cold runs against real Fineract); the same scan run repeatedly within
+three cold runs against the real reference platform); the same scan run repeatedly within
 one long-lived process gives a different, but internally consistent, lower
 number (60-64). These are different failure modes needing different
 mitigations (Graphify: better identity resolution; CodeGraph: understanding
@@ -180,13 +180,13 @@ one generic "reliability" score.
 
 ### 4.6 The buildless/build-based line is the real adoption-cost divider, and it's sharper than expected
 
-Two separate real build blockers were hit and fixed for Fineract-with-CodeQL
+Two separate real build blockers were hit and fixed for reference-platform-with-CodeQL
 this session, worth distinguishing since they look similar but aren't:
 
 1. **Prior research pass:** genuine network unavailability (no route to Maven
    Central / `services.gradle.org`) — an infrastructure/CI-policy problem, not
-   a CodeQL or Fineract problem.
-2. **This session:** network was fine, but Fineract's Gradle version-derivation
+   a CodeQL or reference-platform problem.
+2. **This session:** network was fine, but the reference platform's Gradle version-derivation
    plugin needs `git describe --tags`, which fails on a shallow clone (no
    tags reachable). Fixed by `git fetch --unshallow`.
 
@@ -203,7 +203,7 @@ system's own fragility.
 
 ## 5. What this does *not* yet establish (honest gaps in this review itself)
 
-- **Only one real Java codebase tested** (Fineract) — a JAX-RS + Spring hybrid
+- **Only one real Java codebase tested** (the reference banking platform) — a JAX-RS + Spring hybrid
   (REST layer is JAX-RS; DI/security/batch/messaging is Spring), not a pure
   Spring MVC application. `engine-capability-matrix.yml`'s own `spring-mvc`
   row is still `evidenceLevel: mechanism-proven-other-frameworks # never run
@@ -215,9 +215,9 @@ system's own fragility.
   documented dead ends, but neither DI resolution nor JDBC ownership
   disambiguation was actually run against CodeQL this session. They're the
   natural next two experiments, not findings.
-- **CodeQL's cost at real monorepo scale is unmeasured.** Fineract has 30+
-  Gradle modules; this review only built and traced `fineract-charge` (+ its
-  transitive deps `fineract-core`/`fineract-tax`) — a few seconds once
+- **CodeQL's cost at real monorepo scale is unmeasured.** The reference platform has 30+
+  Gradle modules; this review only built and traced the reference Java/JAX-RS
+  banking platform's charge module (+ its transitive core/tax deps) — a few seconds once
   warm. Building and tracing the *entire* monorepo (needed for a
   repo-wide DI-resolution or ownership-disambiguation pass) was not attempted
   and could have a materially different cost profile.
@@ -234,7 +234,7 @@ system's own fragility.
 
 ## 6. Recommended next research steps, in priority order
 
-1. **Test §4.2 (DI/bean-graph resolution) for real** against Fineract's own
+1. **Test §4.2 (DI/bean-graph resolution) for real** against the reference platform's own
    `@Bean`-factory/plain-interface gaps (`ChargeConfiguration`-shaped classes,
    already named in `Architect_Pilot_Feedback_Notes.md`'s Entries 11-13) — highest
    expected value, since it's evidenced as potentially closing two named
@@ -248,7 +248,7 @@ system's own fragility.
    `engine-capability-matrix.yml`'s own `spring-mvc` `evidenceLevel` caveat —
    currently untested by this project at all, independent of which engine.
 4. **Quantitatively re-measure the bare-name-collision rate** on a fresh full
-   Fineract scan with current mitigations active, to know whether 32.4% (raw)
+   reference-platform scan with current mitigations active, to know whether 32.4% (raw)
    is now closer to 0% or still a meaningful residual — turns §4.1 from a
    historical citation into a current, trackable number.
 5. **Only after 1-3 land** — revisit whether any of this warrants a change to

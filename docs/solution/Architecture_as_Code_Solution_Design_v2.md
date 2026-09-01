@@ -379,7 +379,7 @@ routes:
     evidenceLevel: proven-phase1
   - language: java
     framework: [jpa, spring-data-repository]
-    primaryEngine: codegraph-extract-from-source   # PHASE 1 — proven for bare @Entity (a reference Java/JAX-RS banking platform, fineract-core module, 36 real nodes)
+    primaryEngine: codegraph-extract-from-source   # PHASE 1 — proven for bare @Entity (a reference Java/JAX-RS banking platform, core module, 36 real nodes)
     augmentEngine: codeql                           # PHASE 2 — trigger: entity-relationship modeling gaps Phase 1 can't close
     evidenceLevel: proven-phase1-entity-only
   - language: any
@@ -476,11 +476,11 @@ Neither sketch requires a new Scanner engine, a new Rules catalogue entry, or a 
 
 **Slice 2a exit criteria — executable, not prose** (the extraction hardening backlog). All five are enforced by `pipeline/test/regression.test.js` (`npm test`), not just asserted here:
 
-1. `fineract-charge` produces schema-valid CALM via `npm run validate` — **passes** (0 errors, confirmed by test).
+1. The reference platform's charge module produces schema-valid CALM via `npm run validate` — **passes** (0 errors, confirmed by test).
 2. JAX-RS routes match grep baseline exactly (not just count) — **passes**: `ChargesApiResource`'s exact 6-route set asserted, not a tolerance range.
 3. JPA `@Entity` → `database` kind, never `service` — **passes**: `Charge.java` asserted `node-type: database`, zero interfaces.
 4. No `interacts` with `{source, destination}` shape — **enforced structurally** (§5.3: no catalogue row ever requests `interacts`), not just tested; every relationship in every regression case is `connects`.
-5. Automated regression for the reference Python app + NestJS + `fineract-charge` + `fineract-core` counts — **passes**, `npm test`, 6 real tests, all green.
+5. Automated regression for the reference Python app + NestJS + the reference platform's charge module + the reference platform's core module counts — **passes**, `npm test`, 6 real tests, all green.
 
 **Slice 2a is exit-criteria-complete.** Slice 2b/2c remain genuinely open (§10 table above).
 
@@ -502,8 +502,8 @@ The original v1 review's failure mode was qualitative-only success metrics with 
 | Metric | Target (provisional) | Real measurement so far |
 |---|---|---|
 | Route recall vs. grep-verified ground truth | 100% on proxy repos | **19/19** (the reference Java/JAX-RS banking platform JAX-RS), **4/4** ×2 (the reference Python app Flask) |
-| `calm validate` errors | 0 | **0** across every regression case (the reference Python app, NestJS, `fineract-charge`, `fineract-core`) |
-| Time per package (CodeGraph + decorator pass) | Under 2 min (`v0.10 §1.1`) | **~10s** for 823 files (`fineract-core`) |
+| `calm validate` errors | 0 | **0** across every regression case (the reference Python app, NestJS, the reference platform's charge module, the reference platform's core module) |
+| Time per package (CodeGraph + decorator pass) | Under 2 min (`v0.10 §1.1`) | **~10s** for 823 files (the reference platform's core module) |
 | Full combined-scan time at the reference Java/JAX-RS banking platform's real scale (6,781 files) | Not yet targeted | **~96s** (Graphify portion only — not a full end-to-end pipeline timing, named as a gap in §11) |
 | Override rate (how often generated output needs correction) | Not yet measured | No pilot has run against a non-proxy repo yet — genuinely unmeasurable until then |
 | Architect review time per package | Under 15 min (`v0.10 §1.1`) | Not measured — no human-review pilot has happened |
@@ -521,7 +521,7 @@ Pinned to CALM 1.2 throughout, unchanged since `v0.9`. **One-liner policy, state
 | Regression suite is a floor, not a program | Accepted for Slice 2 scope; a real golden-dataset program is a stated backlog item, not designed here. |
 | CodeQL license/build-compatibility unresolved | Real open point from §6 — needs an actual spike against the real target repo's build system before any adoption decision, not assumed compatible from research alone. |
 | Numeric success metric, data-classification owner, companion-interface auth — still provisional | Unchanged from v0.10 §1 — this document does not claim to resolve organizational-authority questions it has none over; it restates their provisional status rather than letting them re-drift silently. |
-| Second module (§9) is sketched, not built | **RESOLVED** — `modules/threat-signals/` is real, built, and proven against real output from a reference Java/JAX-RS banking platform (fineract-core module) (flags `http-entry-point` units with no `security-control` evidence), consuming only `TypedFacts` + the registry types, no Scanner/CALM-builder imports. The actual test of Goal A now passes. Residual risk narrows to *seamlessness* (module registration is still a code edit, not config — Wave M T-M1), not existence. |
+| Second module (§9) is sketched, not built | **RESOLVED** — `modules/threat-signals/` is real, built, and proven against real output from a reference Java/JAX-RS banking platform (core module) (flags `http-entry-point` units with no `security-control` evidence), consuming only `TypedFacts` + the registry types, no Scanner/CALM-builder imports. The actual test of Goal A now passes. Residual risk narrows to *seamlessness* (module registration is still a code edit, not config — Wave M T-M1), not existence. |
 | LLM advisory layer (§7.1) drifts from "bounded escape hatch" to "default second opinion on everything" | Named as a real risk to watch, not assumed away — the trigger-set discipline (§7.1 point 1) and the per-run item cap are the concrete guardrails; if a future version proposes widening the trigger set (e.g. to the whole 40-69 confidence band instead of below-floor/ambiguous only), that should be treated as a real scope decision requiring the same review this document gives every other scope change, not a quiet default-widening. |
 | IR layer (§13) drifts into a second source of truth, or its override block becomes a way around Decision Record enforcement | Mitigated by construction per §13.4 — one-way generation, narrow fenced-block parsing, no direct path to `typed-facts.json`. Named again here because "a file both humans and an LLM can edit" is exactly the shape of thing that tends to accumulate scope over time if the regenerate-and-discard convention isn't actually enforced in the implementation, not just specified in this document. |
 | OpenAPI/AsyncAPI ingestion assumes a static file that may not exist (§4.1) | Named honestly, carried forward from `v0.6 §11` item 10 — annotation-based extraction (`extractFromSource()`) is the specified fallback, not yet built either. Don't scope Slice 2/3 work around "read `openapi.yaml`" without confirming the target repo actually checks one in. |

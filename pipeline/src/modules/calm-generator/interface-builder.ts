@@ -23,20 +23,21 @@ import { NodeTypeMapping, findNodeTypeMapping } from '../../rules/construct-mapp
 const SOURCE_PRECEDENCE: Record<Evidence['source'], number> = {
   'native-route': 0,
   openapi: 1,
-  // T-Y4-1 — CFN/SAM-derived paths, per D-openapi-fallback (design note §3):
-  // OpenAPI wins when both exist (higher-signal, author-written source);
-  // CFN join is the fallback/supplement for API Gateway paths OpenAPI
-  // doesn't itself describe. Above decorator: an infra template's real
-  // deployed binding is more authoritative than a heuristic decorator scan.
+  // CFN/SAM-derived paths: OpenAPI wins when both exist (higher-signal,
+  // author-written source); CFN join is the fallback/supplement for API
+  // Gateway paths OpenAPI doesn't itself describe. Above decorator: an
+  // infra template's real deployed binding is more authoritative than a
+  // heuristic decorator scan.
   'structured-file': 2,
   decorator: 3,
   'graphify-import': 4, // never actually contributes interfaces today (no node-type-mapping row lists persistence/graphify-import under interfaceCategories) — ordered last for completeness, not because it's been exercised
-  call: 5, // AREC T-D1 — security-control category only, never interface-building; ordered last for the same reason as graphify-import (completeness, not exercised)
-  'field-type': 6, // AREC T-E1 — messaging category only, never interface-building; ordered last for the same reason
-  extends: 7, // AREC T-E3 — persistence category only, never interface-building for the JPA/spring-data/serverless-entry-point rows; ordered last for the same reason
-  'structured-config': 8, // T-PC1-7 — spring-config category only, never listed in any interfaceCategories row (attachPortInterfaces handles server.port separately); ordered last for the same reason as the rows above
-  'dependency-manifest': 9, // T-CDX-2/3 — persistence/messaging category only, corroboration-weight-only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
-  'codeql-di': 10, // T-LR-5 — DI-resolution evidence only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
+  call: 5, // security-control category only, never interface-building; ordered last for the same reason as graphify-import (completeness, not exercised)
+  'field-type': 6, // messaging category only, never interface-building; ordered last for the same reason
+  extends: 7, // persistence category only, never interface-building for the JPA/spring-data/serverless-entry-point rows; ordered last for the same reason
+  'structured-config': 8, // spring-config category only, never listed in any interfaceCategories row (attachPortInterfaces handles server.port separately); ordered last for the same reason as the rows above
+  'dependency-manifest': 9, // persistence/messaging category only, corroboration-weight-only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
+  'codeql-di': 10, // DI-resolution evidence only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
+  'codeql-jpa-table': 11, // JPA entity->table CodeQL candidate — persistence category only, corroboration-weight-only, never listed in any interfaceCategories row; ordered last for the same reason as the rows above
 };
 
 export function attachInterfaces(units: TypedUnit[], nodes: CalmNode[], mapping: NodeTypeMapping): void {

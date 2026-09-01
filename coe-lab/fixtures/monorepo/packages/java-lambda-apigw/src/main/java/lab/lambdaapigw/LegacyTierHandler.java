@@ -7,7 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 /**
- * WDL-2 disconfirming case (mirrors real aws-saas-boost-tier-service,
+ * WDL-2 disconfirming case (mirrors a reference AWS SaaS sample's tier-service,
  * HT-ASB-002): a Lambda handler that ALSO owns its own DynamoDbClient
  * field directly, not just a store class it delegates to. Real bug this
  * fixture exists to catch: before Y2's kind-priority fix, this class would

@@ -9,14 +9,14 @@ import { TypedUnit, PENDING_STATUS } from '../types/typed-facts';
 const CORROBORATION_WEIGHT = 10; // same corroboration tier as jpa-table's weight
 
 /**
- * T-CDX-3 (B-cdxgen-reuse) — raw, UNEXPANDED catalogue library names
- * (deliberately not driverImportLibraries()/importOnlyMessagingLibraries()'s
- * Graphify ref_-transformed sets — those exist to match Graphify EDGE
- * targets, a different data source; cdxgen's component names are real,
- * literal package names read from a manifest/lockfile, never Graphify's
- * mangled ref_ form). Maps each name to the unit KIND it would introduce
- * (T-FS-4) — a flat Set lost which catalogue (persistence vs. messaging) a
- * name came from, which introduction needs to pick database vs. topic.
+ * Raw, UNEXPANDED catalogue library names (deliberately not
+ * driverImportLibraries()/importOnlyMessagingLibraries()'s Graphify
+ * ref_-transformed sets — those exist to match Graphify EDGE targets, a
+ * different data source; cdxgen's component names are real, literal
+ * package names read from a manifest/lockfile, never Graphify's mangled
+ * ref_ form). Maps each name to the unit KIND it would introduce — a flat
+ * Set lost which catalogue (persistence vs. messaging) a name came from,
+ * which introduction needs to pick database vs. topic.
  */
 function corroboratingLibraryKinds(rulesDir: string): Map<string, 'database' | 'topic'> {
   const persistence = loadPersistenceDetectionCatalogue(rulesDir);
@@ -34,8 +34,8 @@ function corroboratingLibraryKinds(rulesDir: string): Map<string, 'database' | '
 }
 
 /**
- * T-FS-4 (BACKLOG.md "Secondary sources may introduce facts, not only
- * corroborate") — cdxgen's SBOM sees a real, structural fact (this root
+ * Secondary sources may introduce facts, not only corroborate: cdxgen's
+ * SBOM sees a real, structural fact (this root
  * genuinely depends on a persistence/messaging library) that the primary
  * code-reading engines can miss entirely (a driver used only via reflection,
  * a dependency declared but its usage sitting in a file/pattern this
@@ -83,7 +83,7 @@ function introducedUnit(root: string, matchName: string, matchVersion: string | 
  * `spring-config-pass.ts`'s server.port ambiguity fix already established:
  * corroboration only attaches when exactly ONE persistence/messaging unit
  * exists in the root; 2+ candidates record a real, named ignored item
- * instead of guessing. When exactly ZERO candidates exist (T-FS-4), a
+ * instead of guessing. When exactly ZERO candidates exist, a
  * single unambiguous match introduces a new unit at its own tier instead of
  * staying mute — still never guesses: 2+ matches with zero candidate units
  * is exactly as ambiguous as 2+ matches against one candidate, and stays a
@@ -105,7 +105,7 @@ export const cdxgenCorroborationPass: AnalysisPass = {
       const candidates = (ctx.unitsByRoot.get(root) ?? []).filter((u) => u.kind === 'database' || u.kind === 'topic');
 
       if (candidates.length === 0) {
-        // T-FS-4 — nothing to corroborate; introduce a fact instead of
+        // Nothing to corroborate; introduce a fact instead of
         // staying mute, but only when exactly one real match exists (the
         // same "never guess which one" discipline as every other branch
         // here).
@@ -113,7 +113,7 @@ export const cdxgenCorroborationPass: AnalysisPass = {
           ctx.allIgnoredItems.push({
             ref: `${root}:cdxgen-dependency-corroboration`,
             reason: 'AMBIGUOUS_BOUNDARY',
-            detail: `cdxgen found ${matches.length} real corroborating dependencies (${matches.map((m) => m.name).join(', ')}) but no persistence/messaging unit exists in this root and no interface-mapping mechanism (T-FS-4) resolves which one to introduce a fact for — never guessing`,
+            detail: `cdxgen found ${matches.length} real corroborating dependencies (${matches.map((m) => m.name).join(', ')}) but no persistence/messaging unit exists in this root and no interface-mapping mechanism resolves which one to introduce a fact for — never guessing`,
           });
           continue;
         }

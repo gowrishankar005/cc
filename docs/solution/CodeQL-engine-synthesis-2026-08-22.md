@@ -13,8 +13,8 @@ isolated data point.
 
 | Experiment | Language / mechanism | Real repo | Result |
 |---|---|---|---|
-| `E1` | Java, command-bus dispatch | Fineract | 7 real edges — evaluated, never shipped (T-LR-5 shipped DI resolution instead, a scope decision, not a negative result) |
-| `E1b` | Java, Spring `@Bean`-factory/stereotype | Fineract | **2,105 real bindings**, 731 new relationships, 56 new units, `calm validate` clean — shipped as `T-LR-5` |
+| `E1` | Java, command-bus dispatch | a reference Java/JAX-RS banking platform | 7 real edges — evaluated, never shipped (T-LR-5 shipped DI resolution instead, a scope decision, not a negative result) |
+| `E1b` | Java, Spring `@Bean`-factory/stereotype | a reference Java/JAX-RS banking platform | **2,105 real bindings**, 731 new relationships, 56 new units, `calm validate` clean — shipped as `T-LR-5` |
 | `E2` | Java, Spring — generalization check | `spring-petclinic`, `finos/spring-bot` | **0 usable relationships on either** — mechanism ran mechanically clean (no false positives, correct refusal), yield near-zero |
 | `E2a` | TypeScript, NestJS string-token `useFactory` | `ghostfolio/ghostfolio` | **15 real bindings**, 0 baseline overlap — one real ambiguity found, not yet refused |
 | Tier 2 | Java, Guice `bind().to()` | `finos/legend-sdlc` | 218 raw bindings, **only 10 genuine** — 208 were main/test contamination from an `mvn install` build command, root-caused and fixed-in-understanding (not yet fixed in the query) |
@@ -22,8 +22,9 @@ isolated data point.
 ## The synthesized answer: yield is gated by architecture shape and DI idiom, not by language or framework identity
 
 The single biggest, most repeated finding across all five experiments.
-Fineract's 2,105 bindings and `spring-bot`/`spring-petclinic`'s combined
-zero are **not** a Java-vs-Java inconsistency — Fineract is saturated with
+The reference Java/JAX-RS banking platform's 2,105 bindings and
+`spring-bot`/`spring-petclinic`'s combined zero are **not** a Java-vs-Java
+inconsistency — the reference platform is saturated with
 the specific "ambiguous interface, resolved via `@Bean`-factory or
 stereotype" shape (30,778 decorator facts → 6,741 units); the other two
 repos simply don't have much of that shape, regardless of also being real,
@@ -40,7 +41,7 @@ resolution the two buildless engines structurally cannot see," not
 distributed. A repo audit that grep-verifies real DI-idiom volume *before*
 running CodeQL (the discipline every experiment in this series followed) is
 a better filter than "is this Java" — this is now demonstrated three times
-independently (Fineract vs. the two thin Spring repos; `ghostfolio`'s real
+independently (the reference banking platform vs. the two thin Spring repos; `ghostfolio`'s real
 signal vs. `samchon/payments`' confirmed zero; `legend-sdlc`'s real signal
 found specifically by grep-verifying 261 `@Inject` sites before ever
 building a database).
@@ -56,7 +57,7 @@ building a database).
 2. **Reliability** — no longer theoretical. This session's five real,
    independently-diagnosed build/extraction failure modes (cached-build
    empty extraction, Gradle daemon reuse, a Maven npm-frontend hang,
-   Fineract's own unrelated OOM'ing codegen task, and now the main/test
+   the reference platform's own unrelated OOM'ing codegen task, and now the main/test
    contamination class) are all **build-command-specific to compiled
    languages** — every one of them is a property of what `javac`/Gradle/
    Maven actually does, not of CodeQL's own analysis. Confirmed directly

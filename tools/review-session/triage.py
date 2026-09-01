@@ -1,4 +1,6 @@
-"""Builds residuals.json from a run's review-queue.json (MVP scope).
+"""Builds residuals.json from a run's review-queue.json plus leftover
+artefacts (unmapped-signal clusters, ignored INSUFFICIENT_EVIDENCE /
+AMBIGUOUS_BOUNDARY).
 
 S7 (no sample hardcodes): the trigger -> tier/class mapping below is keyed
 purely on review-queue.json's own trigger names (S1/S2/S5/low-architecture-
@@ -6,14 +8,13 @@ coverage), which are themselves generic across every language/framework
 this pipeline supports — nothing here references a specific repo, class
 name, or framework.
 
-MVP scope note: this covers every trigger hitl-review-trigger.ts already
-emits. It deliberately does NOT yet cover unmapped-signal-cluster ->
-catalogue_candidate promotion or generic ontology-kind-conflict detection
-beyond what S5 already names — those are real, separate extensions,
-named here as a TODO rather than silently assumed done.
+Unmapped clusters and ignored items are generic the same way: they use
+the report's own `signal` / `reason` fields, never a class/framework name.
 """
 
 from __future__ import annotations
+
+import re
 
 # Tier + class per trigger, matched against the design's own taxonomy
 # (Architect_Residual_Review_Session.md §3):
@@ -60,11 +61,31 @@ _TRIGGER_MAP = {
     "contradicting-evidence-force-review": ("A", "contradicting-evidence"),
 }
 
+# Same pattern unmapped-signals.ts uses to recognise catalogue misses.
+_UNMAPPED_DETAIL_RE = re.compile(r'No signal-catalogue\.yml rule matched raw signal "([^"]*)"')
+_CONTRADICTION_PREFIX = "contradiction:"
+_IGNORED_REASONS = frozenset({"INSUFFICIENT_EVIDENCE", "AMBIGUOUS_BOUNDARY"})
+_FILE_LINE_RE = re.compile(r"^.+:\d+$")
 
-def build_residuals(review_queue: dict) -> list[dict]:
+# Pack-time caps (token-conscious). unmapped-signals.ts already caps
+# clusters at 100 / 5 samples; the pack takes a tighter slice so Copilot
+# is not handed the whole leftover dump.
+MAX_UNMAPPED_CLUSTERS_IN_PACK = 20
+MAX_IGNORED_IN_PACK = 30
+
+
+def build_residuals(
+    review_queue: dict,
+    unmapped: dict | None = None,
+    ignored: list | None = None,
+) -> list[dict]:
     """review_queue is the parsed review-queue.json (ReviewQueue shape from
-    hitl-review-trigger.ts). Returns a list of residual dicts matching
-    residuals.json's schema (documented in residuals-schema.json)."""
+    hitl-review-trigger.ts). unmapped is unmapped-signals-report.json (or
+    None). ignored is ignored-items-report.json (a list, or None).
+
+    Returns residual dicts matching residuals.json's schema. Queue items
+    come first (stable R-001… ids for existing tests); leftover classes
+    append after."""
     residuals = []
     for idx, item in enumerate(review_queue.get("items", [])):
         trigger = item["trigger"]
@@ -82,7 +103,105 @@ def build_residuals(review_queue: dict) -> list[dict]:
                 "status": "open",
             }
         )
+
+    claimed_refs = _claimed_refs(residuals)
+    next_n = len(residuals) + 1
+    extra, next_n = _residuals_from_unmapped(unmapped, next_n)
+    residuals.extend(extra)
+    claimed_refs.update(_claimed_refs(extra))
+    extra, _next_n = _residuals_from_ignored(ignored, next_n, claimed_refs)
+    residuals.extend(extra)
     return residuals
+
+
+def _claimed_refs(residuals: list[dict]) -> set[str]:
+    claimed: set[str] = set()
+    for r in residuals:
+        claimed.update(r.get("unitIds") or [])
+        claimed.update(r.get("evidenceRefs") or [])
+    return claimed
+
+
+def _file_line_refs(values: list[str] | None) -> list[str]:
+    return [v for v in (values or []) if isinstance(v, str) and _FILE_LINE_RE.match(v)]
+
+
+def _residuals_from_unmapped(unmapped: dict | None, next_n: int) -> tuple[list[dict], int]:
+    """One residual per unmapped-signal cluster (capped). Tier A: HITL
+    picks catalogue-lane vs one-off construct vs leave-open. Never
+    auto-merge signal-catalogue.yml (S11)."""
+    if not unmapped:
+        return [], next_n
+    clusters = unmapped.get("clusters") or []
+    out = []
+    for cluster in clusters[:MAX_UNMAPPED_CLUSTERS_IN_PACK]:
+        signal = cluster.get("signal") or "(unnamed signal)"
+        count = cluster.get("count", 0)
+        samples = cluster.get("sampleRefs") or []
+        refs = _file_line_refs(samples)
+        out.append(
+            {
+                "id": f"R-{next_n:03d}",
+                "tier": "A",
+                "class": "catalogue-candidate",
+                "trigger": "unmapped-signal-cluster",
+                "unitIds": [],
+                "evidenceRefs": refs,
+                "rationale": (
+                    f'Unmapped signal "{signal}" clustered {count} time(s) '
+                    f"({len(samples)} sample ref(s) in the report). Catalogue-promotion "
+                    "candidate (suggest-rules / a signal-catalogue.yml row) — not an "
+                    "auto-merge. A one-off node_add/relationship_add is only in play if "
+                    "a packed sample names a real unit."
+                ),
+                "status": "open",
+            }
+        )
+        next_n += 1
+    return out, next_n
+
+
+def _residuals_from_ignored(ignored: list | None, next_n: int, claimed_refs: set[str]) -> tuple[list[dict], int]:
+    """INSUFFICIENT_EVIDENCE / AMBIGUOUS_BOUNDARY leftovers that are not
+    already a review-queue item, unmapped cluster, or contradiction
+    (contradictions are T-FS-3 queue triggers)."""
+    if not ignored:
+        return [], next_n
+    items = ignored if isinstance(ignored, list) else ignored.get("items") or []
+    out = []
+    for item in items:
+        if len(out) >= MAX_IGNORED_IN_PACK:
+            break
+        reason = item.get("reason")
+        if reason not in _IGNORED_REASONS:
+            continue
+        detail = item.get("detail") or ""
+        if _UNMAPPED_DETAIL_RE.search(detail):
+            continue
+        if detail.startswith(_CONTRADICTION_PREFIX):
+            continue
+        ref = item.get("ref") or ""
+        if ref and ref in claimed_refs:
+            continue
+        refs = _file_line_refs([ref]) if ref else []
+        cls = "insufficient-evidence" if reason == "INSUFFICIENT_EVIDENCE" else "ambiguous-boundary"
+        trigger = f"ignored-{reason.lower().replace('_', '-')}"
+        out.append(
+            {
+                "id": f"R-{next_n:03d}",
+                "tier": "A",
+                "class": cls,
+                "trigger": trigger,
+                "unitIds": [ref] if ref and not refs else [],
+                "evidenceRefs": refs,
+                "rationale": detail or f"{reason} ignored-item with no detail",
+                "status": "open",
+            }
+        )
+        if ref:
+            claimed_refs.add(ref)
+        next_n += 1
+    return out, next_n
 
 
 def _evidence_refs_for(item: dict) -> list[str]:

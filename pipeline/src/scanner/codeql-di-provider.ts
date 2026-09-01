@@ -5,7 +5,7 @@ import * as os from 'os';
 import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
 
 /**
- * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — a second real structural
+ * A second real structural
  * source, architecturally shaped like `codegraph-crossroot-provider.ts` (one combined,
  * whole-codebase analysis pass), not like `codegraph-provider.ts`'s
  * per-file `StructuralEngine` interface: CodeQL's DI-resolution query is a
@@ -18,7 +18,7 @@ import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
  * generic, no sample-repo class/package names (`OOS-sample-repo-detectors`
  * at full force), verified real at whole-codebase scale in
  * `E1b-codeql-di-resolution-experiment.md` (2106 real DI bindings on
- * Fineract, real ambiguity found and correctly refused).
+ * a reference Java/JAX-RS banking platform, real ambiguity found and correctly refused).
  *
  * Deliberately opt-in only (`--codeql-source-root` + `--codeql-build-command`).
  * The pass is registered in DEFAULT_PASSES so grade/status still see any
@@ -71,7 +71,7 @@ export interface CodeQLDiBinding {
  * CodeQL's tracer observes nothing and the database looks "successful" but
  * captures zero source) rather than an honest error.
  */
-export function runCodeQLDiResolution(sourceRoot: string, buildCommand: string): CodeQLDiBinding[] {
+export function runCodeQLDiResolution(sourceRoot: string, buildCommand: string, fallbackBuildCommand?: string): CodeQLDiBinding[] {
   if (!fs.existsSync(DI_RESOLUTION_QUERY)) {
     console.warn(`[codeql-di] WARNING: query file missing at ${DI_RESOLUTION_QUERY}, continuing without CodeQL DI-resolution evidence`);
     return [];
@@ -83,7 +83,7 @@ export function runCodeQLDiResolution(sourceRoot: string, buildCommand: string):
   // codeql-database-cache.ts's own doc comment for the real bug this fixes
   // (a second independent `database create` against the same source could
   // silently return an empty extraction via Gradle's build cache).
-  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand);
+  const dbPath = getOrBuildCodeqlDatabase(sourceRoot, buildCommand, fallbackBuildCommand);
   if (!dbPath) return []; // binary/build failure already warned by the shared cache
 
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-codeql-di-out-'));
@@ -101,6 +101,9 @@ export function runCodeQLDiResolution(sourceRoot: string, buildCommand: string):
 
   const bindings = parseDiResolutionCsv(fs.readFileSync(csvPath, 'utf8'));
   fs.rmSync(workDir, { recursive: true, force: true });
+  if (bindings.length === 0) {
+    console.log('[codeql-di] query ran cleanly, 0 real DI bindings found (not a failure — see WARNING above if the database/query itself failed)');
+  }
   return bindings;
 }
 

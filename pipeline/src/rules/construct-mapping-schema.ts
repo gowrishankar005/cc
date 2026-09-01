@@ -5,7 +5,7 @@ import { parse as parseYaml } from 'yaml';
 /** Catalogue 2a — docs/solution/Architecture_as_Code_Solution_Design_v2.md §5.2. */
 export interface NodeTypeMappingRule {
   unitKind: string;
-  // T-P0-1 (E2) — 'unresolved-endpoint' isn't a CALM 1.2 enum value but is
+  // 'unresolved-endpoint' isn't a CALM 1.2 enum value but is
   // schema-valid (core.json's node-type-definition is anyOf: [enum, string]).
   calmNodeType: 'service' | 'database' | 'system' | 'network' | 'actor' | 'webclient' | 'ecosystem' | 'ldap' | 'data-asset' | 'unresolved-endpoint';
   interfaceCategories: string[];

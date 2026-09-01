@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Weaver residual review session — residuals.json",
-  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. MVP scope: derived from review-queue.json's own triggers (S1/S2/S5/low-architecture-coverage) — unmapped-signal-cluster catalogue_candidate promotion and generic ontology-conflict detection beyond S5 are named, real, separate extensions to this schema (real classes may be appended later; existing fields do not change shape). T-FS-1 (BACKLOG.md 'Tier-B residual detection') closed the prior 'no trigger produces tier B' gap: multi-hop-single-candidate-below-threshold (multi-hop-bridge-detector.ts's tier-b-single-candidate ignored-item, a single real store candidate found among a bridge's several syntactic implementers) now maps to tier 'B'.",
+  "description": "Written by pack.py (via triage.py's build_residuals + cards.py's build_all_cards), read by the bound Copilot Chat agent and by draft_tier_b.py for any Tier B residual. Sources: review-queue.json triggers (S1/S2/S5/low-architecture-coverage, T-FS-1, T-FS-3) plus unmapped-signal-cluster (class catalogue-candidate) and ignored INSUFFICIENT_EVIDENCE / AMBIGUOUS_BOUNDARY leftovers that are not already a queue item. Extra-read spans are appended to evidence/packs.json by pack.py fetch-span (architect-run).",
   "type": "object",
   "required": ["generatedAt", "items"],
   "properties": {
@@ -77,6 +77,23 @@
             "generatedAt": { "type": "string", "format": "date-time" }
           },
           "required": ["explanation", "hypotheses", "hasCatalogueRuleCandidate", "model", "generatedAt"]
+        },
+        "dossier": {
+          "type": "object",
+          "description": "T-2 (AGENT_TASKS_Residual_Dossier_Module.md) — the opt-in Evidence Dossier pass, run only when pack.py is invoked with --with-dossier (default pack.py behavior is unchanged). Optional, attached only when dossier.py has been run against this residual (any tier) and its response passed every guardrail in parse_and_validate_dossier_response. Same 'never a fact, never a second corroborating signal' discipline as the advisory field above — a human accepting a dossier hypothesis via this residual's own card is ONE human judgement.",
+          "properties": {
+            "explanation": { "type": "string" },
+            "hypotheses": { "type": "array", "items": { "type": "string" } },
+            "evidenceRefsUsed": { "type": "array", "items": { "type": "string" }, "description": "The subset of this residual's own evidenceRefs the dossier response actually cited — never a ref outside what the residual's own pack already contains." },
+            "model": { "type": "string" },
+            "generatedAt": { "type": "string", "format": "date-time" }
+          },
+          "required": ["explanation", "hypotheses", "evidenceRefsUsed", "model", "generatedAt"]
+        },
+        "draftOutcome": {
+          "type": "string",
+          "enum": ["bar-not-met"],
+          "description": "Set by draft_tier_b.py when a Tier B residual was actually attempted and its evidence bar wasn't met (draft_for_residual's own 'cannot_decide' outcome) — distinguishes 'attempted, evidence insufficient' from a residual that was never Tier-B-eligible at all (which has no draftOutcome key). Absent (not null) when draft_tier_b.py has not attempted this residual."
         }
       }
     }

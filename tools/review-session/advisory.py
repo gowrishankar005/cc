@@ -57,24 +57,31 @@ Its only outputs are:
      row would cite -- this file does not attempt that aggregation, only
      the durable log it would be computed from.
 
-No `ANTHROPIC_API_KEY` -> reports what would be attempted, writes nothing
-(same convention `suggest-rules.ts` / `draft_tier_b.py` already use for
-"LLM backend optional").
+T-1 (AGENT_TASKS_Residual_Assist_Redesign.md, 2026-08-23): backend is the
+`claude` CLI only, deliberately not a raw `ANTHROPIC_API_KEY` from the
+environment -- this project's own target-customer profile (fintechs)
+doesn't leave API keys in environment variables for an LLM to pick up
+(owner directive, 2026-08-23); the realistic path is an already-
+authenticated coding-assistant CLI, same as draft_tier_b.py. No `claude`
+CLI on `PATH` -> reports what would be attempted, writes nothing (same
+convention `suggest-rules.ts` already uses for "LLM backend optional").
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
 import sys
-import urllib.request
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-MODEL = "claude-sonnet-4-5-20250929"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import llm_common  # noqa: E402
+from llm_common import _call_llm, _llm_backend_available, _strip_markdown_json_fence  # noqa: E402
+
+MODEL = llm_common.DEFAULT_MODEL
 
 SYSTEM_PROMPT = """You are the reviewer-assistance advisory layer for a Weaver
 residual review session. You are ADVISORY ONLY.
@@ -124,34 +131,9 @@ def build_advisory_prompt(residual: dict, unit_index: dict, packs: dict) -> str:
     """Pure, testable -- same INPUTS-only assembly discipline
     draft_tier_b.py's build_user_prompt already established (scoped to
     this residual's own unit ids only, nothing else leaked into the
-    prompt)."""
-    relevant_units = {uid: info for uid, info in unit_index.items() if uid in residual.get("unitIds", [])}
-    relevant_evidence = {ref: snippet for uid in relevant_units.values() for ref in uid.get("evidenceRefs", []) for r, snippet in packs.items() if r == ref}
-    return json.dumps({"residual": residual, "unit_index": relevant_units, "evidence_snippets": relevant_evidence}, indent=2)
-
-
-def _call_llm(system_prompt: str, user_prompt: str, api_key: str, model: str = MODEL) -> str:
-    """The only network boundary in this file -- mirrors draft_tier_b.py's
-    _call_llm (same isolation reasoning: kept thin and swappable so the
-    real guardrail below is fully testable without ever calling a live
-    API). Never exercised in this environment (no ANTHROPIC_API_KEY) --
-    same honest disclosure as draft_tier_b.py's own module docstring."""
-    body = json.dumps(
-        {
-            "model": model,
-            "max_tokens": 1024,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": user_prompt}],
-        }
-    ).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=body,
-        headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        payload = json.loads(resp.read())
-    return "".join(block.get("text", "") for block in payload.get("content", []))
+    prompt). Delegates to llm_common.build_evidence_prompt -- the shared
+    implementation both files (and dossier.py) now call."""
+    return llm_common.build_evidence_prompt(residual, unit_index, packs)
 
 
 REQUIRED_ADVISORY_KEYS = {"explanation", "hypotheses", "catalogue_rule_candidate"}
@@ -162,18 +144,28 @@ VALID_CALM_NODE_TYPES = {"service", "database", "topic"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
 
-def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
+def parse_and_validate_response(raw_text: str, residual: dict, unit_index: dict | None = None) -> dict:
     """Pure, fully testable without any network call -- the actual
     guardrail (hard rules 1-4 above), not the model's own good behavior,
     which this tool structurally cannot verify or trust on its own.
+
+    `unit_index` (optional, defaults to {}) matches dossier.py's own
+    parse_and_validate_dossier_response fix (found live, 2026-08-23,
+    BACKLOG.md): residual.evidenceRefs is genuinely EMPTY for whole-unit
+    trigger classes (e.g. S2-http-without-security-control) -- the real
+    evidence that reached the model's prompt lives on the unit's own
+    evidenceRefs in unit_index instead. Without this, a real, correctly
+    evidence-grounded response citing unit-level evidence would be
+    spuriously rejected.
 
     Returns {"outcome": "advised", "explanation": ..., "hypotheses": [...],
     "catalogue_rule_candidate": ... or None}
     or {"outcome": "invalid_response", "reason": ...} -- a REJECTION,
     never silently treated as advice, no matter how plausible-looking the
     response is (README S6: never fabricate, never guess)."""
+    unit_index = unit_index or {}
     try:
-        parsed = json.loads(raw_text)
+        parsed = json.loads(_strip_markdown_json_fence(raw_text))
     except (json.JSONDecodeError, TypeError):
         return {"outcome": "invalid_response", "reason": "response was not valid JSON -- rejected, not guessed at"}
 
@@ -212,7 +204,7 @@ def parse_and_validate_response(raw_text: str, residual: dict) -> dict:
     # fields, adapted for prose (see that file's module docstring for the
     # same honest disclosure: this can't detect prior-knowledge USE, only
     # reject any concrete ref that isn't actually in the pack).
-    known_refs = set(residual.get("evidenceRefs", []))
+    known_refs = llm_common.known_evidence_refs(residual, unit_index)
     free_text = explanation + " " + " ".join(hypotheses) + " " + (candidate.get("rationale", "") if isinstance(candidate, dict) else "")
     for match in _EVIDENCE_REF_RE.finditer(free_text):
         ref = f"{match.group(1)}:{match.group(2)}"
@@ -239,19 +231,18 @@ def _validate_catalogue_rule_candidate(candidate) -> str | None:
     return None
 
 
-def advise_for_residual(residual: dict, unit_index: dict, packs: dict, api_key: str | None) -> dict:
-    if not api_key:
-        return {"outcome": "no_key", "reason": "no ANTHROPIC_API_KEY set -- nothing advised"}
+def advise_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
+    if not _llm_backend_available():
+        return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) -- nothing advised"}
     user_prompt = build_advisory_prompt(residual, unit_index, packs)
-    raw = _call_llm(SYSTEM_PROMPT, user_prompt, api_key)
-    return parse_and_validate_response(raw, residual)
+    raw = _call_llm(SYSTEM_PROMPT, user_prompt)
+    return parse_and_validate_response(raw, residual, unit_index)
 
 
 def process_advisory_batch(
     residuals: list[dict],
     unit_index: dict,
     packs: dict,
-    api_key: str,
     advise_fn=advise_for_residual,
     now_fn=lambda: datetime.now(timezone.utc).isoformat(),
     id_fn=lambda: uuid.uuid4().hex[:12],
@@ -276,7 +267,7 @@ def process_advisory_batch(
     seen_candidate_ids: set[str] = set()
 
     for residual in residuals:
-        result = advise_fn(residual, unit_index, packs, api_key)
+        result = advise_fn(residual, unit_index, packs)
         episode = {
             "episodeId": id_fn(),
             "residualId": residual["id"],
@@ -327,7 +318,7 @@ def render_advisory_report(residuals: list[dict]) -> str:
     advised = [r for r in residuals if r.get("advisory")]
     lines = ["# Reviewer-assistance advisory notes (T-RT-4)", "", "Advisory only — explanation and hypotheses for a human to weigh, never a decision. Accepting a hypothesis below is ONE human judgement (via the residual's own choice card), never a second corroborating signal for a hard-gated fact.", ""]
     if not advised:
-        lines.append("_No residual in this pack has been advised on yet — run `advisory.py --session-dir ...` (needs `ANTHROPIC_API_KEY`)._")
+        lines.append("_No residual in this pack has been advised on yet — run `advisory.py --session-dir ...` (needs the `claude` CLI on `PATH`)._")
         return "\n".join(lines) + "\n"
 
     for r in advised:
@@ -377,12 +368,12 @@ def main() -> int:
     unit_index = json.loads((session_dir / "evidence" / "unit-index.json").read_text()) if (session_dir / "evidence" / "unit-index.json").exists() else {}
     packs = json.loads((session_dir / "evidence" / "packs.json").read_text()) if (session_dir / "evidence" / "packs.json").exists() else {}
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        print(f"[advisory] no ANTHROPIC_API_KEY set -- would attempt to advise on {len(targets)} residual(s), writing nothing: {[r['id'] for r in targets]}")
+    if not _llm_backend_available():
+        print(f"[advisory] no LLM backend available (`claude` CLI not found on PATH) -- would attempt to advise on {len(targets)} residual(s), writing nothing: {[r['id'] for r in targets]}")
         return 0
+    print("[advisory] backend: claude CLI")
 
-    updated_targets, episodes, candidates = process_advisory_batch(targets, unit_index, packs, api_key)
+    updated_targets, episodes, candidates = process_advisory_batch(targets, unit_index, packs)
 
     updated_by_id = {r["id"]: r for r in updated_targets}
     pack["items"] = [updated_by_id.get(r["id"], r) for r in all_residuals]

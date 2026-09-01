@@ -6,19 +6,19 @@ import { findLibraryImportEdges } from './graphify-import-strategy-detector';
 import { isTestPath } from '../../rules/test-path';
 
 /**
- * T-X8-3 (G-L2-13) — the import-only strategy from
+ * The import-only strategy from
  * http-client-detection-catalogue.yml. Unlike persistence-detector.ts/
  * messaging-detector.ts, this does NOT create a new TypedUnit — an HTTP
  * client import doesn't describe a new architectural component, it
  * describes an EXISTING unit's outbound capability with an unknown target.
- * Per the task's own instruction ("resolvable target -> low/medium
+ * Per this catalogue's own design ("resolvable target -> low/medium
  * connects; else ignored unresolved-http-target with evidence for HITL")
  * and this catalogue's own real-evidence finding (neither the reference Python app's Python
  * `requests` calls nor a reference Java/JAX-RS banking platform's Java `RestTemplate` calls have a literal,
  * statically-resolvable target — both are runtime-constructed), every
  * detection here is the "else" branch: a CROSS_DOMAIN_UNRESOLVED
  * IgnoredItem, real evidence for a human to complete via the already-real
- * relationship_add override (T-X6-1) — never a fabricated relationship.
+ * relationship_add override — never a fabricated relationship.
  *
  * Import-edge finding is shared with persistence-detector.ts/
  * messaging-detector.ts via graphify-import-strategy-detector.ts (post-MVP
@@ -61,7 +61,7 @@ export function detectOutboundHttpClients(run: CrossPackageGraphRun): IgnoredIte
     ignoredItems.push({
       ref: `${resolved.relativeFilePath}:${line}`,
       reason: 'CROSS_DOMAIN_UNRESOLVED',
-      detail: `unresolved-http-target: imports HTTP client "${edge.target}" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review, T-X6-1).`,
+      detail: `unresolved-http-target: imports HTTP client "${edge.target}" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).`,
     });
   }
 

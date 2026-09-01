@@ -18,11 +18,11 @@ export function buildNodes(units: TypedUnit[], mapping: NodeTypeMapping, gaps: E
   for (const unit of units) {
     const rule = findNodeTypeMapping(mapping, unit.kind);
     if (!rule) {
-      // No catalogue row for this unit kind — this is what §5.2 is meant to
-      // prevent: fail loudly (skip + let it be visible) rather than silently
-      // mis-cast, so a missing mapping row shows up as a missing node, not a
-      // wrong node-type in generated CALM. T-CL-5 — also recorded as a real
-      // emission-coverage gap, not just visible-by-absence.
+      // No catalogue row for this unit kind — fail loudly (skip + let it be
+      // visible) rather than silently mis-cast, so a missing mapping row
+      // shows up as a missing node, not a wrong node-type in generated
+      // CALM. Also recorded as a real emission-coverage gap, not just
+      // visible-by-absence.
       gaps.push({ stage: 'node', factId: unit.id, reason: `no node-type-mapping row for unit kind '${unit.kind}'` });
       continue;
     }

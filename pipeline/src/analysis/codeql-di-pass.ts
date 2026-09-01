@@ -6,8 +6,8 @@ import { relationshipTrust, unitIntroductionTrust } from './fact-trust-matrix';
 import { loadEngineCapabilityMatrix, warnIfMechanismUnverified } from '../scanner/engine-capability-matrix';
 
 /**
- * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — turns CodeQL's real DI-binding
- * table (`codeql-di-provider.ts`) into TypedRelationships/TypedUnits.
+ * Turns CodeQL's real DI-binding table (`codeql-di-provider.ts`) into
+ * TypedRelationships/TypedUnits.
  * Opt-in only: `ctx.codeqlSourceRoot`/`ctx.codeqlBuildCommand` are set by
  * run-slice.ts from `--codeql-source-root` / `--codeql-build-command`
  * (hand-written), or auto-derived via `--auto-codeql` /
@@ -18,11 +18,11 @@ import { loadEngineCapabilityMatrix, warnIfMechanismUnverified } from '../scanne
  * fields are absent. Registered in DEFAULT_PASSES so any facts it produces
  * still get graded/statused; never a default-on path.
  *
- * Trust tier (item 5 of the checklist; full matrix is T-LR-6,
- * `fact-trust-matrix.ts`): same-root confidence (7) sits BETWEEN R2b's (8)
- * and R2c's (6) — deliberately not the strongest tier despite CodeQL's own
- * real, verified accuracy (E1b: 2106 bindings, correct ambiguity refusal) —
- * "never automatically primary" per the checklist means this engine earns
+ * Trust tier (full matrix is in `fact-trust-matrix.ts`): same-root
+ * confidence (7) sits BETWEEN R2b's (8) and R2c's (6) — deliberately not
+ * the strongest tier despite CodeQL's own real, verified accuracy (2106
+ * bindings, correct ambiguity refusal in real testing) — "never
+ * automatically primary" means this engine earns
  * trust over time, not on day one, regardless of how good the underlying
  * analysis already measures. Enforced structurally, not just by the
  * confidence number: this pass NEVER creates a relationship for a (from, to)
@@ -58,7 +58,7 @@ export const codeqlDiPass: AnalysisPass = {
 
     let bindings: CodeQLDiBinding[];
     try {
-      bindings = runCodeQLDiResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand);
+      bindings = runCodeQLDiResolution(ctx.codeqlSourceRoot, ctx.codeqlBuildCommand, ctx.codeqlFallbackBuildCommand);
     } catch (err) {
       console.warn(`[codeql-di] WARNING: unexpected failure running CodeQL DI resolution, continuing without it: ${err}`);
       return;
@@ -69,7 +69,7 @@ export const codeqlDiPass: AnalysisPass = {
     let relationshipCount = 0;
     for (const binding of bindings) {
       // Real, found-via-a-live-run edge case (2026-08-19, a reference
-      // Java/JAX-RS banking platform's fineract-provider): CodeQL's
+      // Java/JAX-RS banking platform's own provider module): CodeQL's
       // `RefType.getName()` returns an empty string for an anonymous
       // implementation class (`new SomeInterface() { ... }` — a real,
       // valid Java construct di_resolution.ql's `ClassInstanceExpr`
@@ -88,7 +88,7 @@ export const codeqlDiPass: AnalysisPass = {
 
       let implUnit = findUnitByFile(ctx.unitsByRoot, implLoc.root, implLoc.relativeFilePath);
       if (!implUnit) {
-        // T-FS-4-class introduction: CodeQL is the ONLY mechanism that knows
+        // CodeQL is the ONLY mechanism that knows
         // this class exists and is real (a stereotype-free @Bean-factory
         // impl, or a stereotype-annotated impl this pipeline's own
         // catalogue-driven detection didn't independently reach). Introduced
