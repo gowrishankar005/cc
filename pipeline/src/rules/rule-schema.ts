@@ -7,29 +7,29 @@ export interface CatalogueRule {
   language: string;
   framework: string;
   matchSignal: string; // literal or | -separated alternatives, matched case-sensitively against raw signal name
-  // 'call' added AREC Wave 3 T-D1 — call-site security signals (e.g. Java's
+  // 'call' — call-site security signals (e.g. Java's
   // `context.authenticatedUser().validateHasReadPermission(...)`, Python's
   // `jwt.decode(...)`) matched from CodeGraph's extractFromSource()
   // `referenceKind: 'calls'` entries, the exact same mechanism family as
   // 'decorator' (referenceKind: 'decorates'), just a different reference kind.
-  // 'field-type' added AREC Wave 3 T-E1 — a field/variable's declared TYPE
+  // 'field-type' — a field/variable's declared TYPE
   // (referenceKind: 'references'), e.g. a KafkaTemplate-typed field as
   // producer-capability evidence.
-  // 'extends' added AREC Wave 3 T-E3 — a class/interface's supertype
+  // 'extends' — a class/interface's supertype
   // (referenceKind: 'extends'), e.g. `extends JpaRepository<Charge, Long>`.
   matchSource: 'native-route' | 'decorator' | 'call' | 'field-type' | 'extends';
-  // 'resilience' added T-LM-2 (CONTRACT_VERSION 12.0.0) — retry-annotation
+  // 'resilience' (CONTRACT_VERSION 12.0.0) — retry-annotation
   // rows (Spring Retry `@Retryable`, Resilience4j `@Retry`).
   category: 'http-entry-point' | 'framework-bootstrap' | 'persistence' | 'messaging' | 'folder-convention' | 'security-control' | 'resilience';
   weight: number;
-  calmNodeType: 'service' | 'database' | 'topic'; // 'topic' added T-X7-2, for messaging-consumer decorator rules (@KafkaListener/@JmsListener) — same CONTRACT_VERSION 4.0.0 bump as TypedUnit.kind's own 'topic' addition
-  // T-LR-3 — OPTIONAL, defaults to false/absent. Marks a row as usable by
+  calmNodeType: 'service' | 'database' | 'topic'; // 'topic', for messaging-consumer decorator rules (@KafkaListener/@JmsListener) — same CONTRACT_VERSION 4.0.0 bump as TypedUnit.kind's own 'topic' addition
+  // OPTIONAL, defaults to false/absent. Marks a row as usable by
   // multi-hop-bridge-detector.ts's stereotype-disambiguation branch (a
   // bridge with 2+ real `implements` candidates resolves when exactly one
   // carries one of these signals). Read directly off the SAME row that
   // already defines the signal name (spring-service-stereotype) rather than
   // duplicating the name into a second catalogue — the one prior precedent
-  // for this class of fix (T-LR-1's `wiring-annotation-catalogue.yml`)
+  // for this class of fix (`wiring-annotation-catalogue.yml`)
   // needed a separate catalogue because no signal-catalogue.yml row already
   // existed for `@Configuration`; here one already does, so a second literal
   // copy of "Service" would itself be the drift risk this pattern exists to
@@ -79,7 +79,7 @@ export function loadSignalCatalogue(catalogueDir: string = __dirname): SignalCat
  * provenance, and a real bug the moment the two rules' weights or categories
  * ever diverge).
  *
- * T-P0-5 (E4, catalogue-as-data stress test) — a THIRD real case, found
+ * A THIRD real case (catalogue-as-data stress test), found
  * adding NestJS GraphQL resolver rows (`nestjs-graphql-field-decorator`,
  * matchSignal "Query|Mutation"): Spring Data JPA's real `@Query(...)`
  * annotation (a Java call-site fact, `ChargeRepository.java`) bare-word
@@ -122,11 +122,11 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * T-LR-3 — every raw signal name usable for multi-hop-bridge-detector.ts's
+ * Every raw signal name usable for multi-hop-bridge-detector.ts's
  * stereotype-disambiguation branch, read directly from signal-catalogue.yml's
  * `bridgeStereotype: true` rows (catalogue-driven, never a hardcoded name in
  * the detector itself — same discipline `wiringAnnotationNames`
- * (wiring-annotation-schema.ts) already established for T-LR-1). A row's
+ * (wiring-annotation-schema.ts) already established). A row's
  * `matchSignal` may itself be a `|`-separated alternation (rule-schema.ts's
  * own convention), so this splits and flattens rather than assuming one
  * name per row.

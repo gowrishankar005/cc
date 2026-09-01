@@ -52,7 +52,7 @@ export function classExtendsBaseClass(absoluteFilePath: string, classSourceLocat
 }
 
 /**
- * T-MR-4 — composition-style ownership check, the counterpart to
+ * Composition-style ownership check, the counterpart to
  * classExtendsBaseClass for libraries whose real ownership idiom is a FIELD
  * holding the client, not inheritance (the AWS SDK's Dynamo clients are
  * never subclassed — a store class holds one as `private final DynamoDbClient
@@ -109,9 +109,8 @@ export function classDeclaresFieldOfType(absoluteFilePath: string, classSourceLo
 }
 
 /**
- * T-LR-1 (BACKLOG.md "@Configuration classes mis-typed database via
- * driver-import evidence") — real evidence from Bug 3's Phase A pass
- * (`soln/bug3-jdbc-ownership-phase-a-memo.md` Finding 2): a
+ * Real finding (BACKLOG.md "@Configuration classes mis-typed database via
+ * driver-import evidence"): a
  * `@Configuration`/`@Bean`-wiring class referencing a driver-import library
  * only as a factory-method parameter type (never actually querying with it)
  * is architecturally never a table owner, regardless of which driver-import

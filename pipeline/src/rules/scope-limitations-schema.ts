@@ -13,7 +13,7 @@ export interface ScopeLimitationsCatalogue {
   limitations: ScopeLimitation[];
 }
 
-/** T-X0-3 — loader for the single scope-limitations source. See scope-limitations.yml's own header for why this replaced a hardcoded array in metadata-builder.ts. */
+/** Loader for the single scope-limitations source. See scope-limitations.yml's own header for why this replaced a hardcoded array in metadata-builder.ts. */
 export function loadScopeLimitations(catalogueDir: string = __dirname): ScopeLimitationsCatalogue {
   const filePath = path.join(catalogueDir, 'scope-limitations.yml');
   const raw = fs.readFileSync(filePath, 'utf8');
