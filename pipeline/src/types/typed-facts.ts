@@ -1,37 +1,37 @@
 /**
- * The Analysis <-> Module contract (requirements v0.6 §1).
+ * The Analysis <-> Module contract.
  * modules/calm-generator reads exactly this shape and nothing else about
  * how the facts were produced — CodeGraph, Graphify, or a future engine.
  */
 
 export interface Evidence {
   signal: string; // raw signal name, e.g. "app.route" or "Controller"
-  // 'openapi' added in CONTRACT_VERSION 2.0.0 (T-X4-1) — this is the named
+  // 'openapi' added in CONTRACT_VERSION 2.0.0 — this is the named
   // reopen trigger from Contract_Evolution_Policy.md §3: a second real
   // engine (the OpenAPI provider) now produces Evidence for the same
   // construct kind (interfaces/routes) native-route/decorator already
   // produce, so the freeze documented there is void as of this version.
-  // 'call' added in CONTRACT_VERSION 5.0.0 (AREC Wave 3 T-D1) — call-site
+  // 'call' added in CONTRACT_VERSION 5.0.0 — call-site
   // security signals (e.g. `validateHasReadPermission(...)`, `jwt.decode(...)`)
   // matched from CodeGraph's extractFromSource() `referenceKind: 'calls'`
   // entries — the same extraction API decorator evidence already uses, a
   // different reference kind, not a new engine.
-  // 'field-type' added in CONTRACT_VERSION 6.0.0 (AREC Wave 3 T-E1) — a
+  // 'field-type' added in CONTRACT_VERSION 6.0.0 — a
   // field/variable's declared TYPE (e.g. a KafkaTemplate-typed field, real
   // messaging-producer evidence), same extraction API, `referenceKind:
   // 'references'` instead of 'calls'/'decorates'.
-  // 'extends' added in CONTRACT_VERSION 7.0.0 (AREC Wave 3 T-E3) — a
+  // 'extends' added in CONTRACT_VERSION 7.0.0 — a
   // class/interface's supertype (e.g. `extends JpaRepository<Charge, Long>`,
   // real Spring Data repository evidence), `referenceKind: 'extends'`.
-  // 'structured-file' added in CONTRACT_VERSION 9.0.0 (T-Y4-1) — a real
+  // 'structured-file' added in CONTRACT_VERSION 9.0.0 — a real
   // path/method binding resolved from an infra template (CFN/SAM API
   // Gateway + Lambda Function join, cfn-manifest-provider.ts), matched to
   // its scanned handler unit by cfn-route-pass.ts. Same category
   // (http-entry-point) as native-route/decorator/openapi evidence — this
   // one carries a REAL path (unlike 'serverless-entry-point', which never
   // does), so it correctly participates in interface-building.
-  // 'structured-config' added in CONTRACT_VERSION 10.0.0 (T-PC1-7,
-  // B-spring-config) — a fact read directly from a deterministically
+  // 'structured-config' added in CONTRACT_VERSION 10.0.0 (B-spring-config)
+  // — a fact read directly from a deterministically
   // parsed `application.yml`/`.properties` file (spring-config-provider.ts),
   // matched to a semantic key this project's own mined vocabulary names
   // (`docs/solution/language/spring-config-property-vocabulary.md`). Unlike
@@ -39,14 +39,14 @@ export interface Evidence {
   // extractFromSource()/decorates-ref API at all — a structured non-code
   // file read, same mechanism class as 'openapi'/'structured-file', not a
   // 5th extraction mechanism.
-  // 'dependency-manifest' added in CONTRACT_VERSION 11.0.0 (T-CDX-2/3,
-  // B-cdxgen-reuse) — a real component name/version from a deterministically
+  // 'dependency-manifest' added in CONTRACT_VERSION 11.0.0 (B-cdxgen-reuse)
+  // — a real component name/version from a deterministically
   // parsed CycloneDX SBOM (`@cyclonedx/cdxgen`, shelled out to the same way
   // Graphify already is), corroborating an ALREADY-detected persistence/
   // messaging unit — never a primary detection source on its own, always
   // weight-10 (corroboration tier), and only ever attached when exactly one
   // candidate unit exists in the root (never guessed under ambiguity).
-  // No new source value added in CONTRACT_VERSION 12.0.0 (T-LM-2, resilience
+  // No new source value added in CONTRACT_VERSION 12.0.0 (resilience
   // lens) — retry annotations reuse the existing 'decorator' source (same
   // extractFromSource()/decorates-ref mechanism @PreAuthorize/@KafkaListener
   // already use) and timeout config reuses the existing 'structured-config'
@@ -79,7 +79,7 @@ export interface Evidence {
     | 'folder-convention'
     | 'security-control'
     | 'serverless-entry-point'
-    // 'spring-config' added in CONTRACT_VERSION 10.0.0 (T-PC1-7) — deliberately
+    // 'spring-config' added in CONTRACT_VERSION 10.0.0 — deliberately
     // descriptive-only (never added to any node-type-mapping.yml row's
     // interfaceCategories): the generic interface-builder.ts assumes a
     // route-shaped signal ("GET /path") for every category it builds
@@ -88,7 +88,7 @@ export interface Evidence {
     // interface, but via a small dedicated function
     // (build-calm.ts's attachPortInterfaces), not this generic mechanism.
     | 'spring-config'
-    // 'resilience' added in CONTRACT_VERSION 12.0.0 (T-LM-2, Lens Modules
+    // 'resilience' added in CONTRACT_VERSION 12.0.0 (Lens Modules
     // lane) — a real, narrowly-scoped resilience-posture signal: a
     // retry-annotation (Spring Retry `@Retryable`, Resilience4j `@Retry`,
     // decorator-sourced) or a resilience4j timeout-duration config value
@@ -102,7 +102,7 @@ export interface Evidence {
   weight: number;
   ref: string; // file:line for code-sourced evidence; "relativeFilePath:paths"-style pointer for openapi (no line numbers available from a parsed YAML/JSON document)
   /**
-   * AREC Wave 3 T-D2 (C-rich) — additive OPTIONAL field (Contract_Evolution_Policy.md
+   * (C-rich) — additive OPTIONAL field (Contract_Evolution_Policy.md
    * §2(b), no separate bump beyond the source-union change above). The
    * evidence's own raw source-line argument/expression text when
    * extractable (e.g. "RESOURCE_NAME_FOR_PERMISSIONS" for a call-site
@@ -114,7 +114,7 @@ export interface Evidence {
 }
 
 /**
- * T-FS-6 (BACKLOG.md "Status vocabulary", BR-40) — fixed review-state
+ * BACKLOG.md's "Status vocabulary" (BR-40) — fixed review-state
  * vocabulary, alongside (not replacing) the existing confidence/grade/band
  * scoring: 'observed' (direct high-confidence static evidence, no inference
  * hop) · 'inferred' (a deterministic rule or a multi-hop mechanism —
@@ -143,7 +143,7 @@ export interface Evidence {
 export type FactStatus = 'observed' | 'inferred' | 'requires-review' | 'reviewed' | 'externally-verified';
 
 /**
- * CONTRACT_VERSION 14.0.0 (T-CL-4) — construction-time placeholder for
+ * CONTRACT_VERSION 14.0.0 — construction-time placeholder for
  * TypedUnit.status/TypedRelationship.status, now a REQUIRED field. Every
  * unit/relationship a real run produces gets its REAL status from
  * status-assignment.ts's assignStatusPass, unconditionally, as the true
@@ -154,7 +154,7 @@ export type FactStatus = 'observed' | 'inferred' | 'requires-review' | 'reviewed
 export const PENDING_STATUS: FactStatus = 'inferred';
 
 /**
- * CONTRACT_VERSION 14.0.0 (T-CL-4) — construction-time placeholder for
+ * CONTRACT_VERSION 14.0.0 — construction-time placeholder for
  * TypedRelationship.id, now a REQUIRED field. fact-identity.ts's
  * assignFactIds (analysis/passes.ts's factIdentityPass) unconditionally
  * overwrites every relationship's id from its own semantic coordinates, as
@@ -164,8 +164,8 @@ export const PENDING_STATUS: FactStatus = 'inferred';
 export const PENDING_RELATIONSHIP_ID = '';
 
 export interface TypedUnit {
-  // T-CL-1 (BACKLOG.md "Fact identity, incremental merge, and review
-  // history") — every existing producer already derives this from semantic
+  // BACKLOG.md's "Fact identity, incremental merge, and review
+  // history" — every existing producer already derives this from semantic
   // coordinates, never a file:line span or a run-scoped counter, so this
   // field needed no shape change, only this comment correcting a stale
   // claim ("derived from qualifiedName or file+line" — line was never
@@ -180,11 +180,11 @@ export interface TypedUnit {
   // `graphify extract` two-run diff that graphifyy's own `_make_id` is
   // content-derived from the symbol's file+name, not a counter, so this is
   // safe to key on directly). A file rename changes this id; the old id
-  // simply stops appearing in a later run's TypedFacts — T-CL-2's merge
-  // reads that as a disappeared fact plus a new one, not a bug to work
-  // around here.
+  // simply stops appearing in a later run's TypedFacts — the incremental
+  // merge pass reads that as a disappeared fact plus a new one, not a bug
+  // to work around here.
   id: string;
-  // 'topic' added in CONTRACT_VERSION 4.0.0 (T-X7-1) — executes the dry run
+  // 'topic' added in CONTRACT_VERSION 4.0.0 — executes the dry run
   // already rehearsed in Contract_Evolution_Policy.md §4 for real: a
   // message queue/topic (Kafka topic, JMS queue, SQS queue, SNS topic) is a
   // genuinely new architectural category, not a service or a database.
@@ -195,10 +195,10 @@ export interface TypedUnit {
   endLine: number;
   evidence: Evidence[];
   confidence: number; // 0-100, weighted confidence bands
-  // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4, Contract_Evolution_Policy.md
+  // REQUIRED as of CONTRACT_VERSION 14.0.0 (Contract_Evolution_Policy.md
   // §2(c) — promoting an existing optional field to required is a real
-  // shape guarantee, not cosmetic). Previously `status?:` (T-FS-6,
-  // additive-optional, tier (b)) — promoted once `assignStatusPass`
+  // shape guarantee, not cosmetic). Previously `status?:`
+  // (additive-optional, tier (b)) — promoted once `assignStatusPass`
   // (status-assignment.ts) was confirmed the unconditional true-last
   // DEFAULT_PASSES entry (analysis/passes.ts), so every unit a real run
   // produces always carries one; a module can now rely on `status` being
@@ -214,17 +214,17 @@ export interface TypedUnit {
 export interface TypedRelationship {
   from: string;
   to: string;
-  // 'shares-secret' added in CONTRACT_VERSION 3.0.0 (T-X5-0) — a k8s
+  // 'shares-secret' added in CONTRACT_VERSION 3.0.0 — a k8s
   // Secret/ConfigMap-mounted-by-both-deployments trust relationship is
   // architecturally distinct from a code-level calls/imports/connects edge
   // (implicit trust via a shared credential, not a network call or a static
   // import), so it gets its own named kind rather than being silently
   // folded into 'connects' — the exact "relationship vocabulary thin"
   // complaint this was named to fix, not perpetuate.
-  // 'deployed-in' added in CONTRACT_VERSION 15.0.0 (T-MR-3, BACKLOG.md
+  // 'deployed-in' added in CONTRACT_VERSION 15.0.0 (BACKLOG.md
   // "Kubernetes-manifest-derived deployed-in relationships") — runtime
   // PLACEMENT (which namespace a service actually runs in), the other half
-  // of what the k8s manifest provider already reads; shares-secret (T-X5-1)
+  // of what the k8s manifest provider already reads; shares-secret
   // is the trust half. `rel.to` is a synthetic namespace-node id
   // (`k8s-namespace:<namespace>`, modules/calm-generator/k8s-namespace-node-builder.ts)
   // built directly as a CALM node the same way system-node-builder.ts's
@@ -235,16 +235,16 @@ export interface TypedRelationship {
   // 'k8s' added alongside 'shares-secret' in the same 3.0.0 bump — the k8s
   // manifest provider (scanner/k8s-manifest-provider.ts) is a third
   // relationship-evidence source, distinct from codegraph/graphify.
-  // 'repo-manifest' added in CONTRACT_VERSION 16.0.0 (T-MR-2,
-  // AGENT_TASKS_Ext_MultiRepo_Deployment.md) — a ranked cross-repo join
-  // resolved against another repo's human-authored T-MR-1 manifest
+  // 'repo-manifest' added in CONTRACT_VERSION 16.0.0
+  // (AGENT_TASKS_Ext_MultiRepo_Deployment.md) — a ranked cross-repo join
+  // resolved against another repo's human-authored manifest
   // (scanner/repo-manifest-provider.ts), never against this run's own
   // scanned code. Both endpoints are synthetic (never a real TypedUnit —
   // neither this repo's own anchor nor the other repo's published contract
   // has a file this run indexed), same "no source file, build the CALM node
   // directly" pattern k8s-namespace-node-builder.ts already established.
   source: 'codegraph' | 'graphify' | 'k8s' | 'codeql' | 'repo-manifest';
-  // T-X9-1 — additive OPTIONAL field (Contract_Evolution_Policy.md §2(b),
+  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b),
   // no CONTRACT_VERSION bump needed: an unknown optional field is harmless
   // to any existing module). Set only by the env soft-graph detector today
   // (low, fixed confidence for a name-correlation-inferred edge) — every
@@ -262,7 +262,7 @@ export interface TypedRelationship {
   // unit (R1 one-hop service->database/topic, or a real service->service
   // call/import). 'trust': kind === 'shares-secret' (implicit trust via a
   // shared credential, not a code-level edge). 'structural' also covers
-  // kind === 'deployed-in' (T-MR-3) — a real, verified k8s namespace-placement
+  // kind === 'deployed-in' — a real, verified k8s namespace-placement
   // fact, but not a service->store/service connectivity claim, so it must
   // never satisfy coverage-report.ts's/hitl-review-trigger.ts's own
   // `grade === 'architecture'` filters (both documented as meaning
@@ -280,20 +280,20 @@ export interface TypedRelationship {
   // hardcoding the confidence-value mapping. 'r2-phase1': the bridge's sole
   // implementer IS itself a database/topic unit (S-layered-access).
   // 'r2b': the implementer is not itself a store but imports exactly one
-  // (S-layered-domain) — one inference hop deeper. 'r2c' (T-LR-2,
-  // BACKLOG.md "Direct-delegate bridge detection") — no `implements`-based
+  // (S-layered-domain) — one inference hop deeper. 'r2c'
+  // (BACKLOG.md "Direct-delegate bridge detection") — no `implements`-based
   // interface layer at all; a concrete class referenced directly imports
   // exactly one store itself. Every other relationship producer
   // (R0/R1/k8s/env-soft-graph) leaves this unset — absence means "not
   // multi-hop-derived," never a fake default.
-  // 'admitted-unresolved' added for T-P0-1 (E2, graded fact admission,
-  // BACKLOG.md's "Graded fact admission (dual-unit gate)" row) — a raw
+  // 'admitted-unresolved' added for graded fact admission
+  // (BACKLOG.md's "Graded fact admission (dual-unit gate)" row) — a raw
   // Graphify edge whose OTHER endpoint doesn't resolve to a real TypedUnit,
   // admitted with a synthesized `kind: 'unresolved'` placeholder unit on
   // that side instead of being silently dropped by
   // graphify-reconciler.ts's `if (!from || !to) continue`.
-  // 'r2-stereotype' added for T-LR-3 (BACKLOG.md "Plain-interface bridge
-  // detection") — a bridge with 2+ real `implements` candidates (previously
+  // 'r2-stereotype' added for BACKLOG.md's "Plain-interface bridge
+  // detection" — a bridge with 2+ real `implements` candidates (previously
   // always refused as ambiguous) resolves when exactly ONE of them carries
   // real, catalogue-recognized `@Service` stereotype evidence
   // (spring-service-stereotype in signal-catalogue.yml) and the terminal
@@ -311,7 +311,7 @@ export interface TypedRelationship {
   // TypedRelationship.kind, IgnoredItem.reason are) — this field is
   // advisory provenance no module's core logic branches on, so widening it
   // needs no CONTRACT_VERSION bump.
-  // 'codeql-di-bean-factory' / 'codeql-di-stereotype' added for T-LR-5
+  // 'codeql-di-bean-factory' / 'codeql-di-stereotype' added
   // (AGENT_TASKS_Ext_CodeQL_Engine.md) — codeql-di-pass.ts's two branches,
   // matching di_resolution.ql's own 'mechanism' column exactly: a
   // @Bean-factory-wired interface->impl binding, or a stereotype-resolved
@@ -325,7 +325,7 @@ export interface TypedRelationship {
   // from the DI mechanisms above (a dispatcher/handler join, not an
   // interface/impl resolution), same trust-tier/never-override discipline.
   // 'cross-repo-api-spec' / 'cross-repo-artifact' / 'cross-repo-service-catalogue'
-  // added for T-MR-2 (cross-repo-join-detector.ts) — the three ranked
+  // added for cross-repo-join-detector.ts — the three ranked
   // reliability tiers, named in the same order: a shared OpenAPI/AsyncAPI
   // spec title, a published artifact coordinate, or a service-catalogue
   // name/DNS match (the weakest tier — see repo-manifest-provider.ts's
@@ -334,7 +334,7 @@ export interface TypedRelationship {
   // of Contract_Evolution_Policy.md §1's tracked closed unions (advisory
   // provenance only) — no CONTRACT_VERSION bump for this addition;
   // TypedRelationship.source gaining 'repo-manifest' is the real (c)-tier
-  // change for T-MR-2.
+  // change this belongs to.
   mechanism?:
     | 'r2-phase1'
     | 'r2b'
@@ -347,17 +347,17 @@ export interface TypedRelationship {
     | 'cross-repo-api-spec'
     | 'cross-repo-artifact'
     | 'cross-repo-service-catalogue';
-  // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4) — same promotion
-  // reasoning as TypedUnit.status above: previously `status?:` (T-FS-6,
-  // tier (b)), promoted once `assignStatusPass` was confirmed unconditional
+  // REQUIRED as of CONTRACT_VERSION 14.0.0 — same promotion
+  // reasoning as TypedUnit.status above: previously `status?:` (tier (b)),
+  // promoted once `assignStatusPass` was confirmed unconditional
   // in DEFAULT_PASSES for every relationship a real run produces. Same
   // status-assignment.ts / override-applier.ts split as TypedUnit.status.
   status: FactStatus;
-  // REQUIRED as of CONTRACT_VERSION 14.0.0 (T-CL-4) — previously `id?:`
-  // (T-CL-1, tier (b)), promoted once `factIdentityPass` (analysis/passes.ts,
+  // REQUIRED as of CONTRACT_VERSION 14.0.0 — previously `id?:`
+  // (tier (b)), promoted once `factIdentityPass` (analysis/passes.ts,
   // after every relationship producer including gradeRelationshipsPass) was
-  // confirmed unconditional in DEFAULT_PASSES, and once T-CL-2's incremental
-  // merge started depending on every relationship actually carrying one to
+  // confirmed unconditional in DEFAULT_PASSES, and once the incremental
+  // merge pass started depending on every relationship actually carrying one to
   // key its prior/fresh matching on. Computed by fact-identity.ts's
   // assignFactIds from this relationship's own semantic coordinates: kind
   // (fact type) + from/to (endpoint identities, themselves stable
@@ -390,17 +390,17 @@ export interface IgnoredItem {
 // incompatible shape rather than silently misfeeding it. Bump only on a
 // breaking shape change to TypedUnit/TypedRelationship/Evidence/IgnoredItem.
 //
-// 2.0.0 (T-X4-1, Contract_Evolution_Policy.md §5): Evidence.source gained
+// 2.0.0 (Contract_Evolution_Policy.md §5): Evidence.source gained
 // 'openapi' — a closed-union extension, tier (c). Both existing modules
 // (calm-generator, threat-signals) were reviewed and bumped to
 // supportedMajorVersion "2" (available-modules.ts) since neither needs
 // code changes to keep working correctly against the new value —
 // calm-generator's interface-builder already generalizes over Evidence.source
-// via a precedence table (T-X4-2), threat-signals filters on category only.
+// via a precedence table, threat-signals filters on category only.
 //
-// 3.0.0 (T-X5-0, Contract_Evolution_Policy.md §5): TypedRelationship.kind
+// 3.0.0 (Contract_Evolution_Policy.md §5): TypedRelationship.kind
 // gained 'shares-secret', TypedRelationship.source gained 'k8s' — another
-// closed-union extension, tier (c), for the k8s manifest provider (T-X5-1).
+// closed-union extension, tier (c), for the k8s manifest provider.
 // Both modules reviewed again and bumped to supportedMajorVersion "3":
 // calm-generator's relationship-builder.ts needed no code change (the
 // generic `${rel.kind} relationship (...)` description and the
@@ -408,7 +408,7 @@ export interface IgnoredItem {
 // generalize over TypedRelationship.kind); threat-signals is unaffected
 // (it inspects Evidence.category on units, never touches relationships).
 //
-// 4.0.0 (T-X7-1, Contract_Evolution_Policy.md §5): TypedUnit.kind gained
+// 4.0.0 (Contract_Evolution_Policy.md §5): TypedUnit.kind gained
 // 'topic' — the exact dry run §4 rehearsed, executed for real. Sequencing
 // followed §4's own note precisely: the node-type-mapping.yml row
 // (unitKind: topic -> calmNodeType: network) was added in the SAME change
@@ -418,7 +418,7 @@ export interface IgnoredItem {
 // threat-signals needed no change (filters on Evidence.category, which is
 // unaffected — 'messaging' already existed in the category union).
 //
-// 5.0.0 (AREC Wave 3 T-D1, Contract_Evolution_Policy.md §5): Evidence.source
+// 5.0.0 (Contract_Evolution_Policy.md §5): Evidence.source
 // gained 'call' — another closed-union extension, tier (c), for call-site
 // security-control detection (control-builder's DatatableWriteService-class
 // finding extended from decorator-only to call-site-capable). Both modules
@@ -428,7 +428,7 @@ export interface IgnoredItem {
 // on category only too, same as every prior bump. `Evidence.argument?:
 // string` (same change) is additive-optional, tier (b), no separate bump.
 //
-// 6.0.0 (AREC Wave 3 T-E1, Contract_Evolution_Policy.md §5): Evidence.source
+// 6.0.0 (Contract_Evolution_Policy.md §5): Evidence.source
 // gained 'field-type' — another closed-union extension, tier (c), for the
 // messaging-producer typed-field detection (KafkaTemplate field type).
 // Both modules reviewed and bumped to supportedMajorVersion "6":
@@ -437,7 +437,7 @@ export interface IgnoredItem {
 // SOURCE_PRECEDENCE table gained a 'field-type' entry, same as 'call' did);
 // threat-signals filters on category only, unaffected.
 //
-// 7.0.0 (AREC Wave 3 T-E3, Contract_Evolution_Policy.md §5): Evidence.source
+// 7.0.0 (Contract_Evolution_Policy.md §5): Evidence.source
 // gained 'extends' — another closed-union extension, tier (c), for
 // Spring Data repository detection (`extends JpaRepository<...>`). Both
 // modules reviewed and bumped to supportedMajorVersion "7": calm-generator's
@@ -445,7 +445,7 @@ export interface IgnoredItem {
 // same change, before this bump; control-builder.ts/threat-signals filter
 // on category, unaffected.
 //
-// 10.0.0 (T-PC1-7, B-spring-config, Contract_Evolution_Policy.md §5):
+// 10.0.0 (B-spring-config, Contract_Evolution_Policy.md §5):
 // Evidence.source gained 'structured-config', Evidence.category gained
 // 'spring-config' — a closed-union extension, tier (c), for the new
 // scanner/spring-config-provider.ts + analysis/spring-config-pass.ts. Both
@@ -457,7 +457,7 @@ export interface IgnoredItem {
 // threat-signals filters on category only ('http-entry-point'/
 // 'security-control'), unaffected by a new, unrelated category value.
 //
-// 11.0.0 (T-CDX-2/3, B-cdxgen-reuse, Contract_Evolution_Policy.md §5):
+// 11.0.0 (B-cdxgen-reuse, Contract_Evolution_Policy.md §5):
 // Evidence.source gained 'dependency-manifest' — a closed-union extension,
 // tier (c), for scanner/cdxgen-provider.ts + analysis/cdxgen-corroboration-pass.ts.
 // No new Evidence.category (reuses the existing 'persistence'/'messaging'
@@ -469,7 +469,7 @@ export interface IgnoredItem {
 // filters on category only, unaffected by a new source value on an
 // already-existing category.
 //
-// 12.0.0 (T-LM-2, Lens Modules lane, AGENT_TASKS_Ext_Lens_Modules.md):
+// 12.0.0 (Lens Modules lane, AGENT_TASKS_Ext_Lens_Modules.md):
 // Evidence.category gained 'resilience' — a closed-union extension, tier
 // (c), for the new resilience-lens module. No new Evidence.source (reuses
 // 'decorator' for retry annotations and 'structured-config' for timeout
@@ -481,7 +481,7 @@ export interface IgnoredItem {
 // node-type-mapping.yml's interfaceCategories, same as 'spring-config');
 // threat-signals filters on 'http-entry-point'/'security-control' only
 // (unaffected).
-// 13.0.0 (T-LR-5, AGENT_TASKS_Ext_CodeQL_Engine.md): Evidence.source gained
+// 13.0.0 (AGENT_TASKS_Ext_CodeQL_Engine.md): Evidence.source gained
 // 'codeql-di' and TypedRelationship.source gained 'codeql' — both closed-union
 // extensions, tier (c), for the new codeql-di-provider.ts + codeql-di-pass.ts.
 // A second real StructuralEngine-class source (CodeQL's Java data-flow
@@ -492,7 +492,7 @@ export interface IgnoredItem {
 // 'codeql-di' Evidence.source is used ONLY when codeql-di-pass.ts introduces
 // a placeholder unit for a resolved implementation class with no existing
 // TypedUnit (same "secondary source introduces a fact at its own tier"
-// pattern T-FS-4 established for dependency-manifest evidence — see
+// pattern already established for dependency-manifest evidence — see
 // status-assignment.ts's hard rule, generalized to cover this source too).
 // Both existing modules + resilience-lens reviewed and bumped to
 // supportedMajorVersion "13": none filter on TypedRelationship.source or
@@ -500,16 +500,17 @@ export interface IgnoredItem {
 // interface-builder.ts SOURCE_PRECEDENCE table gained 'codeql-di', ordered
 // last like every other non-route-shaped source; relationship-builder.ts
 // treats TypedRelationship.source as pass-through provenance metadata only).
-// 14.0.0 (T-CL-4, AGENT_TASKS_Ext_Contract_Lifecycle.md, Contract_Evolution_Policy.md
+// 14.0.0 (AGENT_TASKS_Ext_Contract_Lifecycle.md, Contract_Evolution_Policy.md
 // §2(c)): TypedUnit.status, TypedRelationship.status, and TypedRelationship.id
 // promoted from optional to REQUIRED — a new-required-field change, tier (c),
 // not a closed-union extension. Real, not cosmetic: status-assignment.ts's
 // assignStatusPass and fact-identity.ts's factIdentityPass (via
 // analysis/passes.ts's factIdentityPass entry) are both unconditional,
 // always-last DEFAULT_PASSES entries — every unit/relationship a real run
-// produces has always carried both fields since T-FS-6/T-CL-1 shipped, this
-// bump only makes that guarantee visible in the type itself, and (per T-CL-2)
-// gives incremental-merge.ts's id-keyed matching something the contract
+// produces has always carried both fields since the status/identity work
+// shipped, this bump only makes that guarantee visible in the type itself,
+// and the incremental merge work gives incremental-merge.ts's id-keyed
+// matching something the contract
 // itself promises will be present, not just a per-producer convention. Every
 // existing module reviewed and bumped to supportedMajorVersion "14": none
 // ever branched on the ABSENCE of `status`/`id` (calm-generator's
@@ -519,7 +520,7 @@ export interface IgnoredItem {
 // threat-signals/resilience-lens filter on Evidence.category only, never
 // touch TypedUnit.status/TypedRelationship.id/.status at all).
 //
-// 15.0.0 (T-MR-3, AGENT_TASKS_Ext_MultiRepo_Deployment.md, BACKLOG.md
+// 15.0.0 (AGENT_TASKS_Ext_MultiRepo_Deployment.md, BACKLOG.md
 // "Kubernetes-manifest-derived deployed-in relationships"): TypedRelationship.kind
 // gained 'deployed-in' — a closed-union extension, tier (c). Runtime
 // placement (which k8s namespace a service actually runs in), the
@@ -535,18 +536,18 @@ export interface IgnoredItem {
 // now); threat-signals/resilience-lens filter on Evidence.category only,
 // never touch TypedRelationship.kind, unaffected by a new value.
 //
-// 16.0.0 (T-MR-2, AGENT_TASKS_Ext_MultiRepo_Deployment.md, BACKLOG.md
+// 16.0.0 (AGENT_TASKS_Ext_MultiRepo_Deployment.md, BACKLOG.md
 // "Cross-repo relationship resolution (beyond co-scanned roots)"):
 // TypedRelationship.source gained 'repo-manifest' — a closed-union
 // extension, tier (c). A ranked, never-guessed join against another repo's
-// T-MR-1 manifest (scanner/repo-manifest-provider.ts): shared API-spec
+// human-authored manifest (scanner/repo-manifest-provider.ts): shared API-spec
 // identity -> published artifact coordinates -> service-catalogue/DNS,
 // strictly in that order, each tier only tried once the one before it
 // failed to resolve (analysis/cross_package/cross-repo-join-detector.ts).
 // Both endpoints are synthetic 'system'-node-type CALM nodes (never a
 // TypedUnit — neither side has a file this run indexed), built directly by
 // modules/calm-generator/external-repo-node-builder.ts, same "no source
-// file" pattern k8s-namespace-node-builder.ts (T-MR-3) already established.
+// file" pattern k8s-namespace-node-builder.ts already established.
 // Every relationship this mechanism produces is capped at
 // status: 'requires-review' regardless of which tier resolved it
 // (status-assignment.ts) and grade: 'structural', never 'architecture'
