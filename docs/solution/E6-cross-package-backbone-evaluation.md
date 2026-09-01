@@ -34,7 +34,7 @@ own multi-hop cross-package mechanism (R2 in `engine-capability-matrix.yml`'s
 terms) is a different shape of claim — a reference chain spanning two
 different package roots, resolved through import/field/type edges. The
 external eval's one polyglot-service fixture that touched cross-service
-resolution (`boa-system`, an environment-variable string join) scored
+resolution (a real k8s namespace string join from a reference Java microservices banking sample) scored
 **partial for all three tools, including CodeGraph even when given one
 combined index** — its own findings doc flags CodeGraph's result there as a
 real false-positive (resolved to the wrong variable). That is a different,

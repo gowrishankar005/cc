@@ -21,7 +21,7 @@ was scored against:
 - **`openbb-core`** (OpenBB — real, active open-source investment-research
   platform, FastAPI). Probes: `obb-fastapi-app` (L1 symbol), `obb-route-user-me`
   (L2 http-route), `obb-auth-depends` (L2 control).
-- **Boa `userservice`** (Bank-of-Anthos-shaped fixture, Flask +
+- **A reference banking sample's `userservice`** (a polyglot microservices banking sample's Python component, Flask +
   SQLAlchemy) — the same fixture already used elsewhere in this session's
   cross-package benchmarking, re-run here specifically for the Python
   HTTP-route probe.
@@ -33,7 +33,7 @@ was scored against:
 | openbb-core | `obb-fastapi-app` (L1 symbol) | partial (full=0, file=3) | **hit** (full=10, file=73) | **miss** (full=0, file=0) |
 | openbb-core | `obb-route-user-me` (L2 http-route) | partial | **hit** | hit (partial credit — `/me` prefix not joined by CodeQL's `getUrlPattern()`) |
 | openbb-core | `obb-auth-depends` (L2 control) | hit | **hit** | partial |
-| boa-userservice (Flask) | aggregate, 6 probes | 2/6 | **5/6** | 3/6 |
+| reference-sample-userservice (Flask) | aggregate, 6 probes | 2/6 | **5/6** | 3/6 |
 
 Aggregate score line (`summary.md` §8): `openbb-core | FastAPI | 2/4 | 4/4 | 2/4`
 — Graphify 2, **CodeGraph 4/4 (clean sweep)**, CodeQL 2/4.
@@ -42,7 +42,7 @@ Raw CodeQL query output confirms the miss is real, not a scoring artifact —
 `codeql/openbb-core/flask_fastapi_routes.csv` returns only 6 rows (and one
 of the 6 is a test file, `tests/provider/standard_models/test_options_chains.py`,
 not production code), missing the `read_user_settings`/`/me` composed-path
-binding CodeGraph resolves natively; `codeql/boa-userservice/flask_fastapi_routes.csv`
+binding CodeGraph resolves natively; `codeql/reference-sample-userservice/flask_fastapi_routes.csv`
 returns 4 Flask routes but all typed generically as `httpMethod="route"`
 rather than the real `GET`/`POST` verb CodeGraph's native typing carries.
 
@@ -75,7 +75,7 @@ rather than the real `GET`/`POST` verb CodeGraph's native typing carries.
   surface** — CodeGraph's native `route` typing already covers what CodeQL's
   official Python model covers, and covers it more precisely (verb typing,
   prefix composition).
-- Two real, independent repos (`openbb-core` FastAPI, Boa Flask), not one —
+- Two real, independent repos (`openbb-core` FastAPI, a reference banking sample's Flask service), not one —
   this already clears `Catalogue_Intake.md`'s second-instance bar `E2a`
   itself flagged as not yet met.
 

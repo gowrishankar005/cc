@@ -61,7 +61,7 @@ this same date's Architect_Residual_Review_Session.md changelog row shows
 was already stale): `draft_tier_b.py`/`advisory.py` were live-tested by T-1
 (2026-08-23, real `claude` CLI runs, costs/latencies captured); `dossier.py`
 got its own first-ever live run today (2026-08-26, Entry 23), real success
-against the Bank of Anthos pack. `draft_tier_b.py` itself has not been
+against a reference Java microservices banking sample's pack. `draft_tier_b.py` itself has not been
 re-verified since today's dossier changes.
 -->
 
