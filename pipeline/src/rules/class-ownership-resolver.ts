@@ -117,9 +117,9 @@ export function classDeclaresFieldOfType(absoluteFilePath: string, classSourceLo
  * is architecturally never a table owner, regardless of which driver-import
  * library its `@Bean` signatures happen to reference — generalizes past
  * JDBC to any catalogued library (`AccountingJournalEntryConfiguration`,
- * the memo's own cited real example, confirmed via a fresh Fineract clone:
+ * the memo's own cited real example, confirmed via a fresh clone of a reference Java/JAX-RS banking platform:
  * `@Configuration` sits on the line immediately above the class
- * declaration, `fineract-provider/.../starter/AccountingJournalEntryConfiguration.java:60-61`).
+ * declaration, the provider module's own `starter/AccountingJournalEntryConfiguration.java:60-61`).
  *
  * Same read-back technique as `classExtendsBaseClass` above, but scans
  * BACKWARD from the class's own start line, not forward from it —
@@ -142,7 +142,7 @@ export function classHasAnnotation(absoluteFilePath: string, classSourceLocation
     fileLineCache.set(absoluteFilePath, lines);
   }
 
-  // Real finding running this against Fineract: Graphify attributes a class
+  // Real finding running this against a reference Java/JAX-RS banking platform: Graphify attributes a class
   // node's source_location to the LAST annotation line directly above the
   // class keyword when one is present, not to the `class X {` line itself
   // (confirmed: AccountingJournalEntryConfiguration.java's real class node

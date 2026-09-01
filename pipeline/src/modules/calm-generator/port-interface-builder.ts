@@ -103,10 +103,10 @@ export function springConfigProtocolBySignal(units: TypedUnit[]): Map<string, st
       // unwrap Spring's `${VAR:jdbc:...}` colon-default placeholder syntax
       // in this same change: a signal like
       // "spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://...}"
-      // (apache/fineract's own real shape) never starts with "...=jdbc:"
+      // (a reference Java/JAX-RS banking platform's own real shape) never starts with "...=jdbc:"
       // literally, so this check silently stopped populating `protocol`
       // for exactly the real case the placeholder fix targeted — verified
-      // live against the real Fineract fixture. Now reuses the SAME shared
+      // live against a real a reference Java/JAX-RS banking platform fixture. Now reuses the SAME shared
       // resolver every other JDBC-scheme consumer uses, instead of its own
       // independent prefix check.
       const rawValue = e.signal.slice(prefix.length);

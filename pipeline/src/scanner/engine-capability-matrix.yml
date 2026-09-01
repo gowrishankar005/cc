@@ -87,13 +87,13 @@ relationshipMechanisms:
     framework: [spring-mvc, spring-boot]
     mechanism: codeql-di-resolution
     evidenceLevel: proven
-    note: "T-LR-5/E1b: 2105 real bindings, whole-codebase scale, Fineract. E2 (2026-08-21) generalization check: mechanism safe (no false positives, correct refusal) on spring-petclinic/finos-spring-bot, yield near-zero on both — real per-repo architecture-density dependency (how much ambiguous-interface/bean-factory shape a codebase has), not a framework-identity dependency. See CodeQL-engine-synthesis-2026-08-22.md."
+    note: "T-LR-5/E1b: 2105 real bindings, whole-codebase scale, a reference Java/JAX-RS banking platform. E2 (2026-08-21) generalization check: mechanism safe (no false positives, correct refusal) on spring-petclinic/finos-spring-bot, yield near-zero on both — real per-repo architecture-density dependency (how much ambiguous-interface/bean-factory shape a codebase has), not a framework-identity dependency. See CodeQL-engine-synthesis-2026-08-22.md."
 
   - language: java
-    framework: [any] # generic string-keyed registration/lookup join — not framework-specific like the DI mechanisms above (Fineract's own convention is plain, hand-rolled, no framework annotation involved)
+    framework: [any] # generic string-keyed registration/lookup join — not framework-specific like the DI mechanisms above (a reference Java/JAX-RS banking platform's own convention is plain, hand-rolled, no framework annotation involved)
     mechanism: codeql-command-dispatch
     evidenceLevel: proven
-    note: "#18/E1: originally evaluated 2026-08-13 (E1-codeql-engine-evaluation.md, 7 real edges), never shipped. Re-verified and shipped 2026-08-22 after the original query was found to have never left gitignored soln/ — reconstructed from the memo's own mechanism description, 408 real bindings at whole-fineract-provider-tree scale, including a genuine second real dispatch convention (InteropWrapperBuilder) found unprompted, the exact 'generalizes to a second convention' check E1's own 'what's next' section named but never ran."
+    note: "#18/E1: originally evaluated 2026-08-13 (E1-codeql-engine-evaluation.md, 7 real edges), never shipped. Re-verified and shipped 2026-08-22 after the original query was found to have never left gitignored soln/ — reconstructed from the memo's own mechanism description, 408 real bindings at whole-provider-module-tree scale, including a genuine second real dispatch convention (InteropWrapperBuilder) found unprompted, the exact 'generalizes to a second convention' check E1's own 'what's next' section named but never ran."
 
   - language: typescript
     framework: [nestjs]
@@ -107,4 +107,4 @@ relationshipMechanisms:
     evidenceLevel: exploratory-not-shipped
     note: "Tier2 (2026-08-22): real gap confirmed on finos/legend-sdlc, but the first exploratory query's 218 raw bindings were 208/218 main/test-scoping-contaminated (mvn install compiled test source) — only 10 hand-verified clean. Needs source-root/active-Module scoping before this evidenceLevel could honestly move past exploratory."
 
-crossPackageBackbone: codegraph # one combined CodeGraph index over the common ancestor of all given roots, scoped via ProjectConfig.exclude — migrated from Graphify (docs/solution/E6-cross-package-backbone-evaluation.md); proven against Fineract (charge/core/security/provider), Waltz (3-module), a reference Python microservices repo, and a TS/DynamoDB fixture
+crossPackageBackbone: codegraph # one combined CodeGraph index over the common ancestor of all given roots, scoped via ProjectConfig.exclude — migrated from Graphify (docs/solution/E6-cross-package-backbone-evaluation.md); proven against a reference Java/JAX-RS banking platform (its own charge/core/security/provider modules), a reference Java governance platform (its own 3-module structure), a reference Python microservices repo, and a TS/DynamoDB fixture

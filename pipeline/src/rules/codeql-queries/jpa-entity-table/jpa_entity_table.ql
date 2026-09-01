@@ -6,7 +6,7 @@
  *   name= — never infers JPA's implicit default (class-name-derived) table
  *   name, matching this project's never-guess discipline (same reasoning
  *   di_resolution.ql/guice_di.ql already apply to ambiguous bindings).
- *   Real result running against apache/fineract (fineract-charge/-core/-tax):
+ *   Real result running against a reference Java/JAX-RS banking platform (its own charge/core/tax modules):
  *   39 real bindings, 0 @Entity classes lacking an explicit @Table in this
  *   codebase — full coverage within this query's own honest scope.
  * @kind table

@@ -18,7 +18,7 @@ import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
  * Query: `src/rules/codeql-queries/jpa-entity-table/jpa_entity_table.ql` —
  * generic, no sample-repo class/package names, requires an EXPLICIT
  * `@Table(name=...)` and never infers JPA's implicit default table name.
- * Real result running against apache/fineract: 39 real bindings, 0 @Entity
+ * Real result running against a reference Java/JAX-RS banking platform: 39 real bindings, 0 @Entity
  * classes lacking an explicit @Table in that codebase.
  *
  * Same opt-in/graceful-degradation contract as every other CodeQL-based

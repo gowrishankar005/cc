@@ -7,7 +7,7 @@ import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
 /**
  * #18 (BACKLOG.md "CodeQL command-bus dispatch") — the second real CodeQL
  * capability this pipeline evaluated (`E1-codeql-engine-evaluation.md`,
- * 7 real edges on Fineract) but never shipped, because T-LR-5 scoped DI
+ * 7 real edges on a reference Java/JAX-RS banking platform) but never shipped, because T-LR-5 scoped DI
  * resolution as the smaller safe first unit. Architecturally identical to
  * `codeql-di-provider.ts` — a real, whole-codebase CodeQL query, not a
  * per-file `StructuralEngine` — deliberately duplicated in shape rather
@@ -19,7 +19,7 @@ import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
  * Query: `src/rules/codeql-queries/command-dispatch/command_dispatch.ql` —
  * generic, no sample-repo class/annotation names, re-verified real at
  * whole-codebase scale 2026-08-22 (408 real bindings on the whole
- * `fineract-provider` tree, including a genuine second real dispatch
+ * its own provider-module tree, including a genuine second real dispatch
  * convention, `InteropWrapperBuilder`, found unprompted — see the query's
  * own doc comment and `docs/solution/E1-codeql-engine-evaluation.md`).
  *

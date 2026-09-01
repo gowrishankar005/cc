@@ -122,7 +122,8 @@ export function detectValueContradictions(deployments: DeploymentManifest[], uni
 
   for (const unit of units) {
     if (unit.kind !== 'database') continue;
-    // Real second key found verifying this against apache/fineract (T-FS-3
+    // Real second key found verifying this against a reference Java/JAX-RS
+    // banking platform (T-FS-3
     // real-instance pass, 2026-08-15): spring-config-pass.ts's
     // extractDatasource() also falls back to spring.datasource.hikari.jdbcUrl
     // when spring.datasource.url is absent — same real fact, different

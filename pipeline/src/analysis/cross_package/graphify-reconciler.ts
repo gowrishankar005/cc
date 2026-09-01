@@ -94,7 +94,8 @@ export function buildNodeToUnitMap(run: CrossPackageGraphRun, unitsByRoot: Map<s
  * annotated `@Component` (importing `org.springframework.stereotype.Component`,
  * a framework marker) produces both an `imports` edge AND a `references`
  * edge to an unrelated, same-named in-repo class — quantified at 32.4% of
- * relationships on a real 918-relationship Fineract scan.
+ * relationships on a real 918-relationship scan of a reference Java/JAX-RS
+ * banking platform.
  *
  * Java-only (the only evidenced language) — rejects an edge only on a
  * POSITIVE, CONFIRMED disagreement: the source class has a real import for

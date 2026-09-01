@@ -14,7 +14,7 @@ import { EmissionCoverageGap } from './emission-coverage';
  * raw kind (e.g. both an 'imports' edge and a 'references'/'calls' edge —
  * the exact real shape B-stereotype-name-collision's own repro produced)
  * survives that earlier dedup as 2+ separate CalmRelationship objects.
- * Confirmed on a real 918-relationship Fineract scan: 162 real,
+ * Confirmed on a real 918-relationship scan of a reference Java/JAX-RS banking platform: 162 real,
  * otherwise-correct source/destination pairs produced 182 redundant objects.
  * Only `connects` is reachable today (see this file's own header comment);
  * the other three branches are written defensively so a future

@@ -69,7 +69,7 @@ export const codeqlDiPass: AnalysisPass = {
     let relationshipCount = 0;
     for (const binding of bindings) {
       // Real, found-via-a-live-run edge case (2026-08-19, a reference
-      // Java/JAX-RS banking platform's fineract-provider): CodeQL's
+      // Java/JAX-RS banking platform's own provider module): CodeQL's
       // `RefType.getName()` returns an empty string for an anonymous
       // implementation class (`new SomeInterface() { ... }` — a real,
       // valid Java construct di_resolution.ql's `ClassInstanceExpr`

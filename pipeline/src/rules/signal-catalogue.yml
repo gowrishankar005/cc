@@ -236,7 +236,7 @@ rules:
     calmNodeType: service
 
   # --- Java: Spring Security control evidence (requirements v0.10 §0 / v0.11) ---
-  # Real evidence: spikes/fineract/repo/fineract-core/.../DatatableWriteService.java
+  # Real evidence: a reference Java/JAX-RS banking platform's own DatatableWriteService.java
   # — a pure Java `interface` with @PreAuthorize on every method, NO @Path/
   # @RestController at all. Weighted 40 (sufficient alone, same tier as
   # jpa-entity) deliberately: this is a genuine, previously-completely-invisible
@@ -282,8 +282,8 @@ rules:
     calmNodeType: service
 
   # T-R2-2 (C-call expansion, Catalogue_Intake.md). Real evidence, verified
-  # directly against real a reference Java governance platform source (spikes/waltz/repo), not assumed:
-  # `WebUtilities.requireRole()` (waltz-web/.../WebUtilities.java:127-150)
+  # directly against real a reference Java governance platform source, not assumed:
+  # `WebUtilities.requireRole()` (the reference platform's own WebUtilities.java:127-150)
   # calls `userRoleService.hasRole(user, requiredRoles)` and THROWS
   # `NotAuthorizedException()` when it returns false — a genuine, definite
   # fine-grained role-authorization gate, same strength as a reference Java/JAX-RS banking platform's
@@ -308,7 +308,7 @@ rules:
   # its real implementation (the reference platform's SpringSecurityPlatformSecurityContext.java:81):
   # `void isAuthenticated() { authenticatedUser(); }`, a void "assert or
   # throw" method (same shape as validateHasReadPermission), real call site
-  # at fineract-provider/.../ClientSearchService.java:52. Weighted LOWER than
+  # at the reference platform's own ClientSearchService.java:52. Weighted LOWER than
   # the fine-grained permission family (30, not 40) on a real, stated
   # distinction, not an arbitrary number: isAuthenticated() proves a user is
   # LOGGED IN, not that they're AUTHORIZED for the specific action being

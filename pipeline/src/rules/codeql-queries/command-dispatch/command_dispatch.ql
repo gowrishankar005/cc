@@ -24,7 +24,7 @@
  *              too early** — it selected the lookup method's own declaring
  *              class (`CommandWrapperBuilder`) as `dispatcherClass`, not
  *              its real caller. Mechanically real (408 bindings, whole
- *              `fineract-provider` tree, a genuine second real convention
+ *              its own provider-module tree, a genuine second real convention
  *              `InteropWrapperBuilder` found unprompted) but wired into a
  *              live pipeline pass, EVERY row was refused: `CommandWrapperBuilder`
  *              is a plain, unannotated builder utility with zero framework
@@ -33,7 +33,7 @@
  *              own, deliberately) silently refused all of them. This is
  *              the actual, root-cause fix, not a polish pass: added the
  *              real-call-site hop, re-verified against the same live
- *              Fineract build — the flagship chain
+ *              a reference Java/JAX-RS banking platform's build — the flagship chain
  *              `ChargesApiResource.createCharge() -> CreateChargeDefinitionCommandHandler`
  *              (the exact relationship `OOS-command-bus`'s own revisit
  *              trigger and this whole capability exist to resolve — see

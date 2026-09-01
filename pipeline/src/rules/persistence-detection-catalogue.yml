@@ -143,7 +143,8 @@ strategies:
       # IS the store" case, R2b's extra hop not even needed), and
       # ChargesApiResource -> ChargeReadPlatformServiceImpl is a real,
       # calm-validated (0 errors), confidence-10 cross-root relationship in a
-      # real fineract-charge+fineract-provider multi-root run. Not a synthetic
+      # real multi-root run against a reference Java/JAX-RS banking platform's
+      # charge+provider modules. Not a synthetic
       # proof — the actual case this whole R2/R2b program was scoped around.
       - { name: org.springframework.jdbc.core, language: java, evidenceLevel: verified }
 
@@ -182,8 +183,8 @@ strategies:
       a jOOQ-specific patch) — org.jooq is now a real `driver-import` library
       row (no separate mechanism needed; plain import detection was always
       sufficient, "typed-field usage" was never actually required). Real
-      re-verification against real a reference Java governance platform source (spikes/waltz/repo,
-      waltz-data module, 241 files): 229 real `database` units detected,
+      re-verification against real a reference Java governance platform source
+      (its own data module, 241 files): 229 real `database` units detected,
       evidence.signal correctly shows the real resolved import (e.g.
       "org.jooq.Record1", "org.jooq.impl.DSL", "org.jooq.DSLContext"),
       including the exact GenericSelector.java case this row was originally

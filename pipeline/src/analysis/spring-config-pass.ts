@@ -66,9 +66,11 @@ function buildUnit(file: SpringConfigFile, suffix: string, kind: TypedUnit['kind
  * 2.0) binds `spring.datasource.hikari.jdbcUrl` (Hikari's own native
  * property name is `jdbcUrl`, not `url`) as an ALTERNATE way a real repo
  * declares this fact — confirmed against a real, non-synthetic source,
- * not guessed from memory: `apache/fineract`'s
- * fineract-provider/src/main/resources/application.properties:468
- * (`spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}`).
+ * not guessed from memory: a reference Java/JAX-RS banking platform's own
+ * provider-module application.properties:468
+ * (`spring.datasource.hikari.jdbcUrl=${FINERACT_HIKARI_JDBC_URL:jdbc:postgresql://localhost:5432/fineract_tenants}` —
+ * property KEY/VALUE quoted verbatim from the real source file as evidence,
+ * not genericized, since it's a real technical fact being cited).
  * `spring.datasource.url` is checked first (the more common, already-mined
  * convention per spring-config-property-vocabulary.md); the Hikari key is
  * only a fallback when it's absent, same "real, non-obvious key form"

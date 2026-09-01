@@ -18,7 +18,7 @@ import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
  * generic, no sample-repo class/package names (`OOS-sample-repo-detectors`
  * at full force), verified real at whole-codebase scale in
  * `E1b-codeql-di-resolution-experiment.md` (2106 real DI bindings on
- * Fineract, real ambiguity found and correctly refused).
+ * a reference Java/JAX-RS banking platform, real ambiguity found and correctly refused).
  *
  * Deliberately opt-in only (`--codeql-source-root` + `--codeql-build-command`).
  * The pass is registered in DEFAULT_PASSES so grade/status still see any

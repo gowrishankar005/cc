@@ -19,4 +19,4 @@ annotations:
     language: java
     ecosystem: spring
     evidenceLevel: verified
-    evidence: "35 of 156 real Fineract files importing org.springframework.jdbc.core are @Configuration classes wiring the driver via a @Bean factory-method parameter, never querying with it directly (soln/bug3-jdbc-ownership-phase-a-memo.md, Finding 2); confirmed live against AccountingJournalEntryConfiguration.java"
+    evidence: "35 of 156 real files in a reference Java/JAX-RS banking platform importing org.springframework.jdbc.core are @Configuration classes wiring the driver via a @Bean factory-method parameter, never querying with it directly (soln/bug3-jdbc-ownership-phase-a-memo.md, Finding 2); confirmed live against AccountingJournalEntryConfiguration.java"

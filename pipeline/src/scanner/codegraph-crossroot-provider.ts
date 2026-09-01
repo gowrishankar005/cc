@@ -6,7 +6,7 @@ const { CodeGraph } = require('@colbymchenry/codegraph');
 /**
  * Replaces graphify-provider.ts as the cross-package structural backbone
  * (see docs/solution/E6-cross-package-backbone-evaluation.md). Real finding,
- * verified against Apache Fineract (fineract-charge + fineract-core): a
+ * verified against a reference Java/JAX-RS banking platform (its own charge + core modules): a
  * single CodeGraph index over the common-ancestor of all given package
  * roots, scoped via `ProjectConfig.exclude` (NOT `include` — `include` is
  * additive-only, "force in despite .gitignore", never restrictive; `exclude`
@@ -126,7 +126,7 @@ function computeExcludePatterns(scanRoot: string, absRoots: string[]): string[] 
  * class walk) expects. Flattens `contains` edges through any number of
  * `namespace`-kind hops, re-parenting the namespace's own outgoing edges
  * onto the original requester. Real bug found running this against a real
- * Fineract fixture: `SqlInjectionPreventerServiceImpl` was unreachable via
+ * a reference Java/JAX-RS banking platform fixture: `SqlInjectionPreventerServiceImpl` was unreachable via
  * the one-hop walk without this — the walk found the namespace and stopped.
  */
 function expandOutgoingEdges(cg: any, nodeId: string): any[] {
@@ -145,7 +145,7 @@ function expandOutgoingEdges(cg: any, nodeId: string): any[] {
 }
 
 /**
- * Real, evidenced gap (Fineract-scale multi-hop bridge resolution silently
+ * Real, evidenced gap (a reference Java/JAX-RS banking platform-scale multi-hop bridge resolution silently
  * losing the R2b "implementer imports a store" hop): CodeGraph attributes a
  * `references`/`imports`/`calls` edge to the specific FIELD or METHOD
  * declaration where the usage occurs, not the enclosing class — confirmed
@@ -180,7 +180,7 @@ function reparentMemberEdgesToEnclosingClass(nodes: CrossPackageNode[], edges: C
     if (e.relation === 'contains' || e.relation === 'method') continue;
     const enclosingSource = enclosingClassByMember.get(e.source);
     if (enclosingSource) e.source = enclosingSource;
-    // Real, evidenced gap (Waltz `UIDEndpoint -> WebUtilities.mkPath`, a
+    // Real, evidenced gap (a reference Java governance platform's `UIDEndpoint -> WebUtilities.mkPath`, a
     // static-member import/call): CodeGraph resolved this MORE precisely
     // than Graphify did — a real `calls` edge straight to the `mkPath`
     // METHOD node, not the class — but `buildNodeToUnitMap` matches a node
@@ -335,7 +335,7 @@ function extractGenericTypeArgNames(declarationText: string): string[] {
 }
 
 /**
- * Real, evidenced gap (Fineract `ChargeRepository extends
+ * Real, evidenced gap (a reference Java/JAX-RS banking platform's `ChargeRepository extends
  * JpaRepository<Charge, Long>`): CodeGraph emits NO `extends` edge at all
  * when the direct supertype is unresolvable (an external library type like
  * Spring Data's `JpaRepository`) — confirmed by reading `getOutgoingEdges`

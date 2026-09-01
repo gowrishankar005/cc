@@ -10,7 +10,7 @@ import * as os from 'os';
  * (sourceRoot, buildCommand), running BOTH in one `run-slice` invocation
  * silently produced an EMPTY second extraction — not a crash, not a
  * warning, just zero bindings. Root cause, confirmed against a real run
- * (Fineract, `gradle.properties` has `org.gradle.caching=true`):
+ * (a reference Java/JAX-RS banking platform, `gradle.properties` has `org.gradle.caching=true`):
  * `--rerun-tasks` only disables Gradle's up-to-date CHECK, not the
  * separate build CACHE — the second build's tasks could still restore
  * outputs from the cache (matching the first build's just-computed input

@@ -58,8 +58,8 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // rewritten, per this project's own append-only-evidence discipline
   // (Claim_Register.md) — see the 'codegraph' rows below for what's live.
   // R2 Phase 1 — sole implementer, no ambiguity. Least-inferred tier this matrix covers.
-  { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'same-root', confidence: 15, evidence: 'BACKLOG.md R2 gold-charge evaluation; real fineract-charge run' },
-  { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'cross-root', confidence: 10, evidence: 'BACKLOG.md R2 gold-charge evaluation; real fineract-charge run' },
+  { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'same-root', confidence: 15, evidence: 'BACKLOG.md R2 gold-charge evaluation; a real run against a reference Java/JAX-RS banking platform charge module' },
+  { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'cross-root', confidence: 10, evidence: 'BACKLOG.md R2 gold-charge evaluation; a real run against a reference Java/JAX-RS banking platform charge module' },
   // R2 stereotype-disambiguated — 2+ real implements candidates, narrowed by real @Service/@Component evidence.
   { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-stereotype', scope: 'same-root', confidence: 12, evidence: 'T-LR-3 (BACKLOG.md "Plain-interface bridge detection")' },
   { engine: 'graphify', factType: 'relationship-edge', mechanism: 'r2-stereotype', scope: 'cross-root', confidence: 7, evidence: 'T-LR-3 (BACKLOG.md "Plain-interface bridge detection")' },
@@ -80,8 +80,9 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // (multi-hop-bridge-detector.ts/graphify-reconciler.ts) is unchanged, only
   // which engine supplies the raw cross-package edges changed. Evidence:
   // E6-cross-package-backbone-evaluation.md (the migration decision trail)
-  // plus a real 3-repo pre/post benchmark (Fineract charge/core/security/
-  // provider, a Python two-root fixture, Waltz 3-module) showing identical
+  // plus a real 3-repo pre/post benchmark (a reference Java/JAX-RS banking platform's
+  // charge/core/security/provider modules, a Python two-root fixture, a
+  // reference Java governance platform's 3-module structure) showing identical
   // unit counts and equal-or-more resolved relationships on every repo
   // checked, confirming these tiers hold under the new engine.
   { engine: 'codegraph', factType: 'relationship-edge', mechanism: 'r2-phase1', scope: 'same-root', confidence: 15, evidence: 'E6-cross-package-backbone-evaluation.md; 3-repo pre/post benchmark, 2026-08-22' },
@@ -100,8 +101,8 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // (E1b: 2106 bindings, correct ambiguity refusal) but "never automatically
   // primary" per the T-LR-6 acceptance criterion, so it does not get to
   // outrank r2-phase1/r2-stereotype despite being a more direct fact.
-  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'same-root', confidence: 7, evidence: 'Claim_Register.md T-LR-5-codeql-di; fineract-charge+fineract-provider run, 2026-08-19, 2105 bindings' },
-  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'cross-root', confidence: 4, evidence: 'Claim_Register.md T-LR-5-codeql-di; fineract-charge+fineract-provider run, 2026-08-19, 2105 bindings' },
+  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'same-root', confidence: 7, evidence: 'Claim_Register.md T-LR-5-codeql-di; a reference Java/JAX-RS banking platform charge+provider run, 2026-08-19, 2105 bindings' },
+  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-stereotype', scope: 'cross-root', confidence: 4, evidence: 'Claim_Register.md T-LR-5-codeql-di; a reference Java/JAX-RS banking platform charge+provider run, 2026-08-19, 2105 bindings' },
   { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-bean-factory', scope: 'same-root', confidence: 7, evidence: 'Claim_Register.md T-LR-5-codeql-di; LoanChargesApiResource -> LoanChargeReadPlatformServiceImpl, real @Bean-factory wiring' },
   { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-di-bean-factory', scope: 'cross-root', confidence: 4, evidence: 'Claim_Register.md T-LR-5-codeql-di; LoanChargesApiResource -> LoanChargeReadPlatformServiceImpl, real @Bean-factory wiring' },
 
@@ -109,19 +110,19 @@ export const TRUST_MATRIX: readonly TrustMatrixEntry[] = [
   // promoted"; status-assignment.ts's SECONDARY_ONLY_SOURCES). Not a
   // relationship-edge fact type at all: this is CodeQL asserting a class
   // exists and is real, not resolving an edge between two already-known units.
-  { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-di', scope: 'n/a', confidence: 10, evidence: 'Claim_Register.md T-LR-5-codeql-di; 56 new units introduced, fineract-charge+fineract-provider run, 2026-08-19' },
+  { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-di', scope: 'n/a', confidence: 10, evidence: 'Claim_Register.md T-LR-5-codeql-di; 56 new units introduced, a reference Java/JAX-RS banking platform charge+provider run, 2026-08-19' },
 
   // Command-bus dispatch join (#18, codeql-command-dispatch-pass.ts).
   // Placed at the SAME tier as DI resolution's mechanisms (7/4) — comparably
   // real, whole-codebase-scale evidence, not a different number invented
   // without justification. Originally evaluated in E1-codeql-engine-evaluation.md
-  // (7 real edges, Fineract-only scope) but never shipped (T-LR-5 scoped DI
+  // (7 real edges, a reference Java/JAX-RS banking platform-only scope) but never shipped (T-LR-5 scoped DI
   // resolution as the smaller safe first unit); re-verified and shipped
   // 2026-08-22 after the original query was found never to have left
   // gitignored soln/ and had to be reconstructed from the memo's own
   // mechanism description.
-  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-command-dispatch', scope: 'same-root', confidence: 7, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, 408 real bindings whole-fineract-provider-tree scale, including a second real dispatch convention (InteropWrapperBuilder) found unprompted' },
-  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-command-dispatch', scope: 'cross-root', confidence: 4, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, 408 real bindings whole-fineract-provider-tree scale, including a second real dispatch convention (InteropWrapperBuilder) found unprompted' },
+  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-command-dispatch', scope: 'same-root', confidence: 7, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, 408 real bindings at whole-provider-module-tree scale, including a second real dispatch convention (InteropWrapperBuilder) found unprompted' },
+  { engine: 'codeql', factType: 'relationship-edge', mechanism: 'codeql-command-dispatch', scope: 'cross-root', confidence: 4, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, 408 real bindings at whole-provider-module-tree scale, including a second real dispatch convention (InteropWrapperBuilder) found unprompted' },
   { engine: 'codeql', factType: 'unit-introduction', mechanism: 'codeql-command-dispatch', scope: 'n/a', confidence: 10, evidence: 'E1-codeql-engine-evaluation.md; re-verified 2026-08-22, real command-handler classes CodeQL alone identified' },
 ];
 
