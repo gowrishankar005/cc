@@ -2,9 +2,9 @@ import { TypedRelationship } from '../../types/typed-facts';
 import { CalmNode } from '../../types/calm';
 
 /**
- * T-MR-2 — neither endpoint of a cross-repo-manifest-sourced relationship
- * has a source file this run indexed, so (same reasoning as
- * k8s-namespace-node-builder.ts's T-MR-3 synthetic namespace node) both are
+ * Neither endpoint of a cross-repo-manifest-sourced relationship has a
+ * source file this run indexed, so (same reasoning as
+ * k8s-namespace-node-builder.ts's synthetic namespace node) both are
  * built directly as CALM nodes, never as a `TypedUnit`. Must run BEFORE
  * `relationship-builder.ts`'s `buildRelationships` — its `nodeIds.has(r.from)
  * && nodeIds.has(r.to)` filter silently drops a relationship whose endpoint
@@ -14,7 +14,7 @@ import { CalmNode } from '../../types/calm';
  * `cross-repo-join-detector.ts`'s own doc comment on why: none of its three
  * join inputs are attributable to one class/file more precisely than "this
  * root produced this evidence"). `external-contract:<repo>|<nodeId>` is the
- * OTHER repo's published contract, named by its own T-MR-1 manifest — `|`
+ * OTHER repo's published contract, named by its own manifest — `|`
  * as the repo/nodeId separator (not `:`, which a filesystem-derived
  * `nodeId` — e.g. `src/main/java/...`) never itself contains, but could in
  * principle collide with a second `:` if reused).
@@ -46,7 +46,7 @@ export function buildCrossRepoNodes(relationships: TypedRelationship[]): CalmNod
       'unique-id': id,
       'node-type': 'system',
       name: root,
-      description: `This run's own package root "${root}" — the anchor for a T-MR-2 ranked cross-repo join (root granularity, not a specific local unit).`,
+      description: `This run's own package root "${root}" — the anchor for a ranked cross-repo join (root granularity, not a specific local unit).`,
     });
   }
   for (const id of [...externalContracts].sort()) {
@@ -58,7 +58,7 @@ export function buildCrossRepoNodes(relationships: TypedRelationship[]): CalmNod
       'unique-id': id,
       'node-type': 'system',
       name: nodeId || repo,
-      description: `External published contract "${nodeId}" from repo "${repo}", declared in that repo's own T-MR-1 manifest — never scanned by this run.`,
+      description: `External published contract "${nodeId}" from repo "${repo}", declared in that repo's own manifest — never scanned by this run.`,
     });
   }
   return nodes;

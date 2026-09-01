@@ -1,5 +1,5 @@
 /**
- * T-CL-5 (Emission-coverage rule) — "what the representation could not
+ * Emission-coverage rule: "what the representation could not
  * carry, and why" becomes a required emission output, not an implicit
  * assumption. Closes BACKLOG.md's "Emission-coverage reporting as a
  * governed rule" row: `coverage-report.ts`/`unmapped-signals.ts` already

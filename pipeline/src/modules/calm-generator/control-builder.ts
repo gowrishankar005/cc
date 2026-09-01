@@ -4,8 +4,8 @@ import { ControlRequirementCatalogue, findControlRequirement } from '../../rules
 import { EmissionCoverageGap } from './emission-coverage';
 
 /**
- * T-R2-3 (C-rich structured authority, Robustness Phase R2). Beyond the raw
- * `expression` text (T-D2), pulls out the one thing that's SAFELY structural
+ * C-rich structured authority. Beyond the raw `expression` text, pulls out
+ * the one thing that's SAFELY structural
  * within it: a Java constant-style authority reference — either a qualified
  * enum member (`SystemRole.ADMIN`) or a bare ALL_CAPS constant
  * (`RESOURCE_NAME_FOR_PERMISSIONS`) — real, grep-verified shapes from both
@@ -57,7 +57,7 @@ export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue:
     for (const ev of unit.evidence) {
       if (ev.category !== 'security-control') continue;
 
-      // T-CL-5 — the unit itself was never emitted as a node (a
+      // The unit itself was never emitted as a node (a
       // node-builder.ts gap already recorded why): its security-control
       // evidence can't be attached to anything either. Recorded here too —
       // buildEmissionCoverageReport's controlEvidenceTotal counts this
@@ -81,7 +81,7 @@ export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue:
       const rule = findControlRequirement(catalogue, ev.signal, language);
       if (!rule) {
         // no catalogue row for this signal — not every security-control-category
-        // signal is necessarily mapped yet. T-CL-5 — a real security-control
+        // signal is necessarily mapped yet. A real security-control
         // fact was found and dropped here; recorded, not silent.
         gaps.push({ stage: 'control', factId: `${unit.id}::${ev.ref}`, reason: `no control-requirement-catalogue row for security-control signal '${ev.signal}'` });
         continue;
@@ -96,14 +96,14 @@ export function attachControls(units: TypedUnit[], nodes: CalmNode[], catalogue:
         config: {
           detectedVia: rule.detectionMechanism,
           evidenceRef: ev.ref,
-          // AREC Wave 3 T-D2 (C-rich) — the evidence's own raw source-line
+          // C-rich: the evidence's own raw source-line
           // argument (e.g. "RESOURCE_NAME_FOR_PERMISSIONS" for a call-site
           // control), when the extractor found one. Absent, not a fake
           // empty string, for decorator evidence that carries no argument
           // today (e.g. @PreAuthorize) — this is real per-signal richness,
           // not invented for every control uniformly.
           ...(ev.argument !== undefined ? { expression: ev.argument } : {}),
-          // T-R2-3 (C-rich structured authority) — see extractAuthorityRef's
+          // C-rich structured authority — see extractAuthorityRef's
           // own doc comment for what this is and isn't.
           ...(extractAuthorityRef(ev.argument) ? { authorityRef: extractAuthorityRef(ev.argument) } : {}),
           // Honest per v0.10 §0: requirement-url is a placeholder this

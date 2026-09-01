@@ -1,18 +1,17 @@
 import { CalmNode, CalmRelationship } from '../../types/calm';
 
 /**
- * T-X7-3 (G-L3-01/G-L3-06) — one `system`-kind node per RUN (not per
- * package root — attributing a TypedUnit back to which root it came from
- * would need a new field on TypedUnit, a real contract change this
- * optional, rule-based enrichment doesn't warrant; per-run is the simpler,
- * still-honest granularity the task's own wording explicitly allows:
- * "One system node per root OR per run"), `composed-of` every real
- * architectural unit this run discovered — the first non-flat, C4-like
- * layering this pipeline has ever produced (every prior run was a flat
- * list of leaf service/database/topic nodes with no composite boundary).
+ * One `system`-kind node per RUN (not per package root — attributing a
+ * TypedUnit back to which root it came from would need a new field on
+ * TypedUnit, a real contract change this optional, rule-based enrichment
+ * doesn't warrant; per-run is the simpler, still-honest granularity),
+ * `composed-of` every real architectural unit this run discovered — the
+ * first non-flat, C4-like layering this pipeline has ever produced (every
+ * prior run was a flat list of leaf service/database/topic nodes with no
+ * composite boundary).
  *
- * The documented rule that keeps this from being "a synthetic node without
- * documented rule" (the task's own reject criterion): emitted ONLY when
+ * The documented rule that keeps this from being a synthetic node with no
+ * documented rule: emitted ONLY when
  * there are 2+ real nodes — a "system" containing exactly one node is
  * cosmetic noise, not a meaningful composite boundary. Disableable via
  * --no-system-node (run-slice.ts) since it's still opinionated output some
@@ -27,7 +26,7 @@ export function buildSystemNode(nodes: CalmNode[]): { systemNode?: CalmNode; com
     'unique-id': SYSTEM_NODE_ID,
     'node-type': 'system',
     name: 'system',
-    description: `Composite system node — composed-of the ${nodes.length} architectural unit(s) this run discovered (T-X7-3).`,
+    description: `Composite system node — composed-of the ${nodes.length} architectural unit(s) this run discovered.`,
   };
 
   const composedOfRelationship: CalmRelationship = {

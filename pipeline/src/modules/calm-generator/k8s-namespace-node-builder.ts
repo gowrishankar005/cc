@@ -2,7 +2,7 @@ import { TypedRelationship } from '../../types/typed-facts';
 import { CalmNode } from '../../types/calm';
 
 /**
- * T-MR-3 — a k8s namespace has no source file, so unlike every other CALM
+ * A k8s namespace has no source file, so unlike every other CALM
  * node in this pipeline it is never a TypedUnit; it's built directly as a
  * CALM node, same pattern as system-node-builder.ts's synthetic `system`
  * node. `node-type: system` per Architecture_as_Code_Solution_Design_v2.md
@@ -32,6 +32,6 @@ export function buildK8sNamespaceNodes(relationships: TypedRelationship[]): Calm
     'unique-id': namespaceNodeId(namespace),
     'node-type': 'system',
     name: namespace,
-    description: `Kubernetes namespace "${namespace}" — runtime placement container (T-MR-3).`,
+    description: `Kubernetes namespace "${namespace}" — runtime placement container.`,
   }));
 }

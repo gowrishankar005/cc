@@ -6,8 +6,8 @@ import { jdbcScheme } from '../../analysis/jdbc-url';
 const DATASOURCE_SIGNAL_PREFIXES = ['spring.datasource.url=', 'spring.datasource.hikari.jdbcUrl='];
 
 /**
- * T-PC1-6/T-SC-6 (B-formal-interface-port) — server.port -> a real
- * `port-interface` CalmInterface (types/calm.ts's own already-verified-against-
+ * server.port -> a real `port-interface` CalmInterface
+ * (types/calm.ts's own already-verified-against-
  * calm.finos.org enum — NOT the informal "tcp-host-port" name the original
  * gap-closure research doc used; that name isn't a real member of this
  * project's own verified CalmInterfaceType union, so using it would have
@@ -44,7 +44,7 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
     // is stable regardless of directory-walk order.
     const distinctPorts = [...new Map(portFacts.map((p) => [p.port, p])).values()].sort((a, b) => a.ref.localeCompare(b.ref));
 
-    // T-CL-1 review fix — the id was `iface-port-${i}`, a positional index
+    // Review fix — the id was `iface-port-${i}`, a positional index
     // into this sorted-and-deduped list: deterministic given identical
     // inputs, but not content-derived — adding a THIRD port fact for the
     // same unit could shift an unrelated, unchanged port's ordinal and
@@ -63,10 +63,9 @@ export function attachPortInterfaces(units: TypedUnit[], nodes: CalmNode[]): voi
 }
 
 /**
- * T-SC-3/T-PC1-3 (B-protocol-populate) — spring.datasource.url's own JDBC
- * scheme -> a real relationship `protocol` value, via the SAME
- * `protocolBySignal` mechanism T-X7-4 already wired for
- * persistence-detection-catalogue.yml's driver-import rows
+ * spring.datasource.url's own JDBC scheme -> a real relationship
+ * `protocol` value, via the SAME `protocolBySignal` mechanism already
+ * wired for persistence-detection-catalogue.yml's driver-import rows
  * (relationship-builder.ts's `inferredProtocol` looks up EITHER endpoint
  * unit's `evidence.signal` against this map). Reads only `Evidence.signal`
  * (TypedFacts' own public contract) — never reaches into scanner/analysis

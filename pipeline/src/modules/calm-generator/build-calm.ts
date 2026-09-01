@@ -33,36 +33,36 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true, gaps: Emi
   const nodeTypeMapping = loadNodeTypeMapping(rulesDir);
   const relationshipTypeMapping = loadRelationshipTypeMapping(rulesDir);
   const controlRequirementCatalogue = loadControlRequirementCatalogue(rulesDir);
-  const protocolBySignal = driverImportProtocols(loadPersistenceDetectionCatalogue(rulesDir)); // T-X7-4
-  for (const [signal, protocol] of springConfigProtocolBySignal(facts.units)) protocolBySignal.set(signal, protocol); // T-PC1-3/B-protocol-populate
+  const protocolBySignal = driverImportProtocols(loadPersistenceDetectionCatalogue(rulesDir));
+  for (const [signal, protocol] of springConfigProtocolBySignal(facts.units)) protocolBySignal.set(signal, protocol);
 
-  // T-P0-1 (E2) — 'unresolved' units (graded-fact-admission placeholders)
-  // used to be filtered out here unconditionally; now catalogue-driven via
+  // 'unresolved' units (graded-fact-admission placeholders) used to be
+  // filtered out here unconditionally; now catalogue-driven via
   // node-type-mapping.yml's own row for unitKind: unresolved, same as every
   // other kind. No special-case filtering left in this file.
   const units = facts.units;
 
   const nodes = buildNodes(units, nodeTypeMapping, gaps);
-  // T-MR-3 — synthetic k8s-namespace nodes, built BEFORE buildRelationships
-  // (unlike system-node-builder's system node, which runs after): a
-  // 'deployed-in' TypedRelationship's `to` must already be a real node id or
+  // Synthetic k8s-namespace nodes, built BEFORE buildRelationships (unlike
+  // system-node-builder's system node, which runs after): a 'deployed-in'
+  // TypedRelationship's `to` must already be a real node id or
   // buildRelationships' own nodeIds.has(r.to) filter silently drops it.
   nodes.push(...buildK8sNamespaceNodes(facts.relationships));
-  // T-MR-2 — same reasoning: a repo-manifest-sourced relationship's
-  // endpoints are synthetic (repo-root / external-contract), never a real
-  // TypedUnit, so both must already exist as real node ids before
-  // buildRelationships' own nodeIds.has(...) filter runs.
+  // Same reasoning: a repo-manifest-sourced relationship's endpoints are
+  // synthetic (repo-root / external-contract), never a real TypedUnit, so
+  // both must already exist as real node ids before buildRelationships' own
+  // nodeIds.has(...) filter runs.
   nodes.push(...buildCrossRepoNodes(facts.relationships));
   attachInterfaces(units, nodes, nodeTypeMapping);
-  attachPortInterfaces(units, nodes); // T-PC1-6/B-formal-interface-port
+  attachPortInterfaces(units, nodes);
   attachControls(units, nodes, controlRequirementCatalogue, gaps);
   attachNodeMetadata(units, nodes, facts);
 
   const relationships = buildRelationships(facts.relationships, nodes, relationshipTypeMapping, units, protocolBySignal, gaps);
 
-  // T-X7-3 — after every other node/relationship is built, so the system
-  // node's composed-of lists the FINAL node set (including any that
-  // node-builder skipped for lacking a mapping row).
+  // After every other node/relationship is built, so the system node's
+  // composed-of lists the FINAL node set (including any that node-builder
+  // skipped for lacking a mapping row).
   if (includeSystemNode) {
     const { systemNode, composedOfRelationship } = buildSystemNode(nodes);
     if (systemNode && composedOfRelationship) {

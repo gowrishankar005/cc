@@ -24,7 +24,7 @@ import { buildEmissionCoverageReport, EmissionCoverageGap } from './emission-cov
  *   private copy, per the new convention).
  * - `overrides-applied-report.json` is genuinely calm-generator-private (no
  *   other module applies overrides) — namespaced only, no top-level copy.
- * - `emission-coverage-report.json` (T-CL-5) is also calm-generator-private
+ * - `emission-coverage-report.json` is also calm-generator-private
  *   — only this module's own builders decide CALM representability, unlike
  *   `coverage-report.json`/`unmapped-signals-report.json` (analysis-time,
  *   pre-CALM completeness, written as top-level platform artefacts by
@@ -39,7 +39,7 @@ export function writeArtefacts(facts: TypedFacts, outDir: string, overridesDir?:
   let calm: CalmDocument = buildCalm(facts, includeSystemNode, emissionGaps);
   logMem('write-artefacts after buildCalm');
 
-  // T-CL-5 — "what the representation could not carry, and why" as a
+  // "What the representation could not carry, and why" as a
   // required emission output, computed from the same gaps the builders
   // recorded inline above (never re-derived independently). Written before
   // overrides are applied: overrides patch already-emitted CALM output and
