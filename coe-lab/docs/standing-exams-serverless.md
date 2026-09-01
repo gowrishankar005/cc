@@ -1,6 +1,10 @@
 # Standing exams — serverless / a large financial-services organization yardstick program
 
-**Status:** T-Y1-3 deliverable, [`AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`](../../docs/solution/AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md).
+**Status:** the lane doc this was originally written against
+(`AGENT_TASKS_Fidelity_Yardstick_and_Serverless.md`) no longer exists in the
+current doc structure (dead citation, found 2026-09-01) — its content
+shipped; see `docs/solution/BACKLOG.md` and `docs/solution/Claim_Register.md`
+for the current status of the serverless/HTTP-Lambda claims this file exams.
 **Scope:** exams for `U-http-serverless` / `B-lambda-http` / `B-dynamo-handler-kind`. Separate from [`standing-disconfirming-exams.md`](./standing-disconfirming-exams.md), which is scoped to the layered-architecture-story program specifically — different programs, different exam vocabularies, not conflated.
 **Rule:** same as the layered-story program's own — an architecture/claim update for `U-http-serverless` without updating the relevant exam's last-run row here is a process reject.
 
