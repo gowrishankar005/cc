@@ -25,7 +25,7 @@ import { isTestPath } from '../rules/test-path';
 
 /**
  * Shared by both a normal scan-and-build run and --from-facts reconstruct-only
- * mode (T-X6-3) — runModules + --strict-overrides check + IR render is the
+ * mode — runModules + --strict-overrides check + IR render is the
  * same tail either way; the only difference between the two modes is
  * whether facts/coverage/unmapped came from a fresh scan or a frozen file.
  * Kept here as a small helper, not duplicated, per "no feature dumps in
@@ -45,7 +45,7 @@ function finishRun(
   runModules(resolveModules(moduleNames), facts, { outDir, overridesDir, includeSystemNode });
   logMem('after runModules');
 
-  // T-X6-2 — --strict-overrides reads back calm-generator's own
+  // --strict-overrides reads back calm-generator's own
   // overrides-applied-report.json (already written by runModules above) the
   // same way the IR's module-projection appendix already reads real module
   // output after the fact — not a new pattern, just this task's use of the
@@ -64,7 +64,7 @@ function finishRun(
     }
   }
 
-  // T-X3-2 — rendered AFTER modules run so the optional "module projections"
+  // Rendered AFTER modules run so the optional "module projections"
   // appendix can read their real output (CALM node/relationship counts,
   // threat-signals findings) — still one-way (reads outDir, never writes
   // back into facts/ctx) and still not calm-generator's own artefact.
@@ -116,7 +116,7 @@ async function runSlice(
     const detectGateResult = runDetectGateSmokeTest(root, allNativeRoutes.length);
     if (detectGateResult.suspectedSilentFailure) anySilentFailure = true;
 
-    // T-TC1-2 (B-test-code-exclusion) — real, confirmed bug: a JUnit test
+    // (B-test-code-exclusion) — real, confirmed bug: a JUnit test
     // file's own JAX-RS-annotated inner test-fixture classes were typed as
     // a real service at confidence 100 with a fabricated route, because
     // nothing ever excluded /test/-path files from decorator/native-route
@@ -132,20 +132,20 @@ async function runSlice(
     }
 
     const decoratorFacts = indexedFiles.flatMap((file) => engine.extractDecoratorFacts(handle, root, file));
-    const callFacts = indexedFiles.flatMap((file) => engine.extractCallFacts(handle, root, file)); // T-D1
-    const typeReferenceFacts = indexedFiles.flatMap((file) => engine.extractTypeReferenceFacts(handle, root, file)); // T-E1
-    const extendsFacts = indexedFiles.flatMap((file) => engine.extractExtendsFacts(handle, root, file)); // T-E3
+    const callFacts = indexedFiles.flatMap((file) => engine.extractCallFacts(handle, root, file));
+    const typeReferenceFacts = indexedFiles.flatMap((file) => engine.extractTypeReferenceFacts(handle, root, file));
+    const extendsFacts = indexedFiles.flatMap((file) => engine.extractExtendsFacts(handle, root, file));
     const filesByExt: Record<string, number> = {};
     for (const file of indexedFiles) {
       const ext = path.extname(file);
       filesByExt[ext] = (filesByExt[ext] ?? 0) + 1;
     }
-    const deployableManifests = discoverDeployableManifests(root); // T-X8-1
+    const deployableManifests = discoverDeployableManifests(root);
     rawByRoot.set(root, { nativeRoutes, decoratorFacts, callFacts, typeReferenceFacts, extendsFacts, filesByExt, deployableManifests, excludedTestFiles });
   }
 
-  // T-X1-2 — detect-gate-smoketest.ts already computes suspectedSilentFailure
-  // (requirements v0.6 §4's known CodeGraph detect()-gate silent-failure
+  // detect-gate-smoketest.ts already computes suspectedSilentFailure
+  // (a known CodeGraph detect()-gate silent-failure
   // pattern) but only warns; --strict-detect makes that failure loud instead
   // of leaving a monorepo pilot to silently produce zero routes and no
   // indication why. Default stays warn-only, unchanged from before this task.
@@ -196,7 +196,7 @@ async function runSlice(
     ignoredItems: ctx.allIgnoredItems,
   };
 
-  // T-CL-2 — read the PRIOR run's typed-facts.json from this same --out
+  // Read the PRIOR run's typed-facts.json from this same --out
   // directory (if any) before finishRun's calm-generator module overwrites
   // it, and merge this run's freshly-computed units/relationships against
   // it: unaffected facts (unchanged evidence) carry their prior status
@@ -234,7 +234,7 @@ async function runSlice(
 }
 
 /**
- * T-X6-3 — reconstruct-only mode: rebuilds modules + IR + overrides from an
+ * Reconstruct-only mode: rebuilds modules + IR + overrides from an
  * EXISTING typed-facts.json, no rescan (no StructuralEngine/Graphify/k8s
  * calls at all). Real use case: iterating on an Override/Decision Record
  * pair against a large monorepo shouldn't require a multi-minute rescan

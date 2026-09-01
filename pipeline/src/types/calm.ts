@@ -14,7 +14,7 @@ export type CalmNodeType =
   | 'ldap'
   | 'webclient'
   | 'data-asset'
-  // T-P0-1 (E2) — not one of CALM 1.2's 9 enum values, but schema-valid:
+  // Not one of CALM 1.2's 9 enum values, but schema-valid:
   // core.json's node-type-definition is `anyOf: [enum, {type: string}]`,
   // confirmed directly against
   // node_modules/@finos/calm-cli/dist/calm/release/1.2/meta/core.json —

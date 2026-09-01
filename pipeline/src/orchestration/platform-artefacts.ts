@@ -5,7 +5,7 @@ import { buildCoverageReport, CoverageReport } from '../analysis/coverage-report
 import { buildUnmappedSignalsReport, UnmappedSignalsReport } from '../analysis/unmapped-signals';
 
 /**
- * T-X0-1/T-X0-2 — coverage-report.json and unmapped-signals-report.json are
+ * coverage-report.json and unmapped-signals-report.json are
  * PLATFORM artefacts (every module reads the same typed-facts.json; these
  * describe the RUN, not one module's output), so they're written from
  * orchestration alongside typed-facts.json — not from inside
