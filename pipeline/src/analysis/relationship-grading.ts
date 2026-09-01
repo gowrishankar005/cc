@@ -17,7 +17,7 @@ export function gradeRelationships(relationships: TypedRelationship[], units: Ty
       rel.grade = 'trust';
       continue;
     }
-    // T-MR-3 (found reviewing this task against coverage-report.ts/
+    // Found reviewing this against coverage-report.ts/
     // hitl-review-trigger.ts's own `grade === 'architecture'` filters,
     // which they document as meaning specifically "R1 one-hop or R2
     // bridge-resolved, never structural/trust") — a k8s Deployment's
@@ -36,7 +36,7 @@ export function gradeRelationships(relationships: TypedRelationship[], units: Ty
       rel.grade = 'structural';
       continue;
     }
-    // T-MR-2 — same reasoning as shares-secret/deployed-in above, made an
+    // Same reasoning as shares-secret/deployed-in above, made an
     // explicit branch rather than left to the generic service-endpoint
     // fallback's accidental behavior (neither cross-repo endpoint is ever a
     // 'service'-kind TypedUnit, so it would fall through to 'structural'
@@ -52,7 +52,7 @@ export function gradeRelationships(relationships: TypedRelationship[], units: Ty
     }
     const fromKind = kindById.get(rel.from);
     const toKind = kindById.get(rel.to);
-    // T-P0-1 (E2) — a relationship touching a graded-fact-admission
+    // A relationship touching a graded-fact-admission
     // placeholder (kind: 'unresolved') must never grade 'architecture',
     // regardless of the other endpoint's kind: BACKLOG.md's own proposal
     // for this mechanism is explicit ("never architecture grade"), and an
