@@ -1,14 +1,14 @@
 /**
  * Single shared JDBC-URL literal resolution + scheme extraction.
  *
- * Real bug found on independent code review (2026-08-16) of T-FS-3: this
- * logic previously existed as THREE independent hand-copied pieces —
- * spring-config-pass.ts's own jdbcScheme(), contradiction-detector.ts's
+ * Real bug found on independent code review (2026-08-16) of contradiction
+ * detection: this logic previously existed as THREE independent hand-copied
+ * pieces — spring-config-pass.ts's own jdbcScheme(), contradiction-detector.ts's
  * jdbcSchemeEngine() (a deliberate re-derivation, per its own "keep this
  * detector's only dependency on OUTPUT, not internals" comment), and
  * port-interface-builder.ts's isJdbcSignal prefix check. When
  * jdbcScheme() was taught to unwrap Spring's `${VAR:default}` placeholder
- * syntax (T-FS-3 real-instance verification against a reference Java/JAX-RS
+ * syntax (real-instance verification against a reference Java/JAX-RS
  * banking platform),
  * contradiction-detector.ts's copy was updated in the same commit but
  * port-interface-builder.ts's WASN'T — proving that "must stay in sync"
