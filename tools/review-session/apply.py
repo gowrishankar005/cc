@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate_drafts import validate as validate_drafts  # noqa: E402
+from validate_drafts import validate as validate_drafts, load_decisions_by_id  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_SLICE = REPO_ROOT / "pipeline" / "dist" / "orchestration" / "run-slice.js"
@@ -58,7 +58,7 @@ def _load_json_dir(dir_path: Path) -> list[dict]:
 def _run_validation(session_dir: Path, manifest: dict) -> tuple[bool, list[str], list[str]]:
     decisions_list = _load_json_dir(session_dir / "drafts" / "decisions")
     overrides_list = _load_json_dir(session_dir / "drafts" / "overrides")
-    decisions_by_id = {d["decision_id"]: d for d in decisions_list if isinstance(d, dict) and "decision_id" in d}
+    decisions_by_id, load_errors = load_decisions_by_id(decisions_list)
 
     calm_node_ids = None
     calm_relationship_ids = None
@@ -71,6 +71,7 @@ def _run_validation(session_dir: Path, manifest: dict) -> tuple[bool, list[str],
             calm_relationship_ids = {r["unique-id"] for r in calm.get("relationships", [])}
 
     report = validate_drafts(decisions_by_id, overrides_list, calm_node_ids, calm_relationship_ids)
+    report.errors = load_errors + report.errors
     # Real gap found on review: if the source scan's architecture.calm.json
     # went missing (moved/deleted since this pack was built), endpoint
     # checks silently degrade to "not checked" with no warning at all — the
@@ -128,6 +129,8 @@ def _write_apply_report(session_dir: Path, entry: dict) -> None:
             lines.append(f"- {key}: {entry[key]}\n")
     if entry.get("out_dir"):
         lines.append(f"- New out-dir: `{entry['out_dir']}`\n")
+    if entry.get("stderr"):
+        lines.append(f"- stderr (real crash cause, if a module was isolated):\n```\n{entry['stderr']}\n```\n")
     report_path.write_text("".join(lines))
 
 
@@ -212,8 +215,29 @@ def main() -> int:
 
     overrides_report_path = out_dir / "modules" / "calm-generator" / "overrides-applied-report.json"
     if not overrides_report_path.exists():
-        print(f"[apply] run-slice succeeded but {overrides_report_path} was not written — no overrides were passed through?", file=sys.stderr)
-        _write_apply_report(session_dir, {"timestamp": _now(), "outcome": "succeeded, but no overrides-applied-report.json found", "out_dir": str(out_dir)})
+        # Real bug found live (Architect_Pilot_Feedback_Notes.md Entry 25):
+        # run-slice can exit 0 (success) even when the calm-generator module
+        # itself threw and was isolated by modules/registry.ts — the real
+        # crash reason lands on stderr (e.g. "[module-registry] module
+        # \"calm-generator\" failed: ...") but this branch used to print only
+        # a generic, easy-to-misread-as-benign message ("no overrides were
+        # passed through?"), which is exactly how a real isolated-module
+        # crash got mistaken for "0 overrides, nothing to apply" in a real
+        # session. Surface the real stderr so this is unmissable.
+        print(f"[apply] run-slice succeeded but {overrides_report_path} was not written.", file=sys.stderr)
+        if result.stderr.strip():
+            print(f"[apply] real cause is likely on stderr below (a module may have thrown and been isolated):\n{result.stderr}", file=sys.stderr)
+        else:
+            print("[apply] no stderr output either — no overrides were passed through?", file=sys.stderr)
+        _write_apply_report(
+            session_dir,
+            {
+                "timestamp": _now(),
+                "outcome": "succeeded, but no overrides-applied-report.json found",
+                "out_dir": str(out_dir),
+                "stderr": result.stderr.strip() or None,
+            },
+        )
         return 1
 
     overrides_result = json.loads(overrides_report_path.read_text())

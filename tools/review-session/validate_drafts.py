@@ -263,6 +263,34 @@ def _load_json_dir(dir_path: Path) -> list[dict]:
     return items
 
 
+def load_decisions_by_id(decisions_list: list[dict]) -> tuple[dict[str, dict], list[str]]:
+    """Real bug found live (Architect_Pilot_Feedback_Notes.md Entry 25): a
+    decision file missing 'decision_id' used to be silently DROPPED from
+    the dict passed into validate() instead of being reported as a real
+    error. A real Copilot Chat session drafted 23 decision files using its
+    own invented field names (residual_id/construct/option) instead of the
+    real schema -- every single one was missing decision_id, so the old
+    dict comprehension produced an EMPTY dict, and validate() reported "0
+    errors" because there was trivially nothing left to check. Every
+    decision file must now be accounted for: either it has a real,
+    non-empty string decision_id and is validated normally, or it doesn't
+    and that is itself a validation error, never a silent drop (the second
+    return value -- prepend it to whatever ValidationReport.errors
+    validate() later produces). Shared by validate_drafts.py's own main()
+    and apply.py's _run_validation() -- this exact filter used to be
+    duplicated (and duplicately wrong) in both places."""
+    decisions_by_id: dict[str, dict] = {}
+    errors: list[str] = []
+    for d in decisions_list:
+        decision_id = d.get("decision_id") if isinstance(d, dict) else None
+        if isinstance(decision_id, str) and decision_id:
+            decisions_by_id[decision_id] = d
+        else:
+            present = sorted(d.keys()) if isinstance(d, dict) else type(d).__name__
+            errors.append(f"decision file missing required field 'decision_id' (or it is not a non-empty string) — cannot be identified or validated. Fields present: {present}")
+    return decisions_by_id, errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate drafts/decisions + drafts/overrides in a residual review Session Pack before apply.")
     parser.add_argument("--session-dir", required=True, help="Session Pack directory (contains drafts/decisions/, drafts/overrides/)")
@@ -272,7 +300,7 @@ def main() -> int:
     session_dir = Path(args.session_dir).resolve()
     decisions_list = _load_json_dir(session_dir / "drafts" / "decisions")
     overrides_list = _load_json_dir(session_dir / "drafts" / "overrides")
-    decisions_by_id = {d["decision_id"]: d for d in decisions_list if isinstance(d, dict) and "decision_id" in d}
+    decisions_by_id, load_errors = load_decisions_by_id(decisions_list)
 
     calm_node_ids = None
     calm_relationship_ids = None
@@ -286,6 +314,7 @@ def main() -> int:
         calm_relationship_ids = {r["unique-id"] for r in calm.get("relationships", [])}
 
     report = validate(decisions_by_id, overrides_list, calm_node_ids, calm_relationship_ids)
+    report.errors = load_errors + report.errors
 
     if calm_node_ids is None:
         report.warnings.insert(0, "no --calm given — node/relationship endpoint existence was NOT checked (pass --calm to check for real)")

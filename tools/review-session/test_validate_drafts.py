@@ -5,7 +5,7 @@ real repo."""
 
 import unittest
 
-from validate_drafts import validate
+from validate_drafts import validate, load_decisions_by_id
 
 GOOD_DECISION = {
     "decision_id": "D-001",
@@ -205,6 +205,63 @@ class TestValidateDrafts(unittest.TestCase):
         override = {"override_id": "O-relremove", "module": "architecture", "target_ref": "rel-real", "override_type": "relationship_remove", "decision_record_ref": "D-001", "status": "active", "created_by": "x", "created_at": "x"}
         report = validate({"D-001": GOOD_DECISION}, [override], calm_node_ids=set(), calm_relationship_ids={"rel-real"})
         self.assertTrue(report.valid, report.errors)
+
+
+class TestLoadDecisionsById(unittest.TestCase):
+    """Entry 25, Architect_Pilot_Feedback_Notes.md: a real Copilot Chat
+    session drafted 23 decision files using invented field names
+    (residual_id/construct/option) instead of the real decision_id/
+    final_decision/status schema. The OLD code (a bare dict comprehension in
+    both validate_drafts.py's main() and apply.py's _run_validation())
+    silently DROPPED every file missing decision_id instead of reporting an
+    error -- with all 23 missing it, the result was an empty dict and a
+    trivially "valid" report. These tests exercise the loading step itself
+    (every prior test in this file calls validate() directly with an
+    already-correct dict, which is exactly why this defect had zero test
+    coverage before)."""
+
+    def test_well_formed_decision_is_kept(self):
+        decisions_by_id, errors = load_decisions_by_id([GOOD_DECISION])
+        self.assertEqual(decisions_by_id, {"D-001": GOOD_DECISION})
+        self.assertEqual(errors, [])
+
+    def test_decision_missing_decision_id_is_reported_not_silently_dropped(self):
+        """The exact real shape a live chat session actually wrote to disk."""
+        malformed = {"residual_id": "R-001", "construct": "signal-catalogue-candidate", "option": "[1]", "rationale": "...", "reviewer": "llm-advisory:claude", "timestamp": "2026-09-01T00:00:00Z"}
+        decisions_by_id, errors = load_decisions_by_id([GOOD_DECISION, malformed])
+        self.assertEqual(decisions_by_id, {"D-001": GOOD_DECISION}, "the well-formed decision must still be kept")
+        self.assertEqual(len(errors), 1, f"the malformed decision must produce exactly one error, not be silently dropped: {errors}")
+        self.assertIn("decision_id", errors[0])
+        self.assertIn("residual_id", errors[0], "the error should name the real (wrong) fields present, to help diagnose an invented schema")
+
+    def test_all_decisions_malformed_yields_all_errors_not_empty_report(self):
+        """Second, independent instance of the real bug (per this repo's own
+        'verify against a second instance' rule): with EVERY decision file
+        malformed (the real shape of the actual failed session), the result
+        must be N real errors, never a silently-empty, trivially-valid dict."""
+        malformed = [{"residual_id": f"R-{i:03d}", "construct": "x", "option": "[1]"} for i in range(1, 4)]
+        decisions_by_id, errors = load_decisions_by_id(malformed)
+        self.assertEqual(decisions_by_id, {})
+        self.assertEqual(len(errors), 3)
+
+    def test_decision_id_present_but_not_a_string_is_reported(self):
+        malformed = dict(GOOD_DECISION)
+        malformed["decision_id"] = 12345
+        decisions_by_id, errors = load_decisions_by_id([malformed])
+        self.assertEqual(decisions_by_id, {})
+        self.assertEqual(len(errors), 1)
+
+    def test_end_to_end_via_validate_all_malformed_decisions_fail_validation(self):
+        """Full integration: load_decisions_by_id's errors must actually
+        surface through validate()'s report, matching how both real callers
+        (validate_drafts.py's main(), apply.py's _run_validation()) use it —
+        report.errors = load_errors + report.errors."""
+        malformed = {"residual_id": "R-001", "construct": "x", "option": "[1]"}
+        decisions_by_id, load_errors = load_decisions_by_id([malformed])
+        report = validate(decisions_by_id, [], calm_node_ids=set())
+        report.errors = load_errors + report.errors
+        self.assertFalse(report.valid, "a pack where every decision file is schema-invalid must never validate as clean")
+        self.assertTrue(any("decision_id" in e for e in report.errors), report.errors)
 
 
 if __name__ == "__main__":
