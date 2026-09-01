@@ -17,6 +17,9 @@ graphify-out/
 # Local sample-repo clones used for manual testing (never committed)
 spikes/
 
+# Local run-slice scan output used for manual testing (never committed)
+test_llm/
+
 # Python
 __pycache__/
 *.py[cod]
