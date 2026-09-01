@@ -191,7 +191,7 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     );
   }
 
-  // Robustness T-R0-2 — architecture coverage RATE, same precondition
+  // Architecture coverage RATE, same precondition
   // spirit as S1 (only meaningful when a store unit exists to potentially
   // connect to). Outbound only (rel.from), architecture-grade only (never
   // structural/trust) — a service "has architecture coverage" when it has
@@ -274,9 +274,9 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   }
 
   const completeness = computeCompleteness(ctx.allUnits, ctx.relationships);
-  // Robustness T-R0-5 — crossPackageStatus was already surfaced prominently in
+  // crossPackageStatus was already surfaced prominently in
   // intelligence-ir.md's own header, but living in a DIFFERENT field than
-  // silenceFlags meant a reviewer (or the T-E5 hitl-review-trigger.js CLI,
+  // silenceFlags meant a reviewer (or the hitl-review-trigger.js CLI,
   // which reads exactly this array) could miss that a degraded/failed
   // cross-package backbone pass is the REAL reason a run looks architecturally
   // empty — every cross-package edge, persistence-detector unit, and R2
@@ -285,15 +285,15 @@ export function buildCoverageReport(ctx: AnalysisContext): CoverageReport {
   // Folding this into the SAME reviewer-facing list closes that gap.
   if (crossPackageStatus !== 'ok') {
     completeness.silenceFlags.push(
-      `S0-cross-package-backbone-incomplete: crossPackageStatus is "${crossPackageStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to R2/C-call maturity`
+      `S0-cross-package-backbone-incomplete: crossPackageStatus is "${crossPackageStatus}"${ctx.crossPackageError ? ` (${String(ctx.crossPackageError)})` : ''} — cross-package relationships, import-based persistence/messaging units, and R2 bridge resolution all depend on the cross-package backbone pass; this run's architecture story may look emptier than the source code actually is, for a reason unrelated to detection maturity`
     );
   }
-  // T-Y5-1 — the second, CFN-specific half of the HT-ASB-006 class: real
+  // The CFN-specific half: real
   // infra evidence of an HTTP surface (actual API Gateway Method/Resource
   // bindings in the passed --cfn-manifests dir) exists, but NONE of it
   // bound to any unit this scan found — e.g. the handler's Java source
-  // lives in a package root not passed to this scan (the real, honest
-  // 21-of-26-unresolved case found in T-Y4-2's own wild exam against
+  // lives in a package root not passed to this scan (a real, honest
+  // 21-of-26-unresolved case found against
   // a reference AWS SaaS sample's shared resources/ directory). Only meaningful when
   // --cfn-manifests was actually passed (undefined, not 0, when it wasn't
   // — same "don't fake a 0" precondition discipline as every other rate
