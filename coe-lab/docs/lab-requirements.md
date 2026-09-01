@@ -27,7 +27,7 @@ Lab results are **trustworthy as gates** only when:
 2. `lib-fintech-common` has zero must-not-detect violations  
 3. Multi-root Python score exists  
 4. Stretch failures map to `expectedPlatformGaps` or a new gap class  
-5. Wild-type regression (BoA/Fineract) still passes  
+5. Wild-type regression (a reference Java microservices banking sample / Fineract) still passes  
 
 ## Future (lab v0.2+)
 

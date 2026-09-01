@@ -2,7 +2,7 @@
   "$schema": "https://calm.finos.org/release/1.2/meta/calm.json",
   "unique-id": "coe-lab-py-jwt-gateway",
   "name": "CoE Lab \u2014 JWT Auth Gateway",
-  "description": "Hand-authored gold for Flask gateway with call-based jwt.decode auth (Bank of Anthos\u2013shaped). Routes are required; JWT control attachment is aspirational until call-based detection is complete.",
+  "description": "Hand-authored gold for Flask gateway with call-based jwt.decode auth (shaped like a reference Java microservices banking sample). Routes are required; JWT control attachment is aspirational until call-based detection is complete.",
   "metadata": [
     {
       "key": "x-lab-gold-source",

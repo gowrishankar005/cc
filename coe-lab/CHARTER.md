@@ -14,7 +14,7 @@ Provide a **versioned, reproducible benchmark** for the Architecture-as-Code pla
 
 - **Benchmark lab**, not “rebuild Fidelity as many products.”
 - **Fidelity stack = strong menu of signals**, not a claim to clone Fidelity.
-- **Public proxies** (BoA, Fineract) remain **wild-type** checks; lab is **controlled trial**.
+- **Public proxies** (a reference Java microservices banking sample, Fineract) remain **wild-type** checks; lab is **controlled trial**.
 - Prefer **one monorepo, many packages** (matches pipeline multi-root reality).
 
 ## In scope

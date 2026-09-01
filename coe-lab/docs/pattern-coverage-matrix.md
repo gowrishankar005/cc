@@ -12,8 +12,8 @@
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | fineract-charge | 5 | 1 | 0 | 3 | 0 | 0 | 0 | 0 | 2 | 1* |
 | fineract-core | 11 | 36 | 4 | 12 | 0 | 0 | 0 | 0 | 11 | 2 |
-| boa-userservice | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 8 | 0 | 0 |
-| boa-balancereader | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
+| refbank-userservice | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 8 | 0 | 0 |
+| refbank-balancereader | 1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
 | ghostfolio-api | 34 | 0 | 0 | 0 | 0 | 0 | 90 | 0 | 0 | 0 |
 | lab-java-jaxrs | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 |
 | lab-py-accounts | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 |
@@ -26,7 +26,7 @@
 
 ## Mechanism × sample (qualitative)
 
-| Mechanism | Fineract | BoA | Ghostfolio | Lab |
+| Mechanism | Fineract | a reference Java microservices banking sample | Ghostfolio | Lab |
 |---|---|---|---|---|
 | HTTP units | strong | strong (Flask/Spring) | strong Nest | strong |
 | Entity units | strong | partial Java | n/a (Prisma import) | strong |
@@ -82,8 +82,8 @@ Full platform scan of all samples **not** required for this ranking. Deep pipeli
 | fineract-core | 7 | 36 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 19 |
 | fineract-security *(new)* | 6 | 2 | 0 | 2 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
 | fineract-provider *(new)* | 112 | 91 | 0 | 72 | 0 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 90 |
-| boa-userservice | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |
-| boa-contacts | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
+| refbank-userservice | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 4 | 0 | 0 | 0 |
+| refbank-contacts | 1 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 3 | 0 | 0 | 0 |
 | ghostfolio-api | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 | waltz-data *(new)* | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 229 | 0 | 0 | 0 | 0 | 0 |
 | waltz-web *(new)* | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 45 | 0 | 0 | 0 | 0 | 0 |

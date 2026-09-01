@@ -44,7 +44,7 @@ Before writing JSON, record in registry + gold metadata:
 
 | Field | Example |
 |---|---|
-| `package-id` | `waltz-data`, `boa-userservice`, `ghostfolio-api` |
+| `package-id` | `waltz-data`, `refbank-userservice`, `ghostfolio-api` |
 | Source root(s) | `spikes/waltz/repo/waltz-data` |
 | Scan mode | single-root \| multi-root (list roots) |
 | Grain | class/file \| module |

@@ -49,18 +49,18 @@
 
 ---
 
-## E-boa-R1
+## E-refbank-R1
 
 | | |
 |---|---|
-| **Protocol** | BoA `userservice` + `contacts` combined run (existing regression fixture) |
+| **Protocol** | a reference Java microservices banking sample's `userservice` + `contacts` combined run (existing regression fixture) |
 | **Expected outcome** | architecture `service → database` relationship present for both services; must not regress across any change in this program |
 
 **Last-run:**
 
 | Date | Agent/session | Result | Artefact / evidence |
 |---|---|---|---|
-| 2026-08-08 | robustness session (regression baseline) | **PASS** — 0 errors, 0 warnings, real relationships present | `pipeline/test/regression.test.js`, test `"Bank of Anthos — cross-package Graphify pass, real relationships, 0 errors 0 warnings"` |
+| 2026-08-08 | robustness session (regression baseline) | **PASS** — 0 errors, 0 warnings, real relationships present | `pipeline/test/regression.test.js`, test `"a reference Java microservices banking sample — cross-package Graphify pass, real relationships, 0 errors 0 warnings"` |
 | 2026-08-08 | layered-story session (T-L4-1 final matrix) | **PASS, confirmed not regressed** — full suite re-run (56/56 green) after all L0-L3 changes, including this exam's own test | Same test, full suite run after Phase L3 |
 
 ---
@@ -115,6 +115,6 @@ None recorded. Owner has not overridden any `D-*` default as of this document's 
 
 | Date | Note |
 |---|---|
-| 2026-08-08 | **T-L4-1 — full standing exam matrix run** (program close). All 5 exams re-run/re-confirmed on genuinely fresh state (not cached artefacts): `E-charge-single-L2` and `E-charge-multi-story` re-scanned from scratch and re-scored (both PASS as expected); `E-boa-R1`, `E-r2-ambiguity`, `E-r2b-positive` reconfirmed via a full 56/56-green suite run that also exercises every L1-L3 addition (root-set guard, `mechanism` field, `relationshipsByMechanism`, HITL rationale). No exam regressed across the whole L0-L4 program. |
+| 2026-08-08 | **T-L4-1 — full standing exam matrix run** (program close). All 5 exams re-run/re-confirmed on genuinely fresh state (not cached artefacts): `E-charge-single-L2` and `E-charge-multi-story` re-scanned from scratch and re-scored (both PASS as expected); `E-refbank-R1`, `E-r2-ambiguity`, `E-r2b-positive` reconfirmed via a full 56/56-green suite run that also exercises every L1-L3 addition (root-set guard, `mechanism` field, `relationshipsByMechanism`, HITL rationale). No exam regressed across the whole L0-L4 program. |
 | 2026-08-08 | T-L1-1/T-L1-2 verification runs: both `E-charge-single-L2` and `E-charge-multi-story` now have a real run of their exact frozen protocol (previously only mechanism-level regression-test evidence). Single-root: L0/L1 PASS, L2 FAIL exactly as predicted. Multi-root: now scored against a real hand-authored gold package (`coe-lab/gold/calm/fineract-charge-provider/`, new) instead of only a regression test — L0/L1/L2 all PASS. Also verified the new `--allow-root-mismatch`-gated root-set guard in `validate-calm-pair.mjs` (T-L1-2) actually refuses the abuse case (single-root output scored against the multi-root gold) rather than silently scoring it. |
-| 2026-08-08 | Initial standing-exams doc (T-L0-1). All 5 exam IDs created. E-boa-R1/E-r2-ambiguity/E-r2b-positive seeded from real, currently-green automated regression tests. E-charge-multi-story seeded from the real T-R1-3-follow-up multi-root closure test (mechanism-level PASS; formal multi-root gold scoring still pending T-L1-1). E-charge-single-L2 seeded from the original 2026-08-07 finding plus the T-C1 regression test confirming the same honest-residual mechanism; the frozen `validate-calm-pair --require-l2` protocol itself has not been run yet — pending T-L1-3's expected-fail harness. |
+| 2026-08-08 | Initial standing-exams doc (T-L0-1). All 5 exam IDs created. E-refbank-R1/E-r2-ambiguity/E-r2b-positive seeded from real, currently-green automated regression tests. E-charge-multi-story seeded from the real T-R1-3-follow-up multi-root closure test (mechanism-level PASS; formal multi-root gold scoring still pending T-L1-1). E-charge-single-L2 seeded from the original 2026-08-07 finding plus the T-C1 regression test confirming the same honest-residual mechanism; the frozen `validate-calm-pair --require-l2` protocol itself has not been run yet — pending T-L1-3's expected-fail harness. |

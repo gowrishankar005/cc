@@ -41,7 +41,7 @@ Saying “all pass” without a layer is **forbidden**.
 | Lab **stretch** (kafka, dynamo, jwt, k8s) | L0 + L1 report; L2 per gold expected gaps | May expected-fail L2 |
 | **Wild Fineract** charge/core | L0 + L1 + **L2** for story gold | L2 fail until AREC R2/C-call or gold OOS |
 | **Wild Fineract** system-map | L0 only vs class-level gen | Incomparable grain without aggregation |
-| Ghostfolio / BoA full | L0 + L1; L2 per claim cell | Use as disconfirming samples |
+| Ghostfolio / reference-sample full | L0 + L1; L2 per claim cell | Use as disconfirming samples |
 
 ---
 

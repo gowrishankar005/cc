@@ -13,7 +13,7 @@
 |---|---|
 | Is the lab **trustworthy enough to start evaluating** the platform? | **Yes.** Core tier has measured scores (all core packages **pass** after scorer/fixture fixes). |
 | Does it **align with requirements**? | **Strongly for Slice 1/2 languages and Fidelity-aligned *signal menu***; intentionally incomplete for out-of-scope matrix cells (frontend, Scala, gRPC). |
-| Biggest remaining trust risk | **Representativeness** — lab is tiny; still need wild-type (BoA/Fineract). Stretch packages correctly show **0 recall** until messaging/cloud land. |
+| Biggest remaining trust risk | **Representativeness** — lab is tiny; still need wild-type (a reference Java microservices banking sample / Fineract). Stretch packages correctly show **0 recall** until messaging/cloud land. |
 | Second risk | Nest dual **openapi.yaml** unit (mitigated in gold ignore); Java packages use thin poms, not full Spring Boot apps. |
 
 **One line:** Lab is now a **measurement-capable** core gate (nodes/interfaces/rels on controlled packages) **plus** stretch probes for open platform gaps — not a substitute for real monorepos.
@@ -37,7 +37,7 @@ Legend: **G** = gold + fixture exist · **P** = partial/stretch · **—** = del
 | Auth decorator | @PreAuthorize etc. | — | — | **—** gap (OpenAPI bearer only on Nest package) |
 | Auth call-based JWT | — | jwt.decode | — | **—** gap |
 | Auth OAuth2 libs | named | — | — | **—** gap |
-| k8s trust (shared Secret) | BoA-class | | | **P** `deploy/k8s` stretch |
+| k8s trust (shared Secret) | reference-sample-class | | | **P** `deploy/k8s` stretch |
 | OpenAPI / Swagger | — | — | ✅ | **P** `ts-nestjs-users/openapi.yaml` (ingest depends on X4) |
 | Frontend Angular | | | ✅ | **outOfScope** in gold (correct) |
 | gRPC / trading domain | ❌ | | | **—** correctly not forced into gold as FN |
@@ -148,7 +148,7 @@ Use this **acceptance bar** before treating lab results as platform quality:
 3. At least **one multi-root** Python score exists.  
 4. Stretch packages may fail; failures map to **expectedPlatformGaps** or a new gap class — not silent.  
 5. Same commit of gold + fixtures used for score.  
-6. Parallel **wild-type** note: BoA and/or Fineract still pass regression suite.  
+6. Parallel **wild-type** note: a reference Java microservices banking sample and/or Fineract still pass regression suite.  
 7. No platform PR that both opens gold and changes catalogues without an eval-only miss write-up.
 
 ---

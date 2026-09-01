@@ -20,7 +20,7 @@ From public Fidelity engineering job signals (e.g. Principal Full Stack Java rol
 | Messaging | **Kafka**, Artemis, Flink; cloud **SQS/SNS** | Kafka annotation-style package + SQS SDK import package |
 | Cloud | AWS Lambda, EKS, S3, Kinesis | **Historical miss (2026-08-08):** this row collapsed Lambda into **k8s-style deploy** only — EKS stood in for “cloud,” so Lambda **HTTP entry never got a lab package or claim cell**. Correct product treatment: **B-lambda-http** / Claim **U-http-serverless** (handler + API GW/CFN paths), not deploy-only. K8s trust remains separate. |
 | Frontend | Angular, Node/TS | **Out of generator Slice 1/2** — listed in gold `outOfScope` only |
-| Security | OAuth2 / security practices (Fidelity postings); JWT patterns (BoA) | Decorator control + optional shared secret k8s |
+| Security | OAuth2 / security practices (target-customer-shaped postings); JWT patterns (a reference Java microservices banking sample) | Decorator control + optional shared secret k8s |
 
 ## 2. Broader fintech popularity (lab coverage menu)
 
@@ -55,7 +55,7 @@ From public Fidelity engineering job signals (e.g. Principal Full Stack Java rol
 
 | Repo | Role |
 |---|---|
-| Bank of Anthos (spikes) | Real multi-service Python |
+| a reference Java microservices banking sample (spikes) | Real multi-service Python |
 | Fineract (spikes) | Real Java JAX-RS/JPA scale |
 | Ghostfolio / Nest samples | Real NestJS |
 
