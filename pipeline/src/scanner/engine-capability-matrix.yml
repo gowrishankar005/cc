@@ -87,7 +87,7 @@ relationshipMechanisms:
     framework: [spring-mvc, spring-boot]
     mechanism: codeql-di-resolution
     evidenceLevel: proven
-    note: "T-LR-5/E1b: 2105 real bindings, whole-codebase scale, a reference Java/JAX-RS banking platform. E2 (2026-08-21) generalization check: mechanism safe (no false positives, correct refusal) on spring-petclinic/finos-spring-bot, yield near-zero on both — real per-repo architecture-density dependency (how much ambiguous-interface/bean-factory shape a codebase has), not a framework-identity dependency. See CodeQL-engine-synthesis-2026-08-22.md."
+    note: "CodeQL DI-resolution engine: 2105 real bindings, whole-codebase scale, a reference Java/JAX-RS banking platform. A later generalization check found the mechanism safe (no false positives, correct refusal) on spring-petclinic/finos-spring-bot, yield near-zero on both — real per-repo architecture-density dependency (how much ambiguous-interface/bean-factory shape a codebase has), not a framework-identity dependency. See CodeQL-engine-synthesis-2026-08-22.md."
 
   - language: java
     framework: [any] # generic string-keyed registration/lookup join — not framework-specific like the DI mechanisms above (a reference Java/JAX-RS banking platform's own convention is plain, hand-rolled, no framework annotation involved)

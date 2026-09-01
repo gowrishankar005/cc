@@ -10,7 +10,7 @@ import { computeCommonAncestor } from './codegraph-crossroot-provider';
  * explicit, conscious opt-in (the free CodeQL CLI license permits
  * automated/CI use only against an Open Source Codebase or under GHAS — see
  * `codeql-di-provider.ts`'s own doc comment and `Claim_Register.md`'s
- * `T-LR-5-codeql-di` row). `--auto-codeql` only removes the friction of
+ * CodeQL DI-resolution row). `--auto-codeql` only removes the friction of
  * hand-deriving the two flag values; it does not change what "opt-in" means.
  *
  * Gradle root only auto-detected when a `gradlew` wrapper is present — a

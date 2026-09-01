@@ -5,10 +5,11 @@ import * as os from 'os';
 import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
 
 /**
- * #18 (BACKLOG.md "CodeQL command-bus dispatch") — the second real CodeQL
- * capability this pipeline evaluated (`E1-codeql-engine-evaluation.md`,
- * 7 real edges on a reference Java/JAX-RS banking platform) but never shipped, because T-LR-5 scoped DI
- * resolution as the smaller safe first unit. Architecturally identical to
+ * The second real CodeQL capability this pipeline evaluated
+ * (`E1-codeql-engine-evaluation.md`, 7 real edges on a reference
+ * Java/JAX-RS banking platform) but didn't ship at the same time as the DI
+ * resolution engine, which was scoped as the smaller safe first unit.
+ * Architecturally identical to
  * `codeql-di-provider.ts` — a real, whole-codebase CodeQL query, not a
  * per-file `StructuralEngine` — deliberately duplicated in shape rather
  * than abstracted, since the two mechanisms' binding shapes (interface

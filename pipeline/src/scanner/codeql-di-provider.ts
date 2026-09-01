@@ -5,7 +5,7 @@ import * as os from 'os';
 import { getOrBuildCodeqlDatabase } from './codeql-database-cache';
 
 /**
- * T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — a second real structural
+ * A second real structural
  * source, architecturally shaped like `codegraph-crossroot-provider.ts` (one combined,
  * whole-codebase analysis pass), not like `codegraph-provider.ts`'s
  * per-file `StructuralEngine` interface: CodeQL's DI-resolution query is a
