@@ -166,6 +166,74 @@ class TestApplyEndToEnd(unittest.TestCase):
         combined = validate_run.stdout + validate_run.stderr
         self.assertIn("Errors: no (0)", combined, f"expected 0 validation errors, got:\n{combined}")
 
+    def test_apply_refuses_a_malformed_decision_shape_before_calling_run_slice(self):
+        """Entry 25, Architect_Pilot_Feedback_Notes.md: a real Copilot Chat
+        session drafted 23 decision files using invented field names
+        (residual_id/construct/option) instead of the real decision_id/
+        final_decision/status schema -- validate_drafts's old file-loading
+        step silently dropped every one instead of reporting it, so
+        _run_validation() reported "0 errors" and apply.py went on to call
+        run-slice, which crashed inside an isolated module and never wrote
+        architecture.calm.json, with only a vague "no overrides were passed
+        through?" message. Writes the EXACT malformed shape actually found
+        on disk from that real session (not a hypothetical), and asserts
+        apply.py now refuses at the validation stage -- before run-slice is
+        ever invoked at all, matching test_apply_refuses_when_validation_fails's
+        own pattern."""
+        malformed_decision = {
+            "residual_id": "R-001",
+            "construct": "signal-catalogue-candidate",
+            "option": "[1]",
+            "rationale": "JWT-based authentication exists in source; pattern not detected by pipeline's catalogue.",
+            "reviewer": "llm-advisory:claude",
+            "timestamp": "2026-09-01T00:00:00Z",
+        }
+        (self.session_dir / "drafts" / "decisions" / "R-001.json").write_text(json.dumps(malformed_decision))
+        run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir), "--i-confirm-apply"])
+        self.assertNotEqual(run.returncode, 0)
+        self.assertFalse(self.applied_dir.exists(), "run-slice must never even be invoked for a schema-invalid pack")
+        self.assertIn("decision_id", run.stdout + run.stderr)
+
+    def test_apply_surfaces_real_stderr_when_a_module_is_isolated(self):
+        """Entry 25 (continued): even once the malformed-decision case is
+        caught earlier by validation (test above), the OTHER real failure
+        mode -- run-slice exits 0 but a module threw and was isolated by
+        modules/registry.ts, so overrides-applied-report.json is never
+        written -- deserves its own real defense-in-depth fix: surface
+        result.stderr (where the isolated module's real error lands) instead
+        of a generic message a human can misread as "0 overrides, fine".
+        Uses --run-slice to point at a stub script (this is what that flag
+        exists for) so this test doesn't depend on engineering a real
+        pipeline crash."""
+        self._write_draft()
+        stub = self.tmp / "fake-run-slice.js"
+        stub.write_text(
+            "const fs = require('fs');\n"
+            "const path = require('path');\n"
+            "const outIdx = process.argv.indexOf('--out');\n"
+            "const outDir = process.argv[outIdx + 1];\n"
+            "fs.mkdirSync(path.join(outDir, 'modules', 'calm-generator'), { recursive: true });\n"
+            "console.error('[module-registry] module \"calm-generator\" failed: DISTINCTIVE_TEST_MARKER_a1b2c3');\n"
+            "process.exit(0);\n"
+        )
+        run = _run(
+            [
+                sys.executable,
+                str(TOOLS_DIR / "apply.py"),
+                "--session-dir",
+                str(self.session_dir),
+                "--out",
+                str(self.applied_dir),
+                "--i-confirm-apply",
+                "--run-slice",
+                str(stub),
+            ]
+        )
+        self.assertNotEqual(run.returncode, 0)
+        self.assertIn("DISTINCTIVE_TEST_MARKER_a1b2c3", run.stderr, "the real isolated-module error must be surfaced, not swallowed")
+        report = (self.session_dir / "apply-report.md").read_text()
+        self.assertIn("DISTINCTIVE_TEST_MARKER_a1b2c3", report, "the real crash cause must also land in the audit trail")
+
     def test_missing_source_calm_warns_but_does_not_silently_skip(self):
         """Real gap found on review: if the source scan's architecture.calm.json
         goes missing (moved/deleted since the pack was built), endpoint

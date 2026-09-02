@@ -156,5 +156,34 @@ class TestPackEndToEnd(unittest.TestCase):
         mock_backend.assert_not_called()
 
 
+class TestRenderAgentsMd(unittest.TestCase):
+    """Entry 25, Architect_Pilot_Feedback_Notes.md: a real Copilot Chat
+    session invented its own Decision Record field names instead of the
+    real schema, because AGENTS.md (the one file inside the pack the chat
+    agent can actually read) never embedded it -- only a bare citation to
+    pipeline/src/types/overrides.ts, a file outside the pack the agent is
+    explicitly forbidden from opening. Locks that the real, required field
+    names are now embedded directly, so this can't silently regress back to
+    a one-line summary. No pipeline build required -- pure Python import."""
+
+    def test_agents_md_embeds_the_real_decision_record_and_override_fields(self):
+        from pack import _render_agents_md
+
+        rendered = _render_agents_md()
+        for field in ("decision_id", "final_decision", "target_type", "target_ref", "reviewed_at", "override_id", "decision_record_ref", "override_type"):
+            self.assertIn(f'"{field}"', rendered, f"expected real field name {field!r} embedded in AGENTS.md's own text")
+
+    def test_agents_md_shows_the_no_override_decision_shape(self):
+        """The most common real outcome (leave-open/accepted) needs its own
+        worked example — not just the decision+override pair — or an
+        architect/agent could wrongly infer every decision needs a matching
+        override file."""
+        from pack import _render_agents_md
+
+        rendered = _render_agents_md()
+        self.assertIn("NO override", rendered)
+        self.assertIn('"accepted"', rendered)
+
+
 if __name__ == "__main__":
     unittest.main()

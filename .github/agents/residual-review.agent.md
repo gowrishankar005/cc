@@ -191,11 +191,20 @@ Never use workspace search. The `tools:` list above does not include
       span shows a real control signal (`@PreAuthorize`,
       `validateHasReadPermission`, equivalent). Otherwise document the gap.
    9. Write the Decision Record and Override as two separate JSON files
-      under this pack's `drafts/decisions/` and `drafts/overrides/` (shapes:
-      `pipeline/src/types/overrides.ts`). Then **present what you drafted to
-      the architect as Accept / Reject / Edit rationale — a file existing
-      under `drafts/` is a proposal, never an approval.** Do not imply it's
-      already decided.
+      under this pack's `drafts/decisions/` and `drafts/overrides/`. **The
+      exact field names come from this pack's own `AGENTS.md`, "The real
+      Decision Record / Override shape" section — copy those two worked
+      examples verbatim, never invent your own field names** (found live: a
+      real chat session invented `residual_id`/`construct`/`option` instead
+      of the real `decision_id`/`final_decision`/`status` schema, and every
+      one of 23 drafts silently failed to apply — `Architect_Pilot_
+      Feedback_Notes.md` Entry 25). You cannot read `pipeline/src/types/
+      overrides.ts` yourself (outside the pack, workspace search is off) —
+      `AGENTS.md`'s worked examples ARE the schema for this session, not a
+      substitute for it. Then **present what you drafted to the architect
+      as Accept / Reject / Edit rationale — a file existing under `drafts/`
+      is a proposal, never an approval.** Do not imply it's already
+      decided.
 
    `draft_tier_b.py` (offline, `tools/review-session/`) exists as a
    secondary, headless alternative — useful for batch/scripted runs outside

@@ -444,14 +444,79 @@ def _render_agents_md() -> str:
         "2. For each open item: use listed evidence; if needed, cite only file:line already in evidence/packs.json.\n"
         "3. Never edit typed-facts.json.\n"
         "4. Write proposals only under drafts/.\n"
-        "5. Every override must reference an active Decision Record with rationale.\n"
+        "5. Every override must reference an active Decision Record with rationale — see the REAL shape below, "
+        "never a guessed one.\n"
         "6. Tier A is the architect's decision — offer choices, never decide alone.\n"
         "7. Tier B may be drafted directly in this chat — see the chat-mode file's own §5.1 hard rules "
         "(llm-advisory: reviewer, cited evidence). Present as Accept / Reject / Edit rationale.\n"
         "8. 0 or 2+ candidates after pack + extra-read → cannot_decide, never fabricate. "
         "No folklore (\"typical Spring\").\n"
         "9. Never run apply.py / run-slice / override-applier / pack.py fetch-span from this chat — "
-        "applying and extra-reads are human steps. If evidence is short, PRINT one fetch-span command and stop.\n"
+        "applying and extra-reads are human steps. If evidence is short, PRINT one fetch-span command and stop.\n\n"
+        "## The real Decision Record / Override shape — copy these, never invent your own fields\n\n"
+        "Found live (a real Copilot Chat session drafted 23 Decision Records using invented fields "
+        "`residual_id`/`construct`/`option` instead of the real schema below — every one silently failed "
+        "to apply): you cannot read `pipeline/src/types/overrides.ts` from this chat (outside the pack, "
+        "workspace search is off) — these two worked examples ARE the schema, copy their field names exactly.\n\n"
+        "**Decision Record with NO override** (the most common real outcome — a `leave-open`/`accepted` "
+        "answer, or any decision that doesn't change CALM):\n"
+        "```json\n"
+        + json.dumps(
+            {
+                "decision_id": "D-<residual-id>-001",
+                "module": "architecture",
+                "target_type": "node",
+                "target_ref": "<calm-element unique-id, or an ignored-item file:line ref>",
+                "final_decision": {"action": "accepted", "new_value": None},
+                "rationale": "<one line citing the residual id and the evidence ref it's based on>",
+                "reviewer": "llm-advisory:<model>",
+                "reviewed_at": "<ISO timestamp>",
+                "status": "active",
+                "supersedes": None,
+            },
+            indent=2,
+        )
+        + "\n```\n\n"
+        "**Decision Record + its Override** (only when a real CALM change is warranted — `final_decision.action` "
+        "is `overridden`/`added`/`removed`, and a matching Override file exists under `drafts/overrides/`, "
+        "`override_type` one of type_change/relationship_add/relationship_remove/node_add/node_remove/"
+        "node_rename/boundary_change):\n"
+        "```json\n"
+        + json.dumps(
+            {
+                "decision_id": "D-<residual-id>-001",
+                "module": "architecture",
+                "target_type": "node",
+                "target_ref": "<calm-element unique-id>",
+                "final_decision": {"action": "overridden", "new_value": "database"},
+                "rationale": "<one line citing the residual id and the evidence ref it's based on>",
+                "reviewer": "llm-advisory:<model>",
+                "reviewed_at": "<ISO timestamp>",
+                "status": "active",
+                "supersedes": None,
+            },
+            indent=2,
+        )
+        + "\n```\n"
+        "```json\n"
+        + json.dumps(
+            {
+                "override_id": "O-<residual-id>-001",
+                "module": "architecture",
+                "target_ref": "<same calm-element unique-id as the decision's target_ref>",
+                "override_type": "type_change",
+                "new_value": "database",
+                "decision_record_ref": "D-<residual-id>-001",
+                "status": "active",
+                "created_by": "llm-advisory:<model>",
+                "created_at": "<ISO timestamp>",
+            },
+            indent=2,
+        )
+        + "\n```\n\n"
+        "**Every field above is required** — a decision file missing `decision_id` (or any other required "
+        "field) is not silently accepted; it fails validation and apply.py refuses to apply it. Do not omit "
+        "one to save space.\n"
     )
 
 
