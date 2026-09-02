@@ -21,6 +21,9 @@ const RUN_SLICE = path.join(PIPELINE_ROOT, 'dist', 'orchestration', 'run-slice.j
 const CONTROL_URL_MAPPING = path.join(PIPELINE_ROOT, 'dist', 'rules', 'control-url-mapping.json');
 
 const PYTHON_SAMPLE_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/accounts');
+const BOA_LEDGERWRITER_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/ledger/ledgerwriter');
+const BOA_BALANCEREADER_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/ledger/balancereader');
+const BOA_TRANSACTIONHISTORY_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/boa/repo/src/ledger/transactionhistory');
 const JAVA_SAMPLE_ROOT = path.resolve(PIPELINE_ROOT, '../spikes/fineract/repo');
 const JAVA_SAMPLE_KAFKA_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/springbatch/messagehandler/kafka');
 const JAVA_SAMPLE_KAFKA_PRODUCER_ROOT = path.resolve(JAVA_SAMPLE_ROOT, 'fineract-provider/src/main/java/org/apache/fineract/infrastructure/event/external/producer/kafka');
@@ -1203,18 +1206,30 @@ test(
       // unit and has real direct edges to ChargeRepository/Charge within
       // this module alone.
       //
-      // E6/drop-graphify-backbone update (2026-08-22): count moved 3 -> 5
-      // after the cross-package backbone migrated from Graphify to
-      // CodeGraph — verified via a direct scan (5 distinct, non-duplicate
-      // (from,to,kind) rows, not a regression): ChargesApiResource now ALSO
-      // shows two real edges to Charge (calls + connects) that Graphify's
-      // engine never surfaced, alongside ChargeRepositoryWrapper's 3
-      // pre-existing edges to ChargeRepository/Charge. Same "update the
-      // test when detection genuinely improves" precedent this test's own
-      // comment already established once.
+      // E6/drop-graphify-backbone update (2026-08-22) claimed count moved
+      // 3 -> 5, "verified via a direct scan... not a regression" — that
+      // verification was wrong, corrected 2026-09-02 (B-stereotype-name-
+      // collision, same-package/no-import fix, real second instance):
+      // checked directly against the real source this time (every line of
+      // ChargesApiResource.java, not just edge presence) — ChargesApiResource
+      // has NO real reference to the bare class "Charge" anywhere; every
+      // occurrence of the word is inside a Javadoc/@Operation description
+      // STRING, never executable code. The 2 "real" edges E6 introduced were
+      // themselves a genuine, undetected CodeGraph false positive — and one
+      // this project had ALREADY, separately, extensively documented as
+      // impossible: Claim_Register.md's own R2-gold-charge-single row states
+      // "The resource class never imports the entity class directly; there
+      // is no static one-hop chain in the real source for this shape" —
+      // E6 silently fabricated exactly the edge this repo had already proven
+      // doesn't exist, and the bare-name-collision fix's own
+      // isBareNameCollision package-mismatch check catches it as a side
+      // effect (ChargesApiResource is in .api, Charge is in .domain, no
+      // import for either connects them). Count restored to 3 —
+      // ChargeRepositoryWrapper's 3 real, verified edges to
+      // ChargeRepository/Charge, unaffected by this fix.
       assert.ok(coverage.completeness.serviceUnitCount >= 1, 'expected at least one service unit');
       assert.ok(coverage.completeness.databaseUnitCount >= 1, 'expected at least one database unit');
-      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 5, 'expected 5 real service-touching relationships (ChargeRepositoryWrapper + ChargesApiResource, T-LR-3 + E6 cross-package-backbone-migration coverage)');
+      assert.equal(coverage.completeness.serviceTouchingRelationshipCount, 3, 'expected 3 real service-touching relationships (ChargeRepositoryWrapper only — ChargesApiResource\'s 2 edges to Charge were a real, undetected false positive, now fixed)');
       assert.ok(
         !coverage.completeness.silenceFlags.some((f) => f.startsWith('S1-zero-service-touching-relationships')),
         'S1 must NOT fire — real service-touching connectivity now exists in this module alone'
@@ -1266,19 +1281,21 @@ test(
       // CreateChargeDefinitionCommandHandler, DeleteChargeDefinitionCommandHandler,
       // UpdateChargeDefinitionCommandHandler).
       //
-      // E6/drop-graphify-backbone update (2026-08-22): 1 -> 2 services with
-      // a real architecture-grade outbound edge, after the cross-package
-      // backbone migrated from Graphify to CodeGraph — ChargesApiResource
-      // now ALSO resolves a real edge to Charge (confirmed via direct scan,
-      // same underlying fact as the serviceTouchingRelationshipCount 3->5
-      // update above), alongside ChargeRepositoryWrapper's pre-existing
-      // edge. The 3 command handlers still hit the same honest R2 residual
-      // as before (their real implementer/target lives in fineract-provider,
-      // a third module) — real progress on one shape, the other residual
-      // unchanged.
+      // E6/drop-graphify-backbone update (2026-08-22) claimed 1 -> 2
+      // services with a real architecture-grade outbound edge — corrected
+      // 2026-09-02 (B-stereotype-name-collision, same-package/no-import
+      // fix, real second instance): ChargesApiResource's "real edge to
+      // Charge" was itself a genuine, undetected false positive (see the
+      // serviceTouchingRelationshipCount test above for the full evidence —
+      // checked every line of the real source, no reference to the bare
+      // class "Charge" anywhere outside Javadoc text). Reverted to 1 —
+      // ChargeRepositoryWrapper's real edge alone. The 3 command handlers
+      // still hit the same honest R2 residual as before (their real
+      // implementer/target lives in fineract-provider, a third module) —
+      // unaffected by this fix either way.
       assert.equal(coverage.completeness.serviceUnitCount, 5);
-      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 2, 'ChargeRepositoryWrapper and ChargesApiResource now have a real architecture-grade outbound edge; the 3 command handlers still hit the cross-module R2 residual');
-      assert.equal(coverage.completeness.architectureOutboundCoverage, 0.4, 'expected 40% architecture coverage (2/5 services) for fineract-charge alone');
+      assert.equal(coverage.completeness.servicesWithArchitectureOutbound, 1, 'ChargeRepositoryWrapper has a real architecture-grade outbound edge; ChargesApiResource\'s was a false positive, now fixed; the 3 command handlers still hit the cross-module R2 residual');
+      assert.equal(coverage.completeness.architectureOutboundCoverage, 0.2, 'expected 20% architecture coverage (1/5 services) for fineract-charge alone');
     } finally {
       fs.rmSync(charge.outDir, { recursive: true, force: true });
     }
@@ -3467,15 +3484,20 @@ test(
       // honest residual (the command handlers' real implementer still lives
       // in fineract-provider, a third module), confirmed via a direct scan.
       //
-      // E6/drop-graphify-backbone update (2026-08-22): 4 -> 3
-      // low-architecture-coverage items, after the cross-package backbone
-      // migrated from Graphify to CodeGraph — ChargesApiResource now
-      // resolves a real outbound edge (see the T-R0-2/silence-metrics test
-      // updates above) and no longer needs review; only the 3 command
-      // handlers remain flagged.
+      // E6/drop-graphify-backbone update (2026-08-22) claimed 4 -> 3
+      // low-architecture-coverage items — corrected 2026-09-02
+      // (B-stereotype-name-collision, same-package/no-import fix, real
+      // second instance): ChargesApiResource's "real outbound edge" was
+      // itself a genuine, undetected false positive (see the
+      // serviceTouchingRelationshipCount/T-R0-2 test updates above for the
+      // full evidence). Reverted to 4 — ChargesApiResource correctly needs
+      // review again, alongside the 3 command handlers, exactly matching
+      // this repo's own already-documented, standing fact
+      // (Claim_Register.md's R2-gold-charge-single row: "no static one-hop
+      // chain exists in the real source for this shape").
       assert.equal(queue.items.filter((i) => i.trigger === 'S1-zero-service-touching-relationships').length, 0);
-      assert.equal(queue.items.filter((i) => i.trigger === 'low-architecture-coverage').length, 3);
-      assert.ok(!queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')), 'ChargesApiResource now has a real outbound edge, so it must no longer need review');
+      assert.equal(queue.items.filter((i) => i.trigger === 'low-architecture-coverage').length, 4);
+      assert.ok(queue.items.some((i) => i.unitId.endsWith('ChargesApiResource.java')), 'ChargesApiResource has no real outbound edge (its old one was a false positive), so it correctly needs review again');
       // S2 must NOT fire here — ChargesApiResource has real security-rbac-002
       // call-site control evidence (T-D1), so it correctly has no S2 item.
       assert.equal(queue.items.filter((i) => i.trigger === 'S2-http-without-security-control').length, 0);
@@ -4109,6 +4131,63 @@ test('B-stereotype-name-collision — a common Spring/JAX-RS annotation must nev
   }
 });
 
+test(
+  'B-stereotype-name-collision — real, second instance (same-package, no-import case): a reference Java microservices banking sample\'s 3 independent services must never fabricate a cross-service relationship from a shared class name',
+  { skip: (!fs.existsSync(BOA_LEDGERWRITER_ROOT) || !fs.existsSync(BOA_BALANCEREADER_ROOT) || !fs.existsSync(BOA_TRANSACTIONHISTORY_ROOT)) && 'spikes/boa/repo/src/ledger/* not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    // Real bug found live reviewing a real generated architecture.calm.json
+    // (2026-09-02, Architect_Pilot_Feedback_Notes.md-adjacent finding): all
+    // 10 real cross-package relationships this 3-service scan produced were
+    // fabricated. Root cause, confirmed against real source:
+    // balancereader/TransactionRepository.java `extends
+    // CrudRepository<Transaction, Long>` is a genuine, no-import,
+    // same-package reference to its OWN Transaction class — but each of the
+    // 3 independently-deployed services defines its own, unrelated
+    // Transaction/TransactionRepository/LedgerReader classes, and the
+    // original isBareNameCollision only ever rejected an edge on an
+    // EXPLICIT, disagreeing import — "no import" (the same-package case)
+    // always degraded to "can't disprove, leave it", so a bare reference
+    // resolved to a wrong SIBLING service's same-named class went
+    // undetected. This is the exact real second instance (per this
+    // project's own "verify against a second instance" rule) of the same
+    // isBareNameCollision mechanism the original B-stereotype-name-collision
+    // fixture above was built for — real production code, not a synthetic
+    // fixture, closing the gap for real.
+    const { outDir, calm } = runPipeline([BOA_LEDGERWRITER_ROOT, BOA_BALANCEREADER_ROOT, BOA_TRANSACTIONHISTORY_ROOT]);
+    try {
+      const crossPackageRels = calm.relationships.filter((r) => {
+        const conn = r['relationship-type']?.connects;
+        if (!conn) return false;
+        const md = Object.fromEntries((r.metadata ?? []).map((m) => [m.key, m.value]));
+        return md['x-aac-cross-package'] === true;
+      });
+      assert.deepEqual(
+        crossPackageRels.map((r) => r['unique-id']),
+        [],
+        'a real 3-independent-service scan must never fabricate a cross-service relationship from a shared class name alone — every real relationship here must be same-package'
+      );
+
+      // The fix must not be an over-correction either: each service's own
+      // real, legitimate same-package TransactionRepository -> Transaction
+      // connects edge (the exact shape the false positives were modeled on)
+      // must still be present, once per service.
+      for (const service of ['ledgerwriter', 'balancereader', 'transactionhistory']) {
+        const legitimate = calm.relationships.find((r) => {
+          const conn = r['relationship-type']?.connects;
+          if (!conn) return false;
+          return conn.source?.node?.includes(`${service}/TransactionRepository.java`) && conn.destination?.node?.includes(`${service}/Transaction.java`);
+        });
+        assert.ok(legitimate, `${service}'s own real, legitimate same-package TransactionRepository -> Transaction edge must not be suppressed by the collision fix`);
+      }
+
+      const { errors } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
 test('B-stereotype-name-collision — findJavaImportForBareName/getJavaPackageDeclaration direct unit tests', () => {
   const { findJavaImportForBareName, getJavaPackageDeclaration } = require(path.join(PIPELINE_ROOT, 'dist/rules/java-import-resolver'));
 
@@ -4133,6 +4212,73 @@ test('B-stereotype-name-collision — findJavaImportForBareName/getJavaPackageDe
     assert.equal(getJavaPackageDeclaration(samePackage, cache), 'example.domain');
     assert.equal(getJavaPackageDeclaration(noPackage, cache), undefined, 'a file with no package declaration must degrade to undefined, not crash or guess');
     assert.equal(getJavaPackageDeclaration(path.join(dir, 'DoesNotExist.java'), cache), undefined, 'an unreadable file must degrade to undefined, not throw');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('B-stereotype-name-collision — isBareNameCollision/isBareNameCollisionForBridgeCandidate direct unit tests (the real, second-instance same-package-mismatch fix)', () => {
+  const { isBareNameCollision, isBareNameCollisionForBridgeCandidate } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/graphify-reconciler'));
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-bare-name-collision-'));
+  try {
+    // Two independent "services", each with its own, separately-defined
+    // Widget.java and Helper.java — the exact real shape found (each of
+    // Bank of Anthos's 3 ledger services defines its own Transaction /
+    // TransactionRepository / LedgerReader).
+    fs.mkdirSync(path.join(dir, 'svcA'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'svcB'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'svcA', 'Widget.java'), ['package example.svcA;', '', 'public class Widget {', '}'].join('\n'));
+    fs.writeFileSync(path.join(dir, 'svcB', 'Widget.java'), ['package example.svcB;', '', 'public class Widget {', '}'].join('\n'));
+    // The real bug shape: a same-package reference needing NO import.
+    fs.writeFileSync(path.join(dir, 'svcA', 'WidgetRepository.java'), ['package example.svcA;', '', 'public interface WidgetRepository extends CrudRepository<Widget, Long> {', '}'].join('\n'));
+    fs.writeFileSync(path.join(dir, 'svcA', 'Controller.java'), ['package example.svcA;', '', 'public class Controller {', '    private Helper helper;', '}'].join('\n'));
+    fs.writeFileSync(path.join(dir, 'svcA', 'Helper.java'), ['package example.svcA;', '', 'public class Helper {', '}'].join('\n'));
+    fs.writeFileSync(path.join(dir, 'svcB', 'Helper.java'), ['package example.svcB;', '', 'public class Helper {', '}'].join('\n'));
+
+    // Minimal CrossPackageGraphRun stand-in — resolveRoot only needs to
+    // satisfy the real contract (path.join(root, relativeFilePath) is a
+    // real, readable file); it doesn't need to replicate the real
+    // implementation's own common-ancestor logic.
+    const run = { resolveRoot: (sourceFile) => ({ root: dir, relativeFilePath: sourceFile }) };
+    const fileLineCache = new Map();
+    const collisionCache = new Map();
+
+    const edgeToWidget = { source: 'x', target: 'widget-node', relation: 'references', context: '', confidence: '', source_file: 'svcA/WidgetRepository.java', source_location: 'L1', weight: 1 };
+    const from = { root: dir, unit: { id: 'from', filePath: 'svcA/WidgetRepository.java' } };
+    const nodeById = new Map([['widget-node', { label: 'Widget' }]]);
+
+    const toOwnPackage = { root: dir, unit: { id: 'svcA-widget', filePath: 'svcA/Widget.java' } };
+    assert.equal(isBareNameCollision(edgeToWidget, from, toOwnPackage, nodeById, run, fileLineCache, collisionCache), false, 'a real, no-import, same-package reference resolving to its OWN package must never be flagged as a collision');
+
+    const toWrongPackage = { root: dir, unit: { id: 'svcB-widget', filePath: 'svcB/Widget.java' } };
+    assert.equal(
+      isBareNameCollision(edgeToWidget, from, toWrongPackage, nodeById, run, fileLineCache, collisionCache),
+      true,
+      'the real bug: a no-import bare reference resolved to a DIFFERENT package\'s own unrelated same-named class must now be detected as a collision (previously always degraded to "can\'t disprove")'
+    );
+
+    // isBareNameCollisionForBridgeCandidate — same check, one hop earlier,
+    // for a bridge candidate with no resolved TypedUnit at all yet.
+    const edgeToOwnHelper = { source: 'ctrl', target: 'helper-node-own', relation: 'references', context: '', confidence: '', source_file: 'svcA/Controller.java', source_location: 'L1', weight: 1 };
+    const nodeByIdOwnHelper = new Map([['helper-node-own', { label: 'Helper', source_file: 'svcA/Helper.java' }]]);
+    assert.equal(
+      isBareNameCollisionForBridgeCandidate(edgeToOwnHelper, nodeByIdOwnHelper, run, fileLineCache, collisionCache),
+      false,
+      'a controller\'s real reference to its OWN same-package bridge candidate must never be flagged as a collision'
+    );
+
+    // The real repro: TransactionHistoryController's own bare reference to
+    // "LedgerReader" was resolved to balancereader's OWN, unrelated
+    // LedgerReader.java — one hop before isBareNameCollision's existing
+    // check ever runs.
+    const edgeToWrongHelper = { source: 'ctrl', target: 'helper-node-wrong', relation: 'references', context: '', confidence: '', source_file: 'svcA/Controller.java', source_location: 'L1', weight: 1 };
+    const nodeByIdWrongHelper = new Map([['helper-node-wrong', { label: 'Helper', source_file: 'svcB/Helper.java' }]]);
+    assert.equal(
+      isBareNameCollisionForBridgeCandidate(edgeToWrongHelper, nodeByIdWrongHelper, run, fileLineCache, collisionCache),
+      true,
+      'the real bug, one hop earlier: a bridge candidate resolved to a DIFFERENT service\'s own unrelated same-named helper class must be detected and rejected before the second hop ever runs'
+    );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
