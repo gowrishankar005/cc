@@ -136,6 +136,18 @@ _CLASS_TEMPLATES = {
     "catalogue-candidate": _catalogue_candidate_options,
     "insufficient-evidence": _insufficient_evidence_options,
     "ambiguous-boundary": _ambiguous_boundary_options,
+    # §3.2 (Architect_Residual_Review_Session.md) says this class "reuses
+    # single-candidate-below-threshold's card shape" -- literally the same
+    # generator, not a near-duplicate: the candidate is already named in
+    # the residual's own rationale text here too (outbound-http-detector.ts/
+    # env-soft-graph-detector.ts's own evidence string), same "accept the
+    # one real candidate already found, or reject it" shape, same S5/S7
+    # discipline against inventing one. Real gap found on review (2026-09-02):
+    # this row was missing entirely, so build_options silently fell through
+    # to zero real options (only leave-open/other) for every real
+    # unresolved-outbound-target residual -- caught by actually rendering a
+    # card, not by inspecting residuals.json alone.
+    "unresolved-outbound-target": _single_candidate_below_threshold_options,
 }
 
 

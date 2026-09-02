@@ -69,6 +69,26 @@ class TestCardDeterminism(unittest.TestCase):
         self.assertIn("Reject -- not the right candidate", labels)
         self.assertEqual(options[-1]["key"], "other")
 
+    def test_unresolved_outbound_target_reuses_single_candidate_card_shape(self):
+        """§3.2 (Architect_Residual_Review_Session.md) explicitly says this
+        class reuses single-candidate-below-threshold's card shape -- real
+        gap found on review 2026-09-02: this class had no _CLASS_TEMPLATES
+        row at all, so build_options silently produced zero real options
+        (only leave-open/other) for every real residual of this class,
+        contradicting the design. Locks in the fix."""
+        residual = {
+            "id": "R-006",
+            "tier": "B",
+            "class": "unresolved-outbound-target",
+            "unitIds": ["LedgerWriterController.java"],
+            "rationale": 'unresolved-http-target: imports HTTP client "org.springframework.web.client.RestTemplate" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).',
+        }
+        options = build_options(residual, {})
+        labels = [o["label"] for o in options]
+        self.assertIn("Accept the identified candidate", labels)
+        self.assertIn("Reject -- not the right candidate", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
     def test_contradicting_evidence_never_auto_picks_a_winner(self):
         """T-FS-3: the card must offer real choices (trust config / trust
         manifest / both-correct-for-different-envs) but never silently
