@@ -1,0 +1,40 @@
+name: handover hygiene
+
+# Runs check-third-party-references.js — a mechanical guard against the
+# exact class of drift that has already had to be swept by hand twice: a
+# real third-party/customer proper noun (Fineract, Bank of Anthos, Fidelity,
+# ...) landing in prose or a comment, or a T-XXX-style tracking-ID prefix
+# landing in a pipeline/src comment. Both are already CLAUDE.md rules
+# ("abstract third-party references the day you write them", "comments are
+# for a stranger with no memory of today"); this catches a new instance at
+# the PR that introduces it instead of at the next handover sweep.
+#
+# Deliberately repo-wide (not scoped to pipeline/** like pipeline-test.yml)
+# since prose/comments carrying this class of drift can land in any doc,
+# README, or source file — narrowing the path filter would just recreate
+# the exact blind spot that motivated this check.
+on:
+  push:
+    paths-ignore:
+      - 'spikes/**'
+      - 'coe-lab/fixtures/**'
+      - 'coe-lab/gold/**'
+  pull_request:
+    paths-ignore:
+      - 'spikes/**'
+      - 'coe-lab/fixtures/**'
+      - 'coe-lab/gold/**'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed so origin/main is a real, comparable ref for the check script below
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: node pipeline/scripts/check-third-party-references.js origin/main

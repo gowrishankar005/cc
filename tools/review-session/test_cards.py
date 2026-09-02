@@ -143,8 +143,8 @@ class TestCardDeterminism(unittest.TestCase):
         self.assertIn("@Get()", card)
 
     def test_evidence_preview_shows_the_real_anchor_line_not_the_windows_first_line(self):
-        """Real bug, found live against Bank of Anthos (Architect_Pilot_
-        Feedback_Notes.md Entry 19): evidence_packs[ref] is a multi-line
+        """Real bug, found live against the reference Java microservices
+        banking sample (Architect_Pilot_Feedback_Notes.md Entry 19): evidence_packs[ref] is a multi-line
         context WINDOW (context_lines before AND after the ref's own
         claimed line), not text starting at that line. The old code took
         the snippet's first non-blank line as "the evidence," which was

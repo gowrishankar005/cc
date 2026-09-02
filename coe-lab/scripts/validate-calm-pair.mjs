@@ -35,7 +35,7 @@ const ALL_GOLD = [
   'ts-orders-dynamo',
   'deploy-k8s-trust',
   'py-multi-root',
-  // Wild-type Fineract (hand-authored; generate separately against real module roots)
+  // Wild-type reference banking platform (hand-authored; generate separately against real module roots)
   'fineract-charge',
   // T-L1-1/T-L1-5 — multi-root gold: score only against a generated CALM
   // produced by scanning fineract-charge + fineract-provider TOGETHER (see
@@ -71,7 +71,7 @@ function parseArgs(argv) {
     // a single-root run, in either direction.
     else if (a === '--allow-root-mismatch') out.allowRootMismatch = true;
     // AREC Wave 3 T-A3 — L2 (architecture-story/relationship-topology) is
-    // the layer this project's own methodology (Fineract RCA) found weakest
+    // the layer this project's own methodology (the reference banking platform RCA) found weakest
     // and least built (R2 multi-hop is specified-unbuilt). Default exit code
     // does NOT fail on an L2-only gap — L0 (schema) and L1 (unit/node
     // recall) are what CI-style gating should hold the line on today; L2 is
@@ -139,7 +139,7 @@ function hasControls(node) {
  * comparable to a class/file-grain generated CALM at all — not just for L2
  * topology, for L1 node matching too (every "gold node" would spuriously
  * read as missing). Reads a real metadata key rather than naming any
- * specific package, so a future non-Fineract module-grain gold gets the
+ * specific package, so a future module-grain gold from a different reference platform gets the
  * same honest N/A automatically.
  */
 function goldGrain(gold) {
@@ -176,7 +176,7 @@ function generatedRootCount(actual) {
  * node) and l2 (relationship/architecture-story-level: missing connects
  * topology) buckets, since lab L1 "ALL PASS" was previously indistinguishable
  * from a real L2 architecture-story pass — exactly the false-comfort finding
- * from the Fineract RCA (validation-approach-vnext.md).
+ * from the reference banking platform RCA (validation-approach-vnext.md).
  */
 function semanticCompare(gold, generated) {
   const l1 = [];
@@ -545,7 +545,7 @@ coe-lab/docs/multi-root-l2-protocol.md for the exact command template.`);
     }
     // AREC T-A3 — explicit L0/L1/L2 lines so a reader can never mistake an
     // L1 (unit) pass for an L2 (architecture story) pass, the exact
-    // confusion the Fineract RCA found (validation-approach-vnext.md).
+    // confusion the reference banking platform RCA found (validation-approach-vnext.md).
     console.log(`L0 schema (gold): ${r.goldSchemaOk ? 'PASS' : 'FAIL'}${r.goldWarnings ? ' (warnings)' : ''}`);
     console.log(`L0 schema (gen):  ${r.genSchemaOk ? 'PASS' : 'FAIL'} ${r.genSchemaOk ? '' : r.genSchemaLog}`);
     console.log(`L1 unit recall:   ${r.l1Status}${r.l1Reason ? ` (${r.l1Reason})` : ''}`);
