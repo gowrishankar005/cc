@@ -6,8 +6,10 @@ already established)."""
 
 import json
 import unittest
+from unittest import mock
 
-from dossier import build_dossier_prompt, parse_and_validate_dossier_response, process_dossier_batch
+import dossier
+from dossier import build_dossier_prompt, dossier_for_residual, parse_and_validate_dossier_response, process_dossier_batch
 
 TIER_A_RESIDUAL = {
     "id": "R-001",
@@ -180,6 +182,30 @@ class TestProcessDossierBatch(unittest.TestCase):
         updated, episodes = process_dossier_batch([TIER_A_RESIDUAL], {}, {}, dossier_fn=fake_dossier_fn, now_fn=lambda: "t")
         self.assertNotIn("dossier", updated[0])
         self.assertEqual(episodes[0]["outcome"], "invalid_response")
+
+
+class TestS2AuthJudgmentAddendum(unittest.TestCase):
+    """Priority #4 of the 2026-09-02 LLM-assist candidate batch
+    (BACKLOG.md's 'Call-site security-control dossier for uncatalogued auth
+    patterns' row) -- a trigger-specific system-prompt steer, not a new
+    mechanism. Must engage ONLY for S2-http-without-security-control, never
+    leak into any other trigger's prompt."""
+
+    def test_s2_residual_gets_addendum_appended_to_system_prompt(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
+        self.assertIn(dossier.DOSSIER_SYSTEM_PROMPT, system_prompt_used)
+
+    def test_non_s2_residual_does_not_get_addendum(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_B_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
+        self.assertEqual(system_prompt_used, dossier.DOSSIER_SYSTEM_PROMPT)
 
 
 if __name__ == "__main__":

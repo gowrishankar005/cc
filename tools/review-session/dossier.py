@@ -84,6 +84,23 @@ You are being run on ONE residual for one dossier episode. Do not
 summarize or comment on residuals outside this one."""
 
 
+S2_AUTH_JUDGMENT_ADDENDUM = """TRIGGER-SPECIFIC STEER for this residual (S2-http-without-security-control):
+
+This pipeline only catalogues 4 named auth/authorization vocabularies
+(`control-requirement-catalogue.yml`) -- an HTTP unit using a REAL but
+UNCATALOGUED auth pattern reads, deterministically, as "no security-control
+evidence," which is exactly why this residual exists. Your job here is NOT
+a generic evidence summary -- it is this one specific judgment:
+
+Does the code actually shown to you (your own evidence inputs, nothing else)
+contain a real authentication or authorization check this pipeline simply
+doesn't have a catalogue row for -- e.g. a custom header/token check, a
+framework-native guard/middleware/filter, a manual role check? If so, name
+that pattern as one of your hypotheses and cite the exact evidence ref it
+comes from. If the evidence genuinely shows no such pattern, say so plainly
+in "explanation" rather than speculating -- this is hard rule 2, restated
+for this specific question, not a license to relax it."""
+
 REQUIRED_DOSSIER_KEYS = {"explanation", "hypotheses", "evidenceRefsUsed"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
@@ -161,7 +178,10 @@ def dossier_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
     if not _llm_backend_available():
         return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) -- nothing dossiered"}
     user_prompt = build_dossier_prompt(residual, unit_index, packs)
-    raw = _call_llm(DOSSIER_SYSTEM_PROMPT, user_prompt)
+    system_prompt = DOSSIER_SYSTEM_PROMPT
+    if residual.get("trigger") == "S2-http-without-security-control":
+        system_prompt = DOSSIER_SYSTEM_PROMPT + "\n\n" + S2_AUTH_JUDGMENT_ADDENDUM
+    raw = _call_llm(system_prompt, user_prompt)
     return parse_and_validate_dossier_response(raw, residual, unit_index)
 
 
