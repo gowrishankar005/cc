@@ -1,5 +1,7 @@
 # AGENT TASK — Build `unresolved-outbound-target` (§3.2): the 3 missing high-value edges become reviewable
 
+**T-1 status: SHIPPED 2026-09-02.** See `BACKLOG.md`'s row for the real end-to-end verification and the one real, disclosed follow-on gap it surfaced (`triage.py`'s `_evidence_refs_for` stub — a separate BACKLOG row, out of this task's scope). T-2 (preview/merge tool, below) remains not started.
+
 **Lane:** T-1 independent; T-2 optional/separate, can follow later
 **Governance/DoD:** `docs/solution/Architect_Residual_Review_Session.md` §3.2 (this file executes that design, already written and reviewed — do not re-derive the design, follow it), §3.1's producer registry (T-1 must land in the SAME diff as the registry change, per that section's own CI-enforced rule — already done, see below), `docs/solution/Architecture_as_Code_Solution_Design_v2.md` §7.1 (the eligibility rule this class satisfies)
 **Priority:** #1 in the 2026-09-02 LLM-assist consolidated planning list — highest user-visible value: this is what actually gets the 3 architecturally-central missing edges (found reviewing a real scan against its own published reference diagram) in front of an architect instead of silently sitting in `ignored-items-report.json`.

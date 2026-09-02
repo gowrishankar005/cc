@@ -27,6 +27,11 @@ import { findUnitForDeployment } from './deployment-correlation';
  * verified against the real manifest BEFORE writing the matching logic,
  * not discovered after the fact.
  */
+// Exported so hitl-review-trigger.ts (§3.2, unresolved-outbound-target) can
+// match this exact prefix instead of re-typing it — same convention
+// outbound-http-detector.ts's own exported prefix already established.
+export const UNRESOLVED_ENV_TARGET_PREFIX = 'unresolved-env-target:';
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -64,7 +69,7 @@ export function detectEnvSoftGraphRelationships(
           ignoredItems.push({
             ref: `k8s:configmap:${configMapName}:${keyName}`,
             reason: 'CROSS_DOMAIN_UNRESOLVED',
-            detail: `unresolved-env-target: "${referencer.name}" references ConfigMap "${configMapName}" key "${keyName}" (allowlisted basename "${basename}") but no other deployment name correlates — no relationship emitted, per the "never guess" rule.`,
+            detail: `${UNRESOLVED_ENV_TARGET_PREFIX} "${referencer.name}" references ConfigMap "${configMapName}" key "${keyName}" (allowlisted basename "${basename}") but no other deployment name correlates — no relationship emitted, per the "never guess" rule.`,
           });
           continue;
         }
@@ -75,7 +80,7 @@ export function detectEnvSoftGraphRelationships(
           ignoredItems.push({
             ref: `k8s:configmap:${configMapName}:${keyName}`,
             reason: 'CROSS_DOMAIN_UNRESOLVED',
-            detail: `unresolved-env-target: name-correlated "${referencer.name}" -> "${target.name}" (ConfigMap "${configMapName}" key "${keyName}") but ${!referencerUnit ? `no TypedUnit matches "${referencer.name}"` : `no TypedUnit matches "${target.name}"`} — no code-level unit to attach the relationship to.`,
+            detail: `${UNRESOLVED_ENV_TARGET_PREFIX} name-correlated "${referencer.name}" -> "${target.name}" (ConfigMap "${configMapName}" key "${keyName}") but ${!referencerUnit ? `no TypedUnit matches "${referencer.name}"` : `no TypedUnit matches "${target.name}"`} — no code-level unit to attach the relationship to.`,
           });
           continue;
         }

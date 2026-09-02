@@ -51,6 +51,17 @@ import re
 #     -- a genuine value-level contradiction between two real sources is
 #     exactly that shape, so it is never draftable, only an architect
 #     judgment call.
+#   unresolved-outbound-target -> Tier B "unresolved-outbound-target"
+#     (Architect_Residual_Review_Session.md §3.2, priority #1 of the
+#     2026-09-02 LLM-assist consolidated plan). A real, citable piece of
+#     evidence (an HTTP-client import site, or a ConfigMap value shaped
+#     like a service address) that outbound-http-detector.ts/
+#     env-soft-graph-detector.ts's own "never guess" rule correctly
+#     refused to turn into a relationship -- Tier B because the evidence
+#     itself usually names a real candidate target, matching
+#     single-candidate-below-threshold's own shape more than a genuine
+#     multi-candidate judgment call. Falls through to bar-not-met exactly
+#     like any other Tier B item when no real candidate correlates.
 _TRIGGER_MAP = {
     "S1-zero-service-touching-relationships": ("A", "multi-candidate-bridge"),
     "low-architecture-coverage": ("A", "multi-candidate-bridge"),
@@ -59,6 +70,7 @@ _TRIGGER_MAP = {
     "S5-cfn-routes-found-but-unbound": ("C", "missing-intermediates-not-in-scan"),
     "multi-hop-single-candidate-below-threshold": ("B", "single-candidate-below-threshold"),
     "contradicting-evidence-force-review": ("A", "contradicting-evidence"),
+    "unresolved-outbound-target": ("B", "unresolved-outbound-target"),
 }
 
 # Same pattern unmapped-signals.ts uses to recognise catalogue misses.

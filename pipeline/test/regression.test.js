@@ -3557,6 +3557,44 @@ test(
   }
 );
 
+test('HITL review trigger: unresolved-outbound-target — §3.2, fires for unresolved-http-target/unresolved-env-target, never for unresolved-multi-hop/unresolved-k8s-deployed-in', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      { id: 'svc.py::svc', kind: 'service', filePath: 'svc.py', startLine: 1, endLine: 10, confidence: 80, evidence: [] },
+    ],
+    relationships: [],
+    ignoredItems: [
+      // unresolved-http-target: ref is "relativeFilePath:line" — must resolve to the real unit owning that file.
+      { ref: 'svc.py:5', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-http-target: imports HTTP client "requests" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).' },
+      // unresolved-env-target (no correlating deployment at all) — no unit for "unrelatedthing" exists, unitId stays undefined, not fabricated.
+      { ref: 'k8s:configmap:cfg:KEY_ADDR', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-env-target: "unrelatedthing" references ConfigMap "cfg" key "KEY_ADDR" (allowlisted basename "key") but no other deployment name correlates — no relationship emitted, per the "never guess" rule.' },
+      // Must NOT fire this trigger — genuine absence/ambiguity, no specific evidence to cite (design doc §7.1's eligibility rule).
+      { ref: 'other.py:1', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-multi-hop: "bridge.py" has 0 real candidate implementers.' },
+      { ref: 'k8s:deploy:x', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-k8s-deployed-in: no matching namespace found.' },
+    ],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const outbound = queue.items.filter((i) => i.trigger === 'unresolved-outbound-target');
+  assert.equal(outbound.length, 2, 'exactly the 2 evidence-specific ignored items must become unresolved-outbound-target residuals');
+
+  const httpItem = outbound.find((i) => i.rationale.startsWith('unresolved-http-target:'));
+  assert.ok(httpItem, 'unresolved-http-target item missing from the queue');
+  assert.equal(httpItem.unitId, 'svc.py::svc', 'unresolved-http-target must resolve unitId by matching item.ref\'s file path against the real unit that owns it');
+  assert.equal(httpItem.unitKind, 'service');
+
+  const envItem = outbound.find((i) => i.rationale.startsWith('unresolved-env-target:'));
+  assert.ok(envItem, 'unresolved-env-target item missing from the queue');
+  assert.equal(envItem.unitId, undefined, 'no real unit correlates to "unrelatedthing" — unitId must stay undefined, never guessed');
+
+  assert.equal(queue.items.filter((i) => i.trigger !== 'unresolved-outbound-target').length, 0, 'unresolved-multi-hop/unresolved-k8s-deployed-in must never fire this trigger — the whole point of the evidence-specificity eligibility rule');
+});
+
 test('HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
   const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
   const facts = {

@@ -5,6 +5,9 @@ import { TypedFacts, TypedUnit } from '../../types/typed-facts';
 import { CoverageReport } from '../coverage-report';
 import { UNRESOLVED_MULTI_HOP_PREFIX, TIER_B_SINGLE_CANDIDATE_PREFIX } from '../cross_package/multi-hop-bridge-detector';
 import { CONTRADICTION_PREFIX } from '../cross_package/contradiction-detector';
+import { UNRESOLVED_HTTP_TARGET_PREFIX } from '../cross_package/outbound-http-detector';
+import { UNRESOLVED_ENV_TARGET_PREFIX } from '../cross_package/env-soft-graph-detector';
+import { findUnitForDeployment } from '../cross_package/deployment-correlation';
 
 /**
  * OFFLINE ONLY, deterministic, no LLM call anywhere in this file — stricter
@@ -57,7 +60,16 @@ export interface ReviewQueueItem {
     // datastore engine, the live spring-config naming another). Forces a
     // review decision; the conflicting unit's own confidence is never
     // touched or averaged by this trigger.
-    | 'contradicting-evidence-force-review';
+    | 'contradicting-evidence-force-review'
+    // §3.2 (Architect_Residual_Review_Session.md) — a real, citable piece
+    // of evidence (an HTTP-client import site, or a ConfigMap value
+    // shaped like a service address) that a deterministic correlation
+    // mechanism refused to fabricate into a relationship. Distinct from
+    // unresolved-multi-hop/unresolved-k8s-deployed-in (genuine
+    // absence/ambiguity, no specific evidence to cite) — those stay
+    // filtered as noise, unchanged, per design doc §7.1's
+    // evidence-specificity eligibility rule.
+    | 'unresolved-outbound-target';
   /** Absent for a genuinely run-level residual (S5-cfn-routes-found-but-unbound) — no unit was matched, so none can be named. */
   unitId?: string;
   unitKind?: TypedUnit['kind'];
@@ -226,6 +238,45 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
       unitKind: sourceUnit?.kind,
       confidence: sourceUnit?.confidence,
       rationale: item.detail,
+    });
+  }
+
+  // §3.2 — same always-on convention as the tier-b block above: a real,
+  // citable outbound-target hypothesis matters regardless of this run's
+  // overall silence-flag state. Best-effort unitId recovery, since neither
+  // detector's own ignored-item shape gives one directly:
+  //  - unresolved-http-target: item.ref is "relativeFilePath:line"
+  //    (outbound-http-detector.ts's own convention) — match by filePath
+  //    against the unit that owns that file (Slice 1's one-unit-per-file
+  //    granularity makes this exact, not a heuristic).
+  //  - unresolved-env-target: item.ref is a synthetic "k8s:configmap:..."
+  //    key, not a unit id at all — the real referencing deployment's name
+  //    is the first quoted string in detail; reuse
+  //    deployment-correlation.ts's own findUnitForDeployment (the same
+  //    matcher env-soft-graph-detector.ts itself already uses) instead of
+  //    a second, drifting name-matching heuristic here.
+  const unitsByFilePath = new Map(facts.units.map((u) => [u.filePath, u]));
+  for (const item of facts.ignoredItems) {
+    if (item.reason !== 'CROSS_DOMAIN_UNRESOLVED') continue;
+    const isHttp = item.detail?.startsWith(UNRESOLVED_HTTP_TARGET_PREFIX);
+    const isEnv = item.detail?.startsWith(UNRESOLVED_ENV_TARGET_PREFIX);
+    if (!isHttp && !isEnv) continue;
+
+    let unit: TypedUnit | undefined;
+    if (isHttp) {
+      const filePath = item.ref.replace(/:\d+$/, '');
+      unit = unitsByFilePath.get(filePath);
+    } else {
+      const referencerName = item.detail!.match(/"([^"]+)"/)?.[1];
+      unit = referencerName ? findUnitForDeployment(facts.units, referencerName) : undefined;
+    }
+
+    items.push({
+      trigger: 'unresolved-outbound-target',
+      unitId: unit?.id,
+      unitKind: unit?.kind,
+      confidence: unit?.confidence,
+      rationale: item.detail!,
     });
   }
 

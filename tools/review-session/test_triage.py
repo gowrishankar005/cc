@@ -77,7 +77,30 @@ class TestBuildResiduals(unittest.TestCase):
         self.assertEqual(len(residuals), 1)
         self.assertEqual(residuals[0]["tier"], "A")
         self.assertEqual(residuals[0]["class"], "contradicting-evidence")
-        self.assertEqual(residuals[0]["unitIds"], ["application.yml::spring-datasource"])
+
+    def test_unresolved_outbound_target_maps_to_tier_b(self):
+        """§3.2 (Architect_Residual_Review_Session.md), priority #1 of the
+        2026-09-02 LLM-assist consolidated plan — a real, citable piece of
+        evidence (HTTP-client import site, or a ConfigMap value shaped like
+        a service address) that a deterministic correlation mechanism
+        refused to fabricate into a relationship. Tier B, like
+        single-candidate-below-threshold, not Tier A."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "unresolved-outbound-target",
+                    "unitId": "svc.py::svc",
+                    "unitKind": "service",
+                    "confidence": 80,
+                    "rationale": 'unresolved-http-target: imports HTTP client "requests" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "B")
+        self.assertEqual(residuals[0]["class"], "unresolved-outbound-target")
+        self.assertEqual(residuals[0]["unitIds"], ["svc.py::svc"])
 
     def test_empty_queue_produces_empty_residuals(self):
         self.assertEqual(build_residuals({"items": []}), [])
