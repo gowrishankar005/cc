@@ -6457,3 +6457,35 @@ test('expandOutgoingEdges — a genuine namespace cycle must never stack-overflo
   assert.ok(callsEdge, 'the real edge reachable through the cycle must still surface, not just "didn\'t crash"');
   assert.equal(callsEdge.source, 'ns1');
 });
+
+test('reconcileCrossPackageEdges — a test-file-sourced admitted-unresolved node is never synthesized (real noise found reviewing a live Bank of Anthos scan: BalanceReaderControllerTest et al. showing up as real CALM nodes)', () => {
+  const { reconcileCrossPackageEdges } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/graphify-reconciler'));
+  const root = '/fake/root';
+  const resolveRoot = (sourceFile) => ({ root, relativeFilePath: sourceFile });
+
+  const fooUnit = { id: 'Foo.java', kind: 'service', name: 'Foo', filePath: 'Foo.java', startLine: 1, endLine: 10, evidence: [], confidence: 40 };
+  const unitsByRoot = new Map([[root, [fooUnit]]]);
+
+  const graph = {
+    nodes: [
+      { id: 'fooNode', label: 'Foo', file_type: 'class', source_file: 'Foo.java', source_location: 'L1', _origin: 'x' },
+      { id: 'testNode', label: 'FooTest', file_type: 'class', source_file: 'FooTest.java', source_location: 'L1', _origin: 'x' },
+      { id: 'helperNode', label: 'Helper', file_type: 'class', source_file: 'Helper.java', source_location: 'L1', _origin: 'x' },
+    ],
+    edges: [
+      // Foo -> FooTest: the real noise shape (a test class ends up as an
+      // edge endpoint admission tries to rescue). Must be dropped, not admitted.
+      { source: 'fooNode', target: 'testNode', relation: 'calls', context: '', confidence: '', source_file: 'Foo.java', source_location: 'L1', weight: 1, _origin: 'x' },
+      // Foo -> Helper: a real, non-test unresolved file. Must STILL be
+      // admitted (proves the fix didn't over-suppress legitimate admission).
+      { source: 'fooNode', target: 'helperNode', relation: 'calls', context: '', confidence: '', source_file: 'Foo.java', source_location: 'L1', weight: 1, _origin: 'x' },
+    ],
+  };
+  const run = { graph, resolveRoot };
+
+  const { relationships } = reconcileCrossPackageEdges(run, unitsByRoot);
+  const toTest = relationships.find((r) => r.to.includes('testNode') || r.from.includes('testNode'));
+  assert.equal(toTest, undefined, 'a test-file-sourced node must never be admitted as a real relationship endpoint');
+  const toHelper = relationships.find((r) => r.to.includes('helperNode'));
+  assert.ok(toHelper, 'a real, non-test unresolved file must still be admitted (the fix must not over-suppress)');
+});
