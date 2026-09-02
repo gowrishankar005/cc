@@ -6458,7 +6458,7 @@ test('expandOutgoingEdges — a genuine namespace cycle must never stack-overflo
   assert.equal(callsEdge.source, 'ns1');
 });
 
-test('reconcileCrossPackageEdges — a test-file-sourced admitted-unresolved node is never synthesized (real noise found reviewing a live Bank of Anthos scan: BalanceReaderControllerTest et al. showing up as real CALM nodes)', () => {
+test('reconcileCrossPackageEdges — a test-file-sourced admitted-unresolved node is never synthesized (real noise found reviewing a live scan of a reference Java microservices banking sample: BalanceReaderControllerTest et al. showing up as real CALM nodes)', () => {
   const { reconcileCrossPackageEdges } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/graphify-reconciler'));
   const root = '/fake/root';
   const resolveRoot = (sourceFile) => ({ root, relativeFilePath: sourceFile });
