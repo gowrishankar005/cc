@@ -898,7 +898,7 @@ test('T-LR-3 (BACKLOG.md "Plain-interface bridge detection") — synthetic fixtu
 });
 
 test(
-  'T-LR-2/T-LR-3 real evidence: a reference Java governance platform (Waltz), 3-module scan — the real direct-delegate chains this test used to see via r2c now resolve as real direct R1 edges instead (T-LR-3 real-data update, 2026-08-16), 0 fabricated',
+  'T-LR-2/T-LR-3 real evidence: a reference Java governance platform, 3-module scan — the real direct-delegate chains this test used to see via r2c now resolve as real direct R1 edges instead (T-LR-3 real-data update, 2026-08-16), 0 fabricated',
   {
     skip: !fs.existsSync(JAVA_SAMPLE2_SERVICE_ROOT) && 'spikes/waltz/repo/waltz-service not present (scratch clone, see CLAUDE.md)',
     timeout: 180_000,
@@ -1097,7 +1097,7 @@ test(
       // as expected from removing test contamination and nothing else.
       //
       // 2026-08-13 finding (T-P0-1 follow-up investigation, not an
-      // upstream-Fineract-drift issue): this exact-94 assertion was found to
+      // upstream-drift-in-the-reference-platform issue): this exact-94 assertion was found to
       // be measuring a quantity that ISN'T stable across repeated
       // same-process invocation. A fresh, isolated `node
       // dist/orchestration/run-slice.js` process against fineract-core alone
@@ -1128,7 +1128,7 @@ test(
       // r0Graded relationship must be structural" assertion was only ever
       // true because no r0Graded edge's endpoints resolved to a real
       // 'service' unit. T-LR-3's new bare-`@Service` catalogue row makes a
-      // real, common Fineract convention — a thin "RepositoryWrapper"
+      // real, common convention seen in the reference banking platform — a thin "RepositoryWrapper"
       // service-layer class wrapping a Spring Data repository
       // (GLAccountRepositoryWrapper, CodeValueRepositoryWrapper,
       // OfficeRepositoryWrapper, AppUserRepositoryWrapper, and more,
@@ -3838,7 +3838,7 @@ test('Code review fix (2026-08-16) — springConfigProtocolBySignal recognizes t
         // Real signal shape found on review (2026-08-16): the ORIGINAL fix
         // only taught jdbcScheme() to unwrap the placeholder — it never
         // updated port-interface-builder.ts's own separate prefix check,
-        // so this exact real Fineract shape silently never got `protocol`
+        // so this exact real shape found in the reference banking platform silently never got `protocol`
         // populated even though it's a real, resolvable jdbc: URL.
         id: 'application.properties::spring-datasource',
         kind: 'database',
@@ -4224,8 +4224,8 @@ test('B-stereotype-name-collision — isBareNameCollision/isBareNameCollisionFor
   try {
     // Two independent "services", each with its own, separately-defined
     // Widget.java and Helper.java — the exact real shape found (each of
-    // Bank of Anthos's 3 ledger services defines its own Transaction /
-    // TransactionRepository / LedgerReader).
+    // the reference Java microservices banking sample's 3 ledger services
+    // defines its own Transaction / TransactionRepository / LedgerReader).
     fs.mkdirSync(path.join(dir, 'svcA'), { recursive: true });
     fs.mkdirSync(path.join(dir, 'svcB'), { recursive: true });
     fs.writeFileSync(path.join(dir, 'svcA', 'Widget.java'), ['package example.svcA;', '', 'public class Widget {', '}'].join('\n'));
@@ -4475,7 +4475,7 @@ test('T-P0-5 (E4, catalogue-as-data stress) — findRule() never falls back to a
 
 test('mapSignalsPass: unitsByRoot and allUnits share the confidence floor — a sub-floor unit cannot anchor a relationship', () => {
   // Mechanism class: analysis-stage unit-set consistency. Second instance
-  // of the Waltz JWTAuthenticationFilter class (low-confidence-only source
+  // of the reference governance platform's JWTAuthenticationFilter class (low-confidence-only source
   // that used to sit in unitsByRoot, get picked up by buildNodeToUnitMap,
   // and then miss kindById because it was never in allUnits).
   const { mapSignalsPass, CONFIDENCE_FLOOR } = require(path.join(PIPELINE_ROOT, 'dist/analysis/passes'));
@@ -4891,7 +4891,7 @@ test('T-LR-5 (AGENT_TASKS_Ext_CodeQL_Engine.md) — CodeQL binary absent degrade
   }
 });
 
-test('T-LR-5 — parseDiResolutionCsv parses di_resolution.ql\'s real 7-column output shape (real rows copied from a live run against Fineract, 2026-08-19)', () => {
+test('T-LR-5 — parseDiResolutionCsv parses di_resolution.ql\'s real 7-column output shape (real rows copied from a live run against the reference banking platform, 2026-08-19)', () => {
   const { parseDiResolutionCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-di-provider'));
   // Real rows, copied verbatim from a real `codeql bqrs decode --format=csv`
   // run against a real CodeQL database built from spikes/fineract/repo
@@ -5929,7 +5929,7 @@ test('--no-auto-codeql suppresses both the --auto-codeql flag and the WEAVER_COD
 test('engine-capability-matrix.yml: java/codeql-di-resolution is marked proven (T-LR-5/E1b real evidence)', () => {
   const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
   const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
-  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-di-resolution'), 'the one real, shipped DI-resolution mechanism (T-LR-5, 2105 real Fineract bindings) must be recorded as proven');
+  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-di-resolution'), 'the one real, shipped DI-resolution mechanism (T-LR-5, 2105 real bindings from the reference banking platform) must be recorded as proven');
 });
 
 test('engine-capability-matrix.yml: exploratory-only mechanisms (NestJS/Guice) are correctly NOT marked proven', () => {
@@ -5995,7 +5995,7 @@ test('T-onboarding-18b — getOrBuildCodeqlDatabase builds at most once per (sou
   try {
     const db1 = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile');
     const db2 = getOrBuildCodeqlDatabase('/fake/root', 'mvn compile'); // identical key -> must reuse, not rebuild
-    assert.equal(createCallCount, 1, 'a second call with the identical (sourceRoot, buildCommand) must reuse the first real database, never rebuild it — this is the real fix for the silent-empty-second-extraction bug found running DI resolution + command dispatch together against Fineract');
+    assert.equal(createCallCount, 1, 'a second call with the identical (sourceRoot, buildCommand) must reuse the first real database, never rebuild it — this is the real fix for the silent-empty-second-extraction bug found running DI resolution + command dispatch together against the reference banking platform');
     assert.equal(db1, db2);
 
     const db3 = getOrBuildCodeqlDatabase('/fake/root', 'mvn -Pother compile'); // different build command -> a real, different database
@@ -6075,7 +6075,7 @@ test('getOrBuildCodeqlDatabase: a genuinely broken build still gets the generic 
   }
 });
 
-test('#18 — parseCommandDispatchCsv parses command_dispatch.ql\'s real 5-column output shape (real rows, re-verified 2026-08-22 against a live Fineract build, v2 real-caller fix)', () => {
+test('#18 — parseCommandDispatchCsv parses command_dispatch.ql\'s real 5-column output shape (real rows, re-verified 2026-08-22 against a live build of the reference banking platform, v2 real-caller fix)', () => {
   const { parseCommandDispatchCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-command-dispatch-provider'));
   // Real rows, copied verbatim from a real `codeql bqrs decode --format=csv`
   // run against a real CodeQL database built from the whole fineract-provider
@@ -6234,10 +6234,10 @@ test('#18 — codeqlCommandDispatchPass is a no-op unless BOTH codeqlSourceRoot 
 test('engine-capability-matrix.yml: java/codeql-command-dispatch is marked proven (#18 real evidence, re-verified 2026-08-22)', () => {
   const { loadEngineCapabilityMatrix, isRelationshipMechanismProven } = require(path.join(PIPELINE_ROOT, 'dist/scanner/engine-capability-matrix'));
   const matrix = loadEngineCapabilityMatrix(path.join(PIPELINE_ROOT, 'dist/scanner'));
-  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-command-dispatch'), 'the shipped command-dispatch mechanism (408 real Fineract bindings, 2026-08-22) must be recorded as proven');
+  assert.ok(isRelationshipMechanismProven(matrix, 'java', 'codeql-command-dispatch'), 'the shipped command-dispatch mechanism (408 real bindings from the reference banking platform, 2026-08-22) must be recorded as proven');
 });
 
-test('JPA entity->table CodeQL candidate — parseJpaTableCsv parses jpa_entity_table.ql\'s real 3-column output shape (real rows copied from a live run against Fineract, 2026-08-22)', () => {
+test('JPA entity->table CodeQL candidate — parseJpaTableCsv parses jpa_entity_table.ql\'s real 3-column output shape (real rows copied from a live run against the reference banking platform, 2026-08-22)', () => {
   const { parseJpaTableCsv } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codeql-jpa-table-provider'));
   const realCsv = [
     '"entityClass","tableName","file"',
