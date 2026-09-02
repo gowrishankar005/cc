@@ -80,6 +80,7 @@ const ALLOWED_PATH_SUBSTRINGS = [
   'docs/solution/Architect_Pilot_Feedback_Notes.md',
   'pipeline/scripts/check-generalization.js',
   'pipeline/scripts/check-third-party-references.js',
+  '.github/workflows/handover-hygiene.yml',
 ];
 
 // This project's own tracking-ID shapes, confirmed against the real
