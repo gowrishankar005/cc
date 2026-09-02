@@ -6393,3 +6393,67 @@ test('JPA entity->table CodeQL candidate — codeqlJpaTablePass is a no-op unles
   codeqlJpaTablePass.run(ctx2); // build command missing -> still a no-op
   assert.equal(unit.evidence.length, 0);
 });
+
+test('expandOutgoingEdges — real, non-cyclic multi-level namespace chain still flattens correctly (unchanged behavior)', () => {
+  const { expandOutgoingEdges } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codegraph-crossroot-provider'));
+  // file -> ns1 -> ns2 -> class (2 namespace hops), plus a direct non-namespace edge off the file itself.
+  const nodes = {
+    file: { kind: 'file' },
+    ns1: { kind: 'namespace' },
+    ns2: { kind: 'namespace' },
+    cls: { kind: 'class' },
+  };
+  const edgesByNode = {
+    file: [
+      { kind: 'contains', target: 'ns1', source: 'file', relation: 'contains' },
+      { kind: 'imports', target: 'other', source: 'file', relation: 'imports' },
+    ],
+    ns1: [{ kind: 'contains', target: 'ns2', source: 'ns1', relation: 'contains' }],
+    ns2: [{ kind: 'contains', target: 'cls', source: 'ns2', relation: 'contains' }],
+    cls: [],
+  };
+  const cg = {
+    getOutgoingEdges: (id) => edgesByNode[id] ?? [],
+    getNode: (id) => nodes[id],
+  };
+  const result = expandOutgoingEdges(cg, 'file');
+  // The namespace-chained `contains -> cls` edge must be re-parented to 'file'
+  // (2 hops flattened away), and the direct `imports` edge off 'file' must
+  // pass through unchanged — same real shape the original recursive version
+  // was built for (a reference Java/JAX-RS banking platform's SqlInjectionPreventerServiceImpl finding).
+  assert.equal(result.length, 2);
+  const containsEdge = result.find((e) => e.kind === 'contains');
+  assert.equal(containsEdge.source, 'file');
+  assert.equal(containsEdge.target, 'cls');
+  const importsEdge = result.find((e) => e.kind === 'imports');
+  assert.equal(importsEdge.source, 'file');
+  assert.equal(importsEdge.target, 'other');
+});
+
+test('expandOutgoingEdges — a genuine namespace cycle must never stack-overflow (real user-reported crash: RangeError: maximum call stack size exceeded)', () => {
+  const { expandOutgoingEdges } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codegraph-crossroot-provider'));
+  // ns1 -> ns2 -> ns1 (a real cycle CodeGraph's own graph could in principle
+  // produce) plus one real, reachable non-namespace edge off ns2 that must
+  // still surface despite the cycle.
+  const nodes = {
+    ns1: { kind: 'namespace' },
+    ns2: { kind: 'namespace' },
+  };
+  const edgesByNode = {
+    ns1: [{ kind: 'contains', target: 'ns2', source: 'ns1', relation: 'contains' }],
+    ns2: [
+      { kind: 'contains', target: 'ns1', source: 'ns2', relation: 'contains' }, // the cycle
+      { kind: 'calls', target: 'somewhere', source: 'ns2', relation: 'calls' },
+    ],
+  };
+  const cg = {
+    getOutgoingEdges: (id) => edgesByNode[id] ?? [],
+    getNode: (id) => nodes[id],
+  };
+  // Must complete without throwing (the original recursive version would
+  // recurse ns1 -> ns2 -> ns1 -> ns2 -> ... without bound here).
+  const result = expandOutgoingEdges(cg, 'ns1');
+  const callsEdge = result.find((e) => e.kind === 'calls');
+  assert.ok(callsEdge, 'the real edge reachable through the cycle must still surface, not just "didn\'t crash"');
+  assert.equal(callsEdge.source, 'ns1');
+});
