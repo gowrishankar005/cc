@@ -3595,6 +3595,56 @@ test('HITL review trigger: unresolved-outbound-target — §3.2, fires for unres
   assert.equal(queue.items.filter((i) => i.trigger !== 'unresolved-outbound-target').length, 0, 'unresolved-multi-hop/unresolved-k8s-deployed-in must never fire this trigger — the whole point of the evidence-specificity eligibility rule');
 });
 
+test('HITL review trigger: low-confidence-emitted-relationship — §3.3, fires for architecture-grade relationships below CONFIDENCE_FLOOR, never for undefined/at-or-above confidence or non-architecture grade', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      { id: 'ledgerwriter', kind: 'service', filePath: 'ledgerwriter.java', startLine: 1, endLine: 10, confidence: 100, evidence: [] },
+      { id: 'contacts', kind: 'service', filePath: 'contacts.py', startLine: 1, endLine: 10, confidence: 100, evidence: [] },
+    ],
+    relationships: [
+      // Below CONFIDENCE_FLOOR (40), architecture-grade, real evidenceNote — must fire.
+      { from: 'ledgerwriter', to: 'contacts', kind: 'connects', crossPackage: true, source: 'k8s', confidence: 20, grade: 'architecture', evidenceNote: 'ConfigMap "service-api-config" key "TRANSACTIONS_API_ADDR" (allowlisted basename "transactions") name-correlated to deployment "contacts"', status: 'observed', id: 'rel-low-conf' },
+      // At-or-above CONFIDENCE_FLOOR — must NOT fire.
+      { from: 'ledgerwriter', to: 'contacts', kind: 'calls', crossPackage: true, source: 'codegraph', confidence: 60, grade: 'architecture', status: 'observed', id: 'rel-high-conf' },
+      // Confidence unset entirely — must NOT fire (undefined is "no confidence claim, not zero", never coerced to low).
+      { from: 'ledgerwriter', to: 'contacts', kind: 'calls', crossPackage: true, source: 'codegraph', grade: 'architecture', status: 'observed', id: 'rel-no-conf' },
+      // Low confidence but NOT architecture-grade — must NOT fire (structural/trust are not architecture claims).
+      { from: 'ledgerwriter', to: 'contacts', kind: 'shares-secret', crossPackage: true, source: 'k8s', confidence: 20, grade: 'trust', status: 'observed', id: 'rel-trust' },
+    ],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const lowConf = queue.items.filter((i) => i.trigger === 'low-confidence-emitted-relationship');
+  assert.equal(lowConf.length, 1, 'exactly the one below-floor, architecture-grade relationship must fire this trigger');
+  assert.equal(lowConf[0].unitId, 'ledgerwriter');
+  assert.ok(lowConf[0].rationale.includes('rel-low-conf'), 'rationale must cite the real relationship id — needed later as target_ref for relationship_remove');
+  assert.ok(lowConf[0].rationale.includes('service-api-config'), 'rationale must cite the real evidenceNote, not just a bare confidence number');
+});
+
+test('HITL review trigger: low-confidence-emitted-relationship — falls back to a generic note when evidenceNote is absent, never crashes', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [{ id: 'svc', kind: 'service', filePath: 'svc.py', startLine: 1, endLine: 10, confidence: 100, evidence: [] }],
+    relationships: [{ from: 'svc', to: 'other', kind: 'connects', crossPackage: true, source: 'k8s', confidence: 10, grade: 'architecture', status: 'observed', id: 'rel-no-note' }],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const lowConf = queue.items.filter((i) => i.trigger === 'low-confidence-emitted-relationship');
+  assert.equal(lowConf.length, 1);
+  assert.ok(lowConf[0].rationale.includes('No further evidence captured'), 'must fall back to a generic note, not crash, when evidenceNote is unset (a future non-env-soft-graph low-confidence producer)');
+});
+
 test('HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
   const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
   const facts = {

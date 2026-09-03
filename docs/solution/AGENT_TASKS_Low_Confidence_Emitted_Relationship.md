@@ -1,5 +1,7 @@
 # AGENT TASK — Build `low-confidence-emitted-relationship` (§3.3): a second look at facts already shipped
 
+**Status: SHIPPED 2026-09-02.** See `BACKLOG.md`'s row for full detail and real end-to-end verification. One real, broader-than-scoped finding surfaced during verification: this producer correctly also fires for low-confidence `r2c`-mechanism multi-hop-bridge relationships, not just `env-soft-graph` ones — matches §3.3's own literal text, disclosed as a real additional value, not narrowed to only the originally-cited case.
+
 **Lane:** Independent — no dependency on `unresolved-outbound-target` (§3.2/T-1, shipped) or any other item in the 2026-09-02 LLM-assist batch
 **Governance/DoD:** `docs/solution/Architect_Residual_Review_Session.md` §3.3 (the design this file executes — read it first, don't re-derive), §3.1's producer registry (this task's `triage.py` change MUST land in the same diff as a §3.1 row update, per `pipeline/scripts/check-residual-taxonomy-sync.js`'s own CI-enforced rule), `docs/solution/Contract_Evolution_Policy.md` §2(b) (the new optional `TypedRelationship` field this task adds is a tier-(b) additive change — log it in that doc's running table, same as the existing `confidence`/`grade`/`mechanism` rows)
 **Priority:** #3 in the 2026-09-02 consolidated LLM-assist planning list.

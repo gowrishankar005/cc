@@ -96,6 +96,7 @@ export function detectEnvSoftGraphRelationships(
           crossPackage: referencerUnit.filePath !== targetUnit.filePath,
           source: 'k8s',
           confidence: 20, // low, fixed — a name-correlation guess, never promoted
+          evidenceNote: `ConfigMap "${configMapName}" key "${keyName}" (allowlisted basename "${basename}") name-correlated to deployment "${target.name}"`,
           status: PENDING_STATUS,
           id: PENDING_RELATIONSHIP_ID,
         });

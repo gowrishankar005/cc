@@ -102,6 +102,30 @@ class TestBuildResiduals(unittest.TestCase):
         self.assertEqual(residuals[0]["class"], "unresolved-outbound-target")
         self.assertEqual(residuals[0]["unitIds"], ["svc.py::svc"])
 
+    def test_low_confidence_emitted_relationship_maps_to_tier_a(self):
+        """§3.3 (Architect_Residual_Review_Session.md), priority #3 of the
+        2026-09-02 LLM-assist consolidated plan — a genuinely different
+        problem from unresolved-outbound-target: a relationship that's
+        ALREADY sitting in the canonical architecture.calm.json today, at
+        low confidence, never surfaced for a second look. Tier A, not B —
+        no new candidate to draft, only a confirm/reject decision."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "low-confidence-emitted-relationship",
+                    "unitId": "ledgerwriter",
+                    "unitKind": "service",
+                    "confidence": 100,
+                    "rationale": 'relationship "rel-low-conf" (ledgerwriter -> contacts, confidence 20) is already emitted in this run\'s architecture.calm.json but has never been reviewed. ConfigMap "service-api-config" key "TRANSACTIONS_API_ADDR" name-correlated to deployment "contacts"',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "A")
+        self.assertEqual(residuals[0]["class"], "low-confidence-emitted-relationship")
+        self.assertEqual(residuals[0]["unitIds"], ["ledgerwriter"])
+
     def test_empty_queue_produces_empty_residuals(self):
         self.assertEqual(build_residuals({"items": []}), [])
 

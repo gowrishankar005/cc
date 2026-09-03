@@ -71,6 +71,17 @@ _TRIGGER_MAP = {
     "multi-hop-single-candidate-below-threshold": ("B", "single-candidate-below-threshold"),
     "contradicting-evidence-force-review": ("A", "contradicting-evidence"),
     "unresolved-outbound-target": ("B", "unresolved-outbound-target"),
+    # low-confidence-emitted-relationship -> Tier A "low-confidence-emitted-
+    # relationship" (Architect_Residual_Review_Session.md §3.3, priority #3
+    # of the 2026-09-02 LLM-assist consolidated plan). A genuinely different
+    # problem from unresolved-outbound-target above: not a relationship that
+    # was refused, but one that's ALREADY sitting in the canonical
+    # architecture.calm.json today at low confidence (env-soft-graph's fixed
+    # 20), with nothing ever surfacing it for a second look. Tier A, not B:
+    # there's no new candidate to draft, only a confirm/reject decision on
+    # something already claimed -- matches contradicting-evidence's own
+    # shape (an architect judgment call) more than a single-candidate draft.
+    "low-confidence-emitted-relationship": ("A", "low-confidence-emitted-relationship"),
 }
 
 # Same pattern unmapped-signals.ts uses to recognise catalogue misses.

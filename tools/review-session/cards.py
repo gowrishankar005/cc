@@ -83,6 +83,24 @@ def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) 
     ]
 
 
+def _low_confidence_emitted_relationship_options(residual: dict, unit_index: dict) -> list[dict]:
+    """§3.3 (Architect_Residual_Review_Session.md): a relationship that's
+    ALREADY sitting in the canonical architecture.calm.json today, at low
+    confidence, with nothing ever surfacing it for a second look. Only two
+    real options -- the relationship's own id (needed for target_ref) and
+    its evidence are already named in the residual's own rationale text,
+    same "never re-derive or invent" discipline as
+    _single_candidate_below_threshold_options above. Confirm needs no
+    Override at all (a Decision Record alone, final_decision
+    {"action": "accepted", "new_value": None} -- the documented, most
+    common real outcome); reject needs a relationship_remove Override,
+    target_ref the same relationship id."""
+    return [
+        {"key": "1", "label": "Confirm — this relationship is real", "detail": 'Decision Record only, no Override — target_type "relationship", target_ref the relationship id named in the rationale above, final_decision {"action": "accepted", "new_value": null}'},
+        {"key": "2", "label": "Reject — remove it", "detail": "Decision Record + relationship_remove Override, target_ref the same relationship id — deletes an admitted scan fact, per this pack's own AGENTS.md hard rule 8"},
+    ]
+
+
 def _catalogue_candidate_options(residual: dict, unit_index: dict) -> list[dict]:
     """Unmapped-signal cluster: catalogue lane first (S11), optional
     one-off construct only if a packed sample already names a real unit —
@@ -148,6 +166,7 @@ _CLASS_TEMPLATES = {
     # unresolved-outbound-target residual -- caught by actually rendering a
     # card, not by inspecting residuals.json alone.
     "unresolved-outbound-target": _single_candidate_below_threshold_options,
+    "low-confidence-emitted-relationship": _low_confidence_emitted_relationship_options,
 }
 
 

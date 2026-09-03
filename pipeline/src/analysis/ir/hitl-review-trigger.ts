@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import * as fs from 'fs';
 import * as path from 'path';
-import { TypedFacts, TypedUnit } from '../../types/typed-facts';
+import { TypedFacts, TypedUnit, TypedRelationship } from '../../types/typed-facts';
 import { CoverageReport } from '../coverage-report';
 import { UNRESOLVED_MULTI_HOP_PREFIX, TIER_B_SINGLE_CANDIDATE_PREFIX } from '../cross_package/multi-hop-bridge-detector';
 import { CONTRADICTION_PREFIX } from '../cross_package/contradiction-detector';
 import { UNRESOLVED_HTTP_TARGET_PREFIX } from '../cross_package/outbound-http-detector';
 import { UNRESOLVED_ENV_TARGET_PREFIX } from '../cross_package/env-soft-graph-detector';
 import { findUnitForDeployment } from '../cross_package/deployment-correlation';
+import { CONFIDENCE_FLOOR } from '../passes';
 
 /**
  * OFFLINE ONLY, deterministic, no LLM call anywhere in this file — stricter
@@ -69,7 +70,15 @@ export interface ReviewQueueItem {
     // absence/ambiguity, no specific evidence to cite) — those stay
     // filtered as noise, unchanged, per design doc §7.1's
     // evidence-specificity eligibility rule.
-    | 'unresolved-outbound-target';
+    | 'unresolved-outbound-target'
+    // §3.3 (Architect_Residual_Review_Session.md) — a genuinely different
+    // problem from unresolved-outbound-target above: not a relationship
+    // that was refused, but one that's already sitting in the canonical
+    // architecture.calm.json today at low confidence (fixed 20 from the
+    // opt-in env-soft-graph mechanism, --enable-env-soft-graph) with
+    // nothing ever surfacing it for a second look. Reads TypedRelationship[]
+    // directly, never an IgnoredItem — a third kind of producer.
+    | 'low-confidence-emitted-relationship';
   /** Absent for a genuinely run-level residual (S5-cfn-routes-found-but-unbound) — no unit was matched, so none can be named. */
   unitId?: string;
   unitKind?: TypedUnit['kind'];
@@ -277,6 +286,31 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
       unitKind: unit?.kind,
       confidence: unit?.confidence,
       rationale: item.detail!,
+    });
+  }
+
+  // §3.3 — reads facts.relationships directly, never an IgnoredItem (a
+  // relationship that WAS emitted, at low confidence, not one that was
+  // refused). undefined confidence must never be treated as low — same
+  // "no confidence claim, not zero" convention TypedRelationship.confidence's
+  // own doc comment states; a bare `< CONFIDENCE_FLOOR` comparison would
+  // incorrectly pass for every relationship with no confidence claim at all
+  // (JS: `undefined < 40` is false, but relying on that coercion instead of
+  // an explicit check is exactly the implicit behavior this repo avoids).
+  // unitsById built once, reused here (same map already built above for the
+  // tier-b/contradiction blocks).
+  for (const rel of facts.relationships) {
+    if (rel.grade !== 'architecture') continue;
+    if (rel.confidence === undefined || rel.confidence >= CONFIDENCE_FLOOR) continue;
+    const fromUnit = unitsById.get(rel.from);
+    items.push({
+      trigger: 'low-confidence-emitted-relationship',
+      unitId: rel.from,
+      unitKind: fromUnit?.kind,
+      confidence: fromUnit?.confidence,
+      rationale: `relationship "${rel.id}" (${rel.from} -> ${rel.to}, confidence ${rel.confidence}) is already emitted in this run's architecture.calm.json but has never been reviewed. ${
+        rel.evidenceNote ?? 'No further evidence captured for this relationship.'
+      }`,
     });
   }
 

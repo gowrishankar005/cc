@@ -89,6 +89,35 @@ class TestCardDeterminism(unittest.TestCase):
         self.assertIn("Reject -- not the right candidate", labels)
         self.assertEqual(options[-1]["key"], "other")
 
+    def test_low_confidence_emitted_relationship_offers_confirm_reject_and_renders_a_real_card(self):
+        """§3.3 (Architect_Residual_Review_Session.md), priority #3 — real
+        options AND a real rendered card, not just build_options's returned
+        list. Locked in as a real render this time (not just the returned
+        options list) since the T-1 review found exactly that shallower
+        check missed a real gap (unresolved-outbound-target's own card
+        template)."""
+        residual = {
+            "id": "R-020",
+            "tier": "A",
+            "class": "low-confidence-emitted-relationship",
+            "unitIds": ["ledgerwriter"],
+            "evidenceRefs": [],
+            "rationale": 'relationship "rel-low-conf" (ledgerwriter -> contacts, confidence 20) is already emitted in this run\'s architecture.calm.json but has never been reviewed. ConfigMap "service-api-config" key "TRANSACTIONS_API_ADDR" name-correlated to deployment "contacts"',
+        }
+        unit_index = {"ledgerwriter": {"kind": "service", "confidence": 100, "evidenceRefs": []}}
+
+        options = build_options(residual, unit_index)
+        labels = [o["label"] for o in options]
+        self.assertIn("Confirm — this relationship is real", labels)
+        self.assertIn("Reject — remove it", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+        card = render_card_markdown(residual, unit_index, {}, [])
+        self.assertIn("rel-low-conf", card, "the real relationship id must be citable from the rendered card — needed as target_ref")
+        self.assertIn("Confirm — this relationship is real", card)
+        self.assertIn("Reject — remove it", card)
+        self.assertIn("service-api-config", card, "real evidenceNote must reach the rendered card, not just a bare confidence number")
+
     def test_contradicting_evidence_never_auto_picks_a_winner(self):
         """T-FS-3: the card must offer real choices (trust config / trust
         manifest / both-correct-for-different-envs) but never silently
