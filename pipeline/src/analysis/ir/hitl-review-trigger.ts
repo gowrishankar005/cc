@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as fs from 'fs';
 import * as path from 'path';
-import { TypedFacts, TypedUnit, TypedRelationship } from '../../types/typed-facts';
+import { TypedFacts, TypedUnit } from '../../types/typed-facts';
 import { CoverageReport } from '../coverage-report';
 import { UNRESOLVED_MULTI_HOP_PREFIX, TIER_B_SINGLE_CANDIDATE_PREFIX } from '../cross_package/multi-hop-bridge-detector';
 import { CONTRADICTION_PREFIX } from '../cross_package/contradiction-detector';
