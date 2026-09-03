@@ -3,6 +3,7 @@ import { CrossPackageGraphRun, CrossPackageEdge, parseSourceLocation } from '../
 import { TypedUnit, TypedRelationship, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { findJavaImportForBareName, getJavaPackageDeclaration, javaFileReferencesBareName } from '../../rules/java-import-resolver';
 import { relationshipTrust } from '../fact-trust-matrix';
+import { isTestPath } from '../../rules/test-path';
 
 /**
  * Maps each Graphify node to the CodeGraph-typed unit it refers to (which
@@ -283,6 +284,21 @@ function buildPlaceholderMatch(
   if (!node.source_file) return undefined;
   const resolved = run.resolveRoot(node.source_file);
   if (!resolved) return undefined;
+  // Real, evidenced noise found reviewing a live scan (a reference Java
+  // microservices banking sample): admission had no test-file guard at
+  // all, unlike every other unit-creation path in this pipeline (which all
+  // already use this exact isTestPath() helper) — a real JUnit/pytest test
+  // class referencing production code (e.g. `BalanceReaderControllerTest`)
+  // got synthesized into a real `unresolved-endpoint` CALM node purely
+  // because it was the unresolved SOURCE or TARGET of an edge admission
+  // was trying to rescue, cluttering the generated architecture with
+  // test-only noise. Same "never guess" refusal shape as the two guards
+  // above (empty source_file, out-of-root file) — a test file is real
+  // data, just not architectural, so this returns undefined (the edge is
+  // silently dropped, matching this function's own established convention
+  // for every other non-admittable case) rather than fabricating a
+  // placeholder for it.
+  if (isTestPath(resolved.relativeFilePath)) return undefined;
 
   const line = parseSourceLocation(node.source_location) ?? 0;
   const unit: TypedUnit = {

@@ -6,8 +6,10 @@ already established)."""
 
 import json
 import unittest
+from unittest import mock
 
-from dossier import build_dossier_prompt, parse_and_validate_dossier_response, process_dossier_batch
+import dossier
+from dossier import build_dossier_prompt, dossier_for_residual, parse_and_validate_dossier_response, process_dossier_batch
 
 TIER_A_RESIDUAL = {
     "id": "R-001",
@@ -180,6 +182,104 @@ class TestProcessDossierBatch(unittest.TestCase):
         updated, episodes = process_dossier_batch([TIER_A_RESIDUAL], {}, {}, dossier_fn=fake_dossier_fn, now_fn=lambda: "t")
         self.assertNotIn("dossier", updated[0])
         self.assertEqual(episodes[0]["outcome"], "invalid_response")
+
+
+class TestS2AuthJudgmentAddendum(unittest.TestCase):
+    """Priority #4 of the 2026-09-02 LLM-assist candidate batch
+    (BACKLOG.md's 'Call-site security-control dossier for uncatalogued auth
+    patterns' row) -- a trigger-specific system-prompt steer, not a new
+    mechanism. Must engage ONLY for S2-http-without-security-control, never
+    leak into any other trigger's prompt."""
+
+    def test_s2_residual_gets_addendum_appended_to_system_prompt(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
+        self.assertIn(dossier.DOSSIER_SYSTEM_PROMPT, system_prompt_used)
+
+    def test_non_s2_residual_does_not_get_addendum(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_B_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
+        self.assertEqual(system_prompt_used, dossier.DOSSIER_SYSTEM_PROMPT)
+
+
+TIER_A_S3_RESIDUAL = {
+    "id": "R-004",
+    "tier": "A",
+    "class": "messaging-producer-unverified",
+    "trigger": "S3-messaging-producer-unverified",
+    "unitIds": ["KafkaExternalEventProducer.java"],
+    "evidenceRefs": ["KafkaExternalEventProducer.java:48"],
+    "rationale": "r",
+    "status": "open",
+}
+
+
+class TestS3MessagingProducerAddendum(unittest.TestCase):
+    """BACKLOG.md 'Messaging-producer usage verification', priority #5 of
+    the 2026-09-02 LLM-assist candidate batch -- a trigger-specific
+    system-prompt steer, not a new mechanism, same shape as the S2
+    addendum above. Must engage ONLY for S3-messaging-producer-unverified,
+    never leak into any other trigger's prompt (including S2's own)."""
+
+    def test_s3_residual_gets_addendum_appended_to_system_prompt(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_S3_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
+        self.assertIn(dossier.DOSSIER_SYSTEM_PROMPT, system_prompt_used)
+        self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used, "S2's own addendum must never leak into an S3 residual's prompt")
+
+    def test_s2_residual_does_not_get_s3_addendum(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertNotIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
+
+
+TIER_C_RESILIENCE_RESIDUAL = {
+    "id": "R-040",
+    "tier": "C",
+    "class": "hand-rolled-resilience-candidate",
+    "trigger": "hand-rolled-resilience-candidate",
+    "unitIds": [],
+    "evidenceRefs": ["Sender.java:189"],
+    "rationale": "r",
+    "status": "open",
+}
+
+
+class TestHandRolledResilienceAddendum(unittest.TestCase):
+    """BACKLOG.md 'Hand-rolled resilience-logic detection', priority #6
+    (last item) of the 2026-09-02 LLM-assist candidate batch -- a
+    trigger-specific system-prompt steer, not a new mechanism, same shape
+    as the S2/S3 addenda above. Must engage ONLY for
+    hand-rolled-resilience-candidate, never leak into any other trigger's
+    prompt."""
+
+    def test_resilience_residual_gets_addendum_appended_to_system_prompt(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_C_RESILIENCE_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertIn(dossier.HAND_ROLLED_RESILIENCE_ADDENDUM, system_prompt_used)
+        self.assertIn(dossier.DOSSIER_SYSTEM_PROMPT, system_prompt_used)
+        self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
+        self.assertNotIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
+
+    def test_non_resilience_residual_does_not_get_the_addendum(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertNotIn(dossier.HAND_ROLLED_RESILIENCE_ADDENDUM, system_prompt_used)
 
 
 if __name__ == "__main__":

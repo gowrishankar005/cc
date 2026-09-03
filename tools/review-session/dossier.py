@@ -84,6 +84,68 @@ You are being run on ONE residual for one dossier episode. Do not
 summarize or comment on residuals outside this one."""
 
 
+S2_AUTH_JUDGMENT_ADDENDUM = """TRIGGER-SPECIFIC STEER for this residual (S2-http-without-security-control):
+
+This pipeline only catalogues 4 named auth/authorization vocabularies
+(`control-requirement-catalogue.yml`) -- an HTTP unit using a REAL but
+UNCATALOGUED auth pattern reads, deterministically, as "no security-control
+evidence," which is exactly why this residual exists. Your job here is NOT
+a generic evidence summary -- it is this one specific judgment:
+
+Does the code actually shown to you (your own evidence inputs, nothing else)
+contain a real authentication or authorization check this pipeline simply
+doesn't have a catalogue row for -- e.g. a custom header/token check, a
+framework-native guard/middleware/filter, a manual role check? If so, name
+that pattern as one of your hypotheses and cite the exact evidence ref it
+comes from. If the evidence genuinely shows no such pattern, say so plainly
+in "explanation" rather than speculating -- this is hard rule 2, restated
+for this specific question, not a license to relax it."""
+
+S3_MESSAGING_PRODUCER_ADDENDUM = """TRIGGER-SPECIFIC STEER for this residual (S3-messaging-producer-unverified):
+
+This pipeline types a unit as a real messaging producer purely from a
+declared field/import (e.g. a `KafkaTemplate`-typed field, an SQS/SNS
+client import) -- deliberately NOT paired with a `.send()`/`.publish()`
+call-site check, since no such mechanism exists in this pipeline yet.
+Your job here is NOT a generic evidence summary -- it is this one
+specific judgment:
+
+Does the code actually shown to you (your own evidence inputs, nothing
+else) contain a real call that sends or publishes through this specific
+field/import -- e.g. `.send(...)`, `.publish(...)`, an equivalent
+producer-client method? If so, name that call site as one of your
+hypotheses and cite the exact evidence ref it comes from. If the evidence
+genuinely shows the field/import declared but never called, or used for
+something other than sending/publishing, say so plainly in "explanation"
+rather than speculating -- this is hard rule 2, restated for this
+specific question, not a license to relax it."""
+
+HAND_ROLLED_RESILIENCE_ADDENDUM = """TRIGGER-SPECIFIC STEER for this residual (hand-rolled-resilience-candidate):
+
+This residual exists because this pipeline found a real call to a
+resilience-adjacent API (e.g. `Thread.sleep`) with no way to
+deterministically tell what it actually is -- the same bare "loop +
+try/catch + sleep" shape covers genuinely different real intents (a
+hand-rolled retry/backoff loop, a periodic polling loop, rate-limiting,
+a shutdown grace period, or something unrelated entirely). Unlike every
+other trigger this tool dossiers, nothing was ever claimed by this
+pipeline here -- there is no fact to confirm or challenge. Your job here
+is NOT a generic evidence summary -- it is this one specific,
+explicitly informational judgment:
+
+Does the code actually shown to you (your own evidence inputs, nothing
+else) plausibly implement a hand-rolled retry/backoff pattern around this
+call site -- a loop, a failure condition being retried, an
+increasing/backing-off delay? Or does it look like something else (a
+periodic poll unrelated to failure handling, rate-limiting, a shutdown
+delay, a test wait)? Name which, citing the real evidence it's grounded
+in. Never phrase a hypothesis as a fact to confirm or reject -- there is
+no Decision Record or Override this residual could ever produce; your
+role here is purely to help a human decide whether this is worth a
+manual follow-up, nothing more. If the evidence is too thin to judge
+either way, say so plainly rather than guessing -- this is hard rule 2,
+restated for this specific, unusually evidence-thin question."""
+
 REQUIRED_DOSSIER_KEYS = {"explanation", "hypotheses", "evidenceRefsUsed"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
@@ -157,11 +219,26 @@ def parse_and_validate_dossier_response(raw_text: str, residual: dict, unit_inde
     return {"outcome": "dossiered", "explanation": explanation, "hypotheses": hypotheses, "evidenceRefsUsed": evidence_refs_used}
 
 
+# Trigger-specific system-prompt steers -- one small, named addendum per
+# trigger, concatenated onto DOSSIER_SYSTEM_PROMPT (never replacing it,
+# never a second prompt-building code path). A dict, not an if/elif chain,
+# so a third trigger-specific steer is a one-line addition, not a growing
+# branch (BACKLOG.md's LLM-assist-candidate rows -- S2/S3 both shipped
+# 2026-09-02).
+_TRIGGER_ADDENDA = {
+    "S2-http-without-security-control": S2_AUTH_JUDGMENT_ADDENDUM,
+    "S3-messaging-producer-unverified": S3_MESSAGING_PRODUCER_ADDENDUM,
+    "hand-rolled-resilience-candidate": HAND_ROLLED_RESILIENCE_ADDENDUM,
+}
+
+
 def dossier_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
     if not _llm_backend_available():
         return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) -- nothing dossiered"}
     user_prompt = build_dossier_prompt(residual, unit_index, packs)
-    raw = _call_llm(DOSSIER_SYSTEM_PROMPT, user_prompt)
+    addendum = _TRIGGER_ADDENDA.get(residual.get("trigger"))
+    system_prompt = DOSSIER_SYSTEM_PROMPT + "\n\n" + addendum if addendum else DOSSIER_SYSTEM_PROMPT
+    raw = _call_llm(system_prompt, user_prompt)
     return parse_and_validate_dossier_response(raw, residual, unit_index)
 
 

@@ -68,6 +68,19 @@ def _missing_intermediates_options(residual: dict, unit_index: dict) -> list[dic
     ]
 
 
+def _hand_rolled_resilience_candidate_options(residual: dict, unit_index: dict) -> list[dict]:
+    """BACKLOG.md "Hand-rolled resilience-logic detection" (Tier C): a real
+    call to a known resilience-adjacent API, with no way to
+    deterministically tell a retry/backoff loop apart from a polling
+    loop, rate-limiting, or something unrelated. Never a TypedUnit, so
+    nothing was ever claimed -- no option here produces a Decision Record
+    or Override, same shape as _missing_intermediates_options above."""
+    return [
+        {"key": "1", "label": "Document as a known resilience gap", "detail": "worth a manual follow-up outside this session — no Decision Record needed, nothing was claimed by this pipeline to confirm or reject"},
+        {"key": "2", "label": "Not resilience-related", "detail": "the call site is unrelated (a shutdown delay, a test wait, rate-limiting, etc.) — no further action needed"},
+    ]
+
+
 def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) -> list[dict]:
     """T-FS-1 (Tier B): multi-hop-bridge-detector.ts found exactly ONE real
     database/topic-typed candidate among a bridge interface's several
@@ -80,6 +93,41 @@ def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) 
     return [
         {"key": "1", "label": "Accept the identified candidate", "detail": "promote to a real architecture relationship at the confidence named in the rationale above -- the one candidate this pipeline already found, not a new guess"},
         {"key": "2", "label": "Reject -- not the right candidate", "detail": "the syntactic implementer count was misleading (e.g. a decoy/mock/legacy alternative implementation); document as such"},
+    ]
+
+
+def _low_confidence_emitted_relationship_options(residual: dict, unit_index: dict) -> list[dict]:
+    """§3.3 (Architect_Residual_Review_Session.md): a relationship that's
+    ALREADY sitting in the canonical architecture.calm.json today, at low
+    confidence, with nothing ever surfacing it for a second look. Only two
+    real options -- the relationship's own id (needed for target_ref) and
+    its evidence are already named in the residual's own rationale text,
+    same "never re-derive or invent" discipline as
+    _single_candidate_below_threshold_options above. Confirm needs no
+    Override at all (a Decision Record alone, final_decision
+    {"action": "accepted", "new_value": None} -- the documented, most
+    common real outcome); reject needs a relationship_remove Override,
+    target_ref the same relationship id."""
+    return [
+        {"key": "1", "label": "Confirm — this relationship is real", "detail": 'Decision Record only, no Override — target_type "relationship", target_ref the relationship id named in the rationale above, final_decision {"action": "accepted", "new_value": null}'},
+        {"key": "2", "label": "Reject — remove it", "detail": "Decision Record + relationship_remove Override, target_ref the same relationship id — deletes an admitted scan fact, per this pack's own AGENTS.md hard rule 8"},
+    ]
+
+
+def _messaging_producer_unverified_options(residual: dict, unit_index: dict) -> list[dict]:
+    """BACKLOG.md "Messaging-producer usage verification" -- a topic unit
+    typed purely from field-type/import-only messaging evidence, never
+    paired with a real .send()/.publish() call-site check (no such
+    mechanism exists in this pipeline yet). Only two real options, same
+    minimal shape as _low_confidence_emitted_relationship_options above.
+    Confirm needs no Override at all (a Decision Record alone -- the
+    documented, most common real outcome); reject needs a node_remove
+    Override (already fully supported, including cascading relationship
+    cleanup), target_ref the unit's own id (already the CALM node's own
+    unique-id, per node-builder.ts)."""
+    return [
+        {"key": "1", "label": "Confirm — this is a real messaging producer", "detail": "Decision Record only, no Override — the field-type/import evidence is correct even without a call-site check"},
+        {"key": "2", "label": "Reject — remove it", "detail": "Decision Record + node_remove Override (already fully supported, including cascading relationship cleanup) — the field is declared but never actually used to send/publish, or belongs to a different client entirely"},
     ]
 
 
@@ -136,6 +184,21 @@ _CLASS_TEMPLATES = {
     "catalogue-candidate": _catalogue_candidate_options,
     "insufficient-evidence": _insufficient_evidence_options,
     "ambiguous-boundary": _ambiguous_boundary_options,
+    # §3.2 (Architect_Residual_Review_Session.md) says this class "reuses
+    # single-candidate-below-threshold's card shape" -- literally the same
+    # generator, not a near-duplicate: the candidate is already named in
+    # the residual's own rationale text here too (outbound-http-detector.ts/
+    # env-soft-graph-detector.ts's own evidence string), same "accept the
+    # one real candidate already found, or reject it" shape, same S5/S7
+    # discipline against inventing one. Real gap found on review (2026-09-02):
+    # this row was missing entirely, so build_options silently fell through
+    # to zero real options (only leave-open/other) for every real
+    # unresolved-outbound-target residual -- caught by actually rendering a
+    # card, not by inspecting residuals.json alone.
+    "unresolved-outbound-target": _single_candidate_below_threshold_options,
+    "low-confidence-emitted-relationship": _low_confidence_emitted_relationship_options,
+    "messaging-producer-unverified": _messaging_producer_unverified_options,
+    "hand-rolled-resilience-candidate": _hand_rolled_resilience_candidate_options,
 }
 
 

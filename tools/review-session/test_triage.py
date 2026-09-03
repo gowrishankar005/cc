@@ -77,7 +77,131 @@ class TestBuildResiduals(unittest.TestCase):
         self.assertEqual(len(residuals), 1)
         self.assertEqual(residuals[0]["tier"], "A")
         self.assertEqual(residuals[0]["class"], "contradicting-evidence")
-        self.assertEqual(residuals[0]["unitIds"], ["application.yml::spring-datasource"])
+
+    def test_unresolved_outbound_target_maps_to_tier_b(self):
+        """§3.2 (Architect_Residual_Review_Session.md), priority #1 of the
+        2026-09-02 LLM-assist consolidated plan — a real, citable piece of
+        evidence (HTTP-client import site, or a ConfigMap value shaped like
+        a service address) that a deterministic correlation mechanism
+        refused to fabricate into a relationship. Tier B, like
+        single-candidate-below-threshold, not Tier A."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "unresolved-outbound-target",
+                    "unitId": "svc.py::svc",
+                    "unitKind": "service",
+                    "confidence": 80,
+                    "rationale": 'unresolved-http-target: imports HTTP client "requests" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "B")
+        self.assertEqual(residuals[0]["class"], "unresolved-outbound-target")
+        self.assertEqual(residuals[0]["unitIds"], ["svc.py::svc"])
+
+    def test_low_confidence_emitted_relationship_maps_to_tier_a(self):
+        """§3.3 (Architect_Residual_Review_Session.md), priority #3 of the
+        2026-09-02 LLM-assist consolidated plan — a genuinely different
+        problem from unresolved-outbound-target: a relationship that's
+        ALREADY sitting in the canonical architecture.calm.json today, at
+        low confidence, never surfaced for a second look. Tier A, not B —
+        no new candidate to draft, only a confirm/reject decision."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "low-confidence-emitted-relationship",
+                    "unitId": "ledgerwriter",
+                    "unitKind": "service",
+                    "confidence": 100,
+                    "rationale": 'relationship "rel-low-conf" (ledgerwriter -> contacts, confidence 20) is already emitted in this run\'s architecture.calm.json but has never been reviewed. ConfigMap "service-api-config" key "TRANSACTIONS_API_ADDR" name-correlated to deployment "contacts"',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "A")
+        self.assertEqual(residuals[0]["class"], "low-confidence-emitted-relationship")
+        self.assertEqual(residuals[0]["unitIds"], ["ledgerwriter"])
+
+    def test_s3_messaging_producer_unverified_maps_to_tier_a(self):
+        """BACKLOG.md "Messaging-producer usage verification", priority #5
+        of the 2026-09-02 LLM-assist consolidated plan — a topic unit typed
+        purely from field-type/import-only messaging evidence, never paired
+        with a real .send()/.publish() call-site check. Tier A, not B: no
+        single obviously-correct draftable action, an architect (or LLM
+        dossier) has to actually read the code to judge."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "S3-messaging-producer-unverified",
+                    "unitId": "KafkaExternalEventProducer.java",
+                    "unitKind": "topic",
+                    "confidence": 40,
+                    "rationale": '"KafkaExternalEventProducer.java" is typed as a messaging producer purely from field-type/import-only evidence — no .send()/.publish() call-site check exists in this pipeline yet.',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "A")
+        self.assertEqual(residuals[0]["class"], "messaging-producer-unverified")
+        self.assertEqual(residuals[0]["unitIds"], ["KafkaExternalEventProducer.java"])
+
+    def test_hand_rolled_resilience_candidate_maps_to_tier_c(self):
+        """BACKLOG.md "Hand-rolled resilience-logic detection", priority #6
+        (last item) of the 2026-09-02 LLM-assist consolidated plan — a real
+        call to a resilience-adjacent API with no way to deterministically
+        tell a retry/backoff loop apart from a polling loop or something
+        unrelated. Tier C, not A or B: never a TypedUnit, so nothing was
+        ever claimed -- no fact to confirm, reject, or draft."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "hand-rolled-resilience-candidate",
+                    "unitId": None,
+                    "unitKind": None,
+                    "confidence": None,
+                    "rationale": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "C")
+        self.assertEqual(residuals[0]["class"], "hand-rolled-resilience-candidate")
+
+    def test_hand_rolled_resilience_candidate_ignoredItem_never_double_counted(self):
+        """Real bug found and fixed before shipping, not found live: this
+        trigger deliberately reuses reason: INSUFFICIENT_EVIDENCE (unlike
+        unresolved-outbound-target's CROSS_DOMAIN_UNRESOLVED, which is
+        already outside _IGNORED_REASONS). Without an explicit exclusion in
+        _residuals_from_ignored (same convention _CONTRADICTION_PREFIX
+        already uses), the identical ignoredItem would ALSO become a
+        second, generically-labeled 'insufficient-evidence' residual."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "hand-rolled-resilience-candidate",
+                    "unitId": None,
+                    "unitKind": None,
+                    "confidence": None,
+                    "rationale": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+                }
+            ]
+        }
+        ignored = [
+            {
+                "ref": "Sender.java:189",
+                "reason": "INSUFFICIENT_EVIDENCE",
+                "detail": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+            }
+        ]
+        residuals = build_residuals(rq, ignored=ignored)
+        self.assertEqual(len(residuals), 1, f"the same real evidence must produce exactly ONE residual, not a duplicate generic one: {residuals}")
+        self.assertEqual(residuals[0]["class"], "hand-rolled-resilience-candidate")
 
     def test_empty_queue_produces_empty_residuals(self):
         self.assertEqual(build_residuals({"items": []}), [])

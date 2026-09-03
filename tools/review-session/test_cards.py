@@ -69,6 +69,108 @@ class TestCardDeterminism(unittest.TestCase):
         self.assertIn("Reject -- not the right candidate", labels)
         self.assertEqual(options[-1]["key"], "other")
 
+    def test_unresolved_outbound_target_reuses_single_candidate_card_shape(self):
+        """§3.2 (Architect_Residual_Review_Session.md) explicitly says this
+        class reuses single-candidate-below-threshold's card shape -- real
+        gap found on review 2026-09-02: this class had no _CLASS_TEMPLATES
+        row at all, so build_options silently produced zero real options
+        (only leave-open/other) for every real residual of this class,
+        contradicting the design. Locks in the fix."""
+        residual = {
+            "id": "R-006",
+            "tier": "B",
+            "class": "unresolved-outbound-target",
+            "unitIds": ["LedgerWriterController.java"],
+            "rationale": 'unresolved-http-target: imports HTTP client "org.springframework.web.client.RestTemplate" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).',
+        }
+        options = build_options(residual, {})
+        labels = [o["label"] for o in options]
+        self.assertIn("Accept the identified candidate", labels)
+        self.assertIn("Reject -- not the right candidate", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+    def test_low_confidence_emitted_relationship_offers_confirm_reject_and_renders_a_real_card(self):
+        """§3.3 (Architect_Residual_Review_Session.md), priority #3 — real
+        options AND a real rendered card, not just build_options's returned
+        list. Locked in as a real render this time (not just the returned
+        options list) since the T-1 review found exactly that shallower
+        check missed a real gap (unresolved-outbound-target's own card
+        template)."""
+        residual = {
+            "id": "R-020",
+            "tier": "A",
+            "class": "low-confidence-emitted-relationship",
+            "unitIds": ["ledgerwriter"],
+            "evidenceRefs": [],
+            "rationale": 'relationship "rel-low-conf" (ledgerwriter -> contacts, confidence 20) is already emitted in this run\'s architecture.calm.json but has never been reviewed. ConfigMap "service-api-config" key "TRANSACTIONS_API_ADDR" name-correlated to deployment "contacts"',
+        }
+        unit_index = {"ledgerwriter": {"kind": "service", "confidence": 100, "evidenceRefs": []}}
+
+        options = build_options(residual, unit_index)
+        labels = [o["label"] for o in options]
+        self.assertIn("Confirm — this relationship is real", labels)
+        self.assertIn("Reject — remove it", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+        card = render_card_markdown(residual, unit_index, {}, [])
+        self.assertIn("rel-low-conf", card, "the real relationship id must be citable from the rendered card — needed as target_ref")
+        self.assertIn("Confirm — this relationship is real", card)
+        self.assertIn("Reject — remove it", card)
+        self.assertIn("service-api-config", card, "real evidenceNote must reach the rendered card, not just a bare confidence number")
+
+    def test_messaging_producer_unverified_offers_confirm_reject_and_renders_a_real_card(self):
+        """BACKLOG.md "Messaging-producer usage verification", priority #5
+        — real options AND a real rendered card, not just build_options's
+        returned list (same depth-of-check discipline as the
+        low-confidence-emitted-relationship test above)."""
+        residual = {
+            "id": "R-030",
+            "tier": "A",
+            "class": "messaging-producer-unverified",
+            "unitIds": ["KafkaExternalEventProducer.java"],
+            "evidenceRefs": ["KafkaExternalEventProducer.java:48"],
+            "rationale": '"KafkaExternalEventProducer.java" is typed as a messaging producer purely from field-type/import-only evidence — no .send()/.publish() call-site check exists in this pipeline yet. Review whether the code actually uses this field/import to send or publish.',
+        }
+        unit_index = {"KafkaExternalEventProducer.java": {"kind": "topic", "confidence": 40, "evidenceRefs": ["KafkaExternalEventProducer.java:48"]}}
+
+        options = build_options(residual, unit_index)
+        labels = [o["label"] for o in options]
+        self.assertIn("Confirm — this is a real messaging producer", labels)
+        self.assertIn("Reject — remove it", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+        card = render_card_markdown(residual, unit_index, {}, [])
+        self.assertIn("Confirm — this is a real messaging producer", card)
+        self.assertIn("Reject — remove it", card)
+        self.assertIn("KafkaExternalEventProducer.java", card)
+
+    def test_hand_rolled_resilience_candidate_offers_informational_options_and_renders_a_real_card(self):
+        """BACKLOG.md "Hand-rolled resilience-logic detection", priority #6
+        (last item) — Tier C, no TypedUnit exists, so neither option may
+        produce a Decision Record or Override. Real options AND a real
+        rendered card, same depth-of-check discipline as every other card
+        test in this file."""
+        residual = {
+            "id": "R-040",
+            "tier": "C",
+            "class": "hand-rolled-resilience-candidate",
+            "unitIds": [],
+            "evidenceRefs": [],
+            "rationale": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+        }
+        unit_index = {}
+
+        options = build_options(residual, unit_index)
+        labels = [o["label"] for o in options]
+        self.assertIn("Document as a known resilience gap", labels)
+        self.assertIn("Not resilience-related", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+        card = render_card_markdown(residual, unit_index, {}, [])
+        self.assertIn("Document as a known resilience gap", card)
+        self.assertIn("Not resilience-related", card)
+        self.assertIn("Sender.java:189", card, "the real call-site evidence must be citable from the rendered card")
+
     def test_contradicting_evidence_never_auto_picks_a_winner(self):
         """T-FS-3: the card must offer real choices (trust config / trust
         manifest / both-correct-for-different-envs) but never silently

@@ -252,6 +252,20 @@ export interface TypedRelationship {
   // correctly treats as "no confidence claim," not zero.
   confidence?: number;
   // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no
+  // CONTRACT_VERSION bump), same precedent as `confidence` above. Set only
+  // by env-soft-graph-detector.ts today (the literal ConfigMap name/key/
+  // basename that produced the name-correlation) — every other relationship
+  // producer leaves it unset. Exists so a residual producer surfacing a
+  // low-confidence relationship for human review (Architect_Residual_Review_Session.md
+  // §3.3, low-confidence-emitted-relationship) can cite the real evidence
+  // that produced it, not just a bare confidence number. Free text, not a
+  // file:line ref — this evidence is a k8s manifest correlation, not a
+  // source-code location. When a run correlates multiple ConfigMap keys to
+  // the same unit pair, only the FIRST key's note is kept (matches
+  // env-soft-graph-detector.ts's own existing "one edge, not one per key"
+  // dedup) — a disclosed simplification, not a bug.
+  evidenceNote?: string;
+  // Additive OPTIONAL field (Contract_Evolution_Policy.md §2(b), no
   // CONTRACT_VERSION bump). Computed generically by analysis/relationship-grading.ts's
   // gradeRelationshipsPass (last pass in DEFAULT_PASSES, after every
   // relationship producer) from rel.kind + endpoint TypedUnit.kind — never

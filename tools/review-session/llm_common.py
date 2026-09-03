@@ -42,9 +42,23 @@ def build_evidence_prompt(residual: dict, unit_index: dict, packs: dict) -> str:
     their evidence snippets (never anything from an unrelated residual),
     the same INPUTS-only discipline every caller of this needs. Identical
     logic advisory.py's build_advisory_prompt and draft_tier_b.py's
-    build_user_prompt used to each keep their own copy of."""
+    build_user_prompt used to each keep their own copy of.
+
+    Real, live bug found and fixed 2026-09-03 (the second half of
+    BACKLOG.md's '_evidence_refs_for is a permanent stub' row, found
+    verifying hand-rolled-resilience-candidate's own dossier addendum):
+    this only ever pulled snippets via unitIds -> unit_index ->
+    evidenceRefs, silently dropping any snippet pack.py's own
+    _build_evidence_packs already captured directly from
+    residual.evidenceRefs (real for any no-unit, Tier C residual — the
+    ref never has a unit to route through). pack.py's own packing step
+    was already correct; only this assembly step was missing the direct
+    residual.evidenceRefs -> packs lookup."""
     relevant_units = {uid: info for uid, info in unit_index.items() if uid in residual.get("unitIds", [])}
     relevant_evidence = {ref: snippet for uid in relevant_units.values() for ref in uid.get("evidenceRefs", []) for r, snippet in packs.items() if r == ref}
+    for ref in residual.get("evidenceRefs", []):
+        if ref in packs:
+            relevant_evidence[ref] = packs[ref]
     return json.dumps({"residual": residual, "unit_index": relevant_units, "evidence_snippets": relevant_evidence}, indent=2)
 
 

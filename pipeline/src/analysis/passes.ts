@@ -5,6 +5,7 @@ import { runCodegraphCrossrootPass } from '../scanner/codegraph-crossroot-provid
 import { detectPersistenceUnits } from './cross_package/persistence-detector';
 import { reconcileCrossPackageEdges } from './cross_package/graphify-reconciler';
 import { ignoreLowConfidence } from './ignored-items';
+import { detectHandRolledResilienceCandidates } from './resilience-call-detector';
 import { openApiPass } from './openapi-pass';
 import { k8sTrustPass } from './k8s-trust-pass';
 import { detectMessagingPass } from './messaging-pass';
@@ -80,6 +81,14 @@ export const mapSignalsPass: AnalysisPass = {
         }
       }
       pushAll(ctx.allIgnoredItems, ignoredItems);
+      // BACKLOG.md "Hand-rolled resilience-logic detection" — reads the
+      // SAME already-extracted raw.callFacts this loop's own
+      // mapSignalsToUnits call already consumes, no second CodeGraph
+      // invocation. Deliberately NOT part of mapSignalsToUnits/
+      // signal-catalogue.yml — see resilience-call-detector.ts's own doc
+      // comment for why (never creates a TypedUnit, under any
+      // circumstance).
+      pushAll(ctx.allIgnoredItems, detectHandRolledResilienceCandidates(raw.callFacts));
       // B-test-code-exclusion — real, visible record of every
       // file excluded from extraction as test code, never a silent skip.
       for (const filePath of raw.excludedTestFiles) {

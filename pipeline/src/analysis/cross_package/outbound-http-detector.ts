@@ -27,6 +27,12 @@ import { isTestPath } from '../../rules/test-path';
  * since a file importing two different HTTP-client libraries is two real
  * findings here, not one unit.
  */
+// Exported so hitl-review-trigger.ts (§3.2, unresolved-outbound-target) can
+// match this exact prefix instead of re-typing it — same "one source of
+// truth" convention multi-hop-bridge-detector.ts's own exported prefixes
+// already established.
+export const UNRESOLVED_HTTP_TARGET_PREFIX = 'unresolved-http-target:';
+
 export function detectOutboundHttpClients(run: CrossPackageGraphRun): IgnoredItem[] {
   const catalogue = loadHttpClientDetectionCatalogue(path.join(__dirname, '..', '..', 'rules'));
   const libraries = importOnlyHttpClientLibraries(catalogue);
@@ -61,7 +67,7 @@ export function detectOutboundHttpClients(run: CrossPackageGraphRun): IgnoredIte
     ignoredItems.push({
       ref: `${resolved.relativeFilePath}:${line}`,
       reason: 'CROSS_DOMAIN_UNRESOLVED',
-      detail: `unresolved-http-target: imports HTTP client "${edge.target}" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).`,
+      detail: `${UNRESOLVED_HTTP_TARGET_PREFIX} imports HTTP client "${edge.target}" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).`,
     });
   }
 

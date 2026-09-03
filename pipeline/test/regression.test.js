@@ -1802,6 +1802,55 @@ test('S6 (BACKLOG.md "Isolated-node completeness flag") — a unit with zero rel
   assert.equal(onlyTargetCompleteness.isolatedNodeCount, 1, 'b.py now has zero relationships (r1 removed) so it — not orphan.py, which is now a real `to` endpoint — is the isolated one');
 });
 
+test('S3 (BACKLOG.md "Messaging-producer usage verification") — a topic unit with messaging-category evidence fires; spring-config-broker (category spring-config, a stronger signal) never does', () => {
+  const { computeCompleteness } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
+
+  const fieldTypeProducer = {
+    id: 'KafkaExternalEventProducer.java',
+    kind: 'topic',
+    name: 'KafkaExternalEventProducer',
+    filePath: 'KafkaExternalEventProducer.java',
+    startLine: 48,
+    endLine: 60,
+    evidence: [{ signal: 'KafkaTemplate', source: 'field-type', category: 'messaging', weight: 40, ref: 'KafkaExternalEventProducer.java:48' }],
+    confidence: 40,
+    status: 'observed',
+  };
+  const importOnlyProducer = {
+    id: 'OrdersDynamoStore.ts',
+    kind: 'topic',
+    name: 'OrdersDynamoStore',
+    filePath: 'OrdersDynamoStore.ts',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: '@aws-sdk/client-sqs', source: 'graphify-import', category: 'messaging', weight: 20, ref: 'OrdersDynamoStore.ts:1' }],
+    confidence: 20,
+    status: 'observed',
+  };
+  const springConfigBroker = {
+    id: 'application.yml::spring-kafka',
+    kind: 'topic',
+    name: 'kafka broker',
+    filePath: 'application.yml',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: 'spring.kafka.bootstrap-servers=kafka-host:9092', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:spring.kafka.bootstrap-servers' }],
+    confidence: 40,
+    status: 'observed',
+  };
+  const completeness = computeCompleteness([fieldTypeProducer, importOnlyProducer, springConfigBroker], []);
+  assert.equal(completeness.messagingProducerUnverifiedCount, 2, 'both field-type and import-only messaging evidence must count; spring-config-broker (category spring-config, a real config-declared address) must not');
+  assert.ok(
+    completeness.silenceFlags.some((f) => f.startsWith('S3-messaging-producer-unverified')),
+    `expected an S3-messaging-producer-unverified silenceFlag, got: ${completeness.silenceFlags}`
+  );
+
+  // Negative: only the stronger spring-config-broker signal present -> S3 must stay silent.
+  const noFieldTypeCompleteness = computeCompleteness([springConfigBroker], []);
+  assert.equal(noFieldTypeCompleteness.messagingProducerUnverifiedCount, 0);
+  assert.ok(!noFieldTypeCompleteness.silenceFlags.some((f) => f.startsWith('S3')), 'a real config-declared broker address must never fire S3');
+});
+
 test('--strict-isolated-nodes: a run with an isolated unit fails loudly when the flag is passed, succeeds without it (BACKLOG row 16, S6)', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
   const outDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
@@ -3456,6 +3505,31 @@ test(
       // shares-secret + 6 env-soft-graph + 6 deployed-in = 17.
       assert.equal(coverage.relationshipsBySource.k8s, 5 + 6 + 6, 'shares-secret (5) + env-soft-graph connects (6) + deployed-in (6), all source: k8s');
       assert.ok(coverage.unresolvedByMechanism['unresolved-env-target'] > 0);
+
+      // §5.7a real end-to-end finding (2026-09-02) — numbers above are
+      // UNCHANGED by §5.7a's k8s-database-node-synthesis fix, and that's a
+      // real, honest result worth recording, not a silent gap. This
+      // fixture is the exact real ledger-db/accounts-db shape §5.7a was
+      // designed for, but its own two real StatefulSets each fail to
+      // resolve for a DIFFERENT reason than what the design anticipated:
+      // (1) ledger-db is referenced only via a "SPRING_DATASOURCE_URL" key
+      // whose basename ("SPRING_DATASOURCE") never name-correlates to
+      // "ledger-db" at all — the correlation step itself fails, before
+      // §5.7a's image/container-name fallback ever runs (a
+      // findMatchingDeployment/name-correlation gap, outside this fix's
+      // own stated scope, which assumed correlation already succeeds).
+      // (2) accounts-db DOES correlate by name (via ACCOUNTS_DB_URI), but
+      // its own container is literally named "accounts-db" (an
+      // app-specific name) rather than "postgres"/any recognized engine
+      // token, and its image path carries no engine name either — a real,
+      // disclosed LIMIT of image/container-name recognition specifically,
+      // not a bug. The mechanism itself is proven real and correct
+      // (regression.test.js's own synthetic tests reproduce ledger-db's
+      // EXACT real container-name shape, "postgres", and confirm it
+      // resolves) — this fixture's own two real edges just don't happen to
+      // hit the specific signal §5.7a recognizes. See BACKLOG.md for the
+      // full disclosure.
+      assert.equal(coverage.relationshipsBySource.k8s, 17, 'confirms §5.7a genuinely added zero NEW resolved edges for this specific fixture (StatefulSet-scanning added new deployments read, but neither ledger-db nor accounts-db resolves here, for the two real, disclosed reasons above) — a real result, not an oversight');
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -3556,6 +3630,285 @@ test(
     }
   }
 );
+
+test('HITL review trigger: unresolved-outbound-target — §3.2, fires for unresolved-http-target/unresolved-env-target, never for unresolved-multi-hop/unresolved-k8s-deployed-in', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      { id: 'svc.py::svc', kind: 'service', filePath: 'svc.py', startLine: 1, endLine: 10, confidence: 80, evidence: [] },
+    ],
+    relationships: [],
+    ignoredItems: [
+      // unresolved-http-target: ref is "relativeFilePath:line" — must resolve to the real unit owning that file.
+      { ref: 'svc.py:5', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-http-target: imports HTTP client "requests" — real outbound-HTTP capability, but no statically-resolvable target (candidate for relationship_add via HITL review).' },
+      // unresolved-env-target (no correlating deployment at all) — no unit for "unrelatedthing" exists, unitId stays undefined, not fabricated.
+      { ref: 'k8s:configmap:cfg:KEY_ADDR', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-env-target: "unrelatedthing" references ConfigMap "cfg" key "KEY_ADDR" (allowlisted basename "key") but no other deployment name correlates — no relationship emitted, per the "never guess" rule.' },
+      // Must NOT fire this trigger — genuine absence/ambiguity, no specific evidence to cite (design doc §7.1's eligibility rule).
+      { ref: 'other.py:1', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-multi-hop: "bridge.py" has 0 real candidate implementers.' },
+      { ref: 'k8s:deploy:x', reason: 'CROSS_DOMAIN_UNRESOLVED', detail: 'unresolved-k8s-deployed-in: no matching namespace found.' },
+    ],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const outbound = queue.items.filter((i) => i.trigger === 'unresolved-outbound-target');
+  assert.equal(outbound.length, 2, 'exactly the 2 evidence-specific ignored items must become unresolved-outbound-target residuals');
+
+  const httpItem = outbound.find((i) => i.rationale.startsWith('unresolved-http-target:'));
+  assert.ok(httpItem, 'unresolved-http-target item missing from the queue');
+  assert.equal(httpItem.unitId, 'svc.py::svc', 'unresolved-http-target must resolve unitId by matching item.ref\'s file path against the real unit that owns it');
+  assert.equal(httpItem.unitKind, 'service');
+
+  const envItem = outbound.find((i) => i.rationale.startsWith('unresolved-env-target:'));
+  assert.ok(envItem, 'unresolved-env-target item missing from the queue');
+  assert.equal(envItem.unitId, undefined, 'no real unit correlates to "unrelatedthing" — unitId must stay undefined, never guessed');
+
+  assert.equal(queue.items.filter((i) => i.trigger !== 'unresolved-outbound-target').length, 0, 'unresolved-multi-hop/unresolved-k8s-deployed-in must never fire this trigger — the whole point of the evidence-specificity eligibility rule');
+});
+
+test('HITL review trigger: low-confidence-emitted-relationship — §3.3, fires for architecture-grade relationships below CONFIDENCE_FLOOR, never for undefined/at-or-above confidence or non-architecture grade', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      { id: 'ledgerwriter', kind: 'service', filePath: 'ledgerwriter.java', startLine: 1, endLine: 10, confidence: 100, evidence: [] },
+      { id: 'contacts', kind: 'service', filePath: 'contacts.py', startLine: 1, endLine: 10, confidence: 100, evidence: [] },
+    ],
+    relationships: [
+      // Below CONFIDENCE_FLOOR (40), architecture-grade, real evidenceNote — must fire.
+      { from: 'ledgerwriter', to: 'contacts', kind: 'connects', crossPackage: true, source: 'k8s', confidence: 20, grade: 'architecture', evidenceNote: 'ConfigMap "service-api-config" key "TRANSACTIONS_API_ADDR" (allowlisted basename "transactions") name-correlated to deployment "contacts"', status: 'observed', id: 'rel-low-conf' },
+      // At-or-above CONFIDENCE_FLOOR — must NOT fire.
+      { from: 'ledgerwriter', to: 'contacts', kind: 'calls', crossPackage: true, source: 'codegraph', confidence: 60, grade: 'architecture', status: 'observed', id: 'rel-high-conf' },
+      // Confidence unset entirely — must NOT fire (undefined is "no confidence claim, not zero", never coerced to low).
+      { from: 'ledgerwriter', to: 'contacts', kind: 'calls', crossPackage: true, source: 'codegraph', grade: 'architecture', status: 'observed', id: 'rel-no-conf' },
+      // Low confidence but NOT architecture-grade — must NOT fire (structural/trust are not architecture claims).
+      { from: 'ledgerwriter', to: 'contacts', kind: 'shares-secret', crossPackage: true, source: 'k8s', confidence: 20, grade: 'trust', status: 'observed', id: 'rel-trust' },
+    ],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const lowConf = queue.items.filter((i) => i.trigger === 'low-confidence-emitted-relationship');
+  assert.equal(lowConf.length, 1, 'exactly the one below-floor, architecture-grade relationship must fire this trigger');
+  assert.equal(lowConf[0].unitId, 'ledgerwriter');
+  assert.ok(lowConf[0].rationale.includes('rel-low-conf'), 'rationale must cite the real relationship id — needed later as target_ref for relationship_remove');
+  assert.ok(lowConf[0].rationale.includes('service-api-config'), 'rationale must cite the real evidenceNote, not just a bare confidence number');
+});
+
+test('HITL review trigger: low-confidence-emitted-relationship — falls back to a generic note when evidenceNote is absent, never crashes', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [{ id: 'svc', kind: 'service', filePath: 'svc.py', startLine: 1, endLine: 10, confidence: 100, evidence: [] }],
+    relationships: [{ from: 'svc', to: 'other', kind: 'connects', crossPackage: true, source: 'k8s', confidence: 10, grade: 'architecture', status: 'observed', id: 'rel-no-note' }],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const lowConf = queue.items.filter((i) => i.trigger === 'low-confidence-emitted-relationship');
+  assert.equal(lowConf.length, 1);
+  assert.ok(lowConf[0].rationale.includes('No further evidence captured'), 'must fall back to a generic note, not crash, when evidenceNote is unset (a future non-env-soft-graph low-confidence producer)');
+});
+
+test('HITL review trigger: S3-messaging-producer-unverified — fires for a topic unit with messaging-category evidence, never for service/database units or a topic unit with no messaging evidence', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'KafkaExternalEventProducer.java',
+        kind: 'topic',
+        filePath: 'KafkaExternalEventProducer.java',
+        startLine: 48,
+        endLine: 60,
+        confidence: 40,
+        evidence: [{ signal: 'KafkaTemplate', source: 'field-type', category: 'messaging', weight: 40, ref: 'KafkaExternalEventProducer.java:48' }],
+      },
+      // spring-config-broker shape — category 'spring-config', not 'messaging' — must NOT fire.
+      { id: 'application.yml::spring-kafka', kind: 'topic', filePath: 'application.yml', startLine: 1, endLine: 1, confidence: 40, evidence: [{ signal: 'spring.kafka.bootstrap-servers=kafka-host:9092', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:spring.kafka.bootstrap-servers' }] },
+      // A service unit — wrong kind, must NOT fire.
+      { id: 'svc.py', kind: 'service', filePath: 'svc.py', startLine: 1, endLine: 1, confidence: 80, evidence: [] },
+    ],
+    relationships: [],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: ['S3-messaging-producer-unverified: 1 messaging-producer unit(s) typed from field-type/import-only evidence alone'] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const items = queue.items.filter((i) => i.trigger === 'S3-messaging-producer-unverified');
+  assert.equal(items.length, 1, 'exactly the one topic unit with real messaging-category evidence must fire this trigger');
+  assert.equal(items[0].unitId, 'KafkaExternalEventProducer.java');
+  assert.equal(items[0].unitKind, 'topic');
+});
+
+test('HITL review trigger: S3-messaging-producer-unverified — never fires when the S3 silence flag did not fire (gated, unlike unresolved-outbound-target/low-confidence-emitted-relationship)', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [{ id: 'KafkaExternalEventProducer.java', kind: 'topic', filePath: 'k.java', startLine: 1, endLine: 1, confidence: 40, evidence: [{ signal: 'KafkaTemplate', source: 'field-type', category: 'messaging', weight: 40, ref: 'k.java:1' }] }],
+    relationships: [],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  assert.equal(queue.items.filter((i) => i.trigger === 'S3-messaging-producer-unverified').length, 0);
+});
+
+test('detectHandRolledResilienceCandidates — fires for a real Thread.sleep call, never for an unrelated call, never produces a TypedUnit (verified end to end)', () => {
+  const { detectHandRolledResilienceCandidates, HAND_ROLLED_RESILIENCE_CANDIDATE_PREFIX } = require(path.join(PIPELINE_ROOT, 'dist/analysis/resilience-call-detector'));
+  const callFacts = [
+    { referenceName: 'Thread.sleep', fromNodeId: 'n1', filePath: 'Sender.java', line: 189 },
+    { referenceName: 'someUnrelatedMethod', fromNodeId: 'n2', filePath: 'Sender.java', line: 200 },
+  ];
+  const items = detectHandRolledResilienceCandidates(callFacts);
+  assert.equal(items.length, 1, 'only the real Thread.sleep call must fire, never an unrelated call name');
+  assert.equal(items[0].ref, 'Sender.java:189');
+  assert.equal(items[0].reason, 'INSUFFICIENT_EVIDENCE');
+  assert.ok(items[0].detail.startsWith(HAND_ROLLED_RESILIENCE_CANDIDATE_PREFIX));
+  assert.ok(items[0].detail.includes('Thread.sleep'));
+
+  // Two real, independent call sites in the same file must both fire — never deduplicated away.
+  const twoCallFacts = [
+    { referenceName: 'Thread.sleep', fromNodeId: 'n1', filePath: 'Sender.java', line: 189 },
+    { referenceName: 'Thread.sleep', fromNodeId: 'n2', filePath: 'Sender.java', line: 360 },
+  ];
+  assert.equal(detectHandRolledResilienceCandidates(twoCallFacts).length, 2);
+
+  assert.deepEqual(detectHandRolledResilienceCandidates([]), []);
+});
+
+test('HITL review trigger: hand-rolled-resilience-candidate — always-on (unlike S3, never gated on a silenceFlag), resolves unitId when a real unit exists at that file, leaves it undefined otherwise', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [{ id: 'StuckJobExecutorServiceImpl.java', kind: 'service', filePath: 'StuckJobExecutorServiceImpl.java', startLine: 1, endLine: 1, confidence: 80, evidence: [] }],
+    relationships: [],
+    ignoredItems: [
+      // Real evidence shape: fineract's Sender.java has ZERO other typed evidence — no real unit exists for it.
+      { ref: 'Sender.java:189', reason: 'INSUFFICIENT_EVIDENCE', detail: 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.' },
+      // A different real file that DOES already have a typed unit for some other reason.
+      { ref: 'StuckJobExecutorServiceImpl.java:42', reason: 'INSUFFICIENT_EVIDENCE', detail: 'hand-rolled-resilience-candidate: calls "Thread.sleep" at StuckJobExecutorServiceImpl.java:42 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.' },
+      // A generic sub-floor rejection with the SAME reason but no resilience prefix — must never fire this trigger.
+      { ref: 'Unrelated.java', reason: 'INSUFFICIENT_EVIDENCE', detail: 'Confidence 20 below the review-queue threshold (40)' },
+    ],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const items = queue.items.filter((i) => i.trigger === 'hand-rolled-resilience-candidate');
+  assert.equal(items.length, 2, 'always-on — must fire with no silenceFlags at all, unlike S3');
+
+  const noUnit = items.find((i) => i.rationale.includes('Sender.java'));
+  assert.ok(noUnit);
+  assert.equal(noUnit.unitId, undefined, 'no real unit exists for Sender.java — unitId must stay undefined, never guessed');
+
+  const withUnit = items.find((i) => i.rationale.includes('StuckJobExecutorServiceImpl.java'));
+  assert.ok(withUnit);
+  assert.equal(withUnit.unitId, 'StuckJobExecutorServiceImpl.java');
+  assert.equal(withUnit.unitKind, 'service');
+});
+
+test('§5.7a — env-soft-graph target with a recognized database engine image and no scanned source synthesizes a k8s-database: node instead of an unresolved-env-target', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+  const { k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));
+
+  const referencerUnit = { id: 'ledgerwriter.java', kind: 'service', name: 'LedgerWriterController', filePath: 'ledgerwriter.java', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'ledgerwriter', namespace: 'default', configMapNames: ['ledger-db-config'], secretMounts: [], sourceFile: 'ledgerwriter.yaml' },
+    // No scanned TypedUnit for this deployment at all — a pure Postgres init-script directory, real evidence shape.
+    { name: 'ledger-db', namespace: 'default', image: 'postgres:14-alpine', configMapNames: [], secretMounts: [], sourceFile: 'ledger-db.yaml' },
+  ];
+  const configMaps = [{ name: 'ledger-db-config', keyNames: ['LEDGER_DB_ADDR'] }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(ignoredItems.length, 0, `expected the database-image fallback to resolve this, no unresolved-env-target expected: ${JSON.stringify(ignoredItems)}`);
+  assert.equal(relationships.length, 1);
+  assert.equal(relationships[0].to, k8sDatabaseNodeId('ledger-db'), 'must synthesize the same id k8s-database-node-builder.ts will build a real CALM node for');
+  assert.equal(relationships[0].crossPackage, true, 'a synthesized target has no real filePath — must be treated as cross-package');
+  assert.equal(relationships[0].confidence, 20);
+  assert.ok(relationships[0].evidenceNote.includes('postgres:14-alpine'), 'evidenceNote must cite the real image that triggered the fallback');
+  assert.ok(relationships[0].evidenceNote.includes('postgresql'), 'evidenceNote must cite the real recognized engine name');
+});
+
+test('§5.7a — env-soft-graph target whose IMAGE has no literal engine name but whose CONTAINER NAME does (real shape found verifying against a reference Java microservices banking sample) still synthesizes a k8s-database: node', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+  const { k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));
+
+  const referencerUnit = { id: 'ledgerwriter.java', kind: 'service', name: 'LedgerWriterController', filePath: 'ledgerwriter.java', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'ledgerwriter', namespace: 'default', configMapNames: ['ledger-db-config'], secretMounts: [], sourceFile: 'ledgerwriter.yaml' },
+    // Real shape: a custom-built registry image with NO literal engine name in the path at all, but a container literally named "postgres".
+    {
+      name: 'ledger-db',
+      namespace: 'default',
+      image: 'us-central1-docker.pkg.dev/bank-of-anthos-ci/bank-of-anthos/ledger-db:v0.6.10@sha256:891cb7afe34f358ce7ed7002a1923b25e113b30bca44fecb10cc8b116d665a03',
+      containerName: 'postgres',
+      configMapNames: [],
+      secretMounts: [],
+      sourceFile: 'ledger-db.yaml',
+    },
+  ];
+  const configMaps = [{ name: 'ledger-db-config', keyNames: ['LEDGER_DB_ADDR'] }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(ignoredItems.length, 0, `expected the container-name fallback to resolve this: ${JSON.stringify(ignoredItems)}`);
+  assert.equal(relationships.length, 1);
+  assert.equal(relationships[0].to, k8sDatabaseNodeId('ledger-db'));
+  assert.ok(relationships[0].evidenceNote.includes('postgres'), 'evidenceNote must cite the real container name that triggered the fallback, since the image itself has no literal engine name');
+});
+
+test('§5.7a — env-soft-graph target with NO scanned source and an unrecognized image still falls through to unresolved-env-target, never guesses', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+
+  const referencerUnit = { id: 'svc.py', kind: 'service', name: 'svc', filePath: 'svc.py', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'svc', namespace: 'default', configMapNames: ['cfg'], secretMounts: [], sourceFile: 'svc.yaml' },
+    // Same shape as contradiction-detector.ts's own "never guessed from an unrelated app image" case.
+    { name: 'orders-service', namespace: 'default', image: 'myorg/orders-service:1.4', configMapNames: [], secretMounts: [], sourceFile: 'orders.yaml' },
+  ];
+  const configMaps = [{ name: 'cfg', keyNames: ['ORDERS_SERVICE_ADDR'] }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(relationships.length, 0, 'an unrecognized image must never synthesize a database node');
+  assert.equal(ignoredItems.length, 1);
+  assert.ok(ignoredItems[0].detail.includes('unresolved-env-target'));
+  assert.ok(ignoredItems[0].detail.includes('do not match a known database engine'), 'detail text must say precisely why — no TypedUnit AND no recognized image/container name');
+});
+
+test('buildK8sDatabaseNodes — one database-kind CALM node per unique k8s-database: id, deterministic', () => {
+  const { buildK8sDatabaseNodes, k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));
+  const relationships = [
+    { from: 'svc.java', to: k8sDatabaseNodeId('ledger-db'), kind: 'connects', crossPackage: true, source: 'k8s', status: 'observed', id: 'r1' },
+    { from: 'svc2.java', to: k8sDatabaseNodeId('ledger-db'), kind: 'connects', crossPackage: true, source: 'k8s', status: 'observed', id: 'r2' }, // same target twice — one node, not two
+    { from: 'svc3.java', to: k8sDatabaseNodeId('accounts-db'), kind: 'connects', crossPackage: true, source: 'k8s', status: 'observed', id: 'r3' },
+    { from: 'svc4.java', to: 'some-real-unit', kind: 'connects', crossPackage: false, source: 'codegraph', status: 'observed', id: 'r4' }, // no prefix — must not produce a node
+  ];
+  const nodes = buildK8sDatabaseNodes(relationships);
+  assert.equal(nodes.length, 2);
+  const ids = nodes.map((n) => n['unique-id']).sort();
+  assert.deepEqual(ids, [k8sDatabaseNodeId('accounts-db'), k8sDatabaseNodeId('ledger-db')].sort());
+  assert.ok(nodes.every((n) => n['node-type'] === 'database'));
+  assert.deepEqual(buildK8sDatabaseNodes(relationships), nodes, 'must be deterministic across calls');
+});
 
 test('HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
   const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
@@ -6392,4 +6745,100 @@ test('JPA entity->table CodeQL candidate — codeqlJpaTablePass is a no-op unles
   const ctx2 = { packageRoots: ['/fake'], allUnits: [unit], allIgnoredItems: [], unitsByRoot: new Map([['/fake', [unit]]]), relationships: [], codeqlSourceRoot: '/fake' };
   codeqlJpaTablePass.run(ctx2); // build command missing -> still a no-op
   assert.equal(unit.evidence.length, 0);
+});
+
+test('expandOutgoingEdges — real, non-cyclic multi-level namespace chain still flattens correctly (unchanged behavior)', () => {
+  const { expandOutgoingEdges } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codegraph-crossroot-provider'));
+  // file -> ns1 -> ns2 -> class (2 namespace hops), plus a direct non-namespace edge off the file itself.
+  const nodes = {
+    file: { kind: 'file' },
+    ns1: { kind: 'namespace' },
+    ns2: { kind: 'namespace' },
+    cls: { kind: 'class' },
+  };
+  const edgesByNode = {
+    file: [
+      { kind: 'contains', target: 'ns1', source: 'file', relation: 'contains' },
+      { kind: 'imports', target: 'other', source: 'file', relation: 'imports' },
+    ],
+    ns1: [{ kind: 'contains', target: 'ns2', source: 'ns1', relation: 'contains' }],
+    ns2: [{ kind: 'contains', target: 'cls', source: 'ns2', relation: 'contains' }],
+    cls: [],
+  };
+  const cg = {
+    getOutgoingEdges: (id) => edgesByNode[id] ?? [],
+    getNode: (id) => nodes[id],
+  };
+  const result = expandOutgoingEdges(cg, 'file');
+  // The namespace-chained `contains -> cls` edge must be re-parented to 'file'
+  // (2 hops flattened away), and the direct `imports` edge off 'file' must
+  // pass through unchanged — same real shape the original recursive version
+  // was built for (a reference Java/JAX-RS banking platform's SqlInjectionPreventerServiceImpl finding).
+  assert.equal(result.length, 2);
+  const containsEdge = result.find((e) => e.kind === 'contains');
+  assert.equal(containsEdge.source, 'file');
+  assert.equal(containsEdge.target, 'cls');
+  const importsEdge = result.find((e) => e.kind === 'imports');
+  assert.equal(importsEdge.source, 'file');
+  assert.equal(importsEdge.target, 'other');
+});
+
+test('expandOutgoingEdges — a genuine namespace cycle must never stack-overflow (real user-reported crash: RangeError: maximum call stack size exceeded)', () => {
+  const { expandOutgoingEdges } = require(path.join(PIPELINE_ROOT, 'dist/scanner/codegraph-crossroot-provider'));
+  // ns1 -> ns2 -> ns1 (a real cycle CodeGraph's own graph could in principle
+  // produce) plus one real, reachable non-namespace edge off ns2 that must
+  // still surface despite the cycle.
+  const nodes = {
+    ns1: { kind: 'namespace' },
+    ns2: { kind: 'namespace' },
+  };
+  const edgesByNode = {
+    ns1: [{ kind: 'contains', target: 'ns2', source: 'ns1', relation: 'contains' }],
+    ns2: [
+      { kind: 'contains', target: 'ns1', source: 'ns2', relation: 'contains' }, // the cycle
+      { kind: 'calls', target: 'somewhere', source: 'ns2', relation: 'calls' },
+    ],
+  };
+  const cg = {
+    getOutgoingEdges: (id) => edgesByNode[id] ?? [],
+    getNode: (id) => nodes[id],
+  };
+  // Must complete without throwing (the original recursive version would
+  // recurse ns1 -> ns2 -> ns1 -> ns2 -> ... without bound here).
+  const result = expandOutgoingEdges(cg, 'ns1');
+  const callsEdge = result.find((e) => e.kind === 'calls');
+  assert.ok(callsEdge, 'the real edge reachable through the cycle must still surface, not just "didn\'t crash"');
+  assert.equal(callsEdge.source, 'ns1');
+});
+
+test('reconcileCrossPackageEdges — a test-file-sourced admitted-unresolved node is never synthesized (real noise found reviewing a live scan of a reference Java microservices banking sample: BalanceReaderControllerTest et al. showing up as real CALM nodes)', () => {
+  const { reconcileCrossPackageEdges } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/graphify-reconciler'));
+  const root = '/fake/root';
+  const resolveRoot = (sourceFile) => ({ root, relativeFilePath: sourceFile });
+
+  const fooUnit = { id: 'Foo.java', kind: 'service', name: 'Foo', filePath: 'Foo.java', startLine: 1, endLine: 10, evidence: [], confidence: 40 };
+  const unitsByRoot = new Map([[root, [fooUnit]]]);
+
+  const graph = {
+    nodes: [
+      { id: 'fooNode', label: 'Foo', file_type: 'class', source_file: 'Foo.java', source_location: 'L1', _origin: 'x' },
+      { id: 'testNode', label: 'FooTest', file_type: 'class', source_file: 'FooTest.java', source_location: 'L1', _origin: 'x' },
+      { id: 'helperNode', label: 'Helper', file_type: 'class', source_file: 'Helper.java', source_location: 'L1', _origin: 'x' },
+    ],
+    edges: [
+      // Foo -> FooTest: the real noise shape (a test class ends up as an
+      // edge endpoint admission tries to rescue). Must be dropped, not admitted.
+      { source: 'fooNode', target: 'testNode', relation: 'calls', context: '', confidence: '', source_file: 'Foo.java', source_location: 'L1', weight: 1, _origin: 'x' },
+      // Foo -> Helper: a real, non-test unresolved file. Must STILL be
+      // admitted (proves the fix didn't over-suppress legitimate admission).
+      { source: 'fooNode', target: 'helperNode', relation: 'calls', context: '', confidence: '', source_file: 'Foo.java', source_location: 'L1', weight: 1, _origin: 'x' },
+    ],
+  };
+  const run = { graph, resolveRoot };
+
+  const { relationships } = reconcileCrossPackageEdges(run, unitsByRoot);
+  const toTest = relationships.find((r) => r.to.includes('testNode') || r.from.includes('testNode'));
+  assert.equal(toTest, undefined, 'a test-file-sourced node must never be admitted as a real relationship endpoint');
+  const toHelper = relationships.find((r) => r.to.includes('helperNode'));
+  assert.ok(toHelper, 'a real, non-test unresolved file must still be admitted (the fix must not over-suppress)');
 });

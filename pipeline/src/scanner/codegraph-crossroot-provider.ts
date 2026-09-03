@@ -128,17 +128,38 @@ function computeExcludePatterns(scanRoot: string, absRoots: string[]): string[] 
  * onto the original requester. Real bug found running this against a real
  * a reference Java/JAX-RS banking platform fixture: `SqlInjectionPreventerServiceImpl` was unreachable via
  * the one-hop walk without this — the walk found the namespace and stopped.
+ *
+ * Real second finding (a user-reported crash, not reproduced locally but
+ * confirmed as a genuine gap by reading this function): the original
+ * recursive version had no cycle guard — a `namespace`-kind cycle or an
+ * unusually deep chain in CodeGraph's own raw graph recurses without bound
+ * and throws `RangeError: maximum call stack size exceeded`, taking down
+ * the entire cross-package pass (passes.ts's `catch` around this whole pass
+ * turns that into a silent "continuing without cross-package relationships"
+ * degradation instead of a targeted one). Rewritten as an iterative,
+ * visited-set-guarded traversal: a namespace node already on the visited
+ * set is never re-expanded, converting a would-be infinite recursion into a
+ * safe (if slightly under-flattened, for the pathological cycle case only)
+ * traversal that can never overflow the stack. Behavior for the real,
+ * non-cyclic case (the a reference Java/JAX-RS banking platform finding above) is
+ * unchanged — every non-namespace edge reachable from `nodeId` through any
+ * number of namespace hops still gets attributed to `nodeId`.
  */
-function expandOutgoingEdges(cg: any, nodeId: string): any[] {
+export function expandOutgoingEdges(cg: any, nodeId: string): any[] {
   const result: any[] = [];
-  for (const e of cg.getOutgoingEdges(nodeId)) {
-    const targetNode = cg.getNode(e.target);
-    if (e.kind === 'contains' && targetNode?.kind === 'namespace') {
-      for (const inner of expandOutgoingEdges(cg, e.target)) {
-        result.push({ ...inner, source: nodeId });
+  const visited = new Set<string>();
+  const stack: string[] = [nodeId];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    for (const e of cg.getOutgoingEdges(current)) {
+      const targetNode = cg.getNode(e.target);
+      if (e.kind === 'contains' && targetNode?.kind === 'namespace') {
+        if (!visited.has(e.target)) stack.push(e.target);
+      } else {
+        result.push(current === nodeId ? e : { ...e, source: nodeId });
       }
-    } else {
-      result.push(e);
     }
   }
   return result;

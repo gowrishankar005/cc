@@ -10,6 +10,7 @@ import { attachNodeMetadata, buildDocumentMetadata } from './metadata-builder';
 import { attachControls } from './control-builder';
 import { buildSystemNode } from './system-node-builder';
 import { buildK8sNamespaceNodes } from './k8s-namespace-node-builder';
+import { buildK8sDatabaseNodes } from './k8s-database-node-builder';
 import { buildCrossRepoNodes } from './external-repo-node-builder';
 import { attachPortInterfaces, springConfigProtocolBySignal } from './port-interface-builder';
 import { EmissionCoverageGap } from './emission-coverage';
@@ -48,6 +49,11 @@ export function buildCalm(facts: TypedFacts, includeSystemNode = true, gaps: Emi
   // TypedRelationship's `to` must already be a real node id or
   // buildRelationships' own nodeIds.has(r.to) filter silently drops it.
   nodes.push(...buildK8sNamespaceNodes(facts.relationships));
+  // Same reasoning (§5.7a): env-soft-graph-detector.ts's target-side
+  // fallback synthesizes a k8s-database: id for a recognized database-engine
+  // image with no scanned source — must already be a real node id before
+  // buildRelationships' own nodeIds.has(...) filter runs.
+  nodes.push(...buildK8sDatabaseNodes(facts.relationships));
   // Same reasoning: a repo-manifest-sourced relationship's endpoints are
   // synthetic (repo-root / external-contract), never a real TypedUnit, so
   // both must already exist as real node ids before buildRelationships' own
