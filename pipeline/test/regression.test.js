@@ -3768,6 +3768,62 @@ test('HITL review trigger: S3-messaging-producer-unverified — never fires when
   assert.equal(queue.items.filter((i) => i.trigger === 'S3-messaging-producer-unverified').length, 0);
 });
 
+test('detectHandRolledResilienceCandidates — fires for a real Thread.sleep call, never for an unrelated call, never produces a TypedUnit (verified end to end)', () => {
+  const { detectHandRolledResilienceCandidates, HAND_ROLLED_RESILIENCE_CANDIDATE_PREFIX } = require(path.join(PIPELINE_ROOT, 'dist/analysis/resilience-call-detector'));
+  const callFacts = [
+    { referenceName: 'Thread.sleep', fromNodeId: 'n1', filePath: 'Sender.java', line: 189 },
+    { referenceName: 'someUnrelatedMethod', fromNodeId: 'n2', filePath: 'Sender.java', line: 200 },
+  ];
+  const items = detectHandRolledResilienceCandidates(callFacts);
+  assert.equal(items.length, 1, 'only the real Thread.sleep call must fire, never an unrelated call name');
+  assert.equal(items[0].ref, 'Sender.java:189');
+  assert.equal(items[0].reason, 'INSUFFICIENT_EVIDENCE');
+  assert.ok(items[0].detail.startsWith(HAND_ROLLED_RESILIENCE_CANDIDATE_PREFIX));
+  assert.ok(items[0].detail.includes('Thread.sleep'));
+
+  // Two real, independent call sites in the same file must both fire — never deduplicated away.
+  const twoCallFacts = [
+    { referenceName: 'Thread.sleep', fromNodeId: 'n1', filePath: 'Sender.java', line: 189 },
+    { referenceName: 'Thread.sleep', fromNodeId: 'n2', filePath: 'Sender.java', line: 360 },
+  ];
+  assert.equal(detectHandRolledResilienceCandidates(twoCallFacts).length, 2);
+
+  assert.deepEqual(detectHandRolledResilienceCandidates([]), []);
+});
+
+test('HITL review trigger: hand-rolled-resilience-candidate — always-on (unlike S3, never gated on a silenceFlag), resolves unitId when a real unit exists at that file, leaves it undefined otherwise', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [{ id: 'StuckJobExecutorServiceImpl.java', kind: 'service', filePath: 'StuckJobExecutorServiceImpl.java', startLine: 1, endLine: 1, confidence: 80, evidence: [] }],
+    relationships: [],
+    ignoredItems: [
+      // Real evidence shape: fineract's Sender.java has ZERO other typed evidence — no real unit exists for it.
+      { ref: 'Sender.java:189', reason: 'INSUFFICIENT_EVIDENCE', detail: 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.' },
+      // A different real file that DOES already have a typed unit for some other reason.
+      { ref: 'StuckJobExecutorServiceImpl.java:42', reason: 'INSUFFICIENT_EVIDENCE', detail: 'hand-rolled-resilience-candidate: calls "Thread.sleep" at StuckJobExecutorServiceImpl.java:42 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.' },
+      // A generic sub-floor rejection with the SAME reason but no resilience prefix — must never fire this trigger.
+      { ref: 'Unrelated.java', reason: 'INSUFFICIENT_EVIDENCE', detail: 'Confidence 20 below the review-queue threshold (40)' },
+    ],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const items = queue.items.filter((i) => i.trigger === 'hand-rolled-resilience-candidate');
+  assert.equal(items.length, 2, 'always-on — must fire with no silenceFlags at all, unlike S3');
+
+  const noUnit = items.find((i) => i.rationale.includes('Sender.java'));
+  assert.ok(noUnit);
+  assert.equal(noUnit.unitId, undefined, 'no real unit exists for Sender.java — unitId must stay undefined, never guessed');
+
+  const withUnit = items.find((i) => i.rationale.includes('StuckJobExecutorServiceImpl.java'));
+  assert.ok(withUnit);
+  assert.equal(withUnit.unitId, 'StuckJobExecutorServiceImpl.java');
+  assert.equal(withUnit.unitKind, 'service');
+});
+
 test('§5.7a — env-soft-graph target with a recognized database engine image and no scanned source synthesizes a k8s-database: node instead of an unresolved-env-target', () => {
   const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
   const { k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));

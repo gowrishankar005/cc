@@ -93,11 +93,32 @@ _TRIGGER_MAP = {
     # something already claimed -- matches contradicting-evidence's own
     # shape (an architect judgment call) more than a single-candidate draft.
     "low-confidence-emitted-relationship": ("A", "low-confidence-emitted-relationship"),
+    # hand-rolled-resilience-candidate -> Tier C "hand-rolled-resilience-
+    # candidate" (BACKLOG.md "Hand-rolled resilience-logic detection",
+    # priority #6, last item of the 2026-09-02 LLM-assist consolidated
+    # plan). A real call to a known resilience-adjacent API with no way to
+    # deterministically tell a retry/backoff loop apart from a polling
+    # loop, rate-limiting, or something unrelated. Tier C, not A or B:
+    # never a TypedUnit (resilience-call-detector.ts's own doc comment),
+    # so nothing was ever claimed -- there is no fact to confirm, reject,
+    # or draft against, matching S5-cfn-routes-found-but-unbound's own
+    # Tier C shape exactly.
+    "hand-rolled-resilience-candidate": ("C", "hand-rolled-resilience-candidate"),
 }
 
 # Same pattern unmapped-signals.ts uses to recognise catalogue misses.
 _UNMAPPED_DETAIL_RE = re.compile(r'No signal-catalogue\.yml rule matched raw signal "([^"]*)"')
 _CONTRADICTION_PREFIX = "contradiction:"
+# BACKLOG.md "Hand-rolled resilience-logic detection" -- this producer
+# deliberately reuses reason: INSUFFICIENT_EVIDENCE (unlike
+# unresolved-outbound-target's CROSS_DOMAIN_UNRESOLVED, which is already
+# outside _IGNORED_REASONS and so never hits this collision at all), so
+# it needs the SAME explicit exclusion _CONTRADICTION_PREFIX already gets
+# below -- without it, _residuals_from_ignored's own generic catch-all
+# would ALSO turn the identical ignoredItem into a second, differently
+# labeled residual (a real double-count bug caught before shipping, not
+# found live).
+_HAND_ROLLED_RESILIENCE_PREFIX = "hand-rolled-resilience-candidate:"
 _IGNORED_REASONS = frozenset({"INSUFFICIENT_EVIDENCE", "AMBIGUOUS_BOUNDARY"})
 _FILE_LINE_RE = re.compile(r"^.+:\d+$")
 
@@ -214,6 +235,8 @@ def _residuals_from_ignored(ignored: list | None, next_n: int, claimed_refs: set
             continue
         if detail.startswith(_CONTRADICTION_PREFIX):
             continue
+        if detail.startswith(_HAND_ROLLED_RESILIENCE_PREFIX):
+            continue
         ref = item.get("ref") or ""
         if ref and ref in claimed_refs:
             continue
@@ -238,12 +261,37 @@ def _residuals_from_ignored(ignored: list | None, next_n: int, claimed_refs: set
     return out, next_n
 
 
+_RATIONALE_EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
+
+
 def _evidence_refs_for(item: dict) -> list[str]:
     """Best-effort file:line refs extractable from a review-queue item's own
     rationale text (it already cites unresolved-multi-hop / unresolved-cfn-route
-    ignored-item details verbatim, per hitl-review-trigger.ts). Falls back to
-    no refs rather than guessing -- consistent with S5 (evidence-first)."""
-    return []
+    ignored-item details verbatim, per hitl-review-trigger.ts).
+
+    Real, live bug found and fixed 2026-09-03 (BACKLOG.md's own
+    '_evidence_refs_for is a permanent stub' row): this returned [] for
+    every trigger, discovered blocking Tier B drafting for
+    unresolved-outbound-target and confirmed a second time, live, for
+    hand-rolled-resilience-candidate -- a real dossier response correctly
+    cited the exact real evidence ref already sitting in its own rationale
+    text, and was rejected outright because known_evidence_refs (llm_common.py)
+    had nothing to check it against (empty residual.evidenceRefs, no
+    unitIds to fall back to for this Tier C, no-unit class). Fixed with the
+    SAME file:line-extraction regex dossier.py's own guardrail already
+    uses (_EVIDENCE_REF_RE) -- one proven pattern, not a second copy.
+
+    Real, disclosed limit this does NOT fix: extracting the ref only makes
+    the GUARDRAIL correctly recognize evidence the rationale text already
+    names -- it does not make pack.py capture an actual code SNIPPET at
+    that ref (build_evidence_prompt only pulls snippets via a residual's
+    own unitIds -> unit_index -> evidenceRefs chain, never directly from
+    residual.evidenceRefs). For a no-unit residual like
+    hand-rolled-resilience-candidate, the model still sees the ref text
+    but not the real code at it -- a real, separate, larger gap
+    (packs.json/build_evidence_prompt's own no-unit case), not silently
+    claimed closed by this fix."""
+    return sorted({f"{m.group(1)}:{m.group(2)}" for m in _RATIONALE_EVIDENCE_REF_RE.finditer(item.get("rationale") or "")})
 
 
 def apply_baseline(residuals: list[dict], baseline_residuals: list[dict], baseline_decisions: list[dict]) -> list[dict]:

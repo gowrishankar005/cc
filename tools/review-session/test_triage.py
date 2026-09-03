@@ -150,6 +150,59 @@ class TestBuildResiduals(unittest.TestCase):
         self.assertEqual(residuals[0]["class"], "messaging-producer-unverified")
         self.assertEqual(residuals[0]["unitIds"], ["KafkaExternalEventProducer.java"])
 
+    def test_hand_rolled_resilience_candidate_maps_to_tier_c(self):
+        """BACKLOG.md "Hand-rolled resilience-logic detection", priority #6
+        (last item) of the 2026-09-02 LLM-assist consolidated plan — a real
+        call to a resilience-adjacent API with no way to deterministically
+        tell a retry/backoff loop apart from a polling loop or something
+        unrelated. Tier C, not A or B: never a TypedUnit, so nothing was
+        ever claimed -- no fact to confirm, reject, or draft."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "hand-rolled-resilience-candidate",
+                    "unitId": None,
+                    "unitKind": None,
+                    "confidence": None,
+                    "rationale": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "C")
+        self.assertEqual(residuals[0]["class"], "hand-rolled-resilience-candidate")
+
+    def test_hand_rolled_resilience_candidate_ignoredItem_never_double_counted(self):
+        """Real bug found and fixed before shipping, not found live: this
+        trigger deliberately reuses reason: INSUFFICIENT_EVIDENCE (unlike
+        unresolved-outbound-target's CROSS_DOMAIN_UNRESOLVED, which is
+        already outside _IGNORED_REASONS). Without an explicit exclusion in
+        _residuals_from_ignored (same convention _CONTRADICTION_PREFIX
+        already uses), the identical ignoredItem would ALSO become a
+        second, generically-labeled 'insufficient-evidence' residual."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "hand-rolled-resilience-candidate",
+                    "unitId": None,
+                    "unitKind": None,
+                    "confidence": None,
+                    "rationale": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+                }
+            ]
+        }
+        ignored = [
+            {
+                "ref": "Sender.java:189",
+                "reason": "INSUFFICIENT_EVIDENCE",
+                "detail": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+            }
+        ]
+        residuals = build_residuals(rq, ignored=ignored)
+        self.assertEqual(len(residuals), 1, f"the same real evidence must produce exactly ONE residual, not a duplicate generic one: {residuals}")
+        self.assertEqual(residuals[0]["class"], "hand-rolled-resilience-candidate")
+
     def test_empty_queue_produces_empty_residuals(self):
         self.assertEqual(build_residuals({"items": []}), [])
 

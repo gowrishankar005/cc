@@ -244,5 +244,43 @@ class TestS3MessagingProducerAddendum(unittest.TestCase):
         self.assertNotIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
 
 
+TIER_C_RESILIENCE_RESIDUAL = {
+    "id": "R-040",
+    "tier": "C",
+    "class": "hand-rolled-resilience-candidate",
+    "trigger": "hand-rolled-resilience-candidate",
+    "unitIds": [],
+    "evidenceRefs": ["Sender.java:189"],
+    "rationale": "r",
+    "status": "open",
+}
+
+
+class TestHandRolledResilienceAddendum(unittest.TestCase):
+    """BACKLOG.md 'Hand-rolled resilience-logic detection', priority #6
+    (last item) of the 2026-09-02 LLM-assist candidate batch -- a
+    trigger-specific system-prompt steer, not a new mechanism, same shape
+    as the S2/S3 addenda above. Must engage ONLY for
+    hand-rolled-resilience-candidate, never leak into any other trigger's
+    prompt."""
+
+    def test_resilience_residual_gets_addendum_appended_to_system_prompt(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_C_RESILIENCE_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertIn(dossier.HAND_ROLLED_RESILIENCE_ADDENDUM, system_prompt_used)
+        self.assertIn(dossier.DOSSIER_SYSTEM_PROMPT, system_prompt_used)
+        self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
+        self.assertNotIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
+
+    def test_non_resilience_residual_does_not_get_the_addendum(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertNotIn(dossier.HAND_ROLLED_RESILIENCE_ADDENDUM, system_prompt_used)
+
+
 if __name__ == "__main__":
     unittest.main()

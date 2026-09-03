@@ -144,6 +144,33 @@ class TestCardDeterminism(unittest.TestCase):
         self.assertIn("Reject — remove it", card)
         self.assertIn("KafkaExternalEventProducer.java", card)
 
+    def test_hand_rolled_resilience_candidate_offers_informational_options_and_renders_a_real_card(self):
+        """BACKLOG.md "Hand-rolled resilience-logic detection", priority #6
+        (last item) — Tier C, no TypedUnit exists, so neither option may
+        produce a Decision Record or Override. Real options AND a real
+        rendered card, same depth-of-check discipline as every other card
+        test in this file."""
+        residual = {
+            "id": "R-040",
+            "tier": "C",
+            "class": "hand-rolled-resilience-candidate",
+            "unitIds": [],
+            "evidenceRefs": [],
+            "rationale": 'hand-rolled-resilience-candidate: calls "Thread.sleep" at Sender.java:189 — may be a hand-rolled retry/backoff loop, a polling loop, rate-limiting, or unrelated; deterministic detection cannot distinguish these shapes without reading the surrounding code.',
+        }
+        unit_index = {}
+
+        options = build_options(residual, unit_index)
+        labels = [o["label"] for o in options]
+        self.assertIn("Document as a known resilience gap", labels)
+        self.assertIn("Not resilience-related", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+        card = render_card_markdown(residual, unit_index, {}, [])
+        self.assertIn("Document as a known resilience gap", card)
+        self.assertIn("Not resilience-related", card)
+        self.assertIn("Sender.java:189", card, "the real call-site evidence must be citable from the rendered card")
+
     def test_contradicting_evidence_never_auto_picks_a_winner(self):
         """T-FS-3: the card must offer real choices (trust config / trust
         manifest / both-correct-for-different-envs) but never silently

@@ -9,6 +9,7 @@ import { UNRESOLVED_HTTP_TARGET_PREFIX } from '../cross_package/outbound-http-de
 import { UNRESOLVED_ENV_TARGET_PREFIX } from '../cross_package/env-soft-graph-detector';
 import { findUnitForDeployment } from '../cross_package/deployment-correlation';
 import { CONFIDENCE_FLOOR } from '../passes';
+import { HAND_ROLLED_RESILIENCE_CANDIDATE_PREFIX } from '../resilience-call-detector';
 
 /**
  * OFFLINE ONLY, deterministic, no LLM call anywhere in this file — stricter
@@ -85,7 +86,15 @@ export interface ReviewQueueItem {
     // call-site check (no such mechanism exists in this pipeline yet).
     // Same shape as S2: a completely silent gap before this trigger
     // existed, an architect judgment call, not a draftable action.
-    | 'S3-messaging-producer-unverified';
+    | 'S3-messaging-producer-unverified'
+    // BACKLOG.md "Hand-rolled resilience-logic detection" — a real call to
+    // a known resilience-adjacent API (Thread.sleep) with no way to
+    // deterministically tell a retry/backoff loop apart from a polling
+    // loop, rate-limiting, or something unrelated. Never a TypedUnit,
+    // by construction (resilience-call-detector.ts's own doc comment) —
+    // Tier C, nothing was ever claimed, so there is nothing to draft or
+    // confirm/reject.
+    | 'hand-rolled-resilience-candidate';
   /** Absent for a genuinely run-level residual (S5-cfn-routes-found-but-unbound) — no unit was matched, so none can be named. */
   unitId?: string;
   unitKind?: TypedUnit['kind'];
@@ -302,6 +311,26 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
 
     items.push({
       trigger: 'unresolved-outbound-target',
+      unitId: unit?.id,
+      unitKind: unit?.kind,
+      confidence: unit?.confidence,
+      rationale: item.detail!,
+    });
+  }
+
+  // BACKLOG.md "Hand-rolled resilience-logic detection" — same always-on
+  // convention as the block above. Best-effort unitId resolution by
+  // filePath (reusing the SAME unitsByFilePath map, not a second copy) —
+  // undefined when the file has no real unit at all, the common case for
+  // this specific class (real evidence: fineract's Sender.java has zero
+  // other typed evidence), matching S5-cfn-routes-found-but-unbound's own
+  // precedent for a genuinely evidence-thin, file-level residual.
+  for (const item of facts.ignoredItems) {
+    if (item.reason !== 'INSUFFICIENT_EVIDENCE' || !item.detail?.startsWith(HAND_ROLLED_RESILIENCE_CANDIDATE_PREFIX)) continue;
+    const filePath = item.ref.replace(/:\d+$/, '');
+    const unit = unitsByFilePath.get(filePath);
+    items.push({
+      trigger: 'hand-rolled-resilience-candidate',
       unitId: unit?.id,
       unitKind: unit?.kind,
       confidence: unit?.confidence,

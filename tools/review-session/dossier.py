@@ -120,6 +120,32 @@ something other than sending/publishing, say so plainly in "explanation"
 rather than speculating -- this is hard rule 2, restated for this
 specific question, not a license to relax it."""
 
+HAND_ROLLED_RESILIENCE_ADDENDUM = """TRIGGER-SPECIFIC STEER for this residual (hand-rolled-resilience-candidate):
+
+This residual exists because this pipeline found a real call to a
+resilience-adjacent API (e.g. `Thread.sleep`) with no way to
+deterministically tell what it actually is -- the same bare "loop +
+try/catch + sleep" shape covers genuinely different real intents (a
+hand-rolled retry/backoff loop, a periodic polling loop, rate-limiting,
+a shutdown grace period, or something unrelated entirely). Unlike every
+other trigger this tool dossiers, nothing was ever claimed by this
+pipeline here -- there is no fact to confirm or challenge. Your job here
+is NOT a generic evidence summary -- it is this one specific,
+explicitly informational judgment:
+
+Does the code actually shown to you (your own evidence inputs, nothing
+else) plausibly implement a hand-rolled retry/backoff pattern around this
+call site -- a loop, a failure condition being retried, an
+increasing/backing-off delay? Or does it look like something else (a
+periodic poll unrelated to failure handling, rate-limiting, a shutdown
+delay, a test wait)? Name which, citing the real evidence it's grounded
+in. Never phrase a hypothesis as a fact to confirm or reject -- there is
+no Decision Record or Override this residual could ever produce; your
+role here is purely to help a human decide whether this is worth a
+manual follow-up, nothing more. If the evidence is too thin to judge
+either way, say so plainly rather than guessing -- this is hard rule 2,
+restated for this specific, unusually evidence-thin question."""
+
 REQUIRED_DOSSIER_KEYS = {"explanation", "hypotheses", "evidenceRefsUsed"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
@@ -202,6 +228,7 @@ def parse_and_validate_dossier_response(raw_text: str, residual: dict, unit_inde
 _TRIGGER_ADDENDA = {
     "S2-http-without-security-control": S2_AUTH_JUDGMENT_ADDENDUM,
     "S3-messaging-producer-unverified": S3_MESSAGING_PRODUCER_ADDENDUM,
+    "hand-rolled-resilience-candidate": HAND_ROLLED_RESILIENCE_ADDENDUM,
 }
 
 

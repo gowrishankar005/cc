@@ -68,6 +68,19 @@ def _missing_intermediates_options(residual: dict, unit_index: dict) -> list[dic
     ]
 
 
+def _hand_rolled_resilience_candidate_options(residual: dict, unit_index: dict) -> list[dict]:
+    """BACKLOG.md "Hand-rolled resilience-logic detection" (Tier C): a real
+    call to a known resilience-adjacent API, with no way to
+    deterministically tell a retry/backoff loop apart from a polling
+    loop, rate-limiting, or something unrelated. Never a TypedUnit, so
+    nothing was ever claimed -- no option here produces a Decision Record
+    or Override, same shape as _missing_intermediates_options above."""
+    return [
+        {"key": "1", "label": "Document as a known resilience gap", "detail": "worth a manual follow-up outside this session — no Decision Record needed, nothing was claimed by this pipeline to confirm or reject"},
+        {"key": "2", "label": "Not resilience-related", "detail": "the call site is unrelated (a shutdown delay, a test wait, rate-limiting, etc.) — no further action needed"},
+    ]
+
+
 def _single_candidate_below_threshold_options(residual: dict, unit_index: dict) -> list[dict]:
     """T-FS-1 (Tier B): multi-hop-bridge-detector.ts found exactly ONE real
     database/topic-typed candidate among a bridge interface's several
@@ -185,6 +198,7 @@ _CLASS_TEMPLATES = {
     "unresolved-outbound-target": _single_candidate_below_threshold_options,
     "low-confidence-emitted-relationship": _low_confidence_emitted_relationship_options,
     "messaging-producer-unverified": _messaging_producer_unverified_options,
+    "hand-rolled-resilience-candidate": _hand_rolled_resilience_candidate_options,
 }
 
 

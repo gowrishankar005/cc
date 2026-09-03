@@ -1,5 +1,7 @@
 # AGENT TASK — Hand-rolled resilience-logic candidate detection (weakest/most speculative item in the 2026-09-02 batch)
 
+**Status: SHIPPED 2026-09-03.** See `BACKLOG.md`'s row for full detail. Real live-model verification against both real repo instances found in this file's own evidence pass: the model correctly identified `LedgerReader.java` as a polling loop, not retry/backoff — the exact disambiguation this design exists to deliver. Two real, live-found bugs in the shared dossier evidence pipeline (`triage.py`'s `_evidence_refs_for` stub, `llm_common.py`'s `build_evidence_prompt`) were found and fixed during verification, not assumed away — see `BACKLOG.md`'s own separate row for that mechanism-level fix.
+
 **Lane:** Independent — no dependency on any other item in the batch.
 **Governance/DoD:** `scope-limitations.yml`'s `resilience-lens-retry-timeout-only` (the disclosed gap this executes), `docs/solution/Catalogue_Intake.md` (this is new detection coverage — evidence + test + `BACKLOG.md` entry required; the evidence pass below satisfies that bar), `docs/solution/Architect_Residual_Review_Session.md` §3.1 (this task's new trigger must land in the same diff as a producer-registry row update)
 **Priority:** #6, last item in the 2026-09-02 consolidated LLM-assist planning list.
