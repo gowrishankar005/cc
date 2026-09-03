@@ -40,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_common  # noqa: E402
-from llm_common import _call_llm, _llm_backend_available, _strip_markdown_json_fence  # noqa: E402
+from llm_common import _llm_backend_available, _strip_markdown_json_fence, call_llm_safe  # noqa: E402
 from validate_drafts import validate as validate_drafts  # noqa: E402
 
 SYSTEM_PROMPT = """You are the Tier B drafting assistant for a Weaver residual review session.
@@ -165,7 +165,9 @@ def draft_for_residual(residual: dict, unit_index: dict, packs: dict, calm_node_
     if not _llm_backend_available():
         return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) — nothing drafted"}
     user_prompt = build_user_prompt(residual, unit_index, packs)
-    raw = _call_llm(SYSTEM_PROMPT, user_prompt)
+    raw, error = call_llm_safe(SYSTEM_PROMPT, user_prompt)
+    if error:
+        return {"outcome": "llm_error", "reason": f"claude CLI call failed -- nothing drafted, but the batch continues: {error}"}
     return parse_and_validate_response(raw, residual, calm_node_ids, calm_relationship_ids)
 
 

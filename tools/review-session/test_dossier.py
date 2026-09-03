@@ -175,6 +175,37 @@ class TestProcessDossierBatch(unittest.TestCase):
         self.assertNotIn("dossier", updated[0])
         self.assertEqual(episodes[0]["outcome"], "no_key")
 
+    def test_one_residuals_llm_error_never_stops_the_batch(self):
+        """Real, live-found bug (2026-09-03): running a real ~30-residual
+        dossier batch against a full real evidence set, one transient
+        claude CLI failure (RuntimeError, exit 1, empty stderr) crashed
+        the ENTIRE pack.py run, discarding every prior successful dossier
+        result in the same batch. dossier_for_residual now catches this
+        (via llm_common.call_llm_safe) and returns a real "llm_error"
+        outcome instead of raising -- this locks in that the BATCH LOOP
+        itself keeps going to the next residual regardless."""
+
+        def flaky_dossier_fn(residual, unit_index, packs):
+            if residual["id"] == TIER_A_RESIDUAL["id"]:
+                return {"outcome": "llm_error", "reason": "claude CLI call failed -- nothing dossiered, but the batch continues: claude CLI exited 1: "}
+            return {"outcome": "dossiered", "explanation": "e", "hypotheses": [], "evidenceRefsUsed": []}
+
+        updated, episodes = process_dossier_batch([TIER_A_RESIDUAL, TIER_B_RESIDUAL], {}, {}, dossier_fn=flaky_dossier_fn, now_fn=lambda: "t")
+        self.assertEqual(len(updated), 2, "the batch must process every residual, not stop at the first failure")
+        self.assertNotIn("dossier", updated[0])
+        self.assertEqual(episodes[0]["outcome"], "llm_error")
+        self.assertIn("dossier", updated[1], "a later residual's real success must not be discarded by an earlier one's failure")
+        self.assertEqual(episodes[1]["outcome"], "dossiered")
+
+    def test_dossier_for_residual_returns_llm_error_outcome_never_raises(self):
+        """dossier_for_residual itself (not just the batch loop around it)
+        must never raise on a real claude CLI failure -- verified at this
+        level too, not just via an injected fake_dossier_fn above."""
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(None, "claude CLI exited 1: ")):
+            result = dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        self.assertEqual(result["outcome"], "llm_error")
+        self.assertIn("claude CLI exited 1", result["reason"])
+
     def test_invalid_response_outcome_never_attaches_dossier(self):
         def fake_dossier_fn(residual, unit_index, packs):
             return {"outcome": "invalid_response", "reason": "malformed"}
@@ -193,7 +224,7 @@ class TestS2AuthJudgmentAddendum(unittest.TestCase):
 
     def test_s2_residual_gets_addendum_appended_to_system_prompt(self):
         raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
-        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(raw, None)) as mock_call:
             dossier_for_residual(TIER_A_RESIDUAL, {}, {})
         system_prompt_used = mock_call.call_args[0][0]
         self.assertIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
@@ -201,7 +232,7 @@ class TestS2AuthJudgmentAddendum(unittest.TestCase):
 
     def test_non_s2_residual_does_not_get_addendum(self):
         raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
-        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(raw, None)) as mock_call:
             dossier_for_residual(TIER_B_RESIDUAL, {}, {})
         system_prompt_used = mock_call.call_args[0][0]
         self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used)
@@ -229,7 +260,7 @@ class TestS3MessagingProducerAddendum(unittest.TestCase):
 
     def test_s3_residual_gets_addendum_appended_to_system_prompt(self):
         raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
-        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(raw, None)) as mock_call:
             dossier_for_residual(TIER_A_S3_RESIDUAL, {}, {})
         system_prompt_used = mock_call.call_args[0][0]
         self.assertIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
@@ -238,7 +269,7 @@ class TestS3MessagingProducerAddendum(unittest.TestCase):
 
     def test_s2_residual_does_not_get_s3_addendum(self):
         raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
-        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(raw, None)) as mock_call:
             dossier_for_residual(TIER_A_RESIDUAL, {}, {})
         system_prompt_used = mock_call.call_args[0][0]
         self.assertNotIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
@@ -266,7 +297,7 @@ class TestHandRolledResilienceAddendum(unittest.TestCase):
 
     def test_resilience_residual_gets_addendum_appended_to_system_prompt(self):
         raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
-        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(raw, None)) as mock_call:
             dossier_for_residual(TIER_C_RESILIENCE_RESIDUAL, {}, {})
         system_prompt_used = mock_call.call_args[0][0]
         self.assertIn(dossier.HAND_ROLLED_RESILIENCE_ADDENDUM, system_prompt_used)
@@ -276,7 +307,7 @@ class TestHandRolledResilienceAddendum(unittest.TestCase):
 
     def test_non_resilience_residual_does_not_get_the_addendum(self):
         raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
-        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "call_llm_safe", return_value=(raw, None)) as mock_call:
             dossier_for_residual(TIER_A_RESIDUAL, {}, {})
         system_prompt_used = mock_call.call_args[0][0]
         self.assertNotIn(dossier.HAND_ROLLED_RESILIENCE_ADDENDUM, system_prompt_used)

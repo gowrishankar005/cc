@@ -4,8 +4,10 @@ advisory.py and draft_tier_b.py. No live backend call in this suite (same
 convention every other test file here already uses)."""
 
 import unittest
+from unittest import mock
 
-from llm_common import DEFAULT_MODEL, _strip_markdown_json_fence, build_evidence_prompt, known_evidence_refs
+import llm_common
+from llm_common import DEFAULT_MODEL, _strip_markdown_json_fence, build_evidence_prompt, call_llm_safe, known_evidence_refs
 
 
 class TestBuildEvidencePrompt(unittest.TestCase):
@@ -56,6 +58,28 @@ class TestKnownEvidenceRefs(unittest.TestCase):
         residual = {"unitIds": ["svc.py"], "evidenceRefs": []}
         unit_index = {"svc.py": {"evidenceRefs": ["svc.py:10"]}, "unrelated.py": {"evidenceRefs": ["unrelated.py:1"]}}
         self.assertEqual(known_evidence_refs(residual, unit_index), {"svc.py:10"})
+
+
+class TestCallLlmSafe(unittest.TestCase):
+    """Real, live-found bug (2026-09-03): _call_llm raising RuntimeError on
+    a real, transient claude CLI failure (exit 1, empty stderr -- hit
+    running a real ~30-residual dossier batch against a full real evidence
+    set) used to propagate all the way up and crash the entire batch,
+    discarding every prior successful result in the same run. call_llm_safe
+    wraps this so a caller's batch loop can isolate one residual's failure
+    from every other one."""
+
+    def test_success_returns_raw_text_and_no_error(self):
+        with mock.patch.object(llm_common, "_call_llm", return_value="real result text"):
+            raw, error = call_llm_safe("system", "user")
+        self.assertEqual(raw, "real result text")
+        self.assertIsNone(error)
+
+    def test_runtime_error_returns_none_and_the_real_reason_never_raises(self):
+        with mock.patch.object(llm_common, "_call_llm", side_effect=RuntimeError("claude CLI exited 1: ")):
+            raw, error = call_llm_safe("system", "user")
+        self.assertIsNone(raw)
+        self.assertEqual(error, "claude CLI exited 1: ")
 
 
 class TestDefaultModel(unittest.TestCase):
