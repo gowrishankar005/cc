@@ -10,11 +10,24 @@ import { parseAllDocuments } from 'yaml';
  * differ and are NOT resolved here). Kustomize/Helm template resolution is
  * explicit backlog, not silently assumed to work against a templated source.
  *
- * Only `Deployment` objects are read for trust detection.
+ * `Deployment` and `StatefulSet` objects are both read (same
+ * `spec.template.spec` Pod-template shape — a StatefulSet is not a special
+ * case, it's the same real k8s convention, just a different top-level
+ * `kind`). Real gap found scoping §5.7a (k8s-evidenced database node
+ * synthesis, Architecture_as_Code_Solution_Design_v2.md): a reference Java
+ * microservices banking sample's own real Postgres database manifests
+ * (`ledger-db`/`accounts-db`) are `kind: StatefulSet`, not `Deployment` —
+ * a real, common pattern for stateful workloads needing stable storage
+ * identity. Excluding it meant this provider silently never saw the exact
+ * database manifests §5.7a's own database-image-recognition fallback was
+ * built to reach. `DeploymentManifest`/`discoverDeployments` keep their
+ * existing names (avoiding a wider rename across every consumer file that
+ * already imports them) — they now mean "workload manifest," not literally
+ * "Deployment-kind-only."
  * Names only for Secret/ConfigMap references — this file never reads a
  * real `Secret`/`ConfigMap` object's `data`/`stringData`, only which OTHER
- * object's `metadata.name` a Deployment references by name. No secret
- * VALUE is ever on a code path this provider touches.
+ * object's `metadata.name` a Deployment/StatefulSet references by name. No
+ * secret VALUE is ever on a code path this provider touches.
  */
 const SKIP_DIRS = new Set(['node_modules', '.git']);
 
@@ -27,6 +40,16 @@ export interface DeploymentManifest {
   name: string;
   namespace: string;
   image?: string;
+  // Additive. Real gap found scoping §5.7a: a team's own custom-built
+  // database image commonly has NO literal engine name anywhere in its
+  // registry path (e.g. a reference Java microservices banking sample's
+  // real `ledger-db`/`accounts-db` StatefulSets both publish under their
+  // own app-registry path, not "postgres") — but the container is
+  // conventionally still NAMED after its role (`name: postgres` in the
+  // real manifest), a second, independent real signal `image` alone
+  // misses entirely. First container's own `name` field, not derived from
+  // `image` in any way.
+  containerName?: string;
   configMapNames: string[];
   secretMounts: SecretMount[];
   sourceFile: string;
@@ -63,7 +86,7 @@ function findManifestFiles(manifestsDir: string): string[] {
 }
 
 function extractDeployment(doc: any, sourceFile: string): DeploymentManifest | undefined {
-  if (doc?.kind !== 'Deployment') return undefined;
+  if (doc?.kind !== 'Deployment' && doc?.kind !== 'StatefulSet') return undefined;
 
   const name: string | undefined = doc?.metadata?.name;
   if (!name) return undefined;
@@ -71,6 +94,7 @@ function extractDeployment(doc: any, sourceFile: string): DeploymentManifest | u
 
   const containers: any[] = doc?.spec?.template?.spec?.containers ?? [];
   const image: string | undefined = containers[0]?.image;
+  const containerName: string | undefined = containers[0]?.name;
 
   const configMapNames = new Set<string>();
   for (const c of containers) {
@@ -91,7 +115,7 @@ function extractDeployment(doc: any, sourceFile: string): DeploymentManifest | u
     }
   }
 
-  return { name, namespace, image, configMapNames: [...configMapNames], secretMounts, sourceFile };
+  return { name, namespace, image, containerName, configMapNames: [...configMapNames], secretMounts, sourceFile };
 }
 
 function extractConfigMapKeys(doc: any, sourceFile: string): ConfigMapKeys | undefined {

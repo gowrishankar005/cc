@@ -2,6 +2,8 @@ import { DeploymentManifest, ConfigMapKeys } from '../../scanner/k8s-manifest-pr
 import { TypedUnit, TypedRelationship, IgnoredItem, PENDING_STATUS, PENDING_RELATIONSHIP_ID } from '../../types/typed-facts';
 import { EnvRelationshipAllowlist, allowlistedBasename } from '../../rules/env-relationship-schema';
 import { findUnitForDeployment } from './deployment-correlation';
+import { imageEngine } from './contradiction-detector';
+import { k8sDatabaseNodeId } from '../../modules/calm-generator/k8s-database-node-builder';
 
 /**
  * Real evidence: a reference Python microservices banking app's
@@ -75,28 +77,75 @@ export function detectEnvSoftGraphRelationships(
         }
 
         const referencerUnit = findUnitForDeployment(units, referencer.name);
-        const targetUnit = findUnitForDeployment(units, target.name);
-        if (!referencerUnit || !targetUnit) {
+        if (!referencerUnit) {
           ignoredItems.push({
             ref: `k8s:configmap:${configMapName}:${keyName}`,
             reason: 'CROSS_DOMAIN_UNRESOLVED',
-            detail: `${UNRESOLVED_ENV_TARGET_PREFIX} name-correlated "${referencer.name}" -> "${target.name}" (ConfigMap "${configMapName}" key "${keyName}") but ${!referencerUnit ? `no TypedUnit matches "${referencer.name}"` : `no TypedUnit matches "${target.name}"`} — no code-level unit to attach the relationship to.`,
+            detail: `${UNRESOLVED_ENV_TARGET_PREFIX} name-correlated "${referencer.name}" -> "${target.name}" (ConfigMap "${configMapName}" key "${keyName}") but no TypedUnit matches "${referencer.name}" — no code-level unit to attach the relationship to.`,
           });
           continue;
         }
 
-        const pairKey = `${referencerUnit.id}->${targetUnit.id}`;
+        // §5.7a: the target may have no scanned source at all (a pure
+        // init-script/config directory, e.g. a Postgres Deployment with no
+        // application code) — real, checked evidence (a reference Java
+        // microservices banking sample's ledger-db/accounts-db). Before
+        // giving up, check whether the target's own container image OR
+        // container name is a recognized database engine
+        // (contradiction-detector.ts's own imageEngine() — already
+        // shipped, already battle-tested against real Docker
+        // image-reference edge cases, reused rather than re-derived) and
+        // synthesize a k8s-database: node id instead of requiring a real
+        // TypedUnit. Only the TARGET side gets this fallback — a
+        // referencer with no scanned source is a different, out-of-scope
+        // case (handled above, unchanged).
+        //
+        // Real gap found verifying end-to-end against the actual real
+        // manifests this was designed for: a team's own custom-built
+        // database image commonly carries NO literal engine name anywhere
+        // in its registry path at all (real example: a reference Java
+        // microservices banking sample's own `ledger-db`/`accounts-db`
+        // StatefulSets both publish under their own app-registry path,
+        // e.g. ".../bank-of-anthos/ledger-db:v0.6.10@sha256:...", not
+        // "postgres") — but the container is conventionally still NAMED
+        // after its role (the real manifest's own container carries
+        // `name: postgres`). imageEngine() works unmodified on a bare
+        // container-name string too (it already splits on '/' and matches
+        // each segment, and a name with no slashes is just a one-segment
+        // input) — checked image first (a stronger, structural signal),
+        // container name second, never guessed from anything else.
+        const targetUnit = findUnitForDeployment(units, target.name);
+        const targetEngine = !targetUnit ? imageEngine(target.image ?? '') ?? imageEngine(target.containerName ?? '') : undefined;
+        if (!targetUnit && !targetEngine) {
+          ignoredItems.push({
+            ref: `k8s:configmap:${configMapName}:${keyName}`,
+            reason: 'CROSS_DOMAIN_UNRESOLVED',
+            detail: `${UNRESOLVED_ENV_TARGET_PREFIX} name-correlated "${referencer.name}" -> "${target.name}" (ConfigMap "${configMapName}" key "${keyName}") but no TypedUnit matches "${target.name}", its deployment image ${
+              target.image ? `"${target.image}"` : '(none recorded)'
+            }, and its container name ${
+              target.containerName ? `"${target.containerName}"` : '(none recorded)'
+            } do not match a known database engine — no code-level unit to attach the relationship to.`,
+          });
+          continue;
+        }
+
+        const targetId = targetUnit ? targetUnit.id : k8sDatabaseNodeId(target.name);
+        const pairKey = `${referencerUnit.id}->${targetId}`;
         if (seenPairs.has(pairKey)) continue; // multiple allowlisted keys can point at the same target — one edge, not one per key
         seenPairs.add(pairKey);
 
         relationships.push({
           from: referencerUnit.id,
-          to: targetUnit.id,
+          to: targetId,
           kind: 'connects',
-          crossPackage: referencerUnit.filePath !== targetUnit.filePath,
+          crossPackage: targetUnit ? referencerUnit.filePath !== targetUnit.filePath : true, // a synthesized target has no real filePath to compare — definitionally outside any scanned root
           source: 'k8s',
           confidence: 20, // low, fixed — a name-correlation guess, never promoted
-          evidenceNote: `ConfigMap "${configMapName}" key "${keyName}" (allowlisted basename "${basename}") name-correlated to deployment "${target.name}"`,
+          evidenceNote: targetUnit
+            ? `ConfigMap "${configMapName}" key "${keyName}" (allowlisted basename "${basename}") name-correlated to deployment "${target.name}"`
+            : `ConfigMap "${configMapName}" key "${keyName}" name-correlated to deployment "${target.name}" (${
+                target.image && imageEngine(target.image) ? `image "${target.image}"` : `container name "${target.containerName}"`
+              }, recognized database engine "${targetEngine}", no scanned source — synthesized k8s-evidenced database node)`,
           status: PENDING_STATUS,
           id: PENDING_RELATIONSHIP_ID,
         });

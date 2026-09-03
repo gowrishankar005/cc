@@ -3456,6 +3456,31 @@ test(
       // shares-secret + 6 env-soft-graph + 6 deployed-in = 17.
       assert.equal(coverage.relationshipsBySource.k8s, 5 + 6 + 6, 'shares-secret (5) + env-soft-graph connects (6) + deployed-in (6), all source: k8s');
       assert.ok(coverage.unresolvedByMechanism['unresolved-env-target'] > 0);
+
+      // §5.7a real end-to-end finding (2026-09-02) — numbers above are
+      // UNCHANGED by §5.7a's k8s-database-node-synthesis fix, and that's a
+      // real, honest result worth recording, not a silent gap. This
+      // fixture is the exact real ledger-db/accounts-db shape §5.7a was
+      // designed for, but its own two real StatefulSets each fail to
+      // resolve for a DIFFERENT reason than what the design anticipated:
+      // (1) ledger-db is referenced only via a "SPRING_DATASOURCE_URL" key
+      // whose basename ("SPRING_DATASOURCE") never name-correlates to
+      // "ledger-db" at all — the correlation step itself fails, before
+      // §5.7a's image/container-name fallback ever runs (a
+      // findMatchingDeployment/name-correlation gap, outside this fix's
+      // own stated scope, which assumed correlation already succeeds).
+      // (2) accounts-db DOES correlate by name (via ACCOUNTS_DB_URI), but
+      // its own container is literally named "accounts-db" (an
+      // app-specific name) rather than "postgres"/any recognized engine
+      // token, and its image path carries no engine name either — a real,
+      // disclosed LIMIT of image/container-name recognition specifically,
+      // not a bug. The mechanism itself is proven real and correct
+      // (regression.test.js's own synthetic tests reproduce ledger-db's
+      // EXACT real container-name shape, "postgres", and confirm it
+      // resolves) — this fixture's own two real edges just don't happen to
+      // hit the specific signal §5.7a recognizes. See BACKLOG.md for the
+      // full disclosure.
+      assert.equal(coverage.relationshipsBySource.k8s, 17, 'confirms §5.7a genuinely added zero NEW resolved edges for this specific fixture (StatefulSet-scanning added new deployments read, but neither ledger-db nor accounts-db resolves here, for the two real, disclosed reasons above) — a real result, not an oversight');
     } finally {
       fs.rmSync(outDir, { recursive: true, force: true });
     }
@@ -3643,6 +3668,92 @@ test('HITL review trigger: low-confidence-emitted-relationship — falls back to
   const lowConf = queue.items.filter((i) => i.trigger === 'low-confidence-emitted-relationship');
   assert.equal(lowConf.length, 1);
   assert.ok(lowConf[0].rationale.includes('No further evidence captured'), 'must fall back to a generic note, not crash, when evidenceNote is unset (a future non-env-soft-graph low-confidence producer)');
+});
+
+test('§5.7a — env-soft-graph target with a recognized database engine image and no scanned source synthesizes a k8s-database: node instead of an unresolved-env-target', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+  const { k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));
+
+  const referencerUnit = { id: 'ledgerwriter.java', kind: 'service', name: 'LedgerWriterController', filePath: 'ledgerwriter.java', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'ledgerwriter', namespace: 'default', configMapNames: ['ledger-db-config'], secretMounts: [], sourceFile: 'ledgerwriter.yaml' },
+    // No scanned TypedUnit for this deployment at all — a pure Postgres init-script directory, real evidence shape.
+    { name: 'ledger-db', namespace: 'default', image: 'postgres:14-alpine', configMapNames: [], secretMounts: [], sourceFile: 'ledger-db.yaml' },
+  ];
+  const configMaps = [{ name: 'ledger-db-config', keyNames: ['LEDGER_DB_ADDR'] }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(ignoredItems.length, 0, `expected the database-image fallback to resolve this, no unresolved-env-target expected: ${JSON.stringify(ignoredItems)}`);
+  assert.equal(relationships.length, 1);
+  assert.equal(relationships[0].to, k8sDatabaseNodeId('ledger-db'), 'must synthesize the same id k8s-database-node-builder.ts will build a real CALM node for');
+  assert.equal(relationships[0].crossPackage, true, 'a synthesized target has no real filePath — must be treated as cross-package');
+  assert.equal(relationships[0].confidence, 20);
+  assert.ok(relationships[0].evidenceNote.includes('postgres:14-alpine'), 'evidenceNote must cite the real image that triggered the fallback');
+  assert.ok(relationships[0].evidenceNote.includes('postgresql'), 'evidenceNote must cite the real recognized engine name');
+});
+
+test('§5.7a — env-soft-graph target whose IMAGE has no literal engine name but whose CONTAINER NAME does (real shape found verifying against a reference Java microservices banking sample) still synthesizes a k8s-database: node', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+  const { k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));
+
+  const referencerUnit = { id: 'ledgerwriter.java', kind: 'service', name: 'LedgerWriterController', filePath: 'ledgerwriter.java', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'ledgerwriter', namespace: 'default', configMapNames: ['ledger-db-config'], secretMounts: [], sourceFile: 'ledgerwriter.yaml' },
+    // Real shape: a custom-built registry image with NO literal engine name in the path at all, but a container literally named "postgres".
+    {
+      name: 'ledger-db',
+      namespace: 'default',
+      image: 'us-central1-docker.pkg.dev/bank-of-anthos-ci/bank-of-anthos/ledger-db:v0.6.10@sha256:891cb7afe34f358ce7ed7002a1923b25e113b30bca44fecb10cc8b116d665a03',
+      containerName: 'postgres',
+      configMapNames: [],
+      secretMounts: [],
+      sourceFile: 'ledger-db.yaml',
+    },
+  ];
+  const configMaps = [{ name: 'ledger-db-config', keyNames: ['LEDGER_DB_ADDR'] }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(ignoredItems.length, 0, `expected the container-name fallback to resolve this: ${JSON.stringify(ignoredItems)}`);
+  assert.equal(relationships.length, 1);
+  assert.equal(relationships[0].to, k8sDatabaseNodeId('ledger-db'));
+  assert.ok(relationships[0].evidenceNote.includes('postgres'), 'evidenceNote must cite the real container name that triggered the fallback, since the image itself has no literal engine name');
+});
+
+test('§5.7a — env-soft-graph target with NO scanned source and an unrecognized image still falls through to unresolved-env-target, never guesses', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+
+  const referencerUnit = { id: 'svc.py', kind: 'service', name: 'svc', filePath: 'svc.py', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'svc', namespace: 'default', configMapNames: ['cfg'], secretMounts: [], sourceFile: 'svc.yaml' },
+    // Same shape as contradiction-detector.ts's own "never guessed from an unrelated app image" case.
+    { name: 'orders-service', namespace: 'default', image: 'myorg/orders-service:1.4', configMapNames: [], secretMounts: [], sourceFile: 'orders.yaml' },
+  ];
+  const configMaps = [{ name: 'cfg', keyNames: ['ORDERS_SERVICE_ADDR'] }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(relationships.length, 0, 'an unrecognized image must never synthesize a database node');
+  assert.equal(ignoredItems.length, 1);
+  assert.ok(ignoredItems[0].detail.includes('unresolved-env-target'));
+  assert.ok(ignoredItems[0].detail.includes('do not match a known database engine'), 'detail text must say precisely why — no TypedUnit AND no recognized image/container name');
+});
+
+test('buildK8sDatabaseNodes — one database-kind CALM node per unique k8s-database: id, deterministic', () => {
+  const { buildK8sDatabaseNodes, k8sDatabaseNodeId } = require(path.join(PIPELINE_ROOT, 'dist/modules/calm-generator/k8s-database-node-builder'));
+  const relationships = [
+    { from: 'svc.java', to: k8sDatabaseNodeId('ledger-db'), kind: 'connects', crossPackage: true, source: 'k8s', status: 'observed', id: 'r1' },
+    { from: 'svc2.java', to: k8sDatabaseNodeId('ledger-db'), kind: 'connects', crossPackage: true, source: 'k8s', status: 'observed', id: 'r2' }, // same target twice — one node, not two
+    { from: 'svc3.java', to: k8sDatabaseNodeId('accounts-db'), kind: 'connects', crossPackage: true, source: 'k8s', status: 'observed', id: 'r3' },
+    { from: 'svc4.java', to: 'some-real-unit', kind: 'connects', crossPackage: false, source: 'codegraph', status: 'observed', id: 'r4' }, // no prefix — must not produce a node
+  ];
+  const nodes = buildK8sDatabaseNodes(relationships);
+  assert.equal(nodes.length, 2);
+  const ids = nodes.map((n) => n['unique-id']).sort();
+  assert.deepEqual(ids, [k8sDatabaseNodeId('accounts-db'), k8sDatabaseNodeId('ledger-db')].sort());
+  assert.ok(nodes.every((n) => n['node-type'] === 'database'));
+  assert.deepEqual(buildK8sDatabaseNodes(relationships), nodes, 'must be deterministic across calls');
 });
 
 test('HITL review trigger: no silence flags -> empty review queue (not an empty file, a real empty array)', () => {
