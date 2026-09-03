@@ -101,6 +101,25 @@ comes from. If the evidence genuinely shows no such pattern, say so plainly
 in "explanation" rather than speculating -- this is hard rule 2, restated
 for this specific question, not a license to relax it."""
 
+S3_MESSAGING_PRODUCER_ADDENDUM = """TRIGGER-SPECIFIC STEER for this residual (S3-messaging-producer-unverified):
+
+This pipeline types a unit as a real messaging producer purely from a
+declared field/import (e.g. a `KafkaTemplate`-typed field, an SQS/SNS
+client import) -- deliberately NOT paired with a `.send()`/`.publish()`
+call-site check, since no such mechanism exists in this pipeline yet.
+Your job here is NOT a generic evidence summary -- it is this one
+specific judgment:
+
+Does the code actually shown to you (your own evidence inputs, nothing
+else) contain a real call that sends or publishes through this specific
+field/import -- e.g. `.send(...)`, `.publish(...)`, an equivalent
+producer-client method? If so, name that call site as one of your
+hypotheses and cite the exact evidence ref it comes from. If the evidence
+genuinely shows the field/import declared but never called, or used for
+something other than sending/publishing, say so plainly in "explanation"
+rather than speculating -- this is hard rule 2, restated for this
+specific question, not a license to relax it."""
+
 REQUIRED_DOSSIER_KEYS = {"explanation", "hypotheses", "evidenceRefsUsed"}
 _EVIDENCE_REF_RE = re.compile(r"\b([\w./-]+\.[a-zA-Z]+):(\d+)\b")
 
@@ -174,13 +193,24 @@ def parse_and_validate_dossier_response(raw_text: str, residual: dict, unit_inde
     return {"outcome": "dossiered", "explanation": explanation, "hypotheses": hypotheses, "evidenceRefsUsed": evidence_refs_used}
 
 
+# Trigger-specific system-prompt steers -- one small, named addendum per
+# trigger, concatenated onto DOSSIER_SYSTEM_PROMPT (never replacing it,
+# never a second prompt-building code path). A dict, not an if/elif chain,
+# so a third trigger-specific steer is a one-line addition, not a growing
+# branch (BACKLOG.md's LLM-assist-candidate rows -- S2/S3 both shipped
+# 2026-09-02).
+_TRIGGER_ADDENDA = {
+    "S2-http-without-security-control": S2_AUTH_JUDGMENT_ADDENDUM,
+    "S3-messaging-producer-unverified": S3_MESSAGING_PRODUCER_ADDENDUM,
+}
+
+
 def dossier_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
     if not _llm_backend_available():
         return {"outcome": "no_key", "reason": "no LLM backend available (`claude` CLI not found on PATH) -- nothing dossiered"}
     user_prompt = build_dossier_prompt(residual, unit_index, packs)
-    system_prompt = DOSSIER_SYSTEM_PROMPT
-    if residual.get("trigger") == "S2-http-without-security-control":
-        system_prompt = DOSSIER_SYSTEM_PROMPT + "\n\n" + S2_AUTH_JUDGMENT_ADDENDUM
+    addendum = _TRIGGER_ADDENDA.get(residual.get("trigger"))
+    system_prompt = DOSSIER_SYSTEM_PROMPT + "\n\n" + addendum if addendum else DOSSIER_SYSTEM_PROMPT
     raw = _call_llm(system_prompt, user_prompt)
     return parse_and_validate_dossier_response(raw, residual, unit_index)
 

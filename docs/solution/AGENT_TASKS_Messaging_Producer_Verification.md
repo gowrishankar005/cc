@@ -1,5 +1,7 @@
 # AGENT TASK — Messaging-producer usage verification: a currently 100%-silent gap gets a real review path
 
+**Status: SHIPPED 2026-09-02 (T-1 + T-2).** See `BACKLOG.md`'s row for full detail and real end-to-end/live-model verification against `KafkaExternalEventProducer.java`.
+
 **Lane:** T-1 independent (deterministic, no LLM); T-2 depends on T-1 (a real trigger must exist before a dossier addendum can steer toward it)
 **Governance/DoD:** `scope-limitations.yml`'s `messaging-producer-field-type-only` (the disclosed gap this executes), `docs/solution/BACKLOG.md`'s "Messaging-producer usage verification" row, `docs/solution/Architect_Residual_Review_Session.md` §3.1 (T-1's new trigger must land in the same diff as a producer-registry row update, per that section's own CI-enforced rule)
 **Priority:** #5 in the 2026-09-02 consolidated LLM-assist planning list.

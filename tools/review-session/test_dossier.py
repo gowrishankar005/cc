@@ -208,5 +208,41 @@ class TestS2AuthJudgmentAddendum(unittest.TestCase):
         self.assertEqual(system_prompt_used, dossier.DOSSIER_SYSTEM_PROMPT)
 
 
+TIER_A_S3_RESIDUAL = {
+    "id": "R-004",
+    "tier": "A",
+    "class": "messaging-producer-unverified",
+    "trigger": "S3-messaging-producer-unverified",
+    "unitIds": ["KafkaExternalEventProducer.java"],
+    "evidenceRefs": ["KafkaExternalEventProducer.java:48"],
+    "rationale": "r",
+    "status": "open",
+}
+
+
+class TestS3MessagingProducerAddendum(unittest.TestCase):
+    """BACKLOG.md 'Messaging-producer usage verification', priority #5 of
+    the 2026-09-02 LLM-assist candidate batch -- a trigger-specific
+    system-prompt steer, not a new mechanism, same shape as the S2
+    addendum above. Must engage ONLY for S3-messaging-producer-unverified,
+    never leak into any other trigger's prompt (including S2's own)."""
+
+    def test_s3_residual_gets_addendum_appended_to_system_prompt(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_S3_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
+        self.assertIn(dossier.DOSSIER_SYSTEM_PROMPT, system_prompt_used)
+        self.assertNotIn(dossier.S2_AUTH_JUDGMENT_ADDENDUM, system_prompt_used, "S2's own addendum must never leak into an S3 residual's prompt")
+
+    def test_s2_residual_does_not_get_s3_addendum(self):
+        raw = json.dumps({"explanation": "e", "hypotheses": [], "evidenceRefsUsed": []})
+        with mock.patch.object(dossier, "_llm_backend_available", return_value=True), mock.patch.object(dossier, "_call_llm", return_value=raw) as mock_call:
+            dossier_for_residual(TIER_A_RESIDUAL, {}, {})
+        system_prompt_used = mock_call.call_args[0][0]
+        self.assertNotIn(dossier.S3_MESSAGING_PRODUCER_ADDENDUM, system_prompt_used)
+
+
 if __name__ == "__main__":
     unittest.main()
