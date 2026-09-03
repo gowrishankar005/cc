@@ -118,6 +118,32 @@ class TestCardDeterminism(unittest.TestCase):
         self.assertIn("Reject — remove it", card)
         self.assertIn("service-api-config", card, "real evidenceNote must reach the rendered card, not just a bare confidence number")
 
+    def test_messaging_producer_unverified_offers_confirm_reject_and_renders_a_real_card(self):
+        """BACKLOG.md "Messaging-producer usage verification", priority #5
+        — real options AND a real rendered card, not just build_options's
+        returned list (same depth-of-check discipline as the
+        low-confidence-emitted-relationship test above)."""
+        residual = {
+            "id": "R-030",
+            "tier": "A",
+            "class": "messaging-producer-unverified",
+            "unitIds": ["KafkaExternalEventProducer.java"],
+            "evidenceRefs": ["KafkaExternalEventProducer.java:48"],
+            "rationale": '"KafkaExternalEventProducer.java" is typed as a messaging producer purely from field-type/import-only evidence — no .send()/.publish() call-site check exists in this pipeline yet. Review whether the code actually uses this field/import to send or publish.',
+        }
+        unit_index = {"KafkaExternalEventProducer.java": {"kind": "topic", "confidence": 40, "evidenceRefs": ["KafkaExternalEventProducer.java:48"]}}
+
+        options = build_options(residual, unit_index)
+        labels = [o["label"] for o in options]
+        self.assertIn("Confirm — this is a real messaging producer", labels)
+        self.assertIn("Reject — remove it", labels)
+        self.assertEqual(options[-1]["key"], "other")
+
+        card = render_card_markdown(residual, unit_index, {}, [])
+        self.assertIn("Confirm — this is a real messaging producer", card)
+        self.assertIn("Reject — remove it", card)
+        self.assertIn("KafkaExternalEventProducer.java", card)
+
     def test_contradicting_evidence_never_auto_picks_a_winner(self):
         """T-FS-3: the card must offer real choices (trust config / trust
         manifest / both-correct-for-different-envs) but never silently

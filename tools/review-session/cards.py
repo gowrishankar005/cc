@@ -101,6 +101,23 @@ def _low_confidence_emitted_relationship_options(residual: dict, unit_index: dic
     ]
 
 
+def _messaging_producer_unverified_options(residual: dict, unit_index: dict) -> list[dict]:
+    """BACKLOG.md "Messaging-producer usage verification" -- a topic unit
+    typed purely from field-type/import-only messaging evidence, never
+    paired with a real .send()/.publish() call-site check (no such
+    mechanism exists in this pipeline yet). Only two real options, same
+    minimal shape as _low_confidence_emitted_relationship_options above.
+    Confirm needs no Override at all (a Decision Record alone -- the
+    documented, most common real outcome); reject needs a node_remove
+    Override (already fully supported, including cascading relationship
+    cleanup), target_ref the unit's own id (already the CALM node's own
+    unique-id, per node-builder.ts)."""
+    return [
+        {"key": "1", "label": "Confirm — this is a real messaging producer", "detail": "Decision Record only, no Override — the field-type/import evidence is correct even without a call-site check"},
+        {"key": "2", "label": "Reject — remove it", "detail": "Decision Record + node_remove Override (already fully supported, including cascading relationship cleanup) — the field is declared but never actually used to send/publish, or belongs to a different client entirely"},
+    ]
+
+
 def _catalogue_candidate_options(residual: dict, unit_index: dict) -> list[dict]:
     """Unmapped-signal cluster: catalogue lane first (S11), optional
     one-off construct only if a packed sample already names a real unit —
@@ -167,6 +184,7 @@ _CLASS_TEMPLATES = {
     # card, not by inspecting residuals.json alone.
     "unresolved-outbound-target": _single_candidate_below_threshold_options,
     "low-confidence-emitted-relationship": _low_confidence_emitted_relationship_options,
+    "messaging-producer-unverified": _messaging_producer_unverified_options,
 }
 
 

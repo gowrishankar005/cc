@@ -78,7 +78,14 @@ export interface ReviewQueueItem {
     // opt-in env-soft-graph mechanism, --enable-env-soft-graph) with
     // nothing ever surfacing it for a second look. Reads TypedRelationship[]
     // directly, never an IgnoredItem — a third kind of producer.
-    | 'low-confidence-emitted-relationship';
+    | 'low-confidence-emitted-relationship'
+    // BACKLOG.md "Messaging-producer usage verification" — coverage-report.ts's
+    // new S3 flag. A topic unit typed purely from field-type/import-only
+    // messaging evidence, never paired with a real .send()/.publish()
+    // call-site check (no such mechanism exists in this pipeline yet).
+    // Same shape as S2: a completely silent gap before this trigger
+    // existed, an architect judgment call, not a draftable action.
+    | 'S3-messaging-producer-unverified';
   /** Absent for a genuinely run-level residual (S5-cfn-routes-found-but-unbound) — no unit was matched, so none can be named. */
   unitId?: string;
   unitKind?: TypedUnit['kind'];
@@ -225,6 +232,19 @@ export function buildReviewQueue(facts: TypedFacts, coverage: CoverageReport): R
         unitKind: unit.kind,
         confidence: unit.confidence,
         rationale: `"${unit.id}" has HTTP-entry-point evidence but no security-control evidence found by this pipeline's catalogue. Review whether real auth exists in source that this run's mechanisms don't cover.`,
+      });
+    }
+  }
+
+  if (silenceFlags.some((f) => f.startsWith('S3-messaging-producer-unverified'))) {
+    for (const unit of facts.units) {
+      if (unit.kind !== 'topic' || !unit.evidence.some((e) => e.category === 'messaging')) continue;
+      items.push({
+        trigger: 'S3-messaging-producer-unverified',
+        unitId: unit.id,
+        unitKind: unit.kind,
+        confidence: unit.confidence,
+        rationale: `"${unit.id}" is typed as a messaging producer purely from field-type/import-only evidence — no .send()/.publish() call-site check exists in this pipeline yet. Review whether the code actually uses this field/import to send or publish, or whether it's declared-but-unused / a different client entirely.`,
       });
     }
   }

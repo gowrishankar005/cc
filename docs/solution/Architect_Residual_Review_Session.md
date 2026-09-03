@@ -259,6 +259,7 @@ section also changing in the same diff.
 |---|---|---|---|
 | `S1-zero-service-touching-relationships` | `coverage-report.ts` `computeCompleteness` | A | multi-candidate-bridge |
 | `S2-http-without-security-control` | `coverage-report.ts` `computeCompleteness` | A | security-authority-policy |
+| `S3-messaging-producer-unverified` | `coverage-report.ts` `computeCompleteness` | A | messaging-producer-unverified |
 | `S5-zero-service-units-with-store-present` | `coverage-report.ts` `computeCompleteness` | A | ontology-judgment |
 | `S5-cfn-routes-found-but-unbound` | `coverage-report.ts` `computeCompleteness` | C | missing-intermediates-not-in-scan |
 | `S6-isolated-nodes` | `coverage-report.ts` `computeCompleteness` | — (soft flag, informational; not a `review-queue.json` residual trigger today — `--strict-isolated-nodes` is the hard-gate opt-in, not a pack input) | — |
@@ -285,6 +286,7 @@ section also changing in the same diff.
 | `S1-zero-service-touching-relationships` | A | multi-candidate-bridge |
 | `low-architecture-coverage` | A | multi-candidate-bridge |
 | `S2-http-without-security-control` | A | security-authority-policy |
+| `S3-messaging-producer-unverified` (new, 2026-09-02, shipped — see below) | A | messaging-producer-unverified |
 | `S5-zero-service-units-with-store-present` | A | ontology-judgment |
 | `S5-cfn-routes-found-but-unbound` | C | missing-intermediates-not-in-scan |
 | `multi-hop-single-candidate-below-threshold` | B | single-candidate-below-threshold |

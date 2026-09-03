@@ -126,6 +126,30 @@ class TestBuildResiduals(unittest.TestCase):
         self.assertEqual(residuals[0]["class"], "low-confidence-emitted-relationship")
         self.assertEqual(residuals[0]["unitIds"], ["ledgerwriter"])
 
+    def test_s3_messaging_producer_unverified_maps_to_tier_a(self):
+        """BACKLOG.md "Messaging-producer usage verification", priority #5
+        of the 2026-09-02 LLM-assist consolidated plan — a topic unit typed
+        purely from field-type/import-only messaging evidence, never paired
+        with a real .send()/.publish() call-site check. Tier A, not B: no
+        single obviously-correct draftable action, an architect (or LLM
+        dossier) has to actually read the code to judge."""
+        rq = {
+            "items": [
+                {
+                    "trigger": "S3-messaging-producer-unverified",
+                    "unitId": "KafkaExternalEventProducer.java",
+                    "unitKind": "topic",
+                    "confidence": 40,
+                    "rationale": '"KafkaExternalEventProducer.java" is typed as a messaging producer purely from field-type/import-only evidence — no .send()/.publish() call-site check exists in this pipeline yet.',
+                }
+            ]
+        }
+        residuals = build_residuals(rq)
+        self.assertEqual(len(residuals), 1)
+        self.assertEqual(residuals[0]["tier"], "A")
+        self.assertEqual(residuals[0]["class"], "messaging-producer-unverified")
+        self.assertEqual(residuals[0]["unitIds"], ["KafkaExternalEventProducer.java"])
+
     def test_empty_queue_produces_empty_residuals(self):
         self.assertEqual(build_residuals({"items": []}), [])
 

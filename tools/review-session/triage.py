@@ -71,6 +71,17 @@ _TRIGGER_MAP = {
     "multi-hop-single-candidate-below-threshold": ("B", "single-candidate-below-threshold"),
     "contradicting-evidence-force-review": ("A", "contradicting-evidence"),
     "unresolved-outbound-target": ("B", "unresolved-outbound-target"),
+    # S3-messaging-producer-unverified -> Tier A "messaging-producer-unverified"
+    # (BACKLOG.md "Messaging-producer usage verification", priority #5 of
+    # the 2026-09-02 LLM-assist consolidated plan). A topic unit typed
+    # purely from field-type/import-only messaging evidence, never paired
+    # with a real .send()/.publish() call-site check (no such mechanism
+    # exists in this pipeline yet). Tier A, not B: like ontology-judgment/
+    # contradicting-evidence, there's no single obviously-correct draftable
+    # action -- an architect (or an LLM dossier) has to actually read the
+    # code to judge, and a wrong automated guess risks deleting a real
+    # messaging producer or leaving a real false positive in place.
+    "S3-messaging-producer-unverified": ("A", "messaging-producer-unverified"),
     # low-confidence-emitted-relationship -> Tier A "low-confidence-emitted-
     # relationship" (Architect_Residual_Review_Session.md §3.3, priority #3
     # of the 2026-09-02 LLM-assist consolidated plan). A genuinely different

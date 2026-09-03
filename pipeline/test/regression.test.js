@@ -1802,6 +1802,55 @@ test('S6 (BACKLOG.md "Isolated-node completeness flag") — a unit with zero rel
   assert.equal(onlyTargetCompleteness.isolatedNodeCount, 1, 'b.py now has zero relationships (r1 removed) so it — not orphan.py, which is now a real `to` endpoint — is the isolated one');
 });
 
+test('S3 (BACKLOG.md "Messaging-producer usage verification") — a topic unit with messaging-category evidence fires; spring-config-broker (category spring-config, a stronger signal) never does', () => {
+  const { computeCompleteness } = require(path.join(PIPELINE_ROOT, 'dist/analysis/coverage-report'));
+
+  const fieldTypeProducer = {
+    id: 'KafkaExternalEventProducer.java',
+    kind: 'topic',
+    name: 'KafkaExternalEventProducer',
+    filePath: 'KafkaExternalEventProducer.java',
+    startLine: 48,
+    endLine: 60,
+    evidence: [{ signal: 'KafkaTemplate', source: 'field-type', category: 'messaging', weight: 40, ref: 'KafkaExternalEventProducer.java:48' }],
+    confidence: 40,
+    status: 'observed',
+  };
+  const importOnlyProducer = {
+    id: 'OrdersDynamoStore.ts',
+    kind: 'topic',
+    name: 'OrdersDynamoStore',
+    filePath: 'OrdersDynamoStore.ts',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: '@aws-sdk/client-sqs', source: 'graphify-import', category: 'messaging', weight: 20, ref: 'OrdersDynamoStore.ts:1' }],
+    confidence: 20,
+    status: 'observed',
+  };
+  const springConfigBroker = {
+    id: 'application.yml::spring-kafka',
+    kind: 'topic',
+    name: 'kafka broker',
+    filePath: 'application.yml',
+    startLine: 1,
+    endLine: 1,
+    evidence: [{ signal: 'spring.kafka.bootstrap-servers=kafka-host:9092', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:spring.kafka.bootstrap-servers' }],
+    confidence: 40,
+    status: 'observed',
+  };
+  const completeness = computeCompleteness([fieldTypeProducer, importOnlyProducer, springConfigBroker], []);
+  assert.equal(completeness.messagingProducerUnverifiedCount, 2, 'both field-type and import-only messaging evidence must count; spring-config-broker (category spring-config, a real config-declared address) must not');
+  assert.ok(
+    completeness.silenceFlags.some((f) => f.startsWith('S3-messaging-producer-unverified')),
+    `expected an S3-messaging-producer-unverified silenceFlag, got: ${completeness.silenceFlags}`
+  );
+
+  // Negative: only the stronger spring-config-broker signal present -> S3 must stay silent.
+  const noFieldTypeCompleteness = computeCompleteness([springConfigBroker], []);
+  assert.equal(noFieldTypeCompleteness.messagingProducerUnverifiedCount, 0);
+  assert.ok(!noFieldTypeCompleteness.silenceFlags.some((f) => f.startsWith('S3')), 'a real config-declared broker address must never fire S3');
+});
+
 test('--strict-isolated-nodes: a run with an isolated unit fails loudly when the flag is passed, succeeds without it (BACKLOG row 16, S6)', () => {
   const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/spring-mvc-sample');
   const outDir1 = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
@@ -3668,6 +3717,55 @@ test('HITL review trigger: low-confidence-emitted-relationship — falls back to
   const lowConf = queue.items.filter((i) => i.trigger === 'low-confidence-emitted-relationship');
   assert.equal(lowConf.length, 1);
   assert.ok(lowConf[0].rationale.includes('No further evidence captured'), 'must fall back to a generic note, not crash, when evidenceNote is unset (a future non-env-soft-graph low-confidence producer)');
+});
+
+test('HITL review trigger: S3-messaging-producer-unverified — fires for a topic unit with messaging-category evidence, never for service/database units or a topic unit with no messaging evidence', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [
+      {
+        id: 'KafkaExternalEventProducer.java',
+        kind: 'topic',
+        filePath: 'KafkaExternalEventProducer.java',
+        startLine: 48,
+        endLine: 60,
+        confidence: 40,
+        evidence: [{ signal: 'KafkaTemplate', source: 'field-type', category: 'messaging', weight: 40, ref: 'KafkaExternalEventProducer.java:48' }],
+      },
+      // spring-config-broker shape — category 'spring-config', not 'messaging' — must NOT fire.
+      { id: 'application.yml::spring-kafka', kind: 'topic', filePath: 'application.yml', startLine: 1, endLine: 1, confidence: 40, evidence: [{ signal: 'spring.kafka.bootstrap-servers=kafka-host:9092', source: 'structured-config', category: 'spring-config', weight: 40, ref: 'application.yml:spring.kafka.bootstrap-servers' }] },
+      // A service unit — wrong kind, must NOT fire.
+      { id: 'svc.py', kind: 'service', filePath: 'svc.py', startLine: 1, endLine: 1, confidence: 80, evidence: [] },
+    ],
+    relationships: [],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: ['S3-messaging-producer-unverified: 1 messaging-producer unit(s) typed from field-type/import-only evidence alone'] } };
+  const queue = buildReviewQueue(facts, coverage);
+  const items = queue.items.filter((i) => i.trigger === 'S3-messaging-producer-unverified');
+  assert.equal(items.length, 1, 'exactly the one topic unit with real messaging-category evidence must fire this trigger');
+  assert.equal(items[0].unitId, 'KafkaExternalEventProducer.java');
+  assert.equal(items[0].unitKind, 'topic');
+});
+
+test('HITL review trigger: S3-messaging-producer-unverified — never fires when the S3 silence flag did not fire (gated, unlike unresolved-outbound-target/low-confidence-emitted-relationship)', () => {
+  const { buildReviewQueue } = require(path.join(PIPELINE_ROOT, 'dist/analysis/ir/hitl-review-trigger'));
+  const facts = {
+    contractVersion: '7.0.0',
+    runVersion: 'test',
+    generatedAt: new Date().toISOString(),
+    packageRoots: [],
+    units: [{ id: 'KafkaExternalEventProducer.java', kind: 'topic', filePath: 'k.java', startLine: 1, endLine: 1, confidence: 40, evidence: [{ signal: 'KafkaTemplate', source: 'field-type', category: 'messaging', weight: 40, ref: 'k.java:1' }] }],
+    relationships: [],
+    ignoredItems: [],
+  };
+  const coverage = { completeness: { silenceFlags: [] } };
+  const queue = buildReviewQueue(facts, coverage);
+  assert.equal(queue.items.filter((i) => i.trigger === 'S3-messaging-producer-unverified').length, 0);
 });
 
 test('§5.7a — env-soft-graph target with a recognized database engine image and no scanned source synthesizes a k8s-database: node instead of an unresolved-env-target', () => {

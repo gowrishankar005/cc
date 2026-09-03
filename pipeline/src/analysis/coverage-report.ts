@@ -91,6 +91,13 @@ export interface CoverageReport {
      */
     httpUnitsWithoutSecurityControlCount: number;
     /**
+     * Topic-kind units typed purely from field-type/import-only messaging
+     * evidence (BACKLOG.md "Messaging-producer usage verification") — see
+     * S3-messaging-producer-unverified's own definition above for the
+     * exact eligibility rule.
+     */
+    messagingProducerUnverifiedCount: number;
+    /**
      * S4 (confidence-not-completeness) is a documentation invariant, not a
      * computed field — deliberately not modelled here; see
      * scope-limitations.yml / metadata-builder.ts for where it's asserted.
@@ -142,6 +149,27 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
   const httpUnitsWithoutSecurityControlCount = units.filter(
     (u) => u.evidence.some((e) => e.category === 'http-entry-point') && !u.evidence.some((e) => e.category === 'security-control')
   ).length;
+  // §5 (BACKLOG.md "Messaging-producer usage verification"): category
+  // 'messaging' is set only by two deliberately weak, uncorroborated
+  // sources today — field-type (a KafkaTemplate-typed field) and
+  // graphify-import (an SQS/SNS import) — neither paired with a
+  // .send()/.publish() call-site check. No stronger messaging-category
+  // source exists in this pipeline (spring-config-broker, a real
+  // config-declared broker address, uses category: 'spring-config'
+  // instead, a structurally different unit) — so every topic-kind unit
+  // with 'messaging' evidence is eligible here, not a narrower subset.
+  //
+  // Naming note: the flag below is 'S3' in the silenceFlags NUMBERING
+  // ONLY (this file's own S0/S1/S2/S5/S6 sequence — S3/S4 were the next
+  // free numbers here). Checked before picking it: several tools/review-session/
+  // files separately cite bare "S1"/"S3"/"S4"/"S7" (e.g. apply.py's "S3/S4"
+  // deliberate-chokepoint note, triage.py's "S7: no sample hardcodes") as
+  // shorthand for a DIFFERENT, unrelated numbered safety/DoD-rule list —
+  // not a real string collision (that citation style never uses the
+  // trailing-hyphen 'S3-...' shape a real silenceFlag does), but worth
+  // flagging so a reader grepping "S3" across the repo isn't confused
+  // about which numbering this is.
+  const messagingProducerUnverifiedCount = units.filter((u) => u.kind === 'topic' && u.evidence.some((e) => e.category === 'messaging')).length;
 
   const silenceFlags: string[] = [];
   if (serviceUnitIds.size >= 1 && databaseUnitCount >= 1 && serviceTouchingRelationshipCount === 0) {
@@ -152,6 +180,11 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
   if (httpUnitsWithoutSecurityControlCount > 0) {
     silenceFlags.push(
       `S2-http-without-security-control: ${httpUnitsWithoutSecurityControlCount} HTTP-entry-point unit(s) have no security-control evidence — may reflect a missing detection mechanism, not necessarily "no auth in source"`
+    );
+  }
+  if (messagingProducerUnverifiedCount > 0) {
+    silenceFlags.push(
+      `S3-messaging-producer-unverified: ${messagingProducerUnverifiedCount} messaging-producer unit(s) typed from field-type/import-only evidence alone — no .send()/.publish() call-site check exists in this pipeline yet, so this may be a declared-but-unused field or a different client entirely`
     );
   }
   // The original, still-real gap S1 structurally cannot catch: S1 requires
@@ -209,6 +242,7 @@ export function computeCompleteness(units: TypedUnit[], relationships: TypedRela
     databaseUnitCount,
     serviceTouchingRelationshipCount,
     httpUnitsWithoutSecurityControlCount,
+    messagingProducerUnverifiedCount,
     silenceFlags,
     topicUnitCount,
     servicesWithArchitectureOutbound,
