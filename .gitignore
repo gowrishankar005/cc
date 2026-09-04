@@ -38,6 +38,12 @@ venv/
 # it for negation rules -- ignoring only the dir's *contents* via .claude/* is what makes
 # !.claude/skills able to re-include one entry.)
 !.claude/skills
+# Same carve-out for hook scripts and the shared hook registration file -- real, reviewable
+# team config (a PreToolUse safety gate every clone should get), not personal state.
+# .claude/hooks-state/ (the gate's own runtime marker) is deliberately NOT carved out here --
+# that's genuinely ephemeral, per-local-session state, not something to commit.
+!.claude/hooks
+!.claude/settings.json
 .idea/
 .vscode/
 *.swp

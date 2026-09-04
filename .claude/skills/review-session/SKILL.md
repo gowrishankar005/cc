@@ -25,10 +25,23 @@ top: owning the full loop end to end, not a new review protocol.
 
 **The `allowed-tools` list above is hygiene, not the safety boundary** — same corrected framing
 `residual-review.agent.md` itself states: a declared tool list is friction, not a sandbox. **The
-one guarantee that actually holds is `apply.py`'s own confirmation gate** (step 11 below). Never
+guarantee that actually holds is `apply.py`'s own confirmation gate** (step 11 below). Never
 pass `--i-confirm-apply` to `apply.py` without having already gotten a real, explicit "yes, apply"
 answer from the user via `AskUserQuestion` in THIS conversation, for THIS run. Never invoke
 `run-slice.js --overrides` or `override-applier.ts` any other way.
+
+**As of 2026-09-05, this is also enforced in real code, not just this file's instructions**:
+`.claude/hooks/check-apply-confirmed.py` (a `PreToolUse` hook, registered in `.claude/settings.json`)
+hard-blocks any Bash command reaching `apply.py --i-confirm-apply`, `bulk_apply.py
+--i-confirm-bulk-apply`, or a raw `run-slice.js ... --overrides` call unless a marker proves a real
+`AskUserQuestion` round trip — matching Step 10's exact phrasing below — already completed within
+the last 15 minutes. That marker can only be written by `.claude/hooks/record-apply-confirmation.py`,
+itself only invoked by the harness after a genuine human answer, never by this skill's own choice —
+an LLM cannot fabricate it by skipping the interactive steps. **Disclosed, not silently assumed**:
+whether this hard block still holds under `--dangerously-skip-permissions` is undocumented (checked
+directly against the real Claude Code docs); treat this backstop as conditional on not running in
+that mode, not as an unconditional guarantee. Step 10's question phrasing and option labels are now
+load-bearing for this hook — see that step's own note before editing them.
 
 ## Step 0 — determine mode
 
@@ -176,8 +189,13 @@ decisions_by_id, _ = load_decisions_by_id(decisions)
 print(json.dumps(summarize_by_trigger(residuals, decisions_by_id), indent=2))
 "
 ```
-Then ask exactly one `AskUserQuestion`: **apply now, or stop here and leave the drafts for manual
-review** — no other phrasing implies consent. Do not proceed on an ambiguous or implied yes.
+Then ask exactly one `AskUserQuestion`, with the question text containing **verbatim** the phrase
+`apply now, or stop here` (a real `PreToolUse` hook, `.claude/hooks/check-apply-confirmed.py`,
+pattern-matches this exact substring against the real `AskUserQuestion` call the harness dispatches
+to the user — a code-enforced backstop, not just this instruction — so do not paraphrase it) and
+exactly two options, with labels starting with **`Apply now`** and **`Stop here`** respectively
+(the hook also matches on these labels to tell which one was picked). No other phrasing implies
+consent. Do not proceed on an ambiguous or implied yes.
 
 ## Step 11 — apply, only on explicit yes
 

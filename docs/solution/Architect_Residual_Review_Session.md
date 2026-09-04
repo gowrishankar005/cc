@@ -441,6 +441,20 @@ deviation from `residual-review.agent.md` hard rule 5, not a weakening of it (th
 protection — the architect answers every residual themselves — holds identically, since
 `AskUserQuestion` cannot be answered by the model).
 
+**Real, code-level enforcement added 2026-09-05, not just instructions.** A markdown-instructions
+file is not enforcement — nothing stops an LLM from reading `SKILL.md` and simply choosing to skip
+its interactive steps (the structurally identical VS Code chat-mode system already had exactly
+this failure happen for real, `Architect_Pilot_Feedback_Notes.md` Entry 24). `.claude/hooks/
+check-apply-confirmed.py` (a `PreToolUse` hook) hard-blocks `apply.py --i-confirm-apply`,
+`bulk_apply.py --i-confirm-bulk-apply`, and a raw `run-slice.js --overrides` call unless a marker —
+written only by `.claude/hooks/record-apply-confirmation.py`, itself only invoked by the harness
+after a genuine `AskUserQuestion` round trip with a real human — is present and fresh (15 minutes).
+Empirically verified this same session: `PostToolUse` genuinely fires for `AskUserQuestion` and its
+input includes the real question/answer text, so the gate can verify *which* question and *what was
+answered*, not just that some question fired. **Disclosed limit, not silently assumed away**:
+whether the block survives `--dangerously-skip-permissions` is undocumented in Claude Code's own
+hooks reference — this backstop's guarantee is conditional on not running in that mode.
+
 ### 4.5 CALM viewer — reused, not built
 
 The architect views the generated/reviewed architecture in an **existing CALM viewer plugin** (the FINOS CALM Studio / draw.io↔CALM converter tooling already referenced in `CLAUDE.md`'s CALM Studio contract note), pointed at `architecture.calm.json`. This design adds no new viewer code — its only two obligations toward that plugin are:
