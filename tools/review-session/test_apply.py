@@ -143,6 +143,33 @@ class TestApplyEndToEnd(unittest.TestCase):
         report_md = (self.session_dir / "apply-report.md").read_text()
         self.assertIn("Residual completeness:", report_md)
 
+    def test_apply_completeness_table_covers_multiple_trigger_classes_some_decided_some_not(self):
+        """Real gap found on review: every other completeness-table test
+        only ever exercised a fixture producing ONE trigger class -- this
+        feature's own stated verification bar is >=3 trigger classes, some
+        decided and some not. residuals.json is overwritten with a richer
+        synthetic set (apply.py's completeness view reads it independently
+        of what run-slice itself produced) while the real scan/apply
+        subprocess flow underneath is unchanged."""
+        self._write_draft()  # R-001, decided (S2-http-without-security-control)
+        residuals_path = self.session_dir / "residuals.json"
+        residuals_doc = json.loads(residuals_path.read_text())
+        residuals_doc["items"] = [
+            {"id": "R-001", "tier": "A", "trigger": "S2-http-without-security-control", "class": "x", "unitIds": [], "evidenceRefs": [], "rationale": "r", "status": "open", "card": "c"},
+            {"id": "R-002", "tier": "A", "trigger": "unmapped-signal-cluster", "class": "x", "unitIds": [], "evidenceRefs": [], "rationale": "r", "status": "open", "card": "c"},
+            {"id": "R-003", "tier": "A", "trigger": "unmapped-signal-cluster", "class": "x", "unitIds": [], "evidenceRefs": [], "rationale": "r", "status": "open", "card": "c"},
+            {"id": "R-004", "tier": "B", "trigger": "unresolved-outbound-target", "class": "x", "unitIds": [], "evidenceRefs": [], "rationale": "r", "status": "open", "card": "c"},
+        ]
+        residuals_path.write_text(json.dumps(residuals_doc))
+
+        run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir), "--i-confirm-apply"])
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertIn("residual completeness: 1/4 decided, by trigger:", run.stdout)
+        self.assertIn("[A] S2-http-without-security-control: 1/1 decided", run.stdout)
+        self.assertIn("[A] unmapped-signal-cluster: 0/2 decided", run.stdout)
+        self.assertIn("[B] unresolved-outbound-target: 0/1 decided", run.stdout)
+        self.assertRegex(run.stdout, r"\[apply\] wrote .* \(1/4 residuals had a decision\)")
+
     def test_apply_refuses_without_confirmation(self):
         self._write_draft()
         run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir)], input="")

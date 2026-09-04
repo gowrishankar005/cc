@@ -23,6 +23,22 @@ class TestBuildEvidencePrompt(unittest.TestCase):
         self.assertNotIn("unrelated.py", prompt)
         self.assertNotIn("Unrelated", prompt)
 
+    def test_structured_config_placeholder_reaches_the_prompt_not_silence(self):
+        """Real gap found 2026-08-23, fixed 2026-09-04 (pack.py's
+        _build_evidence_packs): a dotted-key-path evidenceRef (a
+        structured-config unit, e.g. Spring config) used to be silently
+        omitted from packs entirely -- the model saw an empty
+        evidence_snippets dict with no signal why. This locks the actual
+        integration point an LLM call reads from, not just that pack.py's
+        own packs.json has the placeholder -- build_evidence_prompt must
+        pass it through unmodified, same as any other snippet."""
+        residual = {"id": "R-002", "unitIds": ["application-prod.yml::spring-datasource"], "evidenceRefs": []}
+        unit_index = {"application-prod.yml::spring-datasource": {"kind": "database", "confidence": 40, "evidenceRefs": ["application-prod.yml:spring.datasource.url"]}}
+        packs = {"application-prod.yml:spring.datasource.url": "[no source snippet available for this evidence ref — structured-config key path 'application-prod.yml:spring.datasource.url', not a file:line reference]"}
+        prompt = build_evidence_prompt(residual, unit_index, packs)
+        self.assertIn("no source snippet available", prompt)
+        self.assertIn("spring.datasource.url", prompt)
+
 
 class TestStripMarkdownJsonFence(unittest.TestCase):
     def test_bare_fence_stripped(self):

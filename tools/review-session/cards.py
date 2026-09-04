@@ -109,7 +109,7 @@ def _low_confidence_emitted_relationship_options(residual: dict, unit_index: dic
     common real outcome); reject needs a relationship_remove Override,
     target_ref the same relationship id."""
     return [
-        {"key": "1", "label": "Confirm — this relationship is real", "detail": 'Decision Record only, no Override — target_type "relationship", target_ref the relationship id named in the rationale above, final_decision {"action": "accepted", "new_value": null}'},
+        {"key": "1", "label": "Confirm — this relationship is real", "detail": 'Decision Record only, no Override — target_type "relationship", target_ref the relationship id named in the rationale above, final_decision {"action": "accepted", "new_value": null}, residual_id this residual\'s own id'},
         {"key": "2", "label": "Reject — remove it", "detail": "Decision Record + relationship_remove Override, target_ref the same relationship id — deletes an admitted scan fact, per this pack's own AGENTS.md hard rule 8"},
     ]
 

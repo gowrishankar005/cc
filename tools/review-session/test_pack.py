@@ -243,5 +243,67 @@ class TestRenderAgentsMd(unittest.TestCase):
         self.assertIn('"accepted"', rendered)
 
 
+class TestResidualsByTriggerCompletenessViews(unittest.TestCase):
+    """Real gap found on review of this whole feature's own test coverage:
+    every real end-to-end test that exercised the new completeness views
+    (manifest.json's residualsByTrigger, SESSION.md's per-trigger section,
+    apply.py's printed table) only ever used a fixture that produces ONE
+    trigger class -- never the >=3-trigger-class, some-decided-some-not
+    shape this feature's own stated verification bar requires. These are
+    synthetic (no scan/pipeline build needed) so they can exercise that
+    shape directly and cheaply."""
+
+    def _residual(self, rid, trigger, tier):
+        return {"id": rid, "tier": tier, "trigger": trigger, "class": "x", "unitIds": [], "evidenceRefs": [], "rationale": "r", "status": "open", "card": f"### {rid}\n"}
+
+    def test_manifest_inventory_covers_at_least_three_trigger_classes(self):
+        from pack import _residuals_by_trigger_inventory
+
+        residuals = [
+            self._residual("R-001", "S2-http-without-security-control", "A"),
+            self._residual("R-002", "S2-http-without-security-control", "A"),
+            self._residual("R-003", "unmapped-signal-cluster", "A"),
+            self._residual("R-004", "unresolved-outbound-target", "B"),
+            self._residual("R-005", "hand-rolled-resilience-candidate", "C"),
+        ]
+        inventory = _residuals_by_trigger_inventory(residuals)
+        self.assertEqual(len(inventory), 4, "must break down by all real trigger classes present, not collapse them")
+        self.assertEqual(inventory["S2-http-without-security-control"], {"tier": "A", "count": 2})
+        self.assertEqual(inventory["unmapped-signal-cluster"], {"tier": "A", "count": 1})
+        self.assertEqual(inventory["unresolved-outbound-target"], {"tier": "B", "count": 1})
+        self.assertEqual(inventory["hand-rolled-resilience-candidate"], {"tier": "C", "count": 1})
+
+    def test_session_md_shows_the_true_split_across_trigger_classes_some_decided_some_not(self):
+        """The real verification bar this feature was built against: a
+        multi-trigger-class pack, SOME residuals decided (with a real
+        residual_id-bearing Decision Record already on disk) and some not
+        -- SESSION.md's own render must show the true per-class split, not
+        a synthetic single-class case."""
+        from pack import _render_session_md
+
+        residuals = [
+            self._residual("R-001", "S2-http-without-security-control", "A"),
+            self._residual("R-002", "unmapped-signal-cluster", "A"),
+            self._residual("R-003", "unmapped-signal-cluster", "A"),
+            self._residual("R-004", "unresolved-outbound-target", "B"),
+        ]
+        manifest = {"generatedAt": "2026-09-04T00:00:00Z", "outDir": "/tmp/x", "hasCalm": False}
+        tmp = Path(tempfile.mkdtemp(prefix="session-md-multi-trigger-test-"))
+        try:
+            decisions_dir = tmp / "drafts" / "decisions"
+            decisions_dir.mkdir(parents=True)
+            # Only R-001 and one of the two unmapped-signal-cluster residuals get a real decision.
+            for rid, did in (("R-001", "D-001"), ("R-002", "D-002")):
+                (decisions_dir / f"{did}.json").write_text(json.dumps({"decision_id": did, "status": "active", "residual_id": rid}))
+
+            rendered = _render_session_md(manifest, residuals, tmp)
+            self.assertIn("### By trigger class", rendered)
+            self.assertIn("[A] `S2-http-without-security-control`: 1/1 decided", rendered)
+            self.assertIn("[A] `unmapped-signal-cluster`: 1/2 decided", rendered)
+            self.assertIn("[B] `unresolved-outbound-target`: 0/1 decided", rendered)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
