@@ -23,7 +23,7 @@ limitations:
   - id: boundary-change-override-single-membership-only
     text: "boundary_change override: a node can belong to at most one composed-of boundary at a time — applying the override always vacates any prior boundary membership before placing the node in the new one (or none, when container is explicitly null). A real use case needing a node in 2+ composed-of boundaries simultaneously is not supported; not evidenced as a real need yet."
   - id: env-relationship-name-correlation-only
-    text: "Env/ConfigMap-mediated relationships are detected only via --enable-env-soft-graph (opt-in, requires --k8s-manifests too) and only by KEY-NAME correlation against an allowlisted suffix list — always low, fixed confidence, never a value-based inference."
+    text: "Env/ConfigMap-mediated relationships are detected only via --enable-env-soft-graph (opt-in, requires --k8s-manifests too), primarily by KEY-NAME correlation against an allowlisted suffix list — always low, fixed confidence when auto-emitted this way. When the key NAME fails to correlate, the key's own VALUE (a bare host or credential-stripped URI) is also tried, but a value-based match is never auto-emitted into a CALM relationship at any confidence — only surfaced as a suggested candidate in the unresolved-outbound-target HITL review queue, one repo's evidence only (2026-09-04)."
   - id: openapi-partial
     text: "OpenAPI/Swagger files ARE read when present at a package root (interfaces + securitySchemes) — but evidence has no line-number provenance (structural pointer only, not file:line), and build-time-generated specs with no file on disk are not discovered."
   - id: messaging-producer-field-type-only

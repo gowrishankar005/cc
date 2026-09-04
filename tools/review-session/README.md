@@ -5,6 +5,64 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 **Design authority:** [`docs/solution/Architect_Residual_Review_Session.md`](../../docs/solution/Architect_Residual_Review_Session.md)
 **Status:** The full human-only path (pack → choice cards → hand-authored drafts → validate → apply) works end-to-end for real. Tier B drafting's PRIMARY path is in-chat — Copilot Chat's own `editFiles` tool, bound by the §5.1 rules in `.github/agents/residual-review.agent.md`; `draft_tier_b.py` is a secondary, headless/scripted alternative, not the default. T-FS-1 (`docs/solution/AGENT_TASKS_Ext_Fact_Semantics.md`, `BACKLOG.md` "Tier-B residual detection") gave `triage.py` its first real Tier B producer — `multi-hop-single-candidate-below-threshold`, from `multi-hop-bridge-detector.ts`'s own `tier-b-single-candidate` ignored-item (one real store candidate among a bridge's several syntactic implementers). **T-1 (`docs/solution/AGENT_TASKS_Residual_Assist_Redesign.md`, 2026-08-23) closed the live-model gap for real** — `draft_tier_b.py` and `advisory.py` have both now been run against a real, live backend (the `claude` CLI, already authenticated — deliberately never a raw `ANTHROPIC_API_KEY` from the environment, which doesn't match this project's fintech target-customer profile; see either script's own module docstring). T-RT-1 (`bulk_apply.py`, replicate one answered residual across its similar-class siblings), T-RT-2 (`consequence.py`/`queue_rank.py`, consequence-ranked backlog), and T-RT-4 (`advisory.py`, reviewer-assistance advisory layer — explains evidence, proposes hypotheses, drafts catalogue-rule candidates, **never writes a fact**) are done — see `docs/solution/Claim_Register.md`'s `T-RT-1-bulk-residual-authoring` / `T-RT-2-consequence-ranked-queue` / `T-RT-4-reviewer-assistance-advisory` rows for evidence and honest scope limits (bulk-apply not yet run against a real multi-residual scan; consequence signals are named proxies, not a real PII detector). T-RT-3 (call-site security controls, beyond the 4 named vocabularies) is not started. **T-2 (`docs/solution/AGENT_TASKS_Residual_Dossier_Module.md`, 2026-08-23) is done** — `llm_common.py` now holds the evidence-assembly + network-boundary logic advisory.py and draft_tier_b.py used to each duplicate; the opt-in Evidence Dossier pass (`dossier.py`, `pack.py --with-dossier`) attaches an additive `dossier` field to every open residual (any tier), confirmed against a real live `claude` CLI run on the checked-in NestJS fixture; `draft_tier_b.py` now records `draftOutcome: "bar-not-met"` when a Tier B residual's evidence bar genuinely wasn't met. Hardening/portability work is next — see the design doc for what's built vs. not yet.
 
+## Workflow
+
+The required path is the top-to-bottom spine below (`run-slice` → `pack.py`
+→ answer the cards → `apply.py` → `npm run validate`); every tool branching
+off to the side is optional and slots in around that spine without changing
+it.
+
+```
+  run-slice.js  (core pipeline, deterministic)
+        │
+        ▼
+  hitl-review-trigger.js  — names each open finding a "trigger"
+        │
+        ▼
+  review-queue.json
+        │
+        ▼
+  ┌────────────────────────────────────────────────────────────┐
+  │ pack.py  (orchestrator — builds the Session Pack)            │
+  │   review-queue.json → triage.py's _TRIGGER_MAP               │
+  │                        assigns Tier A / Tier B / Tier C here │
+  │   → cards.py (renders choice cards), consequence.py (ranks)  │
+  │   [--with-dossier] → dossier.py / llm_common.py (optional,   │
+  │                       LLM explanation only, never a fact)    │
+  └────────────────────────────────────────────────────────────┘
+        │
+        ▼
+  SESSION PACK on disk: residuals.json, manifest.json (residualsByTrigger
+  inventory), SESSION.md, AGENTS.md, evidence/, drafts/
+        │
+        ├──▶ queue_rank.py        (optional — reorder backlog by consequence)
+        │
+        ▼
+  ANSWER THE CARDS
+    Tier A/C → human, via VS Code + residual-review chat mode
+    Tier B   → human in-chat, or draft_tier_b.py (headless)
+    writes: drafts/decisions/*.json (requires residual_id), drafts/overrides/*.json
+        │
+        ├──▶ bulk_apply.py        (optional — replicate one answered residual
+        │                          across every sibling in the same tier/class)
+        │
+        ├──▶ validate_drafts.py   (optional pre-check — apply.py runs the
+        │                          same check itself before ever applying)
+        │
+        ├──▶ preview_merge.py     (optional — dry-run diff, no write)
+        │
+        ▼
+  apply.py  — re-validates in-process, requires --i-confirm-apply, prints a
+              per-trigger completeness table, then calls run-slice
+              --from-facts --overrides (the ONLY command that writes CALM)
+        │
+        ▼
+  new architecture.calm.json + apply-report.md + decisions-log.md
+        │
+        ├──▶ npm run validate     (FINOS CALM schema check)
+        └──▶ effective_ir.py      (optional — human-readable architecture summary)
+```
+
 ## Non-negotiable rules (S1–S12 — do not violate, do not skip)
 
 1. **Nothing here is ever imported by `pipeline/src/orchestration/run-slice.ts`** or anything in its call graph. This is offline, human-invoked tooling — never part of the deterministic core.
@@ -77,7 +135,10 @@ python3 -m unittest discover -s . -p "test_*.py" -v
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
 python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
 
-# hand-author drafts (see examples/README.md), then validate before applying
+# hand-author drafts (see examples/README.md)
+
+# optional: pre-check drafts before you're ready to apply for real — apply.py runs this
+# exact same check itself before ever applying, so this step is a convenience, not required
 python3 validate_drafts.py --session-dir ../../review-sessions/my-run --calm /tmp/my-run/architecture.calm.json
 
 # apply (the only command that ever calls run-slice/override-applier) — re-validates itself, requires confirmation

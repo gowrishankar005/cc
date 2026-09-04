@@ -35,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_common  # noqa: E402
-from llm_common import _call_llm, _llm_backend_available, _strip_markdown_json_fence  # noqa: E402
+from llm_common import _llm_backend_available, _strip_markdown_json_fence, call_llm_safe  # noqa: E402
 
 DOSSIER_SYSTEM_PROMPT = """You are the Evidence Dossier assistant for a Weaver
 residual review session. You are ADVISORY ONLY.
@@ -238,7 +238,9 @@ def dossier_for_residual(residual: dict, unit_index: dict, packs: dict) -> dict:
     user_prompt = build_dossier_prompt(residual, unit_index, packs)
     addendum = _TRIGGER_ADDENDA.get(residual.get("trigger"))
     system_prompt = DOSSIER_SYSTEM_PROMPT + "\n\n" + addendum if addendum else DOSSIER_SYSTEM_PROMPT
-    raw = _call_llm(system_prompt, user_prompt)
+    raw, error = call_llm_safe(system_prompt, user_prompt)
+    if error:
+        return {"outcome": "llm_error", "reason": f"claude CLI call failed -- nothing dossiered, but the batch continues: {error}"}
     return parse_and_validate_dossier_response(raw, residual, unit_index)
 
 

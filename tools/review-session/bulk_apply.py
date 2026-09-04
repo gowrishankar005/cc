@@ -209,6 +209,7 @@ def build_replica(
         "source_run_id": anchor_decision.get("source_run_id"),
         "status": "active",
         "supersedes": None,
+        "residual_id": target["id"],
     }
     evidence_snapshot = _own_evidence_snapshot(target, unit_index, evidence_packs)
     if evidence_snapshot:

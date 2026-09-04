@@ -3537,6 +3537,61 @@ test(
 );
 
 test(
+  '§7.x value-based ConfigMap correlation — real end-to-end confirmation against the actual manifests: 6 real host-value candidates surfaced, 3 real self-references correctly distinguished, relationship count UNCHANGED (never auto-emitted)',
+  { skip: !fs.existsSync(PYTHON_SAMPLE_ROOT) && 'spikes/boa/repo not present (scratch clone, see CLAUDE.md)' },
+  () => {
+    const k8sManifestsDir = path.resolve(PYTHON_SAMPLE_ROOT, '..', '..', 'kubernetes-manifests');
+    const ledgerRoot = path.resolve(PYTHON_SAMPLE_ROOT, '..', 'ledger');
+    const roots = [
+      path.join(PYTHON_SAMPLE_ROOT, 'userservice'),
+      path.join(PYTHON_SAMPLE_ROOT, 'contacts'),
+      path.join(PYTHON_SAMPLE_ROOT, '..', 'frontend'),
+      path.join(ledgerRoot, 'balancereader'),
+      path.join(ledgerRoot, 'ledgerwriter'),
+      path.join(ledgerRoot, 'transactionhistory'),
+    ];
+    const { outDir, calm } = runPipeline(roots, ['--k8s-manifests', k8sManifestsDir, '--enable-env-soft-graph']);
+    try {
+      // Real ground truth (hand-verified against the actual manifest values
+      // this same session, 2026-09-04): TRANSACTIONS_API_ADDR/BALANCES_API_ADDR/
+      // SPRING_DATASOURCE_URL never name-correlate to their real targets
+      // (ledgerwriter/balancereader/ledger-db) at all — this is exactly the
+      // "name guess fails" precondition the value-based fallback exists for.
+      const items = JSON.parse(fs.readFileSync(path.join(outDir, 'ignored-items-report.json'), 'utf8'));
+      const valueResolved = items.filter((i) => i.detail?.includes('but its VALUE resolves to a real deployment'));
+      const selfRefs = items.filter((i) => i.detail?.includes('self-reference'));
+
+      const pairs = valueResolved.map((i) => {
+        const [, referencer, target] = i.detail.match(/"([^"]+)".*resolves to a real deployment "([^"]+)"/) ?? [];
+        return `${referencer}->${target}`;
+      });
+      // The 6 real candidates this exact fixture produces, matching this
+      // session's own hand-verification against the real k8s manifests.
+      for (const expected of ['balancereader->ledger-db', 'frontend->ledgerwriter', 'frontend->balancereader', 'ledgerwriter->balancereader', 'ledgerwriter->ledger-db', 'transactionhistory->ledger-db']) {
+        assert.ok(pairs.includes(expected), `expected value-based candidate ${expected}, got: ${JSON.stringify(pairs)}`);
+      }
+      assert.equal(valueResolved.length, 6);
+      valueResolved.forEach((i) => assert.ok(i.detail.includes('HITL review') && i.detail.includes('not auto-emitted')));
+
+      assert.equal(selfRefs.length, 3, `expected 3 real self-references (accounts-db, ledger-db, ledgerwriter's own TRANSACTIONS_API_ADDR), got: ${JSON.stringify(selfRefs.map((i) => i.detail))}`);
+
+      // The real safety property: this mechanism must never change the
+      // canonical relationship set, regardless of how many real value-based
+      // candidates it finds — same 17 k8s-sourced relationships as the test
+      // above, none of them newly added by this fallback.
+      const coverage = JSON.parse(fs.readFileSync(path.join(outDir, 'coverage-report.json'), 'utf8'));
+      assert.equal(coverage.relationshipsBySource.k8s, 17, 'value-based candidates must never be auto-emitted — relationship count must be identical to the pre-Phase-4 baseline');
+
+      const { errors, warnings } = validateCalm(path.join(outDir, 'architecture.calm.json'));
+      assert.equal(errors, 0);
+      assert.equal(warnings, 0);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }
+);
+
+test(
   'HITL review trigger: a real reference Java/JAX-RS banking platform (fineract-charge module) (S1) lists the actual units, the reference Python microservices banking app (S2 only, S1 does not fire) lists only the flagged unit — offline, deterministic, no LLM',
   { skip: (!fs.existsSync(JAVA_SAMPLE_ROOT) || !fs.existsSync(PYTHON_SAMPLE_ROOT)) && 'spikes/fineract or spikes/boa not present (scratch clone, see CLAUDE.md)' },
   () => {
@@ -3892,6 +3947,84 @@ test('§5.7a — env-soft-graph target with NO scanned source and an unrecognize
   assert.equal(ignoredItems.length, 1);
   assert.ok(ignoredItems[0].detail.includes('unresolved-env-target'));
   assert.ok(ignoredItems[0].detail.includes('do not match a known database engine'), 'detail text must say precisely why — no TypedUnit AND no recognized image/container name');
+});
+
+test('extractHostFromConfigValue — bare host:port, URI, and JDBC nested-scheme shapes all resolve; credentials never appear in the result', () => {
+  const { extractHostFromConfigValue } = require(path.join(PIPELINE_ROOT, 'dist/scanner/k8s-manifest-provider'));
+
+  assert.equal(extractHostFromConfigValue('ledgerwriter:8080'), 'ledgerwriter');
+  assert.equal(extractHostFromConfigValue('balancereader:8080'), 'balancereader');
+  // Real shape found live: JDBC's own nested-scheme convention (jdbc:<subprotocol>://...) — the
+  // real host must still resolve via the inner postgresql:// segment.
+  assert.equal(extractHostFromConfigValue('jdbc:postgresql://ledger-db:5432/postgresdb'), 'ledger-db');
+  // Real shape found live: a real username+password embedded directly in a ConfigMap value
+  // (not a Secret) — the credential must NEVER appear anywhere in the extracted result.
+  const withCreds = extractHostFromConfigValue('postgresql://accounts-admin:accounts-pwd@accounts-db:5432/accounts-db');
+  assert.equal(withCreds, 'accounts-db');
+  assert.ok(!withCreds.includes('accounts-admin') && !withCreds.includes('accounts-pwd'), 'credential must never leak into the extracted host');
+
+  // Negative cases: real non-host values found in the same real manifest set — never guessed.
+  assert.equal(extractHostFromConfigValue('883745000'), undefined);
+  assert.equal(extractHostFromConfigValue('True'), undefined);
+  assert.equal(extractHostFromConfigValue('testuser'), undefined);
+});
+
+test('§7.x value-based ConfigMap correlation — key VALUE resolves to a real deployment when the key NAME guess fails; never auto-emitted, routed to HITL review instead', () => {
+  const { detectEnvSoftGraphRelationships, UNRESOLVED_ENV_TARGET_PREFIX } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+
+  const referencerUnit = { id: 'frontend.py', kind: 'service', name: 'frontend', filePath: 'frontend.py', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [
+    { name: 'frontend', namespace: 'default', configMapNames: ['service-api-config'], secretMounts: [], sourceFile: 'frontend.yaml' },
+    { name: 'ledgerwriter', namespace: 'default', configMapNames: [], secretMounts: [], sourceFile: 'ledgerwriter.yaml' },
+  ];
+  // Real shape: TRANSACTIONS_API_ADDR's basename ("TRANSACTIONS") does NOT
+  // name-correlate to "ledgerwriter" at all — the name-based guess must fail
+  // first, exactly as it does for real, before the value-based fallback runs.
+  const configMaps = [{ name: 'service-api-config', keyNames: ['TRANSACTIONS_API_ADDR'], keyHosts: { TRANSACTIONS_API_ADDR: 'ledgerwriter' } }];
+  const allowlist = { version: '0.1.0', suffixes: ['_API_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(relationships.length, 0, 'a value-resolved candidate must never be auto-emitted into relationships, regardless of confidence');
+  assert.equal(ignoredItems.length, 1);
+  assert.ok(ignoredItems[0].detail.startsWith(UNRESOLVED_ENV_TARGET_PREFIX), 'must reuse the existing unresolved-outbound-target trigger match, no new plumbing');
+  assert.ok(ignoredItems[0].detail.includes('"frontend"'), 'referencer name must be the first quoted string (hitl-review-trigger.ts\'s own extraction regex depends on this)');
+  assert.ok(ignoredItems[0].detail.includes('"ledgerwriter"'), 'the value-resolved candidate target must be named in the message');
+  assert.ok(ignoredItems[0].detail.includes('HITL review'), 'must read as a suggestion for human review, not an already-decided fact');
+});
+
+test('§7.x value-based ConfigMap correlation — self-reference (value resolves back to the referencer itself) is a distinct, non-guessed outcome', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+
+  const referencerUnit = { id: 'ledgerwriter.java', kind: 'service', name: 'LedgerWriterController', filePath: 'ledgerwriter.java', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [{ name: 'ledgerwriter', namespace: 'default', configMapNames: ['service-api-config'], secretMounts: [], sourceFile: 'ledgerwriter.yaml' }];
+  // Real shape: a shared ConfigMap applied to every deployment regardless of
+  // use — TRANSACTIONS_API_ADDR's own value happens to equal ledgerwriter's
+  // own deployment name (it IS the transactions/ledger-writer service).
+  const configMaps = [{ name: 'service-api-config', keyNames: ['TRANSACTIONS_API_ADDR'], keyHosts: { TRANSACTIONS_API_ADDR: 'ledgerwriter' } }];
+  const allowlist = { version: '0.1.0', suffixes: ['_API_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(relationships.length, 0, 'a self-reference must never become a relationship');
+  assert.equal(ignoredItems.length, 1);
+  assert.ok(ignoredItems[0].detail.includes('self-reference'), 'must be distinguishable from a genuine unresolved correlation, not read identically');
+  assert.ok(!ignoredItems[0].detail.includes('no other deployment name correlates'), 'must not reuse the generic message — this is a different, more specific outcome');
+});
+
+test('§7.x value-based ConfigMap correlation — value resolves to neither self nor a known deployment still falls through to the original unresolved message, unchanged', () => {
+  const { detectEnvSoftGraphRelationships } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cross_package/env-soft-graph-detector'));
+
+  const referencerUnit = { id: 'svc.py', kind: 'service', name: 'svc', filePath: 'svc.py', startLine: 1, endLine: 1, evidence: [], confidence: 100 };
+  const deployments = [{ name: 'svc', namespace: 'default', configMapNames: ['cfg'], secretMounts: [], sourceFile: 'svc.yaml' }];
+  // The value is a real host shape, but resolves to neither the referencer
+  // itself nor any known deployment in this manifest set (e.g. an external,
+  // unscanned dependency) — must never guess, must fall through unchanged.
+  const configMaps = [{ name: 'cfg', keyNames: ['ORDERS_SERVICE_ADDR'], keyHosts: { ORDERS_SERVICE_ADDR: 'external-orders-host' } }];
+  const allowlist = { version: '0.1.0', suffixes: ['_ADDR'] };
+
+  const { relationships, ignoredItems } = detectEnvSoftGraphRelationships(deployments, configMaps, [referencerUnit], allowlist);
+  assert.equal(relationships.length, 0);
+  assert.equal(ignoredItems.length, 1);
+  assert.ok(ignoredItems[0].detail.includes('no other deployment name correlates'), 'must fall through to the original, unchanged message when the value resolves to nothing real');
 });
 
 test('buildK8sDatabaseNodes — one database-kind CALM node per unique k8s-database: id, deterministic', () => {

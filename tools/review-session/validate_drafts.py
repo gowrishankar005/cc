@@ -37,6 +37,12 @@ REQUIRED_DECISION_FIELDS = {
     "reviewer": str,
     "reviewed_at": str,
     "status": str,
+    # Which residual (residuals.json's own "id", e.g. "R-014") this decision
+    # answers -- added so a Session Pack's completeness view (summarize_by_trigger,
+    # below) has a real structured link instead of regexing an id out of free-text
+    # rationale (the fragile approach a real completeness check needed before this
+    # field existed).
+    "residual_id": str,
 }
 VALID_TARGET_TYPES = {"node", "relationship", "ignored-item"}
 VALID_DECISION_ACTIONS = {"accepted", "overridden", "added", "removed"}
@@ -289,6 +295,37 @@ def load_decisions_by_id(decisions_list: list[dict]) -> tuple[dict[str, dict], l
             present = sorted(d.keys()) if isinstance(d, dict) else type(d).__name__
             errors.append(f"decision file missing required field 'decision_id' (or it is not a non-empty string) — cannot be identified or validated. Fields present: {present}")
     return decisions_by_id, errors
+
+
+def summarize_by_trigger(residuals: list[dict], decisions_by_id: dict[str, dict]) -> dict[str, dict]:
+    """Session Pack completeness view (found real, 2026-09-04, reviewing a
+    real 51-residual, 5-trigger-class pack end to end): a review pass fully
+    worked ONE trigger class and reported the result as a complete
+    architecture -- nothing in pack.py's manifest.json, SESSION.md, or
+    apply.py's own summary line broke that down by trigger class, so the
+    gap was invisible. Returns {trigger: {"tier": str, "total": int,
+    "decided": int}} -- "decided" counts a residual with >=1 active decision
+    record whose residual_id names it (an active decision with no override
+    still counts, e.g. an "accepted, no change" confirmation). Shared by
+    apply.py (real drafts/decisions/ on disk) and pack.py's _render_session_md
+    (may see an empty or partial decisions_by_id on a --baseline re-run,
+    before any new decisions exist for this run) so the two inventories
+    (Architect_Residual_Review_Session.md §3.1's own producer registry is
+    the human-facing counterpart) can't silently drift the way that doc's
+    own history already shows they can."""
+    decided_residual_ids = {
+        d.get("residual_id")
+        for d in decisions_by_id.values()
+        if d.get("status") == "active" and isinstance(d.get("residual_id"), str) and d.get("residual_id")
+    }
+    by_trigger: dict[str, dict] = {}
+    for r in residuals:
+        trigger = r.get("trigger", "<no trigger>")
+        entry = by_trigger.setdefault(trigger, {"tier": r.get("tier"), "total": 0, "decided": 0})
+        entry["total"] += 1
+        if r.get("id") in decided_residual_ids:
+            entry["decided"] += 1
+    return by_trigger
 
 
 def main() -> int:

@@ -50,6 +50,7 @@ GOOD_DECISION = {
     "reviewer": "llm-advisory:claude-sonnet-4-5",
     "reviewed_at": "2026-08-09T00:00:00Z",
     "status": "active",
+    "residual_id": "R-001",
 }
 
 GOOD_RELATIONSHIP_ADD_OVERRIDE = {

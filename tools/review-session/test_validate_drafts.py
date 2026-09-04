@@ -5,7 +5,7 @@ real repo."""
 
 import unittest
 
-from validate_drafts import validate, load_decisions_by_id
+from validate_drafts import validate, load_decisions_by_id, summarize_by_trigger
 
 GOOD_DECISION = {
     "decision_id": "D-001",
@@ -17,6 +17,7 @@ GOOD_DECISION = {
     "reviewer": "architect:gowri",
     "reviewed_at": "2026-08-09T00:00:00Z",
     "status": "active",
+    "residual_id": "R-001",
 }
 
 GOOD_NODE_ADD_OVERRIDE = {
@@ -262,6 +263,47 @@ class TestLoadDecisionsById(unittest.TestCase):
         report.errors = load_errors + report.errors
         self.assertFalse(report.valid, "a pack where every decision file is schema-invalid must never validate as clean")
         self.assertTrue(any("decision_id" in e for e in report.errors), report.errors)
+
+
+class TestSummarizeByTrigger(unittest.TestCase):
+    """Real gap found 2026-09-04 reviewing a real, full 51-residual,
+    5-trigger-class Session Pack: a review pass fully worked ONE trigger
+    class and reported the result as a complete architecture -- nothing
+    broke the pack down by trigger class anywhere, so the gap was
+    invisible. This is the shared helper both apply.py and pack.py's
+    SESSION.md render use so the two views can't drift apart."""
+
+    def _residual(self, rid, trigger, tier="A"):
+        return {"id": rid, "tier": tier, "trigger": trigger}
+
+    def test_multiple_trigger_classes_counted_separately(self):
+        residuals = [
+            self._residual("R-001", "S2-http-without-security-control"),
+            self._residual("R-002", "S2-http-without-security-control"),
+            self._residual("R-003", "unmapped-signal-cluster"),
+        ]
+        decisions_by_id = {"D-001": {"status": "active", "residual_id": "R-001"}}
+        summary = summarize_by_trigger(residuals, decisions_by_id)
+        self.assertEqual(summary["S2-http-without-security-control"], {"tier": "A", "total": 2, "decided": 1})
+        self.assertEqual(summary["unmapped-signal-cluster"], {"tier": "A", "total": 1, "decided": 0})
+
+    def test_superseded_decision_not_counted_as_decided(self):
+        residuals = [self._residual("R-001", "S2-http-without-security-control")]
+        decisions_by_id = {"D-001": {"status": "superseded", "residual_id": "R-001"}}
+        summary = summarize_by_trigger(residuals, decisions_by_id)
+        self.assertEqual(summary["S2-http-without-security-control"]["decided"], 0)
+
+    def test_decision_with_no_residual_id_never_crashes_or_miscounts(self):
+        """A malformed/legacy decision missing residual_id (schema-invalid,
+        already caught elsewhere by REQUIRED_DECISION_FIELDS) must not be
+        silently treated as answering every residual, or crash this view."""
+        residuals = [self._residual("R-001", "S2-http-without-security-control")]
+        decisions_by_id = {"D-001": {"status": "active"}}
+        summary = summarize_by_trigger(residuals, decisions_by_id)
+        self.assertEqual(summary["S2-http-without-security-control"]["decided"], 0)
+
+    def test_empty_residuals_returns_empty_summary(self):
+        self.assertEqual(summarize_by_trigger([], {}), {})
 
 
 if __name__ == "__main__":

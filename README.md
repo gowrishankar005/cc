@@ -303,7 +303,7 @@ anyone deciding what the product can do.
 | `--strict-detect` | No | off | Exit non-zero when routes were expected (grep-verified usage) but zero were found — turns a silent CodeGraph detect-gate failure into a loud one |
 | `--no-snippets` | No | snippets included | Omit source-snippet content from the IR/output (redaction-adjacent; excludes snippet bodies, not evidence pointers) |
 | `--k8s-manifests <dir>` | Yes | — (off) | Read flat/pre-rendered Kubernetes manifests for shared-Secret/ConfigMap trust relationships. **Also activates `deployed-in` runtime-placement relationships** (T-MR-3 — a real `node-type: system` CALM node per namespace, `grade: structural` so it's never mistaken for real service connectivity) **and contradiction detection** (a k8s Deployment image naming a different datastore engine than a Spring-config-sourced unit's own JDBC scheme forces that unit to `requires-review`) — no separate flags for either |
-| `--enable-env-soft-graph` | No | off | Env-key-name-correlation relationships — requires `--k8s-manifests` too; always low, fixed confidence |
+| `--enable-env-soft-graph` | No | off | Env-key-name-correlation relationships — requires `--k8s-manifests` too; always low, fixed confidence. When a ConfigMap key's NAME doesn't correlate, also tries its VALUE (a bare host or a URI, credential-stripped) — a value-based match is never auto-emitted into CALM, only surfaced as a high-confidence `unresolved-outbound-target` review-queue candidate |
 | `--cfn-manifests <dir>` | Yes | — (off) | Read CloudFormation/SAM templates to bind API Gateway routes to their Lambda handlers |
 | `--strict-overrides` | No | off | Fail the run if any Override is rejected (orphaned target, malformed value, inactive Decision Record) instead of reporting and continuing |
 | `--no-system-node` | No | system node included | Omit the synthetic root `system` node and its `composed-of` edges from CALM output |
@@ -460,11 +460,17 @@ node pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
 cd tools/review-session
 python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
 
-# 2. Hand-author decisions for the generated choice cards (tools/review-session/examples/README.md),
-#    then validate before applying
-python3 validate_drafts.py --session-dir ../../review-sessions/my-run --calm /tmp/my-run/architecture.calm.json
+# 2. Hand-author decisions for the generated choice cards (tools/review-session/examples/README.md;
+#    every Decision Record needs a real residual_id linking it back to the residual it answers)
+#    -- optionally with an LLM-assisted dossier/draft pass first (--with-dossier / draft_tier_b.py
+#    in the optional-tools table below)
 
-# 3. Apply — the only command that ever calls run-slice/override-applier; requires confirmation
+# 3. Apply — the only command that ever calls run-slice/override-applier; requires confirmation.
+#    apply.py already re-validates every draft in-process before applying (the exact same check
+#    validate_drafts.py runs) — running validate_drafts.py yourself first is optional, useful if
+#    you want to check before you're ready to commit to applying. Before the confirmation prompt,
+#    apply.py prints a per-trigger-class completeness table (X/Y residuals decided, broken down by
+#    trigger) so "N applied, M rejected" can't read as "the pack is fully reviewed" when it isn't.
 python3 apply.py --session-dir ../../review-sessions/my-run --out /tmp/my-run-reviewed
 ```
 
@@ -476,6 +482,11 @@ python3 apply.py --session-dir ../../review-sessions/my-run --out /tmp/my-run-re
 | `python3 queue_rank.py --session-dir ... [--history <prior-session-dir>]` | Ranks the open backlog highest-consequence-first (PII-touching, external-system-identity, trust-boundary signals — named proxies over real detected facts, not a PII/data-classification engine) and reports real residual age across reruns |
 | `python3 advisory.py --session-dir ...` | **Optional LLM-advisory layer** (needs the `claude` CLI already authenticated on `PATH` — deliberately never a raw `ANTHROPIC_API_KEY`; reports what it would attempt and writes nothing without one) — explains evidence and proposes hypotheses for open residuals, and optionally one catalogue-rule candidate per residual. **Never writes a fact**: any response shaped like a decision/override is rejected outright, and accepting a hypothesis via a card is still one human judgement, never treated as independent corroboration |
 | `python3 pack.py --out-dir ... --session-dir ... --baseline <prior-session-dir>` | A later rescan carries forward already-decided residuals instead of re-asking, and flags real drift (the same unit's trigger/class changed since it was decided) as `reconfirm` rather than silently overwriting or silently re-asking |
+| `python3 pack.py --out-dir ... --session-dir ... --with-dossier` | **Opt-in Evidence Dossier pass** (needs the `claude` CLI authenticated on `PATH`) — attaches an additive `dossier` field (explanation, hypotheses, evidenceRefsUsed) to every open residual, any tier. Never writes a fact; no backend → writes a normal, dossier-less pack |
+| `python3 draft_tier_b.py --session-dir ...` | Headless alternative to in-chat Tier B drafting — sweeps every open Tier B residual, writes `drafts/decisions/`+`drafts/overrides/` directly when the evidence bar is met, `cannot_decide`/`draftOutcome: "bar-not-met"` otherwise. Primary path is still the VS Code chat mode; use this only for scripted/batch runs outside a chat session |
+| `python3 validate_drafts.py --session-dir ... --calm /tmp/my-run/architecture.calm.json` | Pre-check drafts/decisions + drafts/overrides before you're ready to run `apply.py` for real — `apply.py` runs this exact same check itself before ever applying, so this step is optional, not required |
+| `python3 preview_merge.py --session-dir ...` | Dry-run diff of what applying the current drafts would change, without writing anything — reuses `apply.py`'s own merge logic against a throwaway temp dir |
+| `python3 effective_ir.py --calm /tmp/my-run-reviewed/architecture.calm.json --session-dir ... --out .../effective-architecture-ir.md` | Human-readable architecture summary of the reviewed result (MVP), combining the applied CALM output with the session's own Decision Record log |
 
 **Hard boundary:** nothing under `tools/review-session/` is ever imported by
 `pipeline/src/orchestration/run-slice.ts` or anything in its call graph —

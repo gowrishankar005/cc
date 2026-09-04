@@ -120,6 +120,31 @@ def _call_llm(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL) 
     return payload.get("result", "")
 
 
+def call_llm_safe(system_prompt: str, user_prompt: str, model: str = DEFAULT_MODEL) -> tuple[str | None, str | None]:
+    """_call_llm wrapped with real, live-found crash isolation. Found
+    2026-09-03 running a real ~30-residual dossier batch against a
+    reference Java/Python microservices banking sample's full evidence
+    set: a single transient claude CLI failure (RuntimeError, exit code 1,
+    empty stderr -- likely a rate limit or transient network blip from
+    many rapid successive subprocess calls, never reproduced as a
+    deterministic bug in the CLI itself) crashed the ENTIRE batch with
+    nothing written to the session dir, discarding every prior successful
+    dossier result from the same run.
+
+    Returns (raw_text, None) on success, (None, reason) on ANY failure --
+    never raises. Every caller (dossier.py/draft_tier_b.py/advisory.py)
+    already returns a structured {"outcome": ..., "reason": ...} dict for
+    the "no LLM backend available" case; this extends the exact same
+    graceful-degradation discipline to a REAL backend that's available but
+    fails mid-call, so one residual's transient failure in a real batch
+    never takes down every other residual's already-succeeded result in
+    the same run."""
+    try:
+        return _call_llm(system_prompt, user_prompt, model), None
+    except (RuntimeError, json.JSONDecodeError) as e:
+        return None, str(e)
+
+
 _FENCED_JSON_RE = re.compile(r"```(?:json)?\s*\n(.*?)```", re.DOTALL | re.IGNORECASE)
 
 

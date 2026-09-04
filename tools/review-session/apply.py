@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate_drafts import validate as validate_drafts, load_decisions_by_id  # noqa: E402
+from validate_drafts import validate as validate_drafts, load_decisions_by_id, summarize_by_trigger  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RUN_SLICE = REPO_ROOT / "pipeline" / "dist" / "orchestration" / "run-slice.js"
@@ -55,7 +55,7 @@ def _load_json_dir(dir_path: Path) -> list[dict]:
     return [json.loads(f.read_text()) for f in sorted(dir_path.glob("*.json"))]
 
 
-def _run_validation(session_dir: Path, manifest: dict) -> tuple[bool, list[str], list[str]]:
+def _run_validation(session_dir: Path, manifest: dict) -> tuple[bool, list[str], list[str], dict[str, dict]]:
     decisions_list = _load_json_dir(session_dir / "drafts" / "decisions")
     overrides_list = _load_json_dir(session_dir / "drafts" / "overrides")
     decisions_by_id, load_errors = load_decisions_by_id(decisions_list)
@@ -81,7 +81,28 @@ def _run_validation(session_dir: Path, manifest: dict) -> tuple[bool, list[str],
     # explanation is a real observability gap, not just a style nit.
     if calm_node_ids is None:
         report.warnings.insert(0, f"source scan's architecture.calm.json not found under manifest outDir ({out_dir}) — endpoint existence was NOT checked here (override-applier.ts will still catch a real dangling endpoint at apply time, just later and with a less specific message)")
-    return report.valid, report.errors, report.warnings
+    return report.valid, report.errors, report.warnings, decisions_by_id
+
+
+def _print_completeness_table(session_dir: Path, decisions_by_id: dict[str, dict]) -> None:
+    """Real gap found live, 2026-09-04: a review pass fully worked ONE of 5
+    real trigger classes in a real 51-residual pack and reported the result
+    as a complete architecture -- apply.py's own final summary line only
+    ever counted overrides that existed, silently omitting every residual
+    that got a decision with no override (e.g. an "accepted, no change"
+    confirmation) and every residual that got no decision at all. Printed
+    BEFORE the confirmation prompt, not just in the final summary, so an
+    architect sees the true state before committing to apply, not after."""
+    residuals_path = session_dir / "residuals.json"
+    if not residuals_path.exists():
+        return
+    residuals = json.loads(residuals_path.read_text()).get("items", [])
+    summary = summarize_by_trigger(residuals, decisions_by_id)
+    total = sum(e["total"] for e in summary.values())
+    decided = sum(e["decided"] for e in summary.values())
+    print(f"[apply] residual completeness: {decided}/{total} decided, by trigger:")
+    for trigger, entry in sorted(summary.items()):
+        print(f"  - [{entry['tier']}] {trigger}: {entry['decided']}/{entry['total']} decided")
 
 
 def _confirm(i_confirm_apply: bool) -> bool:
@@ -127,6 +148,12 @@ def _write_apply_report(session_dir: Path, entry: dict) -> None:
     for key in ("validation_errors", "validation_warnings", "applied", "rejected", "skipped", "orphans"):
         if entry.get(key):
             lines.append(f"- {key}: {entry[key]}\n")
+    if entry.get("residualsByTrigger"):
+        total = sum(e["total"] for e in entry["residualsByTrigger"].values())
+        decided = sum(e["decided"] for e in entry["residualsByTrigger"].values())
+        lines.append(f"- Residual completeness: {decided}/{total} decided\n")
+        for trigger, e in sorted(entry["residualsByTrigger"].items()):
+            lines.append(f"  - [{e['tier']}] {trigger}: {e['decided']}/{e['total']}\n")
     if entry.get("out_dir"):
         lines.append(f"- New out-dir: `{entry['out_dir']}`\n")
     if entry.get("stderr"):
@@ -162,7 +189,7 @@ def main() -> int:
         return 1
     manifest = json.loads(manifest_path.read_text())
 
-    valid, errors, warnings = _run_validation(session_dir, manifest)
+    valid, errors, warnings, decisions_by_id = _run_validation(session_dir, manifest)
     # Real gap found on review: warnings (e.g. "endpoint existence not
     # checked" when the source CALM is missing) were only ever surfaced on
     # the failure path — on a successful validation they were silently
@@ -176,6 +203,8 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         _write_apply_report(session_dir, {"timestamp": _now(), "outcome": "refused: validation failed", "validation_errors": errors, "validation_warnings": warnings})
         return 1
+
+    _print_completeness_table(session_dir, decisions_by_id)
 
     if not _confirm(args.i_confirm_apply):
         print("[apply] REFUSING — apply not confirmed.", file=sys.stderr)
@@ -241,6 +270,9 @@ def main() -> int:
         return 1
 
     overrides_result = json.loads(overrides_report_path.read_text())
+    residuals_path = session_dir / "residuals.json"
+    residuals = json.loads(residuals_path.read_text()).get("items", []) if residuals_path.exists() else []
+    completeness = summarize_by_trigger(residuals, decisions_by_id)
     entry = {
         "timestamp": _now(),
         "outcome": "applied",
@@ -251,11 +283,14 @@ def main() -> int:
         "skipped": [o["override_id"] for o in overrides_result.get("skipped", [])],
         "orphans": [o["override_id"] for o in overrides_result.get("orphans", [])],
         "validation_warnings": warnings,
+        "residualsByTrigger": completeness,
     }
     _write_apply_report(session_dir, entry)
     _append_decisions_log(session_dir, entry)
 
-    print(f"[apply] wrote {out_dir} — {len(entry['applied'])} applied, {len(entry['rejected'])} rejected, {len(entry['skipped'])} skipped")
+    total = sum(e["total"] for e in completeness.values())
+    decided = sum(e["decided"] for e in completeness.values())
+    print(f"[apply] wrote {out_dir} — {len(entry['applied'])} applied, {len(entry['rejected'])} rejected, {len(entry['skipped'])} skipped ({decided}/{total} residuals had a decision)")
     return 0
 
 
