@@ -7,6 +7,11 @@ Offline tooling that turns a `run-slice` output directory into an architect-frie
 
 ## Workflow
 
+**In Claude Code, `/review-session` (`.claude/skills/review-session/SKILL.md`) runs this entire
+diagram in one conversational flow** — a second delivery vehicle for the same design as the VS
+Code chat mode below (`Architect_Residual_Review_Session.md` §4.4a), asking only for the
+decisions that must be a real human judgment. Everything below is what it calls under the hood.
+
 The required path is the top-to-bottom spine below (`run-slice` → `pack.py`
 → answer the cards → `apply.py` → `npm run validate`); every tool branching
 off to the side is optional and slots in around that spine without changing

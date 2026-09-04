@@ -454,6 +454,12 @@ architect-facing **Session Pack**: choice cards for a human to answer,
 applied back through the *same* Decision Record/Override mechanism
 `--overrides` already uses — never a second, informal write path into CALM.
 
+**Working in Claude Code?** `/review-session` (`.claude/skills/review-session/SKILL.md`) runs
+the entire loop below — scan, dossier, Tier B drafting, interactive Tier A review, validate,
+apply, validate — as one conversational flow, asking only for the decisions that must be a real
+human judgment. The manual steps below are the same underlying tools it calls; useful outside an
+agent session, or to run any one step in isolation.
+
 ```bash
 # 1. Build a real pack from a real run-slice output directory
 node pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
