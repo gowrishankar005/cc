@@ -33,7 +33,10 @@ answer from the user via `AskUserQuestion` in THIS conversation, for THIS run. N
 ## Step 0 — determine mode
 
 - If the user gave an existing `--session-dir` (or a directory that already has `manifest.json` +
-  `residuals.json` in it), this is a **resume** — skip to Step 4 using that session dir.
+  `residuals.json` in it), this is a **resume** — skip to Step 3 using that session dir.
+  `draft_tier_b.py` only ever processes residuals with `status == "open"`, so re-running it here is
+  safe and idempotent — it catches any Tier B residual never yet attempted, never re-drafts one
+  that's already decided. Do not skip past it just because the pack already existed.
 - Otherwise this is a **fresh scan** — the user gave one or more package roots. Ask for an out-dir
   and session-dir if not given (suggest `review-sessions/<short-name>` for the session dir, matching
   every existing example in `tools/review-session/README.md`).
@@ -59,8 +62,9 @@ and show the real stderr, do not retry blindly.
 
 ## Step 2 — pack, with dossier by default
 
-Check LLM backend availability first: `claude -p "OK" 2>&1` (or simpler — just try
-`command -v claude`). If found:
+Check LLM backend availability first with `command -v claude` (the exact same check
+`llm_common._llm_backend_available()` uses — `shutil.which("claude")` — a free PATH lookup, never
+a live call; do not burn a real, billed `claude -p` invocation just to check availability). If found:
 ```
 python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir <session-dir> --with-dossier
 ```
@@ -157,12 +161,23 @@ one residual undecided) — never silently drop a malformed draft and never gues
 
 ## Step 10 — one final, explicit confirmation
 
-Before applying, compute and show the real completeness picture — either run a throwaway Python
-one-liner calling `validate_drafts.summarize_by_trigger` against `residuals.json` + the loaded
-decisions, or just run `apply.py` interactively and let it print its own real completeness table
-(it does this automatically, before the confirmation prompt, as of 2026-09-04). Then ask exactly
-one `AskUserQuestion`: **apply now, or stop here and leave the drafts for manual review** — no
-other phrasing implies consent. Do not proceed on an ambiguous or implied yes.
+Before applying, compute and show the real completeness picture with this one-liner (do NOT run
+`apply.py` itself without `--i-confirm-apply` to "preview" its table — from a non-interactive Bash
+call it will still print the table, but then correctly refuse with a non-zero exit since there's
+no TTY, which reads as a failure when it isn't one; avoid that ambiguity entirely):
+```
+cd tools/review-session && python3 -c "
+import json, sys
+sys.path.insert(0, '.')
+from validate_drafts import summarize_by_trigger, load_decisions_by_id
+residuals = json.load(open('<session-dir>/residuals.json'))['items']
+decisions = [json.loads(f.read_text()) for f in __import__('pathlib').Path('<session-dir>/drafts/decisions').glob('*.json')]
+decisions_by_id, _ = load_decisions_by_id(decisions)
+print(json.dumps(summarize_by_trigger(residuals, decisions_by_id), indent=2))
+"
+```
+Then ask exactly one `AskUserQuestion`: **apply now, or stop here and leave the drafts for manual
+review** — no other phrasing implies consent. Do not proceed on an ambiguous or implied yes.
 
 ## Step 11 — apply, only on explicit yes
 
@@ -193,8 +208,9 @@ the hard way (see `docs/solution/BACKLOG.md`'s "Session Pack completeness visibi
 
 ## Never
 
-- Never write to anything outside `<session-dir>/drafts/` and the files this skill's own steps
-  above explicitly create.
+- Never write anywhere except: `<out-dir>` (Step 1's scan output), `<session-dir>` and its
+  `drafts/` (Steps 2–9), and `<new-out-dir>` (Step 11's applied output) — the exact set of
+  locations the steps above name, nothing improvised.
 - Never edit `typed-facts.json`, anywhere.
 - Never invoke `run-slice.js --overrides`, `apply.py`, or anything touching `override-applier.ts`
   except at Step 11, and only after Step 10's real, explicit confirmation in this conversation.
