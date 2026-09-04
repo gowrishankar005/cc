@@ -59,6 +59,7 @@ class TestPreviewMergeEndToEnd(unittest.TestCase):
             "reviewer": "architect:test",
             "reviewed_at": "2026-09-03T00:00:00Z",
             "status": "active",
+            "residual_id": "R-001",
         }
         override = {
             "override_id": override_id,

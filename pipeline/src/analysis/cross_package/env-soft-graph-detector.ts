@@ -7,8 +7,8 @@ import { k8sDatabaseNodeId } from '../../modules/calm-generator/k8s-database-nod
 
 /**
  * Real evidence: a reference Python microservices banking app's
- * `service-api-config` ConfigMap has KEY NAMES (never read: its values)
- * like `USERSERVICE_API_ADDR`/`CONTACTS_API_ADDR` that, after stripping an
+ * `service-api-config` ConfigMap has KEY NAMES like
+ * `USERSERVICE_API_ADDR`/`CONTACTS_API_ADDR` that, after stripping an
  * allowlisted suffix (env-relationship-allowlist.yml), match OTHER real
  * deployment names in the same manifest set almost exactly
  * ("USERSERVICE_API_ADDR" -> "userservice", an EXACT match against the
@@ -28,6 +28,17 @@ import { k8sDatabaseNodeId } from '../../modules/calm-generator/k8s-database-nod
  * correctly produce an unresolved ignored-item, not a wrong guess. This was
  * verified against the real manifest BEFORE writing the matching logic,
  * not discovered after the fact.
+ *
+ * Value-based fallback (found live, real evidence, 2026-09-04, a different
+ * reference Java/Python microservices banking sample): when name-basename
+ * correlation fails, the key's own VALUE — a bare `host:port` or a URI —
+ * often resolves to the real target by an EXACT literal match instead of a
+ * fuzzy name guess (`k8s-manifest-provider.ts`'s `ConfigMapKeys.keyHosts`,
+ * populated with a bare, already-credential-stripped host, never a raw
+ * value). Deliberately never auto-emitted into `relationships` at any
+ * confidence — routed through the existing `unresolved-outbound-target`
+ * HITL review queue as a suggested target instead, since this is still
+ * only one repo's evidence for this specific correlation shape.
  */
 // Exported so hitl-review-trigger.ts (§3.2, unresolved-outbound-target) can
 // match this exact prefix instead of re-typing it — same convention
@@ -68,6 +79,41 @@ export function detectEnvSoftGraphRelationships(
 
         const target = findMatchingDeployment(basename, deployments, referencer.name);
         if (!target) {
+          // Value-based fallback (found live, real evidence, 2026-09-04): the
+          // key's own VALUE is often a literal, exact reference this
+          // basename-name guess just failed to find by name alone — e.g.
+          // "TRANSACTIONS_API_ADDR" guesses basename "TRANSACTIONS" (no
+          // deployment named that), but the real value is literally
+          // "ledgerwriter:8080". extractedHost is already stripped to a bare
+          // host by k8s-manifest-provider.ts — never a raw value, never a
+          // credential, this file never sees either. Structurally stronger
+          // than the name guess above (an exact literal match, not a fuzzy
+          // one) but deliberately NOT auto-emitted into `relationships` —
+          // still only ONE repo's evidence for this specific correlation
+          // path, and per this project's explicit HITL-gating decision for
+          // this mechanism, it becomes a high-confidence SUGGESTED target for
+          // human review via the existing unresolved-outbound-target queue
+          // (same UNRESOLVED_ENV_TARGET_PREFIX-matching hitl-review-trigger.ts
+          // already reuses unmodified — no new trigger plumbing needed), not
+          // a 4th path that writes directly into canonical CALM.
+          const extractedHost = configMap.keyHosts?.[keyName];
+          if (extractedHost && normalize(extractedHost) === normalize(referencer.name)) {
+            ignoredItems.push({
+              ref: `k8s:configmap:${configMapName}:${keyName}`,
+              reason: 'CROSS_DOMAIN_UNRESOLVED',
+              detail: `${UNRESOLVED_ENV_TARGET_PREFIX} "${referencer.name}" references ConfigMap "${configMapName}" key "${keyName}" whose own value resolves back to itself (self-reference, e.g. a shared ConfigMap applied to every deployment regardless of use) — no relationship emitted, this is not a missing correlation.`,
+            });
+            continue;
+          }
+          const valueTarget = extractedHost ? deployments.find((d) => d.name !== referencer.name && normalize(d.name) === normalize(extractedHost)) : undefined;
+          if (valueTarget) {
+            ignoredItems.push({
+              ref: `k8s:configmap:${configMapName}:${keyName}`,
+              reason: 'CROSS_DOMAIN_UNRESOLVED',
+              detail: `${UNRESOLVED_ENV_TARGET_PREFIX} "${referencer.name}" references ConfigMap "${configMapName}" key "${keyName}" — the key's own NAME doesn't correlate to any deployment, but its VALUE resolves to a real deployment "${valueTarget.name}" by exact host match — high-confidence candidate for relationship_add via HITL review, not auto-emitted (single-repo-evidenced mechanism, deliberately review-gated).`,
+            });
+            continue;
+          }
           ignoredItems.push({
             ref: `k8s:configmap:${configMapName}:${keyName}`,
             reason: 'CROSS_DOMAIN_UNRESOLVED',

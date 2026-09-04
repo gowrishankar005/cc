@@ -13,5 +13,6 @@
   "reviewed_at": "2026-08-09T00:00:00Z",
   "source_run_id": "example-run-002",
   "status": "active",
-  "supersedes": null
+  "supersedes": null,
+  "residual_id": "R-001"
 }

@@ -24,10 +24,17 @@ import { parseAllDocuments } from 'yaml';
  * existing names (avoiding a wider rename across every consumer file that
  * already imports them) — they now mean "workload manifest," not literally
  * "Deployment-kind-only."
- * Names only for Secret/ConfigMap references — this file never reads a
- * real `Secret`/`ConfigMap` object's `data`/`stringData`, only which OTHER
- * object's `metadata.name` a Deployment/StatefulSet references by name. No
- * secret VALUE is ever on a code path this provider touches.
+ * Names only for Secret references — this file never reads a real
+ * `Secret` object's `data`/`stringData`, only which OTHER object's
+ * `metadata.name` a Deployment/StatefulSet references by name. No secret
+ * VALUE is ever on a code path this provider touches.
+ *
+ * ConfigMap references were originally "names only" too; a narrow,
+ * deliberate exception now exists (`ConfigMapKeys.keyHosts`,
+ * `extractHostFromConfigValue`) — see that interface's own docstring for
+ * the real evidence and the exact safety boundary (bare host only, never
+ * the raw value, scheme, userinfo, port, or path; never anywhere outside
+ * this file).
  */
 const SKIP_DIRS = new Set(['node_modules', '.git']);
 
@@ -56,16 +63,46 @@ export interface DeploymentManifest {
 }
 
 /**
- * A ConfigMap's `data` KEY NAMES only, never `data`'s values.
- * Extending the existing "names only" boundary this file already holds for
- * Deployments (never reads Secret data) to ConfigMap objects too — reading
- * `Object.keys(data)` and discarding the values immediately, not "reading
- * then redacting."
+ * A ConfigMap's `data` KEY NAMES only, plus (additive, §7.x value-based
+ * correlation) an EXTRACTED HOST for a key whose value is shaped like a
+ * `host:port` pair or a `scheme://[user:pass@]host[:port]/...` URI —
+ * never the raw value itself. `extractHostFromConfigValue` strips
+ * scheme/userinfo/port/path immediately, in this same file, before the
+ * result ever leaves this function — no code path outside this file (env-
+ * soft-graph-detector.ts included) ever sees a raw ConfigMap value or any
+ * embedded credential. Real risk this guards against, found live: a
+ * reference Java/Python microservices banking sample's own real
+ * `accounts-db-config` ConfigMap (not a Secret) has `ACCOUNTS_DB_URI:
+ * postgresql://accounts-admin:accounts-pwd@accounts-db:5432/accounts-db` —
+ * a real username+password sitting in a ConfigMap value, exactly the shape
+ * this file's original "names only" boundary was protecting against
+ * before this narrow, deliberate exception. Keys whose value doesn't parse
+ * as either shape (a port number, a boolean-ish flag, a plain username —
+ * `883745000`, `True`, `testuser`, all real values found in the same
+ * manifest set) never appear in `keyHosts` at all.
  */
 export interface ConfigMapKeys {
   name: string;
   keyNames: string[];
+  keyHosts?: Record<string, string>;
   sourceFile: string;
+}
+
+/**
+ * Returns ONLY a bare host — never the scheme, userinfo (username/password),
+ * port, path, or query string, and never the original `value` itself.
+ * Tries the URI shape first (searches for "://" anywhere, so a nested
+ * scheme like `jdbc:postgresql://host:port/db` — a real shape found live —
+ * still resolves via its real `postgresql://` segment without needing to
+ * recognize `jdbc:` as a scheme itself), then the plain `host:port` shape.
+ * Returns undefined for anything else — never guesses.
+ */
+export function extractHostFromConfigValue(value: string): string | undefined {
+  const uriMatch = value.match(/:\/\/(?:[^@/]*@)?([^:/?#]+)/);
+  if (uriMatch) return uriMatch[1] || undefined;
+  const hostPortMatch = value.match(/^([a-zA-Z0-9.-]+):(\d+)$/);
+  if (hostPortMatch) return hostPortMatch[1];
+  return undefined;
 }
 
 function findManifestFiles(manifestsDir: string): string[] {
@@ -122,8 +159,19 @@ function extractConfigMapKeys(doc: any, sourceFile: string): ConfigMapKeys | und
   if (doc?.kind !== 'ConfigMap') return undefined;
   const name: string | undefined = doc?.metadata?.name;
   if (!name) return undefined;
-  const keyNames = Object.keys(doc?.data ?? {}); // NEVER doc.data's values
-  return { name, keyNames, sourceFile };
+  const data: Record<string, unknown> = doc?.data ?? {};
+  const keyNames = Object.keys(data);
+  // The only place a raw ConfigMap value is ever read in this whole
+  // pipeline — extracted to a bare host immediately, in this same
+  // expression, never assigned to a variable or returned as-is.
+  const keyHosts: Record<string, string> = {};
+  for (const key of keyNames) {
+    const raw = data[key];
+    if (typeof raw !== 'string') continue;
+    const host = extractHostFromConfigValue(raw);
+    if (host) keyHosts[key] = host;
+  }
+  return { name, keyNames, keyHosts: Object.keys(keyHosts).length > 0 ? keyHosts : undefined, sourceFile };
 }
 
 /** Empty array (not an error) when the directory doesn't exist or has no manifests — "run without it ok", same convention as discoverOpenApiDocuments. */

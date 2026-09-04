@@ -22,6 +22,7 @@ TOOLS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = TOOLS_DIR.parents[1]
 RUN_SLICE = REPO_ROOT / "pipeline" / "dist" / "orchestration" / "run-slice.js"
 NESTJS_FIXTURE = REPO_ROOT / "pipeline" / "test" / "fixtures" / "nestjs-sample"
+SPRING_CONFIG_FIXTURE = REPO_ROOT / "pipeline" / "test" / "fixtures" / "spring-config-sample"
 
 
 @unittest.skipUnless(RUN_SLICE.exists(), "pipeline/dist not built — run `cd pipeline && npm run build` first")
@@ -69,6 +70,20 @@ class TestPackEndToEnd(unittest.TestCase):
         session_md = (self.session_dir / "SESSION.md").read_text()
         self.assertIn("CodeGraph", session_md)
         self.assertIn("fetch-span", session_md)
+
+        # Real completeness-visibility gap found 2026-09-04: manifest.json's
+        # residualCount alone gave no signal of how many trigger classes a
+        # pack actually spans. manifest's per-trigger inventory must be real
+        # (matches residuals.json's own trigger field), and SESSION.md must
+        # show the same breakdown, not just a per-tier count.
+        manifest = json.loads((self.session_dir / "manifest.json").read_text())
+        self.assertIn("residualsByTrigger", manifest)
+        self.assertIn("S2-http-without-security-control", manifest["residualsByTrigger"])
+        self.assertEqual(manifest["residualsByTrigger"]["S2-http-without-security-control"]["tier"], "A")
+        self.assertGreaterEqual(manifest["residualsByTrigger"]["S2-http-without-security-control"]["count"], 1)
+        self.assertEqual(sum(e["count"] for e in manifest["residualsByTrigger"].values()), len(residuals["items"]))
+        self.assertIn("### By trigger class", session_md)
+        self.assertIn("S2-http-without-security-control", session_md)
 
         # Architect_Pilot_Feedback_Notes.md Entry 20: the NestJS fixture lives
         # under REPO_ROOT (pipeline/test/fixtures/...), so at least one
@@ -156,6 +171,49 @@ class TestPackEndToEnd(unittest.TestCase):
         mock_backend.assert_not_called()
 
 
+@unittest.skipUnless(RUN_SLICE.exists() and SPRING_CONFIG_FIXTURE.exists(), "pipeline/dist not built or fixture missing")
+class TestStructuredConfigEvidenceSnippetGap(unittest.TestCase):
+    """Real gap found 2026-08-23, first real end-to-end pack --with-dossier
+    run against this exact fixture: a structured-file-derived unit's
+    evidenceRefs use a dotted-key-path shape (e.g.
+    "application-prod.yml:spring.datasource.url"), not file:line --
+    _build_evidence_packs used to silently omit these from packs.json
+    entirely, so any LLM pass saw empty evidence_snippets with no signal
+    why. Fixed with an explicit placeholder instead of silence."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="review-session-spring-config-test-"))
+        self.out_dir = self.tmp / "out"
+        self.session_dir = self.tmp / "session"
+        run = subprocess.run(["node", str(RUN_SLICE), str(SPRING_CONFIG_FIXTURE), "--out", str(self.out_dir)], capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        pack_run = subprocess.run([sys.executable, str(TOOLS_DIR / "pack.py"), "--out-dir", str(self.out_dir), "--session-dir", str(self.session_dir)], capture_output=True, text=True)
+        self.assertEqual(pack_run.returncode, 0, pack_run.stderr)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+        for cache in (".codegraph", ".graphify-cache", "graphify-out"):
+            shutil.rmtree(SPRING_CONFIG_FIXTURE / cache, ignore_errors=True)
+
+    def test_dotted_key_path_ref_gets_an_honest_placeholder_not_silence(self):
+        packs = json.loads((self.session_dir / "evidence" / "packs.json").read_text())
+        dotted_refs = [k for k in packs if ":" in k and not k.rsplit(":", 1)[-1].isdigit()]
+        self.assertGreater(len(dotted_refs), 0, "expected at least one dotted-key-path evidenceRef in this fixture's own real output")
+        for ref in dotted_refs:
+            self.assertIn("no source snippet available", packs[ref])
+            self.assertIn(ref, packs[ref], "the placeholder must name the real ref it's standing in for")
+
+    def test_real_file_line_refs_still_get_a_real_snippet_not_a_placeholder(self):
+        """Negative case: this fix must not turn EVERY ref into a
+        placeholder — a genuine file:line ref in the same fixture (the
+        Java controller's own source) must still get a real snippet."""
+        packs = json.loads((self.session_dir / "evidence" / "packs.json").read_text())
+        file_line_refs = [k for k in packs if ":" in k and k.rsplit(":", 1)[-1].isdigit()]
+        self.assertGreater(len(file_line_refs), 0, "expected at least one real file:line evidenceRef in this fixture")
+        for ref in file_line_refs:
+            self.assertNotIn("no source snippet available", packs[ref])
+
+
 class TestRenderAgentsMd(unittest.TestCase):
     """Entry 25, Architect_Pilot_Feedback_Notes.md: a real Copilot Chat
     session invented its own Decision Record field names instead of the
@@ -170,7 +228,7 @@ class TestRenderAgentsMd(unittest.TestCase):
         from pack import _render_agents_md
 
         rendered = _render_agents_md()
-        for field in ("decision_id", "final_decision", "target_type", "target_ref", "reviewed_at", "override_id", "decision_record_ref", "override_type"):
+        for field in ("decision_id", "final_decision", "target_type", "target_ref", "reviewed_at", "override_id", "decision_record_ref", "override_type", "residual_id"):
             self.assertIn(f'"{field}"', rendered, f"expected real field name {field!r} embedded in AGENTS.md's own text")
 
     def test_agents_md_shows_the_no_override_decision_shape(self):

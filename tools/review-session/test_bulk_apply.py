@@ -167,6 +167,7 @@ class TestBulkApplyEndToEnd(unittest.TestCase):
             "reviewer": "architect:test",
             "reviewed_at": "2026-08-20T00:00:00Z",
             "status": "active",
+            "residual_id": "R-001",
         }
         override = {
             "override_id": "O-001",

@@ -77,7 +77,10 @@ python3 -m unittest discover -s . -p "test_*.py" -v
 node ../../pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
 python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
 
-# hand-author drafts (see examples/README.md), then validate before applying
+# hand-author drafts (see examples/README.md)
+
+# optional: pre-check drafts before you're ready to apply for real — apply.py runs this
+# exact same check itself before ever applying, so this step is a convenience, not required
 python3 validate_drafts.py --session-dir ../../review-sessions/my-run --calm /tmp/my-run/architecture.calm.json
 
 # apply (the only command that ever calls run-slice/override-applier) — re-validates itself, requires confirmation

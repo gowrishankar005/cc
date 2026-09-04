@@ -38,6 +38,7 @@ from cards import build_all_cards  # noqa: E402
 from consequence import annotate_residuals  # noqa: E402
 import dossier  # noqa: E402
 from llm_common import _llm_backend_available  # noqa: E402
+from validate_drafts import summarize_by_trigger, load_decisions_by_id  # noqa: E402
 
 # Wider than the original +/- 3: most "need 20 more lines" cases stay in
 # the pack. Hard cap on the window so one residual cannot dump a file.
@@ -171,6 +172,14 @@ def pack_main() -> int:
         "hasCalm": has_calm,
         "hasUnmapped": unmapped is not None,
         "residualCount": len(residuals),
+        # Static per-trigger INVENTORY only (tier + count) -- not decided/
+        # undecided, which pack.py cannot know at generation time (drafts/
+        # doesn't exist yet). Decided/undecided is an apply-time fact; see
+        # apply.py's own _print_completeness_table / summarize_by_trigger.
+        # Real gap found 2026-09-04: a review pass fully worked one of 5
+        # trigger classes in a real pack and reported it complete -- this
+        # flat residualCount gave no signal that other classes existed.
+        "residualsByTrigger": _residuals_by_trigger_inventory(residuals),
         "crossPackageBackbone": "codegraph",
         "extraReadCount": 0,
         "extraReadLines": 0,
@@ -265,6 +274,23 @@ def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots
     for ref in refs:
         if ref in packs:
             continue
+        # Real gap found 2026-08-23, first real end-to-end pack --with-dossier
+        # run against a structured-config fixture: a structured-file-derived
+        # unit's evidenceRefs use a dotted-key-path shape (e.g.
+        # "application-prod.yml:spring.datasource.url", from
+        # spring-config-pass.ts's own `ref: ${filePath}:${key}` convention),
+        # not file:line -- _REF_RE never matches it, so it used to be
+        # silently omitted from packs entirely and the LLM layer saw nothing,
+        # with no signal WHY. Real per-key line tracking doesn't exist
+        # anywhere in spring-config-provider.ts today (checked, not assumed
+        # -- would need new YAML-AST line tracking, an unevidenced, bigger
+        # mechanism) -- ship the honest, smaller fix instead: an explicit
+        # placeholder stating the real reason, so build_evidence_prompt
+        # includes it and the model can correctly reason "no snippet, not
+        # nothing" rather than refusing with zero context for why.
+        if not _REF_RE.match(ref):
+            packs[ref] = f"[no source snippet available for this evidence ref — structured-config key path {ref!r}, not a file:line reference]"
+            continue
         result = _read_snippet(ref, resolved_roots, context_lines)
         if result is None:
             continue
@@ -349,6 +375,19 @@ def _read_snippet(ref: str, resolved_roots: list[Path], context_lines: int = DEF
     return None
 
 
+def _residuals_by_trigger_inventory(residuals: list[dict]) -> dict[str, dict]:
+    """manifest.json's static, pack-time-only per-trigger inventory (tier +
+    count) -- see summarize_by_trigger (validate_drafts.py) for the
+    apply-time decided/undecided counterpart this deliberately does NOT
+    duplicate (pack.py runs before drafts/ exists)."""
+    by_trigger: dict[str, dict] = {}
+    for r in residuals:
+        trigger = r.get("trigger", "<no trigger>")
+        entry = by_trigger.setdefault(trigger, {"tier": r.get("tier"), "count": 0})
+        entry["count"] += 1
+    return by_trigger
+
+
 def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path) -> str:
     tier_a = [r for r in residuals if r["tier"] == "A"]
     tier_b = [r for r in residuals if r["tier"] == "B"]
@@ -402,6 +441,24 @@ def _render_session_md(manifest: dict, residuals: list[dict], session_dir: Path)
     askable_c = [r for r in tier_c if r.get("status") != "carried_forward"]
 
     lines += [f"## Residuals ({len(residuals)} total: {len(askable_a)} Tier A, {len(askable_b)} Tier B, {len(askable_c)} Tier C, {len(carried)} carried forward)", ""]
+
+    # Per-trigger-class breakdown, real gap found 2026-09-04: a review pass
+    # fully worked one trigger class and reported the whole pack reviewed --
+    # the tier-only line above mixes several trigger classes per tier with
+    # no way to tell. Reads any drafts/decisions/ already on disk (non-empty
+    # only on a re-run against an existing session-dir) via the same
+    # summarize_by_trigger apply.py's own completeness table uses, so the
+    # two views can't drift apart (Architect_Residual_Review_Session.md
+    # §3.1's producer registry is the human-facing counterpart).
+    decisions_dir = session_dir / "drafts" / "decisions"
+    existing_decisions = [json.loads(f.read_text()) for f in sorted(decisions_dir.glob("*.json"))] if decisions_dir.exists() else []
+    decisions_by_id, _ = load_decisions_by_id(existing_decisions)
+    by_trigger = summarize_by_trigger(residuals, decisions_by_id)
+    if by_trigger:
+        lines += ["### By trigger class", ""]
+        for trigger, entry in sorted(by_trigger.items()):
+            lines.append(f"- [{entry['tier']}] `{trigger}`: {entry['decided']}/{entry['total']} decided")
+        lines.append("")
 
     if carried:
         lines += ["## Carried forward from a prior session (not re-asked)", ""]
@@ -457,7 +514,10 @@ def _render_agents_md() -> str:
         "Found live (a real Copilot Chat session drafted 23 Decision Records using invented fields "
         "`residual_id`/`construct`/`option` instead of the real schema below — every one silently failed "
         "to apply): you cannot read `pipeline/src/types/overrides.ts` from this chat (outside the pack, "
-        "workspace search is off) — these two worked examples ARE the schema, copy their field names exactly.\n\n"
+        "workspace search is off) — these two worked examples ARE the schema, copy their field names exactly. "
+        "Note: `residual_id` IS now a real, required field (added 2026-09-04) — the incident above was about "
+        "inventing it as a substitute for `decision_id`/`final_decision`/`status`, not about the field itself; "
+        "set it to the exact `residuals.json` id you're answering, alongside `decision_id` (the draft's own new id), never instead of it.\n\n"
         "**Decision Record with NO override** (the most common real outcome — a `leave-open`/`accepted` "
         "answer, or any decision that doesn't change CALM):\n"
         "```json\n"
@@ -473,6 +533,7 @@ def _render_agents_md() -> str:
                 "reviewed_at": "<ISO timestamp>",
                 "status": "active",
                 "supersedes": None,
+                "residual_id": "<the residuals.json id this decision answers, e.g. R-014>",
             },
             indent=2,
         )
@@ -494,6 +555,7 @@ def _render_agents_md() -> str:
                 "reviewed_at": "<ISO timestamp>",
                 "status": "active",
                 "supersedes": None,
+                "residual_id": "<the residuals.json id this decision answers, e.g. R-014>",
             },
             indent=2,
         )

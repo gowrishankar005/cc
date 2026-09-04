@@ -55,6 +55,7 @@ class TestApplyEndToEnd(unittest.TestCase):
             "reviewer": "architect:test",
             "reviewed_at": "2026-08-09T00:00:00Z",
             "status": "active",
+            "residual_id": "R-001",
         }
         override = {
             "override_id": "O-test-001",
@@ -86,6 +87,7 @@ class TestApplyEndToEnd(unittest.TestCase):
             "reviewer": "architect:test",
             "reviewed_at": "2026-08-09T00:00:00Z",
             "status": "active",
+            "residual_id": "R-001",
         }
         override = {
             "override_id": "O-test-001",
@@ -126,6 +128,20 @@ class TestApplyEndToEnd(unittest.TestCase):
         self.assertIn("O-test-001", report)
         log = (self.session_dir / "decisions-log.md").read_text()
         self.assertIn("Applied", log)
+
+        # Real gap found 2026-09-04: "N applied, M rejected, K skipped" alone
+        # reads as a completeness signal without being one. Both the
+        # pre-confirmation table (printed before run-slice ever runs) and
+        # the final summary line's suffix must be real, not just present.
+        self.assertIn("[apply] residual completeness:", run.stdout)
+        self.assertRegex(run.stdout, r"\[apply\] wrote .* \(\d+/\d+ residuals had a decision\)")
+
+    def test_apply_report_records_residual_completeness(self):
+        self._write_draft()
+        run = _run([sys.executable, str(TOOLS_DIR / "apply.py"), "--session-dir", str(self.session_dir), "--out", str(self.applied_dir), "--i-confirm-apply"])
+        self.assertEqual(run.returncode, 0, run.stderr)
+        report_md = (self.session_dir / "apply-report.md").read_text()
+        self.assertIn("Residual completeness:", report_md)
 
     def test_apply_refuses_without_confirmation(self):
         self._write_draft()

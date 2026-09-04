@@ -71,6 +71,10 @@ HARD RULES (violating any of these means: do not draft, return
      "cannot_decide: ambiguous between <candidates>" — do not pick one.
   5. Every draft must cite its evidence explicitly in the Decision
      Record's rationale field (residual id, evidence ref, one sentence).
+     The Decision Record's `residual_id` field must be set to the exact
+     `id` value from the `residual` object you were given (e.g. "R-014")
+     — this is a separate, required, structured field from `decision_id`
+     (which is a new id you invent for the draft itself).
   6. Never blend your own confidence into x-aac-confidence. That field is
      computed by the deterministic pipeline; you do not set it.
   7. Output format is fixed JSON, one of:
@@ -91,7 +95,7 @@ def build_user_prompt(residual: dict, unit_index: dict, packs: dict) -> str:
     return llm_common.build_evidence_prompt(residual, unit_index, packs)
 
 
-REQUIRED_DECISION_KEYS = {"decision_id", "module", "target_type", "target_ref", "final_decision", "rationale", "reviewer", "reviewed_at", "status"}
+REQUIRED_DECISION_KEYS = {"decision_id", "module", "target_type", "target_ref", "final_decision", "rationale", "reviewer", "reviewed_at", "status", "residual_id"}
 REQUIRED_OVERRIDE_KEYS = {"override_id", "module", "target_ref", "override_type", "decision_record_ref", "status", "created_by", "created_at"}
 # Tier B (design §3) only ever drafts these — never node_remove/boundary_change/
 # relationship_remove, which are architect-only judgment calls even when evidenced.
@@ -138,6 +142,13 @@ def parse_and_validate_response(raw_text: str, residual: dict, calm_node_ids: se
     reviewer = decision.get("reviewer", "")
     if not isinstance(reviewer, str) or not reviewer.startswith("llm-advisory:"):
         return {"outcome": "invalid_response", "reason": f"decision.reviewer must start with 'llm-advisory:', got: {reviewer!r} — an LLM draft must never claim to be an architect"}
+
+    # Mechanically enforced, not just instructed (hard rule 5): a drafted
+    # decision must actually answer THIS residual, not claim to answer a
+    # different one -- the completeness view (validate_drafts.summarize_by_trigger)
+    # trusts this field, so a wrong value here would silently mis-count.
+    if decision.get("residual_id") != residual.get("id"):
+        return {"outcome": "invalid_response", "reason": f"decision.residual_id {decision.get('residual_id')!r} does not match this residual's own id {residual.get('id')!r}"}
 
     if override.get("override_type") not in TIER_B_ALLOWED_OVERRIDE_TYPES:
         return {"outcome": "invalid_response", "reason": f"override_type '{override.get('override_type')}' is not Tier-B-draftable (only {sorted(TIER_B_ALLOWED_OVERRIDE_TYPES)}) — architect-only judgment call"}
