@@ -243,6 +243,53 @@ class TestRenderAgentsMd(unittest.TestCase):
         self.assertIn('"accepted"', rendered)
 
 
+class TestDossierLimit(unittest.TestCase):
+    """Real, live-found risk fixed 2026-09-05: a full pack (50+ open
+    residuals) hit sustained claude CLI rate-limiting twice in the same
+    real session, and the second time consumed enough real usage quota to
+    lock the calling session out for hours. --dossier-limit bounds the
+    batch instead of all-or-nothing. Pure function tests -- no pipeline
+    build, no live claude CLI call (dossier.process_dossier_batch mocked)."""
+
+    def _residual(self, rid):
+        return {"id": rid, "status": "open", "tier": "A"}
+
+    def test_limit_below_open_count_only_dossiers_the_first_n(self):
+        from pack import _run_dossier_pass
+        import dossier
+
+        residuals = [self._residual(f"R-{i:03d}") for i in range(1, 21)]  # 20 open residuals
+        with mock.patch("pack._llm_backend_available", return_value=True), \
+             mock.patch.object(dossier, "process_dossier_batch", return_value=([], [])) as mock_batch:
+            _run_dossier_pass(residuals, {}, {}, dossier_limit=15)
+        targets_passed = mock_batch.call_args[0][0]
+        self.assertEqual(len(targets_passed), 15, "must dossier only the first 15 of 20 open residuals, not all of them")
+        self.assertEqual([r["id"] for r in targets_passed], [f"R-{i:03d}" for i in range(1, 16)])
+
+    def test_limit_above_open_count_is_a_no_op(self):
+        """A generous limit must never change behavior for a genuinely small pack."""
+        from pack import _run_dossier_pass
+        import dossier
+
+        residuals = [self._residual(f"R-{i:03d}") for i in range(1, 4)]  # 3 open residuals
+        with mock.patch("pack._llm_backend_available", return_value=True), \
+             mock.patch.object(dossier, "process_dossier_batch", return_value=([], [])) as mock_batch:
+            _run_dossier_pass(residuals, {}, {}, dossier_limit=15)
+        self.assertEqual(len(mock_batch.call_args[0][0]), 3)
+
+    def test_no_limit_given_dossiers_every_open_residual_unchanged(self):
+        """Simplicity First: omitting --dossier-limit must reproduce the
+        exact prior behavior -- every open residual, no truncation."""
+        from pack import _run_dossier_pass
+        import dossier
+
+        residuals = [self._residual(f"R-{i:03d}") for i in range(1, 21)]
+        with mock.patch("pack._llm_backend_available", return_value=True), \
+             mock.patch.object(dossier, "process_dossier_batch", return_value=([], [])) as mock_batch:
+            _run_dossier_pass(residuals, {}, {})  # no dossier_limit at all
+        self.assertEqual(len(mock_batch.call_args[0][0]), 20)
+
+
 class TestResidualsByTriggerCompletenessViews(unittest.TestCase):
     """Real gap found on review of this whole feature's own test coverage:
     every real end-to-end test that exercised the new completeness views

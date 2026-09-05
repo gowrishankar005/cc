@@ -73,16 +73,37 @@ node pipeline/dist/orchestration/run-slice.js <roots...> --out <out-dir> [flags 
 Report the real summary line (`[run-slice] wrote artefacts to ...`) — if it exits non-zero, stop
 and show the real stderr, do not retry blindly.
 
-## Step 2 — pack, with dossier by default
+## Step 2 — pack first, WITHOUT dossier; decide on dossier only after seeing the real cost
 
-Check LLM backend availability first with `command -v claude` (the exact same check
-`llm_common._llm_backend_available()` uses — `shutil.which("claude")` — a free PATH lookup, never
-a live call; do not burn a real, billed `claude -p` invocation just to check availability). If found:
+**Real, live-found incident, not a hypothetical (2026-09-05): a full ~51-residual pack run with
+`--with-dossier` hit sustained `claude` CLI rate-limiting, and — run a second time — consumed
+enough real usage quota to lock the calling session out for hours.** `pack.py`'s own CLI already
+treats `--with-dossier` as opt-in, off by default (a deliberate choice from this project's own T-1
+cost measurements: $0.08–$0.32 and 40–132s per real call). Making it this skill's own default
+silently reversed that already-evidenced decision — never do that again. Always build the pack
+first WITHOUT dossier:
 ```
-python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir <session-dir> --with-dossier
+python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir <session-dir>
 ```
-If not found, run without `--with-dossier` and say plainly that no dossier pass ran because the
-`claude` CLI wasn't on PATH — never silently skip this without saying why.
+This is free (no `claude` CLI check even happens without the flag) and gives you the REAL residual
+count from the resulting `manifest.json`'s `residualsByTrigger` before any cost decision — no need
+to guess it upfront. `pack.py` only refuses to rebuild a session-dir that already has unapplied
+drafts, so it's always safe to re-pack the SAME session-dir with `--with-dossier` afterward if the
+architect wants one — nothing is lost by packing dossier-less first.
+
+Then check LLM backend availability with `command -v claude` (the exact same check
+`llm_common._llm_backend_available()` uses — `shutil.which("claude")` — a free PATH lookup, never a
+live call). If found, ask **one** `AskUserQuestion` stating the real residual count, the real
+per-call cost/latency above, and the real incident above, with options along these lines:
+- **No dossier** — proceed straight to Step 3 with the pack as already built.
+- **Bounded dossier (recommend 15)** — re-run `pack.py ... --with-dossier --dossier-limit 15` (or
+  a number the architect picks) — comfortably under the ~20–30 calls that succeeded before hitting
+  a wall in the real incident above, real margin, not cutting it close.
+- **Full dossier for every open residual** — only if the architect explicitly accepts the real,
+  demonstrated lockout risk for a pack this size; never the default, never assumed.
+
+If `claude` isn't on PATH, skip straight to Step 3 and say plainly that no dossier pass ran because
+the CLI wasn't found — never silently skip this without saying why.
 
 ## Step 3 — draft Tier B automatically
 
