@@ -8,6 +8,8 @@
 
 **Hit something not covered here?** [`Architect_Pilot_Feedback_Notes.md`](./Architect_Pilot_Feedback_Notes.md) is a real log of everything a first-time architect actually ran into walking through this guide — worth a check before assuming something unexpected is your mistake.
 
+**Working in Claude Code? You may not need most of the steps below.** `/review-session` (`.claude/skills/review-session/SKILL.md`) runs this entire guide — Steps 1 through 6 — as one conversational flow: it detects the right scan flags for your repo and confirms once, packs (asking about the dossier's real cost before running it, not silently defaulting to it), presents every open decision to you as real evidence-backed cards, validates, asks one explicit "apply now or stop here" before ever touching real CALM, applies, and validates the result — then tells you honestly what's still open. It's a second delivery vehicle for the *identical* rules this whole guide documents (see `Architect_Residual_Review_Session.md` §4.4a), not a shortcut around them. Keep reading if you want to understand what it's doing under the hood, you're on VS Code + Copilot Chat instead, or you want manual, step-by-step control.
+
 ---
 
 ## The shape of the whole thing
@@ -22,7 +24,7 @@ your repo
 2. Build a Session Pack  (pack.py) →  review-sessions/<run-id>/  (SESSION.md, choice cards, drafts/)
    │
    ▼
-3. Work the pack  (VS Code Copilot Chat, or SESSION.md by hand)
+3. Work the pack  (VS Code Copilot Chat, Claude Code's /review-session, or SESSION.md by hand)
    │                                 → you answer what only a human can decide
    │                                 → the assistant drafts the rest, evidence-only, never invents
    ▼
@@ -74,16 +76,19 @@ This detects your `build.gradle`/`pom.xml` and derives the right build command i
 
 ```bash
 python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir review-sessions/<run-id>
-
-# optional: attach a real, evidence-grounded LLM explanation to every open
-# residual before you start (any tier) — see Step 3 for what this needs
-# and what it costs
-python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir review-sessions/<run-id> --with-dossier
 ```
 
-This reads the scan output and writes a self-contained workspace: `review-sessions/<run-id>/SESSION.md` (open this first), `residuals.json` (everything still open, sorted into three tiers — see below), `evidence/` (redacted source snippets backing each item), and an empty `drafts/` waiting to be filled.
+This reads the scan output and writes a self-contained workspace: `review-sessions/<run-id>/SESSION.md` (open this first), `residuals.json` (everything still open, sorted into three tiers — see below), `manifest.json` (includes a real `residualsByTrigger` count — check this before deciding whether a dossier pass is worth the cost, see below), `evidence/` (redacted source snippets backing each item), and an empty `drafts/` waiting to be filled.
 
-If a pack for this run already exists with unapplied drafts, this refuses to overwrite it — apply or discard the old one first.
+If a pack for this run already exists with unapplied drafts, this refuses to overwrite it — apply or discard the old one first. It's always safe to re-run this exact command with `--with-dossier` added afterward, once you've seen the real residual count — nothing is lost by packing dossier-less first.
+
+**Optional: attach a real, evidence-grounded LLM explanation to every open residual (any tier) before you start.** Check `manifest.json`'s `residualsByTrigger` for the real count first — this has a real, measured cost ($0.08–$0.32 and 40–132 seconds per residual) and a real, live-found risk: a full ~50-residual pack has hit sustained rate-limiting, and once, consumed enough real usage quota to lock out the calling session for hours. Bound it instead of running it on everything:
+
+```bash
+python3 tools/review-session/pack.py --out-dir <out-dir> --session-dir review-sessions/<run-id> --with-dossier --dossier-limit 15
+```
+
+`--dossier-limit 15` is a real, evidenced safe margin — comfortably under the ~20–30 calls that succeeded before hitting a wall both times this was tried. Drop the flag only for a genuinely small pack, or if you've explicitly decided the lockout risk is acceptable for this run.
 
 **The three tiers, briefly:**
 - **Tier A — you decide.** Presented as a short multiple-choice card with real evidence attached, never a blank text box.
@@ -95,6 +100,8 @@ If a pack for this run already exists with unapplied drafts, this refuses to ove
 ## Step 3 — Work the pack
 
 The custom agent lives at `.github/agents/residual-review.agent.md` — it's a real file checked into this repo, not something to fetch separately. (If you're on an older Copilot Chat that still expects `.github/chatmodes/*.chatmode.md`, this file won't be picked up from its current location — see your Copilot Chat version, or ask about migrating back, if the agent picker comes up empty.) It reads `SESSION.md` and `residuals.json`, presents each open item as a choice card synthesized from real evidence, and only ever writes proposals under `drafts/`.
+
+**Already using Claude Code instead?** `/review-session` reuses this exact same file's hard rules by reference (`Architect_Residual_Review_Session.md` §4.4a) — it isn't a separate protocol, just a different vehicle that also owns Steps 1, 2, 4–6 for you. Everything below in this step (how to actually decide a card, what "Leave open" means, the fetch-span behavior) applies identically whichever vehicle presents the cards. One real, additional guarantee the Skill vehicle adds: a `PreToolUse` hook (`.claude/hooks/check-apply-confirmed.py`) hard-blocks Step 5's apply command in real code unless a genuine confirmation round-trip with you already happened — not just an instruction the assistant is trusted to follow. (Disclosed honestly: whether that hold survives `--dangerously-skip-permissions` is undocumented by Claude Code itself — don't treat it as unconditional if you run in that mode.)
 
 **VS Code + GitHub Copilot Chat (the primary, intended path).**
 1. Open this repo as a workspace in VS Code (the desktop app, not the terminal).
@@ -121,9 +128,9 @@ The custom agent lives at `.github/agents/residual-review.agent.md` — it's a r
 
 **Practical guidance while you're in the chat, any host:** always approve file writes individually, and never grant a blanket "allow all edits this session" permission — that's needless exposure, not a required convenience, given Step 5 is the real gate either way.
 
-**Optional, before you even open the chat: `pack.py --with-dossier`.** Re-run Step 2 with this flag added and every open residual (any tier) gets a real, evidence-grounded explanation attached before you start — Copilot Chat (or you, reading `SESSION.md` by hand) sees the reasoning up front instead of a bare choice card. Needs the `claude` CLI already authenticated on your `PATH` (same convenience as Copilot Chat itself — no separate key to manage); real cost/latency measured at $0.08–$0.32 and 40–132 seconds per residual, so it's opt-in, not the default, and worth skipping on a pack with a lot of open items unless you want the extra explanation for all of them.
+**Optional, before you even open the chat: `pack.py --with-dossier` (see Step 2 above for the real cost and the `--dossier-limit` safety bound).** Re-run Step 2 with this flag and every open residual (any tier, up to the limit you set) gets a real, evidence-grounded explanation attached before you start — Copilot Chat (or you, reading `SESSION.md` by hand) sees the reasoning up front instead of a bare choice card. Needs the `claude` CLI already authenticated on your `PATH` (same convenience as Copilot Chat itself — no separate key to manage).
 
-**Known gap, real, not yet fixed:** if your repo's residual comes from a Spring config file (`application.yml`-derived database/queue units), `--with-dossier` will currently come back saying no evidence was provided for it — a real coverage hole in how evidence snippets get built for that unit shape (tracked in `BACKLOG.md`), not a sign the dossier pass is broken. Source-code-derived units (the common case) aren't affected.
+**Previously a known gap, fixed:** a residual from a Spring config file (`application.yml`-derived database/queue units) used to come back from `--with-dossier` saying no evidence was provided, with no explanation why — a real coverage hole in how evidence snippets were built for that unit shape. Fixed: that shape now gets an honest placeholder explaining exactly why no snippet is available, instead of the model seeing nothing.
 
 **If a card's evidence snippet is too short to decide from:** the chat prints one `pack.py fetch-span` command instead of guessing — it never runs this itself. Copy it into your terminal, run it, and the extra source lines land in the pack for you to keep reviewing. Two forms: an exact `--start-line`/`--end-line` range, or `--anchor <file:line> --context-lines <n>` for "N lines either side of this line" without hand-computing the range yourself. Capped per session (10 extra reads / 400 lines) so this can't quietly balloon into reading the whole repo.
 
@@ -147,7 +154,7 @@ Checks every draft against the schema and the same integrity rules the real appl
 python3 tools/review-session/apply.py --session-dir review-sessions/<run-id> --out <out-dir>-reviewed
 ```
 
-The only command in this whole workflow that touches `run-slice`/the real override mechanism. It re-validates, asks for your explicit confirmation, then writes the reviewed output to `<out-dir>-reviewed` along with `apply-report.md` and `decisions-log.md` — your audit trail of who decided what.
+The only command in this whole workflow that touches `run-slice`/the real override mechanism. Before it asks for your explicit confirmation, it prints a real, per-trigger-class completeness table — how many of the pack's residuals actually have a decision, broken down by trigger class, not just "N applied." Read this before confirming: it's the thing that stops "N applied, 0 rejected" from silently reading as "the pack is fully reviewed" when several trigger classes were never touched (a real mistake this exact workflow's own build process made once — see `BACKLOG.md`'s "Session Pack completeness visibility" row). Once confirmed, it writes the reviewed output to `<out-dir>-reviewed` along with `apply-report.md` (which repeats the same completeness numbers) and `decisions-log.md` — your audit trail of who decided what.
 
 ## Step 6 — Read the result
 
