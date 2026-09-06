@@ -480,7 +480,11 @@ python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
 # 2. Hand-author decisions for the generated choice cards (tools/review-session/examples/README.md;
 #    every Decision Record needs a real residual_id linking it back to the residual it answers)
 #    -- optionally with an LLM-assisted dossier/draft pass first (--with-dossier / draft_tier_b.py
-#    in the optional-tools table below)
+#    in the optional-tools table below). Check manifest.json's residualsByTrigger for the real
+#    residual count BEFORE adding --with-dossier to the pack.py command above: real cost is
+#    $0.08-$0.32 and 40-132s per residual, and a full ~50-residual pack has hit sustained rate-
+#    limiting and, once, locked the calling session out for hours from real quota exhaustion.
+#    Always pass --dossier-limit 15 (or similar) unless the pack is genuinely small.
 
 # 3. Apply — the only command that ever calls run-slice/override-applier; requires confirmation.
 #    apply.py already re-validates every draft in-process before applying (the exact same check

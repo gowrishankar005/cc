@@ -70,7 +70,7 @@ Every write into the final CALM file goes through step 5, and step 5 only ever a
 node pipeline/dist/orchestration/run-slice.js <package-root> [<package-root> ...] --out <out-dir>
 ```
 
-This produces the raw materials in `<out-dir>`: `typed-facts.json`, `coverage-report.json`, `architecture.calm.json` (the deterministic first pass), `intelligence-ir.md`, and a review queue of anything the scanner itself flagged as uncertain.
+This produces the raw materials in `<out-dir>`: `typed-facts.json`, `coverage-report.json`, `architecture.calm.json` (the deterministic first pass), and `intelligence-ir.md`. The review queue itself doesn't exist yet — `pack.py` (Step 2) generates it automatically from these files, so there's nothing extra to run here.
 
 **What to look at before moving on:** `<out-dir>/coverage-report.json`'s `silenceFlags`. If it includes `S1`, the scan genuinely didn't recover part of the architecture's shape for this repo — that's real information you'll want in hand before promising a stakeholder "this is the architecture," not something the next steps quietly paper over.
 
@@ -201,7 +201,7 @@ python3 tools/review-session/effective_ir.py \
 - Nothing here ever edits `typed-facts.json` — the deterministic scan output is never touched, only projected forward through overrides.
 - The only legal write path into the architecture file is Decision Record + Override, applied by `apply.py`. There is no other door.
 - Insufficient evidence always means "leave it open," never a plausible-sounding guess — this is on purpose.
-- Answering a residual for this run does not mean the scanner will find the same thing automatically next time. It's a correction for *this* run's output, not a permanent fix to the detection mechanism. If `coverage-report.json` flagged a real gap (S1/S2), that's still a real, disclosed gap in what the scanner recovers — say so when you report results, don't let a clean-looking reviewed CALM file imply otherwise.
+- Answering a residual for this run does not mean the scanner will find the same thing automatically next time. It's a correction for *this* run's output, not a permanent fix to the detection mechanism. If `coverage-report.json` flagged `S1` (a real gap in what relationships the scanner recovered) or `S2` (a real gap in security-control detection — a different dimension, not a recovery gap), both are still real, disclosed limitations after you're done reviewing — say so when you report results, don't let a clean-looking reviewed CALM file imply otherwise.
 - Session Packs (`review-sessions/`) are scratch workspaces, not permanent artefacts — gitignored by default. `decisions-log.md` and `apply-report.md` are the pieces worth keeping around for audit purposes if you want to archive one.
 
 For the full rule set (redaction, bulk-apply integrity, what the tool is explicitly forbidden from doing) see `tools/review-session/README.md`'s "Non-negotiable rules" section.
