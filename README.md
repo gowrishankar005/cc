@@ -454,6 +454,10 @@ architect-facing **Session Pack**: choice cards for a human to answer,
 applied back through the *same* Decision Record/Override mechanism
 `--overrides` already uses — never a second, informal write path into CALM.
 
+**New to this? Read [`docs/solution/Architect_Guide_Scan_To_Signoff.md`](./docs/solution/Architect_Guide_Scan_To_Signoff.md) first** — a
+practical, step-by-step walkthrough with what to expect at each step, not just the command
+reference below.
+
 **Working in Claude Code?** `/review-session` (`.claude/skills/review-session/SKILL.md`) runs
 the entire loop below — scan, dossier, Tier B drafting, interactive Tier A review, validate,
 apply, validate — as one conversational flow, asking only for the decisions that must be a real
@@ -532,6 +536,7 @@ A clean L0+L1 result on a fixture does not imply L2 on a real multi-module syste
 | [`docs/solution/Module_Authoring_Guide.md`](./docs/solution/Module_Authoring_Guide.md) | Adding a new module |
 | [`docs/solution/Contract_Evolution_Policy.md`](./docs/solution/Contract_Evolution_Policy.md) | When to version the typed-facts contract |
 | [`docs/solution/Catalogue_Intake.md`](./docs/solution/Catalogue_Intake.md) | Adding a new detection catalogue row |
+| [`docs/solution/Architect_Guide_Scan_To_Signoff.md`](./docs/solution/Architect_Guide_Scan_To_Signoff.md) | Practical, step-by-step architect walkthrough — scan to a signed-off `architecture.calm.json` |
 | [`docs/solution/Architect_Residual_Review_Session.md`](./docs/solution/Architect_Residual_Review_Session.md) | Design for the residual review-session workflow (`tools/review-session/`) |
 | [`CLAUDE.md`](./CLAUDE.md) | Working guidance for AI coding assistants |
 
