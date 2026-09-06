@@ -8,7 +8,17 @@
 
 **Hit something not covered here?** [`Architect_Pilot_Feedback_Notes.md`](./Architect_Pilot_Feedback_Notes.md) is a real log of everything a first-time architect actually ran into walking through this guide — worth a check before assuming something unexpected is your mistake.
 
-**Working in Claude Code? You may not need most of the steps below.** `/review-session` (`.claude/skills/review-session/SKILL.md`) runs this entire guide — Steps 1 through 6 — as one conversational flow: it detects the right scan flags for your repo and confirms once, packs (asking about the dossier's real cost before running it, not silently defaulting to it), presents every open decision to you as real evidence-backed cards, validates, asks one explicit "apply now or stop here" before ever touching real CALM, applies, and validates the result — then tells you honestly what's still open. It's a second delivery vehicle for the *identical* rules this whole guide documents (see `Architect_Residual_Review_Session.md` §4.4a), not a shortcut around them. Keep reading if you want to understand what it's doing under the hood, you're on VS Code + Copilot Chat instead, or you want manual, step-by-step control.
+**Working in Claude Code? You may not need most of the steps below.** Open a Claude Code session in this repo and type:
+```
+/review-session <package-root> [<package-root> ...]
+```
+This runs this entire guide — Steps 1 through 6 — as one conversational flow: it detects the right scan flags for your repo and confirms once, packs (asking about the dossier's real cost before running it, not silently defaulting to it), presents every open decision to you as real evidence-backed cards, validates, asks one explicit "apply now or stop here" before ever touching real CALM, applies, and validates the result — then tells you honestly what's still open. It's a second delivery vehicle for the *identical* rules this whole guide documents (see `Architect_Residual_Review_Session.md` §4.4a), not a shortcut around them.
+
+**Real gotcha, hit for real building this**: the skill listing only refreshes when a Claude Code session *starts* — if the repo (or an edit to the skill itself) is new to an already-running session, `/review-session` won't be recognized until you restart the session. Not a bug in the skill, just how the harness loads skills.
+
+**Resuming a pack you already built** (with any vehicle): point it at the session dir instead — `/review-session --session-dir review-sessions/<run-id>` — and it picks up from Step 3 rather than re-scanning.
+
+Keep reading if you want to understand what it's doing under the hood, you're on VS Code + Copilot Chat instead, or you want manual, step-by-step control.
 
 ---
 

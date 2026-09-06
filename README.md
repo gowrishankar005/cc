@@ -458,11 +458,18 @@ applied back through the *same* Decision Record/Override mechanism
 practical, step-by-step walkthrough with what to expect at each step, not just the command
 reference below.
 
-**Working in Claude Code?** `/review-session` (`.claude/skills/review-session/SKILL.md`) runs
-the entire loop below — scan, dossier, Tier B drafting, interactive Tier A review, validate,
-apply, validate — as one conversational flow, asking only for the decisions that must be a real
-human judgment. The manual steps below are the same underlying tools it calls; useful outside an
-agent session, or to run any one step in isolation.
+**Working in Claude Code?** Open a Claude Code session in this repo and type:
+```
+/review-session <package-root> [<package-root> ...]
+```
+(or point it at an existing `--session-dir` to resume a pack already built). This runs the entire
+loop below — scan, dossier, Tier B drafting, interactive Tier A review, validate, apply, validate —
+as one conversational flow, asking only for the decisions that must be a real human judgment. The
+manual steps below are the same underlying tools it calls; useful outside an agent session, or to
+run any one step in isolation. **One real gotcha**: the skill listing only refreshes when a Claude
+Code session starts — if you've just cloned this repo (or pulled a change that added/edited the
+skill) into an *already-running* session, restart the session before `/review-session` will be
+recognized.
 
 ```bash
 # 1. Build a real pack from a real run-slice output directory
