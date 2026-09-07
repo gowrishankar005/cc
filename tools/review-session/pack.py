@@ -67,6 +67,7 @@ def pack_main() -> int:
     parser.add_argument("--max-residuals", type=int, default=None, help="keep the N highest-consequence askable residuals (carried_forward always kept). Token cap, not a correctness cap.")
     parser.add_argument("--context-lines", type=int, default=DEFAULT_CONTEXT_LINES, help=f"lines either side of an Evidence.ref (default {DEFAULT_CONTEXT_LINES}; window capped at {MAX_SNIPPET_WINDOW})")
     parser.add_argument("--with-dossier", action="store_true", help="opt-in Evidence Dossier pass (T-2): calls the `claude` CLI to attach an additive `dossier` field to every open residual (any tier). Off by default -- needs the `claude` CLI on PATH; no backend -> reports what would have been attempted, writes a normal dossier-less pack.")
+    parser.add_argument("--dossier-limit", type=int, default=None, help="only dossier the first N open residuals instead of every one -- real, live-found risk (2026-09-05): a full pack (50+ residuals) can hit sustained claude CLI rate-limiting and consume enough real usage quota to lock out the calling session for hours. Ignored without --with-dossier.")
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir).resolve()
@@ -149,7 +150,7 @@ def pack_main() -> int:
     # --with-dossier flag, pack.py behaves exactly as it did before this
     # pass existed (doesn't even check for a `claude` CLI backend).
     if args.with_dossier:
-        residuals = _run_dossier_pass(residuals, unit_index, packs)
+        residuals = _run_dossier_pass(residuals, unit_index, packs, dossier_limit=args.dossier_limit)
 
     # Deterministic choice cards, generated from the fixed
     # per-class templates in cards.py (never LLM-invented), attached
@@ -306,15 +307,27 @@ def _build_evidence_packs(residuals: list[dict], unit_index: dict, package_roots
     return packs, paths
 
 
-def _run_dossier_pass(residuals: list[dict], unit_index: dict, packs: dict) -> list[dict]:
+def _run_dossier_pass(residuals: list[dict], unit_index: dict, packs: dict, dossier_limit: int | None = None) -> list[dict]:
     """T-2's opt-in Evidence Dossier pass, over every OPEN residual
-    regardless of tier. No `claude` CLI on PATH (even with --with-dossier
-    set) -> log what would have been attempted, return residuals
-    unchanged so the rest of pack.py writes a normal dossier-less pack."""
+    regardless of tier -- or, if `dossier_limit` is given, only the first
+    N of them. No `claude` CLI on PATH (even with --with-dossier set) ->
+    log what would have been attempted, return residuals unchanged so the
+    rest of pack.py writes a normal dossier-less pack.
+
+    Real, live-found risk this limit exists for (2026-09-05): a real
+    ~51-residual pack hit sustained claude CLI rate-limiting twice, and the
+    second time consumed enough real usage quota to lock the calling
+    session out for hours -- a materially worse outcome than the already-
+    handled per-call `llm_error` degradation (call_llm_safe), since that
+    isolates one residual's failure but does nothing to stop a large batch
+    from being attempted in the first place."""
     targets = [r for r in residuals if r.get("status") == "open"]
     if not targets:
         print("[pack] --with-dossier set but no open residual(s) to build a dossier for -- nothing to do")
         return residuals
+    if dossier_limit is not None and dossier_limit < len(targets):
+        print(f"[pack] --dossier-limit {dossier_limit}: dossiering the first {dossier_limit} of {len(targets)} open residual(s), leaving the rest dossier-less")
+        targets = targets[:dossier_limit]
     if not _llm_backend_available():
         print(f"[pack] --with-dossier set but no LLM backend available (`claude` CLI not found on PATH) -- would attempt a dossier for {len(targets)} residual(s), writing a dossier-less pack: {[r['id'] for r in targets]}")
         return residuals

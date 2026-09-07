@@ -454,6 +454,23 @@ architect-facing **Session Pack**: choice cards for a human to answer,
 applied back through the *same* Decision Record/Override mechanism
 `--overrides` already uses — never a second, informal write path into CALM.
 
+**New to this? Read [`docs/solution/Architect_Guide_Scan_To_Signoff.md`](./docs/solution/Architect_Guide_Scan_To_Signoff.md) first** — a
+practical, step-by-step walkthrough with what to expect at each step, not just the command
+reference below.
+
+**Working in Claude Code?** Open a Claude Code session in this repo and type:
+```
+/review-session <package-root> [<package-root> ...]
+```
+(or point it at an existing `--session-dir` to resume a pack already built). This runs the entire
+loop below — scan, dossier, Tier B drafting, interactive Tier A review, validate, apply, validate —
+as one conversational flow, asking only for the decisions that must be a real human judgment. The
+manual steps below are the same underlying tools it calls; useful outside an agent session, or to
+run any one step in isolation. **One real gotcha**: the skill listing only refreshes when a Claude
+Code session starts — if you've just cloned this repo (or pulled a change that added/edited the
+skill) into an *already-running* session, restart the session before `/review-session` will be
+recognized.
+
 ```bash
 # 1. Build a real pack from a real run-slice output directory
 node pipeline/dist/orchestration/run-slice.js <package-root> --out /tmp/my-run
@@ -463,7 +480,11 @@ python3 pack.py --out-dir /tmp/my-run --session-dir ../../review-sessions/my-run
 # 2. Hand-author decisions for the generated choice cards (tools/review-session/examples/README.md;
 #    every Decision Record needs a real residual_id linking it back to the residual it answers)
 #    -- optionally with an LLM-assisted dossier/draft pass first (--with-dossier / draft_tier_b.py
-#    in the optional-tools table below)
+#    in the optional-tools table below). Check manifest.json's residualsByTrigger for the real
+#    residual count BEFORE adding --with-dossier to the pack.py command above: real cost is
+#    $0.08-$0.32 and 40-132s per residual, and a full ~50-residual pack has hit sustained rate-
+#    limiting and, once, locked the calling session out for hours from real quota exhaustion.
+#    Always pass --dossier-limit 15 (or similar) unless the pack is genuinely small.
 
 # 3. Apply — the only command that ever calls run-slice/override-applier; requires confirmation.
 #    apply.py already re-validates every draft in-process before applying (the exact same check
@@ -482,7 +503,7 @@ python3 apply.py --session-dir ../../review-sessions/my-run --out /tmp/my-run-re
 | `python3 queue_rank.py --session-dir ... [--history <prior-session-dir>]` | Ranks the open backlog highest-consequence-first (PII-touching, external-system-identity, trust-boundary signals — named proxies over real detected facts, not a PII/data-classification engine) and reports real residual age across reruns |
 | `python3 advisory.py --session-dir ...` | **Optional LLM-advisory layer** (needs the `claude` CLI already authenticated on `PATH` — deliberately never a raw `ANTHROPIC_API_KEY`; reports what it would attempt and writes nothing without one) — explains evidence and proposes hypotheses for open residuals, and optionally one catalogue-rule candidate per residual. **Never writes a fact**: any response shaped like a decision/override is rejected outright, and accepting a hypothesis via a card is still one human judgement, never treated as independent corroboration |
 | `python3 pack.py --out-dir ... --session-dir ... --baseline <prior-session-dir>` | A later rescan carries forward already-decided residuals instead of re-asking, and flags real drift (the same unit's trigger/class changed since it was decided) as `reconfirm` rather than silently overwriting or silently re-asking |
-| `python3 pack.py --out-dir ... --session-dir ... --with-dossier` | **Opt-in Evidence Dossier pass** (needs the `claude` CLI authenticated on `PATH`) — attaches an additive `dossier` field (explanation, hypotheses, evidenceRefsUsed) to every open residual, any tier. Never writes a fact; no backend → writes a normal, dossier-less pack |
+| `python3 pack.py --out-dir ... --session-dir ... --with-dossier [--dossier-limit N]` | **Opt-in Evidence Dossier pass** (needs the `claude` CLI authenticated on `PATH`) — attaches an additive `dossier` field (explanation, hypotheses, evidenceRefsUsed) to every open residual, any tier. Never writes a fact; no backend → writes a normal, dossier-less pack. **Real cost, check before running on a large pack**: $0.08–$0.32 and 40–132s per residual (measured), and a real ~51-residual pack hit sustained rate-limiting and, once, locked the calling session out for hours from real quota exhaustion — `--dossier-limit N` bounds the batch (15 is a real, evidenced safe margin) instead of attempting every open residual |
 | `python3 draft_tier_b.py --session-dir ...` | Headless alternative to in-chat Tier B drafting — sweeps every open Tier B residual, writes `drafts/decisions/`+`drafts/overrides/` directly when the evidence bar is met, `cannot_decide`/`draftOutcome: "bar-not-met"` otherwise. Primary path is still the VS Code chat mode; use this only for scripted/batch runs outside a chat session |
 | `python3 validate_drafts.py --session-dir ... --calm /tmp/my-run/architecture.calm.json` | Pre-check drafts/decisions + drafts/overrides before you're ready to run `apply.py` for real — `apply.py` runs this exact same check itself before ever applying, so this step is optional, not required |
 | `python3 preview_merge.py --session-dir ...` | Dry-run diff of what applying the current drafts would change, without writing anything — reuses `apply.py`'s own merge logic against a throwaway temp dir |
@@ -526,6 +547,7 @@ A clean L0+L1 result on a fixture does not imply L2 on a real multi-module syste
 | [`docs/solution/Module_Authoring_Guide.md`](./docs/solution/Module_Authoring_Guide.md) | Adding a new module |
 | [`docs/solution/Contract_Evolution_Policy.md`](./docs/solution/Contract_Evolution_Policy.md) | When to version the typed-facts contract |
 | [`docs/solution/Catalogue_Intake.md`](./docs/solution/Catalogue_Intake.md) | Adding a new detection catalogue row |
+| [`docs/solution/Architect_Guide_Scan_To_Signoff.md`](./docs/solution/Architect_Guide_Scan_To_Signoff.md) | Practical, step-by-step architect walkthrough — scan to a signed-off `architecture.calm.json` |
 | [`docs/solution/Architect_Residual_Review_Session.md`](./docs/solution/Architect_Residual_Review_Session.md) | Design for the residual review-session workflow (`tools/review-session/`) |
 | [`CLAUDE.md`](./CLAUDE.md) | Working guidance for AI coding assistants |
 

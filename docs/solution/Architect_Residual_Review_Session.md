@@ -417,6 +417,44 @@ Confirmed direction: architects interact via **GitHub Copilot Chat inside VS Cod
   4. Degraded-fallback, stated explicitly rather than left implicit: if an organization's Copilot policy disables agent-mode tool execution entirely, the workflow still works — the architect reads `SESSION.md`/choice cards conversationally, then hand-authors the Decision Record + Override JSON exactly as today's pre-B-review-session flow does. Nothing in this design removes that path; the chat mode is a convenience layer over it, not a replacement for it.
 - **Choice cards (§2.1) render as ordinary Copilot Chat markdown** — numbered options, an evidence blockquote, and a follow-up architect reply of `1`/`2`/`other: ...`. No custom webview needed for v1; a richer picker UI is a legitimate RS-5+ nice-to-have, not a blocker.
 
+### 4.4a Second delivery vehicle: Claude Code Skill (2026-09-04)
+
+§4.4 decided the delivery vehicle was VS Code + GitHub Copilot Chat, "not a bespoke extension."
+`.claude/skills/review-session/SKILL.md` is a second, different vehicle for the **identical**
+playbook — not a new design, not a re-derivation. It reuses `.github/agents/residual-review.agent.md`'s
+hard rules **by reference** (reads that file first, before doing anything else) rather than
+duplicating them, specifically so the two vehicles can't drift apart the way this project's own
+retrospective has already flagged as a real, recurring risk elsewhere (cross-document reference
+rot). Same safety framing as §4.4 point 2 applies unchanged: a Claude Code session has real,
+unrestricted `Bash` access (no host-level tool-list restriction analogous to VS Code's declared
+`tools:` array exists for a Skill) — so the skill's own `allowed-tools` frontmatter is documented,
+in the file itself, as hygiene only, never the real guarantee. The real guarantee is unchanged:
+`apply.py`'s own confirmation gate, which the skill's own instructions require an explicit,
+in-conversation `AskUserQuestion` "yes, apply" answer before ever invoking, mirroring the same
+one-guarantee framing §4.4 already established for the first vehicle.
+
+Adds, beyond what the VS Code chat mode does: end-to-end orchestration (scan → dossier → Tier B
+draft → interactive review → validate → apply → validate) in one invocation, evidence-flag
+auto-detection with one confirmation instead of remembered flags, and batched (not strictly
+one-at-a-time) Tier A/Tier-B-draft presentation — the last a disclosed, deliberate pacing
+deviation from `residual-review.agent.md` hard rule 5, not a weakening of it (the actual
+protection — the architect answers every residual themselves — holds identically, since
+`AskUserQuestion` cannot be answered by the model).
+
+**Real, code-level enforcement added 2026-09-05, not just instructions.** A markdown-instructions
+file is not enforcement — nothing stops an LLM from reading `SKILL.md` and simply choosing to skip
+its interactive steps (the structurally identical VS Code chat-mode system already had exactly
+this failure happen for real, `Architect_Pilot_Feedback_Notes.md` Entry 24). `.claude/hooks/
+check-apply-confirmed.py` (a `PreToolUse` hook) hard-blocks `apply.py --i-confirm-apply`,
+`bulk_apply.py --i-confirm-bulk-apply`, and a raw `run-slice.js --overrides` call unless a marker —
+written only by `.claude/hooks/record-apply-confirmation.py`, itself only invoked by the harness
+after a genuine `AskUserQuestion` round trip with a real human — is present and fresh (15 minutes).
+Empirically verified this same session: `PostToolUse` genuinely fires for `AskUserQuestion` and its
+input includes the real question/answer text, so the gate can verify *which* question and *what was
+answered*, not just that some question fired. **Disclosed limit, not silently assumed away**:
+whether the block survives `--dangerously-skip-permissions` is undocumented in Claude Code's own
+hooks reference — this backstop's guarantee is conditional on not running in that mode.
+
 ### 4.5 CALM viewer — reused, not built
 
 The architect views the generated/reviewed architecture in an **existing CALM viewer plugin** (the FINOS CALM Studio / draw.io↔CALM converter tooling already referenced in `CLAUDE.md`'s CALM Studio contract note), pointed at `architecture.calm.json`. This design adds no new viewer code — its only two obligations toward that plugin are:
