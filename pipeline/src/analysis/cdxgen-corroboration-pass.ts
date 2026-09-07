@@ -92,6 +92,10 @@ function introducedUnit(root: string, matchName: string, matchVersion: string | 
 export const cdxgenCorroborationPass: AnalysisPass = {
   name: 'cdxgenCorroboration',
   run(ctx: AnalysisContext) {
+    if (ctx.disableCdxgen) {
+      console.log('[cdxgen-corroboration] --no-cdxgen: skipping dependency-manifest corroboration for this run');
+      return;
+    }
     const rulesDir = path.join(__dirname, '..', 'rules');
     const libraryKinds = corroboratingLibraryKinds(rulesDir);
 

@@ -98,7 +98,8 @@ async function runSlice(
   codeqlBuildCommand?: string,
   repoManifestsDir?: string,
   codeqlFallbackBuildCommand?: string,
-  strictIsolatedNodes = false
+  strictIsolatedNodes = false,
+  disableCdxgen = false
 ): Promise<void> {
   const catalogue = loadSignalCatalogue(path.join(__dirname, '..', 'rules'));
   logEngineCapabilitySummary(loadEngineCapabilityMatrix(path.join(__dirname, '..', 'scanner')));
@@ -170,6 +171,7 @@ async function runSlice(
     codeqlBuildCommand,
     repoManifestsDir,
     codeqlFallbackBuildCommand,
+    disableCdxgen,
   };
   await runPasses(DEFAULT_PASSES, ctx);
   logMem('after runPasses');
@@ -337,6 +339,7 @@ const KNOWN_FLAGS = [
   '--no-auto-codeql',
   '--repo-manifests',
   '--strict-isolated-nodes',
+  '--no-cdxgen',
 ];
 
 // Flags that consume the NEXT token as their value — that token must never
@@ -391,6 +394,8 @@ function main() {
   const includeSystemNode = noSystemNodeIdx === -1;
   const strictIsolatedNodesIdx = args.indexOf('--strict-isolated-nodes');
   const strictIsolatedNodes = strictIsolatedNodesIdx >= 0;
+  const noCdxgenIdx = args.indexOf('--no-cdxgen');
+  const disableCdxgen = noCdxgenIdx >= 0;
 
   const fromFactsIdx = args.indexOf('--from-facts');
   if (fromFactsIdx >= 0) {
@@ -416,7 +421,7 @@ function main() {
   const noAutoCodeqlIdx = args.indexOf('--no-auto-codeql');
   const repoManifestsIdx = args.indexOf('--repo-manifests');
   const repoManifestsDir = repoManifestsIdx >= 0 ? path.resolve(args[repoManifestsIdx + 1]) : undefined;
-  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, autoCodeqlIdx, noAutoCodeqlIdx, repoManifestsIdx, strictIsolatedNodesIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
+  const positionalEnd = [outIdx, overridesIdx, modulesIdx, strictDetectIdx, noSnippetsIdx, k8sManifestsIdx, cfnManifestsIdx, strictOverridesIdx, noSystemNodeIdx, enableEnvSoftGraphIdx, codeqlSourceRootIdx, codeqlBuildCommandIdx, autoCodeqlIdx, noAutoCodeqlIdx, repoManifestsIdx, strictIsolatedNodesIdx, noCdxgenIdx].filter((i) => i >= 0).reduce((min, i) => Math.min(min, i), args.length);
   const packageRoots = args.slice(0, positionalEnd).map((p) => path.resolve(p));
 
   // --auto-codeql / WEAVER_CODEQL_LICENSE_CONFIRMED: only fills in a gap
@@ -456,7 +461,7 @@ function main() {
     }
   }
 
-  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand, repoManifestsDir, codeqlFallbackBuildCommand, strictIsolatedNodes).catch((err) => {
+  runSlice(packageRoots, outDir, overridesDir, moduleNames, strictDetect, includeSnippets, k8sManifestsDir, strictOverrides, includeSystemNode, enableEnvSoftGraph, cfnManifestsDir, codeqlSourceRoot, codeqlBuildCommand, repoManifestsDir, codeqlFallbackBuildCommand, strictIsolatedNodes, disableCdxgen).catch((err) => {
     console.error('[run-slice] FAILED:', err);
     process.exit(1);
   });

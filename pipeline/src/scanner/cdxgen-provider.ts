@@ -24,6 +24,27 @@ import * as path from 'path';
  */
 const CDXGEN_BIN = path.join(__dirname, '..', '..', 'node_modules', '.bin', 'cdxgen');
 
+/**
+ * Real, live-found gap (2026-09-07, reported chasing a fresh Bank of Anthos
+ * scan a downstream team reported taking "about an hour"): for a Java root,
+ * cdxgen doesn't just parse pom.xml — it shells out to a real local `mvn
+ * dependency:tree` against whatever Maven repository/mirror the caller's
+ * environment resolves (confirmed via `ps aux` while reproducing: a real
+ * `org.codehaus.plexus.classworlds.launcher.Launcher dependency:tree`
+ * process). With a cold local cache that's genuine network I/O — measured at
+ * just over 2 minutes for ONE Java service against an isolated empty cache
+ * on a normal connection. On a corporate network whose Maven proxy/
+ * Artifactory blocks or half-answers that call, the previously-unbounded
+ * execFileSync call had no way to fail fast — it just sat there for as long
+ * as the caller's TCP stack kept retrying, once per Java package root. This
+ * bound is deliberately generous (long enough that a real, working, merely
+ * slow cold-cache resolution — the case this project's own evidence shows —
+ * still succeeds) rather than tuned to make the failure mode fast; it exists
+ * to convert "silently eats the whole run" into a visible, attributable
+ * failure, not to make a slow-but-working network path snappy.
+ */
+const CDXGEN_TIMEOUT_MS = 5 * 60 * 1000;
+
 export interface CdxgenComponent {
   name: string;
   version?: string;
@@ -83,7 +104,7 @@ export function discoverCdxgenComponents(packageRoot: string): CdxgenComponent[]
   const typeArgs = projectTypes.flatMap((t) => ['-t', t]);
   const outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-cdxgen-')), 'bom.json');
   try {
-    execFileSync(CDXGEN_BIN, [...typeArgs, '--no-install-deps', '-o', outFile, packageRoot], { stdio: 'pipe' });
+    execFileSync(CDXGEN_BIN, [...typeArgs, '--no-install-deps', '-o', outFile, packageRoot], { stdio: 'pipe', timeout: CDXGEN_TIMEOUT_MS });
     if (!fs.existsSync(outFile)) return [];
     const bom = JSON.parse(fs.readFileSync(outFile, 'utf8'));
     const components: unknown[] = Array.isArray(bom?.components) ? bom.components : [];
@@ -101,7 +122,12 @@ export function discoverCdxgenComponents(packageRoot: string): CdxgenComponent[]
     // (detectPersistencePass's console.warn on a Graphify failure,
     // passes.ts). Still never fails a Weaver run (corroboration-only,
     // never load-bearing) — but now visible, not silent.
-    console.warn(`[cdxgen-provider] WARNING: cdxgen failed for ${packageRoot}, continuing without dependency corroboration: ${err}`);
+    const errWithSignal = err as { signal?: string; code?: string };
+    const timedOut = errWithSignal?.signal === 'SIGTERM' || errWithSignal?.code === 'ETIMEDOUT';
+    const timeoutNote = timedOut
+      ? ` (hit the ${CDXGEN_TIMEOUT_MS / 1000}s timeout — likely a slow/blocked Maven proxy or Artifactory mirror for this environment; --no-cdxgen skips this pass entirely)`
+      : '';
+    console.warn(`[cdxgen-provider] WARNING: cdxgen failed for ${packageRoot}${timeoutNote}, continuing without dependency corroboration: ${err}`);
     return [];
   } finally {
     fs.rmSync(path.dirname(outFile), { recursive: true, force: true });

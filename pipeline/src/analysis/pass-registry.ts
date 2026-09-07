@@ -67,6 +67,8 @@ export interface AnalysisContext {
   codeqlFallbackBuildCommand?: string;
   /** Set by run-slice.ts from --repo-manifests <dir>; crossRepoJoinPass (cross-repo-join-pass.ts) is a no-op when absent, same opt-in convention as k8sManifestsDir/cfnManifestsDir. */
   repoManifestsDir?: string;
+  /** Set by run-slice.ts from --no-cdxgen; cdxgenCorroborationPass is a no-op when true. Real, evidenced need (2026-09-07): cdxgen's Java support shells out to a real local `mvn dependency:tree` per package root, not just a manifest parse — on a machine whose Maven proxy/Artifactory blocks or stalls that call, this "Always"-on pass can silently consume most of a run's wall time. See BACKLOG.md's "cdxgen corroboration: unbounded network I/O, no opt-out" row. */
+  disableCdxgen?: boolean;
   /** Set by cfnRoutePass itself (real counts from its own run), read by coverage-report.ts's S5 flag. Both undefined when cfnManifestsDir was never provided — distinct from "0 real bindings found" (defined, both 0). */
   cfnRouteBindingsFound?: number;
   cfnRouteBindingsBound?: number;

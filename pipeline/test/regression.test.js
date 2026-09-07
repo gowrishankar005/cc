@@ -4437,6 +4437,25 @@ test('T-FS-4 — zero candidates AND 2+ real matches stays a named ignored item,
   }
 });
 
+test('--no-cdxgen: cdxgenCorroborationPass is a no-op and never calls discoverCdxgenComponents (real, live-found 2026-09-07 gap: cdxgen shells out to a real mvn dependency:tree per Java root, real network I/O with no prior opt-out)', () => {
+  const cdxgenProvider = require(path.join(PIPELINE_ROOT, 'dist/scanner/cdxgen-provider'));
+  const originalDiscover = cdxgenProvider.discoverCdxgenComponents;
+  let called = false;
+  cdxgenProvider.discoverCdxgenComponents = () => {
+    called = true;
+    return [];
+  };
+  delete require.cache[require.resolve(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'))];
+  const { cdxgenCorroborationPass } = require(path.join(PIPELINE_ROOT, 'dist/analysis/cdxgen-corroboration-pass'));
+  try {
+    const ctx = { packageRoots: ['/fake/root'], allUnits: [], allIgnoredItems: [], unitsByRoot: new Map(), disableCdxgen: true };
+    cdxgenCorroborationPass.run(ctx);
+    assert.equal(called, false, '--no-cdxgen must skip the pass before it ever shells out, not just discard the result');
+  } finally {
+    cdxgenProvider.discoverCdxgenComponents = originalDiscover;
+  }
+});
+
 test('T-CDX-2 (B-cdxgen-reuse) — no lockfile/manifest -> graceful empty result, never a crash (checked-in NestJS fixture has no package-lock.json)', () => {
   const { discoverCdxgenComponents } = require(path.join(PIPELINE_ROOT, 'dist/scanner/cdxgen-provider'));
   const components = discoverCdxgenComponents(path.join(PIPELINE_ROOT, 'test/fixtures/nestjs-sample'));
@@ -6409,6 +6428,17 @@ test('--no-auto-codeql suppresses both the --auto-codeql flag and the WEAVER_COD
   } finally {
     fs.rmSync(outDir1, { recursive: true, force: true });
     fs.rmSync(outDir2, { recursive: true, force: true });
+  }
+});
+
+test('--no-cdxgen: real CLI invocation skips the cdxgen corroboration pass end to end', () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'weaver-out-'));
+  const fixtureRoot = path.join(PIPELINE_ROOT, 'test/fixtures/cdxgen-sample');
+  try {
+    const output = execFileSync('node', [RUN_SLICE, fixtureRoot, '--out', outDir, '--no-cdxgen'], { encoding: 'utf8' });
+    assert.match(output, /--no-cdxgen: skipping dependency-manifest corroboration/, '--no-cdxgen must produce a visible, attributable skip line, not a silent no-op');
+  } finally {
+    fs.rmSync(outDir, { recursive: true, force: true });
   }
 });
 
