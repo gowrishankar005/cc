@@ -1,83 +1,102 @@
 # CALM AI Toolkit
 
-A reusable process + patch for turning `@finos/calm-cli`'s `calm init-ai` skill into
-something that reliably produces a complete, evidence-grounded `architecture.calm.json`
-from a real codebase — across repos, languages, and code-graph tools.
+Turn any codebase into a complete, validated `architecture.calm.json` — using FINOS
+`@finos/calm-cli`'s `/calm` skill, driven by a phased prompt process instead of one
+"build me the architecture" prompt.
 
-Born from a real, measured comparison (2026-09-10, Bank of Anthos + Apache Fineract):
-the `/calm` skill on its own is a schema reference library, not a workflow. Handed a
-single "build me the architecture" prompt, it produced good-but-inconsistent results —
-a real, fabricated (404) control-requirement URL on *every* run, and a real completeness
-gap (3 genuine domain packages silently skipped) on the run that used a code-graph index.
-Both are traceable to specific, fixable causes — not "LLMs are unreliable," a mechanism
-class each, same discipline this project applies everywhere else.
+On its own, the `/calm` skill is a schema reference, not a workflow. Handed a single
+broad prompt it produces good-but-inconsistent results: a fabricated (404)
+control-requirement URL on every run, and whole subsystems silently skipped. This
+toolkit is a **process** (`PHASED_EXTRACTION_PROCESS.md`) plus a **one-file patch**
+(`calm-skill-patches/`) that fix both, repo- and language-agnostically.
 
-## What's here
+---
 
-- **`PHASED_EXTRACTION_PROCESS.md`** — the actual reusable prompt pack. Six small,
-  ordered prompts instead of one mega-prompt. Copy-paste per repo; parametrized by
-  `{scope}` and whatever code-graph tool is actually available.
-- **`calm-skill-patches/control-creation.md`** — a drop-in replacement for
-  `.claude/skills/calm/calm-prompts/control-creation.md` that fixes the fabricated-URL
-  bug at its real source (see that file's own header for the diagnosis).
-- **`apply-patch.sh`** — copies the patched file over a repo's freshly-generated
-  `calm init-ai` output.
+## Quickstart
 
-## Two real findings this toolkit exists because of
+You need: Node.js, and an AI coding assistant that supports `calm init-ai`
+(Claude Code, GitHub Copilot, Kiro, or Codex).
 
-1. **The fabricated-URL bug is not vague hallucination — it's example-following.**
-   `control-creation.md`'s schema makes `requirement-url` required on every control,
-   and *every worked example in the file* uses a fictional-but-plausible domain
-   (`schemas.company.com`). The model doesn't invent randomly — it pattern-matches
-   the skill's own convention and substitutes the real target repo's real domain,
-   producing something that looks resolvable but 404s. The fix already exists in the
-   CLI (`--url-to-local-file-mapping`, documented in `calm-cli-instructions.md` for
-   exactly this "resources live in the repo but aren't public yet" case) — the skill
-   just never tells the agent to use it. Patched below.
+```bash
+# 1. install the CLI and scaffold the skill into your repo
+npm install -g @finos/calm-cli
+cd /path/to/your-repo
+calm init-ai -p claude          # or: copilot | kiro | codex
 
-2. **A single mega-prompt with a code-graph index silently drops whole subsystems.**
-   Measured, not assumed: given an index and one broad "build the architecture"
-   prompt, the run explored *less* broadly than a raw-source-reading run and missed 3
-   real subsystems entirely — the index makes deciding feel safe before enumeration is
-   done. The fix isn't "don't use code-graph tools," it's "make enumeration its own
-   explicit, ungapped step before any node decision," which is why the process below
-   starts there. (The initial comparison also suggested a large speed/cost win from
-   the index; an isolated re-test — same prompt, same skill, only the index varying —
-   put the real, repeatable payoff at ~20% cost / ~40% tokens, no speed change. See
-   the Verified section below.)
+# 2. apply the patch (fixes the fabricated-URL bug in the generated skill)
+/path/to/calm-ai-toolkit/calm-skill-patches/apply-patch.sh /path/to/your-repo
 
-## On guardrails: keep the non-negotiables short
+# 3. (optional but recommended) set up a code-graph tool for ~20% lower cost
+codegraph init && codegraph sync    # or graphify / codeql — the process doesn't care which
+```
 
-`calm init-ai` targets four different providers/models (Claude, Copilot, Kiro, Codex).
-A long wall of "NEVER do X" rules gets processed differently by each — some models
-over-comply (refuse to model anything they're not 100% sure of, tanking recall), others
-start ignoring rules once the list gets long. `PHASED_EXTRACTION_PROCESS.md` keeps to
-five sharp, load-bearing rules (enumerate first; one node per inventory item; cite
-evidence; never fake a URL; validate for real including dangling-node-ref checks) and
-leaves everything else as guidance/examples, not hard constraints. If a given model
-still doesn't comply well, the fix is usually pinning a more capable model for the
-invocation (`--model <a strong, recent model>`) or splitting a phase into its own
-separate prompt/call rather than adding another rule to the pile.
+Then open your AI assistant in the repo and run the phases from
+**`PHASED_EXTRACTION_PROCESS.md`** — either paste them one after another in a single
+session, or run each as its own prompt if the model drifts. In short, the phases are:
 
-## Verified (2026-09-10, real runs)
+1. **Inventory** — plain directory listing of every module/folder → a checklist.
+2. **Nodes** — one CALM node per checklist item (or an explicit merge/drop reason).
+3. **Relationships + interfaces** — only edges you can back with a real import/call/binding.
+4. **Controls** — each with a local `requirement.json` + `url-mapping.json` entry (never a fake URL).
+5. **Validate** — run `calm validate -a <file> -u url-mapping.json`, fix, repeat until clean.
+6. *(optional)* **Flows** — CALM's lightweight `flows` construct; detailed sequence diagrams stay a separate artifact.
 
-### The two bugs, fixed (Apache Fineract's fineract-core module, ~836 files)
+Output: `<repo>.architecture.json` (+ `controls/` + `url-mapping.json`), passing
+`calm validate` with zero errors.
 
-| | original single-prompt, unpatched skill, with codegraph | **refined: patched skill + phased prompt, with codegraph** |
-|---|---|---|
-| Nodes | 13 (missed 3 real subsystems) | **24** (all present) |
-| Relationships | 19 | **35** |
-| `calm validate` errors | 12 (fabricated URLs) | **0** |
-| Cost | $1.82 | $2.18 |
-| Duration | 10.3 min | 13.5 min |
+**Run it twice.** A single run's node/relationship counts aren't "the answer" — if two
+runs diverge by more than ~10-15%, tighten Phase 1's checklist (see the process doc).
 
-The refined process closes both gaps — the completeness loss from skipping explicit
-enumeration, and the fabricated-URL bug — for a ~20-30% cost premium over the broken
-version. That premium buys correctness; it is a fraction of the cost of getting
-completeness by brute-force reading every file with no code-graph tool ($3.55, the
-original no-codegraph run).
+---
 
-### Does a code-graph tool actually help? (isolated: same patched skill + phased prompt, only codegraph varies)
+## What's in here
+
+| File | What it is |
+|---|---|
+| `PHASED_EXTRACTION_PROCESS.md` | The reusable prompt pack — the six phases above, in full, with the rules and rationale. Copy-paste per repo. |
+| `calm-skill-patches/control-creation.md` | Drop-in replacement for the skill's generated `calm-prompts/control-creation.md`, fixing the fabricated-URL bug at its source. |
+| `calm-skill-patches/apply-patch.sh` | Copies that patched file over a repo's freshly-generated `calm init-ai` output (backs up the original). |
+
+## When to use this
+
+- **Good fit:** you have an existing codebase and want a high-level, service-and-
+  connection architecture model in CALM, fast, without hand-authoring it.
+- **Turn on a code-graph tool if:** you'll run this repeatedly or across many repos —
+  it's a steady ~20% cost / ~40% token saving (details below). For a genuine one-off,
+  the setup isn't worth it.
+- **Not what this is:** a deterministic, regression-testable, CI-gating extraction
+  pipeline. This is LLM-driven summarization — reproducible on *what gets covered*,
+  not on exact node granularity between runs.
+
+---
+
+## Background: the two bugs this fixes
+
+1. **The fabricated-URL bug is example-following, not vague hallucination.** The
+   skill's `control-creation.md` makes `requirement-url` required on every control,
+   and every worked example in it uses a fictional domain (`schemas.company.com`). The
+   model pattern-matches that convention and substitutes the real target repo's real
+   domain — producing a URL that looks resolvable but 404s. The fix already exists in
+   the CLI (`--url-to-local-file-mapping`, documented for exactly this "resources live
+   in the repo but aren't public" case); the skill just never points the agent at it.
+   The patch makes local requirement files + a URL mapping the default taught pattern,
+   using the RFC 2606 `.invalid` TLD for placeholder URLs.
+
+2. **A single broad prompt drops whole subsystems.** Given a code-graph index and one
+   "build the architecture" prompt, runs explored *less* broadly and missed real
+   subsystems entirely — the index makes deciding feel safe before enumeration is
+   done. The fix is making enumeration (Phase 1) its own explicit step, done the same
+   way with or without a code-graph tool, before any node decision.
+
+Keeping the rule list short is deliberate: `calm init-ai` targets four different
+models, and a long wall of "NEVER do X" gets processed differently by each (some
+over-comply and tank recall, others start ignoring it). The process keeps to five
+load-bearing rules and leaves the rest as guidance.
+
+## Background: does a code-graph tool actually help?
+
+Isolated test — same patched skill, same phased prompt, only the code-graph tool
+varies, across three repos of very different size and style:
 
 | Repo | | Cost | Tokens (cache-read) | Turns | Nodes / Rels | valid? |
 |---|---|---|---|---|---|---|
@@ -88,23 +107,35 @@ original no-codegraph run).
 | DI-heavy repo (~575 files, Guice) | with cg | $2.07 | 3.76M | 48 | 21 / 33 | 0 |
 | | no cg | $2.66 | 6.61M | 63 | 20 / 50 | **3** (dangling node refs) |
 
-**Consistent finding across all three:** with a code-graph tool = **~20% lower cost,
-~40% fewer tokens, ~25% fewer turns** — a roughly fixed discount that does *not* scale
-with repo size, does *not* vanish when the repo fits in context, and does *not* grow
-with dependency-injection density. **No** reliable speed benefit, **no** completeness
-or accuracy benefit. One weak signal (N=1): on the DI-heavy repo the no-codegraph run
-over-produced relationships and 3 referenced nodes it never defined; the codegraph run
-was sparser but valid.
+**Consistent across all three:** a code-graph tool = **~20% lower cost, ~40% fewer
+tokens, ~25% fewer turns** — a roughly fixed discount that does *not* scale with repo
+size, does *not* vanish when the repo fits in context, does *not* grow with
+dependency-injection density. **No** reliable speed benefit, **no** completeness or
+accuracy benefit. One weak signal (N=1): the no-codegraph DI-heavy run over-produced
+relationships and referenced 3 nodes it never defined; the codegraph run was sparser
+but valid.
 
-A vendor benchmark for one of these tools reports ~44% cost / ~62% token savings — but
-that's for targeted code *navigation*, where a file-reading baseline flails through
-30-40 tool calls chasing one call path. Architecture extraction is a survey task with
-far less of that waste, hence roughly half the payoff here.
+A vendor benchmark for one of these tools reports ~44% cost / ~62% token savings —
+that's for targeted code *navigation* (a file-reading baseline flailing through 30-40
+tool calls chasing one call path). Architecture extraction is a survey task with far
+less of that waste, hence roughly half the payoff here.
+
+### Bugs fixed — before/after (fineract-core, ~836 files)
+
+| | original broad prompt, unpatched skill | **this toolkit** |
+|---|---|---|
+| Nodes | 13 (missed 3 subsystems) | **24** (all present) |
+| Relationships | 19 | **35** |
+| `calm validate` errors | 12 (fabricated URLs) | **0** |
+| Cost | $1.82 | $2.18 |
+
+The ~20-30% cost premium over the broken version buys correctness — and is a fraction
+of the cost of getting completeness by brute-force reading every file with no
+code-graph tool ($3.55).
 
 ## Status
 
-Exploratory toolkit, not a Weaver capability. Lives outside `pipeline/` deliberately —
-this is a different tool for a different job (fast, LLM-driven architecture summarization
-from an existing codebase), evaluated as a complement to, not a replacement for, Weaver's
-deterministic pipeline. See the session's own comparison notes for what each is actually
-good at.
+Exploratory toolkit, evaluated as a complement to — not a replacement for — a
+deterministic architecture-extraction pipeline. Lives outside `pipeline/`
+deliberately: different tool, different job (fast LLM-driven summarization vs.
+deterministic, regression-tested extraction).
