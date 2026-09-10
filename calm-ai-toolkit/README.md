@@ -34,9 +34,12 @@ Then open your AI assistant in the repo and run the phases from
 **`PHASED_EXTRACTION_PROCESS.md`** — either paste them one after another in a single
 session, or run each as its own prompt if the model drifts. In short, the phases are:
 
-1. **Inventory** — plain directory listing of every module/folder → a checklist.
+0. **Query the graph** *(if you set up a code-graph tool)* — a few bulk queries against
+   its database for the module list and the whole cross-module edge graph, up front.
+1. **Inventory** — every module/folder → a one-line-each checklist (from Phase 0, or a
+   plain directory listing if you have no tool).
 2. **Nodes** — one CALM node per checklist item (or an explicit merge/drop reason).
-3. **Relationships + interfaces** — only edges you can back with a real import/call/binding.
+3. **Relationships + interfaces** — map Phase 0's edge graph to CALM edges; only ones you can back with a real import/call/binding.
 4. **Controls** — each with a local `requirement.json` + `url-mapping.json` entry (never a fake URL).
 5. **Validate** — run `calm validate -a <file> -u url-mapping.json`, fix, repeat until clean.
 6. *(optional)* **Flows** — CALM's lightweight `flows` construct; detailed sequence diagrams stay a separate artifact.
@@ -119,6 +122,12 @@ A vendor benchmark for one of these tools reports ~44% cost / ~62% token savings
 that's for targeted code *navigation* (a file-reading baseline flailing through 30-40
 tool calls chasing one call path). Architecture extraction is a survey task with far
 less of that waste, hence roughly half the payoff here.
+
+**Caveat: these numbers predate Phase 0.** The measured runs only used the
+symbol-question interface, loosely, in Phase 3 — they never ran the bulk database
+queries that get the whole module list and cross-module edge graph in a handful of
+statements. Phase 0 (added after this measurement) should push the payoff higher and
+cut turns further; not yet re-measured.
 
 ### Bugs fixed — before/after (fineract-core, ~836 files)
 

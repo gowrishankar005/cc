@@ -49,10 +49,12 @@ Synthesized from these tools' own guidance plus this toolkit's own multi-repo
 measurements (spring-petclinic 30 files, a ~575-file DI-heavy repo, an ~836-file
 module):
 
-1. **It's a targeted symbol/question tool, not a repo browser.** It answers "what does
-   X do, what calls it, what breaks if it changes" — not "list everything here."
-   Enumeration (Phase 1) is a plain directory listing, not a code-graph query. Feed
-   the code-graph tool names you already have.
+1. **Two faces: symbol interface vs. structural database.** The *symbol interface*
+   (`codegraph_explore` and friends) answers "what does X call, what breaks if it
+   changes" — it is not a repo browser, don't enumerate with it. The *underlying
+   database* (CodeGraph's SQLite, CodeQL's DB) IS a browser — a few bulk queries give
+   you the whole module list and the whole cross-module edge graph, deterministically.
+   Phase 0 uses the database; Phase 3's disambiguation uses the symbol interface.
 2. **Batch names into one query; don't loop one-symbol-per-call.** Every extra call is
    turns and tokens for no extra ground truth.
 3. **Its returned source counts as already read.** If a query already returned a
@@ -60,9 +62,11 @@ module):
 4. **Lean on it hardest for Phase 3.** Its real edge over grep is indirect wiring —
    interface-to-implementation, dependency injection, dynamic dispatch — that a
    literal text search can't follow.
-5. **A structural index is not a substitute for Phase 1.** Given an index, models
-   explore *less* broadly, not more — the index makes deciding feel safe before
-   enumeration is done. Do Phase 1 the same way with or without a code-graph tool.
+5. **An index doesn't excuse skipping enumeration.** Given only a symbol interface and
+   a broad prompt, models explore *less* broadly, not more — it makes deciding feel
+   safe before the module list is complete. Phase 0's bulk queries (or a plain
+   directory listing without a tool) produce that list explicitly; don't start Phase 2
+   without it.
 6. **Refresh the index before the run, not after.** A stale index answering
    confidently about since-changed code is worse than no index.
 
@@ -87,9 +91,13 @@ where token budget compounds; skip the setup for a genuine one-off.
 > tokens — but that's for *targeted code navigation* ("answer this question", "make
 > this change"), where a file-reading baseline burns 30-40 tool calls chasing one
 > call path. Broad architecture extraction is a survey task with far less of that
-> waste to remove, which is why the measured payoff here is roughly half. A more
-> code-graph-forced prompt (drop Phase 1's `find`, route Phase 3 entirely through the
-> tool) would likely narrow the gap — untested.
+> waste to remove.
+>
+> **The ~20%/~40% number above was measured BEFORE Phase 0 existed** — those runs
+> only used the symbol-question interface loosely in Phase 3, never the bulk database
+> queries. Phase 0 (get the module list and the entire cross-module edge graph in a
+> handful of SQL statements instead of many `codegraph_explore` calls) should push
+> the payoff meaningfully higher and cut turns further — not yet re-measured.
 
 ## Setup (once per repo)
 
@@ -107,15 +115,55 @@ If this repo's generated `control-creation.md` still has the fabricated-URL bug
 
 ---
 
+## Phase 0 — Query the structural graph (skip if no code-graph tool)
+
+A code-graph tool has two faces: a **symbol-question interface** (`codegraph_explore`,
+"what does X call") and an **underlying structural database** (CodeGraph's SQLite,
+CodeQL's database, etc.). The symbol interface is *not* a repo browser — but the
+database is, and it answers Phases 1 and 3 deterministically and completely in a
+handful of queries. Do this first.
+
+```
+Using your code-graph tool's underlying database / bulk-query capability (NOT its
+one-symbol-at-a-time lookup), get these answered and keep the results:
+
+  A. MODULE INVENTORY — every top-level module / package / namespace under {scope},
+     with a count of types (class/interface/enum) and files in each. This is the
+     raw material for Phase 1's checklist.
+
+  B. CROSS-BOUNDARY EDGE LIST — every edge (call, import, implements, extends,
+     instantiates) whose two ends are in DIFFERENT modules from (A), grouped by
+     (from-module, to-module, edge-kind) with a count. This is the raw material
+     for Phase 3 — the real inter-component wiring, exhaustive, no exploration
+     needed.
+
+  C. INTERFACE -> IMPLEMENTATION and inheritance edges (implements / extends) —
+     the resolved dynamic-dispatch wiring a text search can't follow.
+
+  D. ANNOTATION / DECORATOR usage per module (e.g. controller/resource/service/
+     entity/config markers) — signals which modules expose APIs, hold data, or
+     are pure configuration.
+
+  E. GENERATED FILES, if the tool tracks them — so Phase 2 can exclude them
+     without guessing.
+
+Print (A) and (B) verbatim; you will reference them by name in later phases.
+```
+
+See the **CodeGraph SQL appendix** at the end for copy-pasteable queries; for
+CodeQL, express the same five as `.ql` queries; for other tools, use their bulk API.
+
 ## Phase 1 — Inventory
 
 ```
-List every top-level module / package / folder / namespace under {scope} using a
-plain directory listing (find/ls/glob) — NOT your code-graph tool, which answers
-symbol questions, not "what exists here". For each item, open enough of it (or
-query your code-graph tool by the real names you now have) to write a one-line
-summary of what it actually contains, from real files/symbols — not inference from
-the name alone.
+Build the checklist from Phase 0's MODULE INVENTORY (A) if you have it. If you have
+no code-graph tool, list every top-level module / package / folder / namespace under
+{scope} with a plain directory listing (find/ls/glob) instead — do NOT use the
+symbol-question interface for this, it is not a repo browser.
+
+For each item, write a one-line summary of what it actually contains, from real
+files/symbols (Phase 0's (D) annotation data and a quick look at the largest few
+files per module) — not inference from the name alone.
 
 Do not skip anything: include things that look like plumbing, infrastructure,
 generated code, config, or glue. List them; you can mark them out of scope in
@@ -147,11 +195,19 @@ Follow node-creation.md's schema exactly. Do not create relationships or interfa
 ## Phase 3 — Relationships + interfaces (evidence-gated)
 
 ```
-For each node, find REAL edges to other nodes you defined in Phase 2 — using your
-code-graph tool's call-path / import / binding / reference lookup (batch the names),
-or direct source reading if no such tool exists. Pay attention to indirect wiring:
-dependency injection, interface-to-implementation, plugin/registry dispatch, event
-listeners, config-driven targets.
+START from Phase 0's CROSS-BOUNDARY EDGE LIST (B) and INTERFACE->IMPL edges (C).
+Every candidate relationship between two nodes should trace to one or more of those
+edges. Map each (from-module -> to-module, kind, count) row onto a CALM relationship
+between the corresponding nodes; a high count is a strong edge, a count of 1-2 is
+worth a look but may be incidental (a shared exception type, a constant).
+
+Use the symbol-question interface (codegraph_explore, batched) only to DISAMBIGUATE
+a specific edge — "is this call the real integration point or just a logging util" —
+not to rediscover the graph Phase 0 already gave you.
+
+If you have no code-graph tool, read source directly for the same wiring: imports,
+calls, dependency injection, interface-to-implementation, plugin/registry dispatch,
+event listeners, config-driven targets.
 
 Only emit a relationship backed by a concrete import, call, binding, route
 registration, or config reference you can name — put the evidence in the
@@ -250,3 +306,63 @@ PlantUML / Mermaid sequence diagram as its own artifact.
 - If output is inconsistent across runs, pin a specific capable model (`--model
   <model-id>`) before adding more guardrail text — a capability gap looks like a
   compliance gap but isn't fixed the same way.
+
+---
+
+## CodeGraph SQL appendix (Phase 0)
+
+CodeGraph stores its index in `.codegraph/codegraph.db` (SQLite). Tables: `nodes`
+(`id, kind, name, qualified_name, file_path, language, decorators` JSON, ...),
+`edges` (`source, target, kind` — one of `contains|calls|references|imports|
+instantiates|decorates|implements|extends`), `files` (`path, generated`).
+**Schema is version-specific and undocumented — verify with `sqlite3 <db> .schema`
+before relying on these.** For CodeQL, express the same intent as `.ql`; for other
+tools, use their bulk API.
+
+Set `PKG` to the path fragment that marks your source root (e.g. `/org/apache/foo/`,
+`/src/`, `/lib/`). These derive "module" as the first path segment after it.
+
+**(A) Module inventory**
+```sql
+WITH m AS (SELECT CASE WHEN instr(file_path,'PKG')>0
+    THEN substr(substr(file_path,instr(file_path,'PKG')+length('PKG')),1,
+         instr(substr(file_path,instr(file_path,'PKG')+length('PKG'))||'/','/')-1)
+    ELSE '(other)' END AS module, id
+  FROM nodes WHERE kind IN ('class','interface','enum','function'))
+SELECT module, COUNT(*) type_count FROM m GROUP BY module ORDER BY 2 DESC;
+```
+
+**(B) Cross-boundary edge list** — the Phase 3 raw material
+```sql
+WITH mod AS (SELECT id, CASE WHEN instr(file_path,'PKG')>0
+    THEN substr(substr(file_path,instr(file_path,'PKG')+length('PKG')),1,
+         instr(substr(file_path,instr(file_path,'PKG')+length('PKG'))||'/','/')-1)
+    ELSE '(other)' END AS module FROM nodes)
+SELECT sm.module AS from_mod, tm.module AS to_mod, e.kind, COUNT(*) n
+FROM edges e JOIN mod sm ON e.source=sm.id JOIN mod tm ON e.target=tm.id
+WHERE sm.module <> tm.module
+  AND e.kind IN ('calls','imports','implements','extends','instantiates')
+GROUP BY from_mod, to_mod, e.kind ORDER BY n DESC;
+```
+
+**(C) Interface → implementation / inheritance**
+```sql
+SELECT s.qualified_name impl, t.qualified_name iface, e.kind
+FROM edges e JOIN nodes s ON e.source=s.id JOIN nodes t ON e.target=t.id
+WHERE e.kind IN ('implements','extends') ORDER BY iface;
+```
+
+**(D) Annotation / decorator usage** (JSON parsing of `decorators` is unreliable —
+match as text)
+```sql
+SELECT file_path, name, decorators FROM nodes
+WHERE decorators LIKE '%Controller%' OR decorators LIKE '%RestController%'
+   OR decorators LIKE '%"Path"%' OR decorators LIKE '%Service%'
+   OR decorators LIKE '%Entity%'  OR decorators LIKE '%Configuration%'
+   OR decorators LIKE '%Repository%';
+```
+
+**(E) Generated files** (only if populated — often `0` for every row)
+```sql
+SELECT path FROM files WHERE generated = 1;
+```
